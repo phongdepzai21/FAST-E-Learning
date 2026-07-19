@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing roles and creation metadata",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Lowercase email address of the user" },
+        "displayName": { "type": "string", "description": "Display name of the user" },
+        "createdAt": { "type": "string", "description": "ISO 8601 creation timestamp string" },
+        "isVip": { "type": "boolean", "description": "Flag indicating if user is a VIP subscriber" },
+        "isAdmin": { "type": "boolean", "description": "Flag indicating if user is an Administrator" },
+        "isTeacher": { "type": "boolean", "description": "Flag indicating if user is a Teacher" },
+        "updatedAt": { "type": "string", "description": "ISO 8601 update timestamp string" }
+      },
+      "required": ["email"]
+    },
+    "PurchasedCourse": {
+      "title": "PurchasedCourse",
+      "description": "A record of registration or purchase of a course by a user",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string", "description": "ID of the registered course" },
+        "courseTitle": { "type": "string", "description": "Name/Title of the course" },
+        "purchasedAt": { "type": "string", "description": "ISO timestamp when registered" },
+        "price": { "type": "string", "description": "Registration cost or price" },
+        "status": { "type": "string", "description": "Status of the course registration" },
+        "progress": { "type": "integer", "description": "Course completion progress (0-100)" },
+        "updatedAt": { "type": "string", "description": "ISO update timestamp string" }
+      },
+      "required": ["courseId"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Master data record for dynamic courses listed on the platform",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Course title" },
+        "price": { "type": "string", "description": "Formatted tuition price" },
+        "image": { "type": "string", "description": "Banner photo URL" },
+        "category": { "type": "string", "description": "Subject category group" },
+        "description": { "type": "string", "description": "Detailed description of the course content" }
+      },
+      "required": ["title"]
+    }
+  },
+  "firestore": {
+    "users/{userEmail}": {
+      "schema": "User",
+      "description": "User accounts mapped by their lowercased email addresses"
+    },
+    "users/{userEmail}/purchased_courses/{courseId}": {
+      "schema": "PurchasedCourse",
+      "description": "A subcollection tracking course enrollment details and progression per user"
+    },
+    "courses/{courseId}": {
+      "schema": "Course",
+      "description": "Platform course documents editable by admins and teachers"
+    }
+  }
+}

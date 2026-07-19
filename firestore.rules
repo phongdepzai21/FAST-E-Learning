@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- GLOBAL SAFETY NET (DEFAULT DENY ALL) ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- UTILITIES AND SECURITY HELPER PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\+\\.\\@]+$');
+    }
+
+    function isOwner(userEmail) {
+      return isSignedIn() && 
+             request.auth.token.email != null && 
+             request.auth.token.email.toLowerCase() == userEmail.toLowerCase();
+    }
+
+    // Check if the current user email belongs to a bootstrapped Admin or has Admin role in DB
+    function isBootstrapAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email != null && 
+             request.auth.token.email.toLowerCase() == 'h1h4phong@gmail.com';
+    }
+
+    function getUserData(email) {
+      return get(/databases/$(database)/documents/users/$(email.toLowerCase())).data;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        isSignedIn() && 
+        request.auth.token.email != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.token.email.toLowerCase())) &&
+        getUserData(request.auth.token.email).isAdmin == true
+      );
+    }
+
+    function isTeacher() {
+      return isBootstrapAdmin() || (
+        isSignedIn() && 
+        request.auth.token.email != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.token.email.toLowerCase())) &&
+        (getUserData(request.auth.token.email).isTeacher == true || getUserData(request.auth.token.email).isAdmin == true)
+      );
+    }
+
+    // --- VALIDATION BLUEPRINTS ---
+    
+    // User Profile schema validation
+    function isValidUser(data) {
+      return data.email is string && 
+             data.email.size() > 3 && 
+             data.email.size() <= 128;
+    }
+
+    // Purchased Course schema validation
+    function isValidPurchasedCourse(data) {
+      return data.courseId is string && 
+             data.courseId.size() > 0 && 
+             data.courseId.size() <= 128;
+    }
+
+    // Course master schema validation
+    function isValidCourse(data) {
+      return data.title is string && 
+             data.title.size() > 0 && 
+             data.title.size() <= 200;
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Users Collection
+    match /users/{userEmail} {
+      allow get: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+      allow list: if isAdmin() || isTeacher(); 
+      
+      // Allow creation of user profile if they are the owner and schema is validated
+      allow create: if isSignedIn() && 
+                       isOwner(userEmail) && 
+                       isValidId(userEmail) && 
+                       isValidUser(request.resource.data) &&
+                       // Prevent self-assigned roles during creation (unless verified bootstrap admin)
+                       (isBootstrapAdmin() || (
+                         request.resource.data.get('isAdmin', false) == false && 
+                         request.resource.data.get('isTeacher', false) == false
+                       ));
+
+      // Allow updates to user profile
+      allow update: if isSignedIn() && (
+        // Admin or Bootstrap Admin has unrestricted update
+        isAdmin() || 
+        // User themselves can update, but must validate schema and are restricted from escalating their roles
+        (
+          isOwner(userEmail) && 
+          isValidUser(request.resource.data) && 
+          (
+            // Prevent changing administrative roles
+            (
+              request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false) &&
+              request.resource.data.get('isTeacher', false) == resource.data.get('isTeacher', false)
+            ) || isBootstrapAdmin()
+          )
+        )
+      );
+
+      // Only Admin or Bootstrap Admin can delete a user account
+      allow delete: if isAdmin();
+
+      // 1.1 Subcollection: Purchased Courses tracked per user
+      match /purchased_courses/{courseId} {
+        allow get: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+        
+        // Secure listing of purchased courses to prevent query scraping
+        allow list: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+
+        allow create: if isSignedIn() && 
+                         (isOwner(userEmail) || isAdmin()) && 
+                         isValidId(courseId) && 
+                         isValidPurchasedCourse(request.resource.data);
+
+        allow update: if isSignedIn() && 
+                         (isOwner(userEmail) || isAdmin()) && 
+                         isValidPurchasedCourse(request.resource.data);
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // 2. Courses Collection (Master database of courses)
+    match /courses/{courseId} {
+      // Publicly viewable by anyone (including unauthenticated visitors)
+      allow get, list: if true;
+
+      // Only teachers or administrators can modify courses
+      allow create: if (isAdmin() || isTeacher()) && 
+                       isValidId(courseId) && 
+                       isValidCourse(request.resource.data);
+
+      allow update: if (isAdmin() || isTeacher()) && 
+                       isValidCourse(request.resource.data);
+
+      allow delete: if isAdmin() || isTeacher();
+    }
+  }
+}
