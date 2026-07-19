@@ -5,6 +5,24 @@ import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES } from '../constants';
 import { Course } from '../types';
 
+const promiseWithTimeout = <T,>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(errorMsg));
+    }, ms);
+
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+};
+
 interface TeacherDashboardProps {
   userEmail: string;
 }
@@ -49,7 +67,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const fetchAllCourses = async () => {
     setIsLoadingCourses(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'courses'));
+      const querySnapshot = await promiseWithTimeout(
+        getDocs(collection(db, 'courses')),
+        8000,
+        'Không thể đồng bộ dữ liệu khóa học mới nhất từ Firebase (Quá thời gian phản hồi).'
+      );
       const firestoreCourses: Course[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -78,8 +100,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         }
       });
       setCourses(combined);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error reading courses:", err);
+      // Fallback to local hardcoded templates
+      setCourses(HARDCODED_COURSES);
+      setMessage({
+        type: 'error',
+        text: 'Đang hiển thị dữ liệu mẫu do không đồng bộ được từ cơ sở dữ liệu Firebase (Quá thời gian phản hồi). Nếu bạn đang dùng Iframe, vui lòng chọn "Mở trong tab mới" ở góc trên bên phải để tránh bị chặn kết nối.'
+      });
     } finally {
       setIsLoadingCourses(false);
     }
@@ -241,8 +269,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       if (imageFile) {
         try {
           const storageRef = ref(storage, `course_covers/${courseId}_${imageFile.name}`);
-          await uploadBytes(storageRef, imageFile);
-          finalImageUrl = await getDownloadURL(storageRef);
+          await promiseWithTimeout(
+            uploadBytes(storageRef, imageFile),
+            10000,
+            'Không thể tải ảnh lên Storage (Quá thời gian phản hồi).'
+          );
+          finalImageUrl = await promiseWithTimeout(
+            getDownloadURL(storageRef),
+            10000,
+            'Không thể lấy link tải ảnh (Quá thời gian phản hồi).'
+          );
         } catch (storageError: any) {
           console.error('Storage upload error:', storageError);
           throw new Error('Lỗi lưu ảnh lên Storage (Dán URL ảnh để dùng tiện nhất): ' + storageError.message);
@@ -262,11 +298,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         createdAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'courses', courseId), newCourse);
+      await promiseWithTimeout(
+        setDoc(doc(db, 'courses', courseId), newCourse),
+        10000,
+        'Không thể lưu thông tin khóa học mới lên Firebase (Quá thời gian phản hồi). Nếu bạn đang mở trang web trong khung xem trước (Iframe) của AI Studio, vui lòng chọn nút "Mở trong tab mới" (Open in a new tab) ở góc trên bên phải để tránh bị trình duyệt chặn kết nối Firebase.'
+      );
       
       setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
       resetForm();
-      await fetchAllCourses();
+      fetchAllCourses();
       setTimeout(() => setActiveTab('list'), 1500);
     } catch (err: any) {
       console.error('Add course error:', err);
@@ -295,8 +335,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       if (imageFile) {
         try {
           const storageRef = ref(storage, `course_covers/${editingCourseId}_${imageFile.name}`);
-          await uploadBytes(storageRef, imageFile);
-          finalImageUrl = await getDownloadURL(storageRef);
+          await promiseWithTimeout(
+            uploadBytes(storageRef, imageFile),
+            10000,
+            'Không thể tải ảnh bìa mới lên Storage (Quá thời gian phản hồi).'
+          );
+          finalImageUrl = await promiseWithTimeout(
+            getDownloadURL(storageRef),
+            10000,
+            'Không thể lấy link tải ảnh bìa mới (Quá thời gian phản hồi).'
+          );
         } catch (storageError: any) {
           console.error('Storage edit upload error:', storageError);
           throw new Error('Tải ảnh bìa mới thất bại: ' + storageError.message);
@@ -315,9 +363,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
+      await promiseWithTimeout(
+        setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true }),
+        10000,
+        'Không thể cập nhật thông tin khóa học lên Firebase (Quá thời gian phản hồi). Nếu bạn đang mở trang web trong khung xem trước (Iframe) của AI Studio, vui lòng chọn nút "Mở trong tab mới" (Open in a new tab) ở góc trên bên phải để tránh bị trình duyệt chặn kết nối Firebase.'
+      );
       setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
-      await fetchAllCourses();
+      fetchAllCourses();
       setTimeout(() => {
         setActiveTab('list');
         resetForm();
