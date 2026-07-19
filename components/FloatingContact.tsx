@@ -84,7 +84,7 @@ const FloatingContact: React.FC = () => {
       THÔNG TIN LIÊN HỆ CÔNG TY:
       - Hotline/Zalo: 0898 419 149
       - Email: hkc.qms@gmail.com
-      - Địa chỉ: Cityland Park Hills, Gò Vấp, TP.HCM
+      - Địa chỉ: Tòa Mộc Gia, Tầng 6, Số 238-240-242 Đường Nguyễn Oanh, Phường Gò Vấp, TP.HCM, Việt Nam
 
       DANH SÁCH KHÓA HỌC HIỆN CÓ:
       ${courseData}

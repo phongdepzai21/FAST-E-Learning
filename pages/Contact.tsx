@@ -161,7 +161,7 @@ const Contact: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest mb-1 font-bold">Địa chỉ văn phòng</p>
-                  <p className="text-gray-700 text-2xl leading-tight font-black">Cityland Park Hills, Phường Gò Vấp, TP.HCM</p>
+                  <p className="text-gray-700 text-2xl leading-tight font-black">Tòa Mộc Gia, Tầng 6, Số 238-240-242 Đường Nguyễn Oanh, Phường Gò Vấp, TP.HCM, Việt Nam</p>
                 </div>
               </div>
             </div>
