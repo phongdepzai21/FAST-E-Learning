@@ -55,22 +55,27 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                             </div>
                         </div>
 
-                        <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
-                            <p className="text-xs font-bold text-blue-600 mb-3 uppercase tracking-wider text-center">Quét mã QR để thanh toán tự động</p>
-                            <div className="flex justify-center mb-4">
-                                {/* Placeholder cho VNPay/Momo QR Code */}
-                                <div className="w-40 h-40 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
+                        <div className="bg-pink-50/50 p-5 rounded-2xl border border-pink-100">
+                            <p className="text-xs font-bold text-[#A50064] mb-3 uppercase tracking-wider text-center">Hướng dẫn thanh toán MoMo Doanh Nghiệp</p>
+                            <div className="flex flex-col md:flex-row items-center gap-6 justify-center mb-4">
+                                <div className="w-40 h-40 bg-white p-2 rounded-xl shadow-sm border border-pink-200 shrink-0">
                                     <div className="w-full h-full bg-[url('https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg')] bg-contain bg-no-repeat bg-center opacity-80"></div>
                                 </div>
-                            </div>
-                            <div className="text-center space-y-2">
-                                <p className="text-[11px] font-medium text-gray-500">Hoặc chuyển khoản thủ công tới:</p>
-                                <div className="bg-white p-3 rounded-xl border border-gray-100 font-mono text-sm font-bold text-gray-800">
-                                    NH TECHCOMBANK <br/>
-                                    1903 0000 000 000 <br/>
-                                    CTK: CTCP ĐÀO TẠO FAST
+                                <div className="text-left space-y-3">
+                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 1:</strong> Mở ứng dụng MoMo.</p>
+                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 2:</strong> Chọn "Quét Mã" và quét mã QR bên cạnh.</p>
+                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 3:</strong> Nhập số tiền <strong>{course.price}</strong> và nội dung:</p>
+                                    <div className="bg-white p-2 rounded-lg border border-pink-100 font-mono text-sm font-bold text-[#A50064] inline-block">
+                                        FAST {course.id.slice(0, 5).toUpperCase()}
+                                    </div>
                                 </div>
-                                <p className="text-xs font-bold text-red-500 mt-2">Nội dung CK: <span className="text-gray-800 bg-white px-2 py-1 rounded border">FAST {course.id.slice(0, 5).toUpperCase()}</span></p>
+                            </div>
+                            <div className="text-center space-y-2 mt-4 pt-4 border-t border-pink-100/50">
+                                <p className="text-[11px] font-medium text-gray-500">Thông tin tài khoản MoMo Doanh Nghiệp:</p>
+                                <div className="bg-white p-3 rounded-xl border border-pink-100 font-mono text-sm font-bold text-gray-800 inline-block">
+                                    Ví MoMo: 0898 419 149 <br/>
+                                    CTK: CÔNG TY TNHH ĐÀO TẠO FAST
+                                </div>
                             </div>
                         </div>
 

@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { COURSES, CONSULTING_SERVICES, TEAM } from '../constants';
-import { GoogleGenAI } from "@google/genai";
 
 interface Message {
   role: 'user' | 'model';
@@ -84,7 +83,7 @@ const FloatingContact: React.FC = () => {
       THÔNG TIN LIÊN HỆ CÔNG TY:
       - Hotline/Zalo: 0898 419 149
       - Email: hkc.qms@gmail.com
-      - Địa chỉ: Tòa Mộc Gia, Tầng 6, Số 238-240-242 Đường Nguyễn Oanh, Phường Gò Vấp, TP.HCM, Việt Nam
+      - Địa chỉ: Cityland Park Hills, Gò Vấp, TP.HCM
 
       DANH SÁCH KHÓA HỌC HIỆN CÓ:
       ${courseData}
@@ -115,61 +114,57 @@ const FloatingContact: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Safe access to API Key to prevent crash if process is undefined in some envs
-      // The instruction says we must use process.env.API_KEY, but checking existence prevents runtime crash.
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("API Key not configured");
-
-      // Khởi tạo Gemini Client
-      const ai = new GoogleGenAI({ apiKey });
-      
-      // Sử dụng model Flash cho tốc độ phản hồi nhanh
-      const model = 'gemini-3-flash-preview';
-
-      // QUAN TRỌNG: Lọc bỏ tin nhắn đầu tiên (Lời chào của Bot) khỏi lịch sử gửi đi
-      // API Gemini yêu cầu lịch sử phải bắt đầu bằng User hoặc System Instruction
-      const historyContents = messages
-        .slice(1) // Bỏ qua phần tử đầu tiên (Lời chào)
-        .map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.text }]
-        }));
-      
-      // Thêm tin nhắn mới nhất của user
-      historyContents.push({ role: 'user', parts: [{ text: userMessage }] });
-
-      // Gọi API với chế độ Streaming
-      const responseStream = await ai.models.generateContentStream({
-        model: model,
-        contents: historyContents,
-        config: {
-          systemInstruction: systemContext,
-          temperature: 0.7, // Sáng tạo vừa phải
-          maxOutputTokens: 500, // Giới hạn độ dài để trả lời nhanh
-        }
+      const response = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, systemContext }),
       });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let fullText = "";
 
       // Tạo tin nhắn placeholder cho model
       setMessages(prev => [...prev, { role: 'model', text: '' }]);
 
-      let fullText = "";
-      
-      for await (const chunk of responseStream) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          fullText += chunkText;
-          setMessages(prev => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            // Chỉ cập nhật nếu tin nhắn cuối là của model (tránh race condition)
-            if (lastMsg.role === 'model') {
-                updated[updated.length - 1] = { ...lastMsg, text: fullText };
+      while (reader) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6);
+            if (dataStr === '[DONE]') continue;
+            
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              if (data.text) {
+                fullText += data.text;
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  if (lastMsg.role === 'model') {
+                    updated[updated.length - 1] = { ...lastMsg, text: fullText };
+                  }
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // ignore parse errors
             }
-            return updated;
-          });
+          }
         }
       }
-
     } catch (error: any) {
       console.error("AI Chat Error Full Details:", error);
       
