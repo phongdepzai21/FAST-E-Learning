@@ -12,46 +12,50 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\+\\.\\@]+$');
+    function getUserEmail() {
+      return isSignedIn() && request.auth.token.get('email', null) != null
+        ? request.auth.token.email.toLowerCase()
+        : '';
+    }
+
+    // Check if the current user email belongs to a bootstrapped Admin/Teacher
+    function isBootstrapAdmin() {
+      return isSignedIn() && (
+        getUserEmail() == 'h1h4phong@gmail.com' ||
+        getUserEmail() == 'hkc.qms@gmail.com' ||
+        getUserEmail() == 'trdung153@gmail.com'
+      );
     }
 
     function isOwner(userEmail) {
-      return isSignedIn() && 
-             request.auth.token.email != null && 
-             request.auth.token.email.toLowerCase() == userEmail.toLowerCase();
+      return isSignedIn() && (
+        getUserEmail() == userEmail.toLowerCase() ||
+        (request.auth.uid != null && request.auth.uid == userEmail)
+      );
     }
 
-    // Check if the current user email belongs to a bootstrapped Admin or has Admin role in DB
-    function isBootstrapAdmin() {
-      return isSignedIn() && 
-             request.auth.token.email != null && 
-             (
-               request.auth.token.email.toLowerCase() == 'h1h4phong@gmail.com' ||
-               request.auth.token.email.toLowerCase() == 'hkc.qms@gmail.com' ||
-               request.auth.token.email.toLowerCase() == 'trdung153@gmail.com'
-             );
-    }
-
-    function getUserData(email) {
-      return get(/databases/$(database)/documents/users/$(email.toLowerCase())).data;
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function isAdmin() {
       return isBootstrapAdmin() || (
         isSignedIn() && 
-        request.auth.token.email != null && 
-        exists(/databases/$(database)/documents/users/$(request.auth.token.email.toLowerCase())) &&
-        getUserData(request.auth.token.email).isAdmin == true
+        getUserEmail() != '' &&
+        exists(/databases/$(database)/documents/users/$(getUserEmail())) &&
+        get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true
       );
     }
 
     function isTeacher() {
       return isBootstrapAdmin() || (
         isSignedIn() && 
-        request.auth.token.email != null && 
-        exists(/databases/$(database)/documents/users/$(request.auth.token.email.toLowerCase())) &&
-        (getUserData(request.auth.token.email).isTeacher == true || getUserData(request.auth.token.email).isAdmin == true)
+        getUserEmail() != '' &&
+        exists(/databases/$(database)/documents/users/$(getUserEmail())) &&
+        (
+          get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isTeacher', false) == true ||
+          get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true
+        )
       );
     }
 
@@ -59,23 +63,18 @@ service cloud.firestore {
     
     // User Profile schema validation
     function isValidUser(data) {
-      return data.email is string && 
-             data.email.size() > 3 && 
-             data.email.size() <= 128;
+      return data.get('email', '') is string;
     }
 
     // Purchased Course schema validation
     function isValidPurchasedCourse(data) {
-      return data.courseId is string && 
-             data.courseId.size() > 0 && 
-             data.courseId.size() <= 128;
+      return data.get('courseId', '') is string;
     }
 
     // Course master schema validation
     function isValidCourse(data) {
-      return data.title is string && 
-             data.title.size() > 0 && 
-             data.title.size() <= 500;
+      return data.get('title', '') is string && 
+             data.get('title', '').size() > 0;
     }
 
     // --- COLLECTION RULES ---
@@ -85,55 +84,14 @@ service cloud.firestore {
       allow get: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
       allow list: if isAdmin() || isTeacher(); 
       
-      // Allow creation of user profile if they are the owner and schema is validated
-      allow create: if isSignedIn() && 
-                       isOwner(userEmail) && 
-                       isValidId(userEmail) && 
-                       isValidUser(request.resource.data) &&
-                       // Prevent self-assigned roles during creation (unless verified bootstrap admin)
-                       (isBootstrapAdmin() || (
-                         request.resource.data.get('isAdmin', false) == false && 
-                         request.resource.data.get('isTeacher', false) == false
-                       ));
-
-      // Allow updates to user profile
-      allow update: if isSignedIn() && (
-        // Admin or Bootstrap Admin has unrestricted update
-        isAdmin() || 
-        // User themselves can update, but must validate schema and are restricted from escalating their roles
-        (
-          isOwner(userEmail) && 
-          isValidUser(request.resource.data) && 
-          (
-            // Prevent changing administrative roles
-            (
-              request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false) &&
-              request.resource.data.get('isTeacher', false) == resource.data.get('isTeacher', false)
-            ) || isBootstrapAdmin()
-          )
-        )
-      );
-
-      // Only Admin or Bootstrap Admin can delete a user account
-      allow delete: if isAdmin();
+      allow create, update: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+      allow delete: if isAdmin() || isBootstrapAdmin();
 
       // 1.1 Subcollection: Purchased Courses tracked per user
       match /purchased_courses/{courseId} {
-        allow get: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-        
-        // Secure listing of purchased courses to prevent query scraping
-        allow list: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-
-        allow create: if isSignedIn() && 
-                         (isOwner(userEmail) || isAdmin()) && 
-                         isValidId(courseId) && 
-                         isValidPurchasedCourse(request.resource.data);
-
-        allow update: if isSignedIn() && 
-                         (isOwner(userEmail) || isAdmin()) && 
-                         isValidPurchasedCourse(request.resource.data);
-
-        allow delete: if isAdmin();
+        allow get, list: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+        allow create, update: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
+        allow delete: if isAdmin() || isTeacher();
       }
     }
 
@@ -142,15 +100,8 @@ service cloud.firestore {
       // Publicly viewable by anyone (including unauthenticated visitors)
       allow get, list: if true;
 
-      // Only teachers or administrators can modify courses
-      allow create: if (isAdmin() || isTeacher()) && 
-                       isValidId(courseId) && 
-                       isValidCourse(request.resource.data);
-
-      allow update: if (isAdmin() || isTeacher()) && 
-                       isValidCourse(request.resource.data);
-
-      allow delete: if isAdmin() || isTeacher();
+      // Teachers, administrators, or bootstrap admins can create, update, delete courses
+      allow create, update, delete: if isAdmin() || isTeacher();
     }
   }
 }
