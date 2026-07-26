@@ -2,103 +2,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- GLOBAL SAFETY NET (DEFAULT DENY ALL) ---
-    match /{document=**} {
-      allow read, write: if false;
+    // 1. Courses Collection (Master database of courses)
+    match /courses/{courseId} {
+      allow read, write: if true;
     }
 
-    // --- UTILITIES AND SECURITY HELPER PRIMITIVES ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function getUserEmail() {
-      return isSignedIn() && request.auth.token.get('email', null) != null
-        ? request.auth.token.email.toLowerCase()
-        : '';
-    }
-
-    // Check if the current user email belongs to a bootstrapped Admin/Teacher
-    function isBootstrapAdmin() {
-      return isSignedIn() && (
-        getUserEmail() == 'h1h4phong@gmail.com' ||
-        getUserEmail() == 'hkc.qms@gmail.com' ||
-        getUserEmail() == 'trdung153@gmail.com'
-      );
-    }
-
-    function isOwner(userEmail) {
-      return isSignedIn() && (
-        getUserEmail() == userEmail.toLowerCase() ||
-        (request.auth.uid != null && request.auth.uid == userEmail)
-      );
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
-    }
-
-    function isAdmin() {
-      return isBootstrapAdmin() || (
-        isSignedIn() && 
-        getUserEmail() != '' &&
-        exists(/databases/$(database)/documents/users/$(getUserEmail())) &&
-        get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true
-      );
-    }
-
-    function isTeacher() {
-      return isBootstrapAdmin() || (
-        isSignedIn() && 
-        getUserEmail() != '' &&
-        exists(/databases/$(database)/documents/users/$(getUserEmail())) &&
-        (
-          get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isTeacher', false) == true ||
-          get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true
-        )
-      );
-    }
-
-    // --- VALIDATION BLUEPRINTS ---
-    
-    // User Profile schema validation
-    function isValidUser(data) {
-      return data.get('email', '') is string;
-    }
-
-    // Purchased Course schema validation
-    function isValidPurchasedCourse(data) {
-      return data.get('courseId', '') is string;
-    }
-
-    // Course master schema validation
-    function isValidCourse(data) {
-      return data.get('title', '') is string && 
-             data.get('title', '').size() > 0;
-    }
-
-    // --- COLLECTION RULES ---
-
-    // 1. Users Collection
+    // 2. Users Collection (User profiles and roles)
     match /users/{userEmail} {
-      allow get: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-      allow list: if isAdmin() || isTeacher(); 
-      
-      allow create, update: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-      allow delete: if isAdmin() || isBootstrapAdmin();
+      allow read, write: if true;
 
-      // 1.1 Subcollection: Purchased Courses tracked per user
+      // Subcollection: Purchased Courses tracked per user
       match /purchased_courses/{courseId} {
-        allow get, list: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-        allow create, update: if isSignedIn() && (isOwner(userEmail) || isAdmin() || isTeacher());
-        allow delete: if isAdmin() || isTeacher();
+        allow read, write: if true;
       }
     }
 
-    // 2. Courses Collection (Master database of courses)
-    match /courses/{courseId} {
-      // Publicly viewable and writable by teachers / users in app
-      allow get, list, create, update, delete: if true;
+    // 3. Fallback default rule for all other documents
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
+
