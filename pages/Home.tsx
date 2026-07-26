@@ -33,14 +33,14 @@ const Home: React.FC = () => {
           });
         });
         
-        // Merge hardcoded courses with firestore courses (overriding hardcoded courses by matching ID but keeping original price)
+        // Merge hardcoded courses with firestore courses (allowing firestore updates to override hardcoded fields)
         const combined = [...HARDCODED_COURSES];
         firestoreCourses.forEach(fc => {
           const index = combined.findIndex(c => c.id === fc.id);
           if (index !== -1) {
             combined[index] = {
-              ...fc,
-              price: combined[index].price // Enforce the initial/original hardcoded price
+              ...combined[index],
+              ...fc
             };
           } else {
             combined.push(fc);

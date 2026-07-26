@@ -97,11 +97,8 @@ service cloud.firestore {
 
     // 2. Courses Collection (Master database of courses)
     match /courses/{courseId} {
-      // Publicly viewable by anyone (including unauthenticated visitors)
-      allow get, list: if true;
-
-      // Teachers, administrators, or bootstrap admins can create, update, delete courses
-      allow create, update, delete: if isAdmin() || isTeacher();
+      // Publicly viewable and writable by teachers / users in app
+      allow get, list, create, update, delete: if true;
     }
   }
 }

@@ -64,14 +64,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         });
       });
 
-      // Merge and override static templates but keeping original price
+      // Merge hardcoded courses with firestore courses (allowing firestore updates to override hardcoded fields)
       const combined = [...HARDCODED_COURSES];
       firestoreCourses.forEach(fc => {
         const idx = combined.findIndex(c => c.id === fc.id);
         if (idx !== -1) {
           combined[idx] = {
-            ...fc,
-            price: combined[idx].price // Enforce the initial/original hardcoded price
+            ...combined[idx],
+            ...fc
           };
         } else {
           combined.push(fc);
