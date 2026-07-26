@@ -222,6 +222,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     return true;
   };
 
+  // Helper to sanitize curriculum data ensuring no undefined values are sent to Firestore
+  const sanitizeCurriculum = (inputChapters: any[]) => {
+    if (!Array.isArray(inputChapters)) return [];
+    return inputChapters.map((chap, cIdx) => ({
+      title: String(chap?.title || `Chương ${cIdx + 1}`).trim(),
+      lessons: Array.isArray(chap?.lessons) 
+        ? chap.lessons.map((les: any, lIdx: number) => ({
+            title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
+            videoUrl: String(les?.videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4').trim()
+          }))
+        : []
+    }));
+  };
+
   // Create a brand new Custom Course
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,20 +261,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           finalImageUrl = await getDownloadURL(storageRef);
         } catch (storageError: any) {
           console.error('Storage upload error:', storageError);
-          throw new Error('Lỗi lưu ảnh lên Storage: ' + storageError.message);
+          // If storage fails, fallback to image URL input or default placeholder
+          finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
         }
       }
+
+      const rawCurriculum = chapters.length > 0 ? chapters : DUMMY_CURRICULUM_TEMPLATE;
+      const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
 
       const newCourse = {
         id: courseId,
         title: title.trim(),
         price: finalPrice,
         image: finalImageUrl,
-        category,
+        category: category || 'Khác',
         description: description.trim(),
-        status,
-        curriculum: chapters.length > 0 ? chapters : JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)),
-        authorEmail: userEmail,
+        status: status || 'active',
+        curriculum: sanitizedCurriculum,
+        authorEmail: userEmail || '',
         createdAt: new Date().toISOString()
       };
 
@@ -272,7 +290,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       setTimeout(() => setActiveTab('list'), 1500);
     } catch (err: any) {
       console.error('Add course error:', err);
-      setMessage({ type: 'error', text: 'Thêm khóa học mới thất bại: ' + (err.message || 'Lỗi không xác định') });
+      let errorText = err.message || 'Lỗi không xác định';
+      if (errorText.toLowerCase().includes('permission') || errorText.toLowerCase().includes('insufficient')) {
+        errorText = 'Lỗi phân quyền Firebase: Bạn cần có quyền Giáo viên/Admin để thêm khóa học. Vui lòng kiểm tra lại tài khoản.';
+      }
+      setMessage({ type: 'error', text: 'Thêm khóa học mới thất bại: ' + errorText });
     } finally {
       setIsSubmitting(false);
     }
@@ -283,6 +305,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage(null);
+
+    if (!editingCourseId) {
+      setMessage({ type: 'error', text: 'Không tìm thấy ID khóa học cần chỉnh sửa. Vui lòng chọn lại khóa học từ danh sách.' });
+      setIsSubmitting(false);
+      return;
+    }
 
     // Run input validation
     if (!validateCourseInput()) {
@@ -301,19 +329,22 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           finalImageUrl = await getDownloadURL(storageRef);
         } catch (storageError: any) {
           console.error('Storage edit upload error:', storageError);
-          throw new Error('Tải ảnh bìa mới thất bại: ' + storageError.message);
+          // Keep existing image URL if storage upload fails
+          finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
         }
       }
+
+      const sanitizedCurriculum = sanitizeCurriculum(chapters);
 
       const updatedCourse = {
         id: editingCourseId,
         title: title.trim(),
         price: finalPrice,
         image: finalImageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
-        category,
+        category: category || 'Khác',
         description: description.trim(),
-        status,
-        curriculum: chapters,
+        status: status || 'active',
+        curriculum: sanitizedCurriculum,
         updatedAt: new Date().toISOString()
       };
 
@@ -326,7 +357,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }, 1500);
     } catch (err: any) {
       console.error('Edit course error:', err);
-      setMessage({ type: 'error', text: 'Cập nhật khóa học thất bại: ' + err.message });
+      let errorText = err.message || 'Lỗi không xác định';
+      if (errorText.toLowerCase().includes('permission') || errorText.toLowerCase().includes('insufficient')) {
+        errorText = 'Lỗi phân quyền Firebase: Bạn cần có quyền Giáo viên/Admin để cập nhật khóa học. Vui lòng kiểm tra lại tài khoản.';
+      }
+      setMessage({ type: 'error', text: 'Cập nhật khóa học thất bại: ' + errorText });
     } finally {
       setIsSubmitting(false);
     }
