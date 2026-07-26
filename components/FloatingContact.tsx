@@ -110,14 +110,15 @@ const FloatingContact: React.FC = () => {
     
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    const updatedMessages = [...messages, { role: 'user' as const, text: userMessage }];
+    setMessages(updatedMessages);
     setIsLoading(true);
 
     try {
       const response = await fetch('/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, systemContext }),
+        body: JSON.stringify({ messages: updatedMessages, systemContext }),
       });
 
       if (!response.ok) {

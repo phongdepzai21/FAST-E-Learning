@@ -28,14 +28,21 @@ async function startServer() {
         }
       });
       
-      const model = 'gemini-3.5-flash';
+      const model = 'gemini-2.5-flash';
 
-      const historyContents = messages
-        .slice(1) // Bỏ qua phần tử đầu tiên (Lời chào)
-        .map((m: any) => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.text }]
-        }));
+      let validMessages = Array.isArray(messages) ? messages : [];
+      // Filter out empty messages
+      validMessages = validMessages.filter((m: any) => m && typeof m.text === 'string' && m.text.trim().length > 0);
+
+      // Map to Gemini API format
+      const historyContents = validMessages.map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.text }]
+      }));
+
+      if (historyContents.length === 0) {
+        return res.status(400).json({ error: "Không có nội dung tin nhắn hợp lệ." });
+      }
 
       // Chế độ streaming
       res.setHeader('Content-Type', 'text/event-stream');
@@ -48,7 +55,7 @@ async function startServer() {
         config: {
           systemInstruction: systemContext,
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 800,
         }
       });
 
