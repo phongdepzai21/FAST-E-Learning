@@ -9,7 +9,7 @@ interface TeacherDashboardProps {
   userEmail: string;
 }
 
-const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Khác'];
+const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Testing', 'Khác'];
 
 const DUMMY_CURRICULUM_TEMPLATE = [
   { 
@@ -154,10 +154,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       setMessage({ type: 'error', text: 'Tên khóa học bắt buộc không được để trống.' });
       return false;
     }
-    if (title.trim().length < 5) {
-      setMessage({ type: 'error', text: 'Tên khóa học quá ngắn (phải có ít nhất 5 ký tự).' });
-      return false;
-    }
 
     // 2. Price/Học phí verification
     if (!price.trim()) {
@@ -165,58 +161,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       return false;
     }
 
-    // 3. Category verification
-    if (!category || !Categories.includes(category)) {
-      setMessage({ type: 'error', text: 'Danh mục phân loại khóa học không hợp lệ.' });
-      return false;
-    }
-
-    // 4. Description verification
-    if (!description.trim()) {
-      setMessage({ type: 'error', text: 'Mô tả chi tiết khóa học không được để trống.' });
-      return false;
-    }
-    if (description.trim().length < 15) {
-      setMessage({ type: 'error', text: 'Mô tả chi tiết khóa học quá ngắn (phải có ít nhất 15 ký tự).' });
-      return false;
-    }
-
-    // 5. Cover Image Verification (either url starts with http or uploaded file)
-    if (!imageUrlInput.trim() && !imageFile) {
-      setMessage({ type: 'error', text: 'Vui lòng cung cấp URL ảnh bìa hoặc chọn tệp tải lên từ máy tính.' });
-      return false;
-    }
+    // Auto fix image URL if missing protocol
     if (imageUrlInput.trim() && !imageUrlInput.trim().startsWith('http://') && !imageUrlInput.trim().startsWith('https://')) {
-      setMessage({ type: 'error', text: 'URL ảnh bìa không hợp lệ. Vui lòng nhập link bắt đầu bằng http:// hoặc https://' });
-      return false;
+      setImageUrlInput('https://' + imageUrlInput.trim().replace(/^\/+/, ''));
     }
 
-    // 6. Curriculum program verification (ensuring clean data structure before Firestore write)
+    // Auto format video URLs in chapters if missing protocol
     if (chapters.length > 0) {
-      for (let i = 0; i < chapters.length; i++) {
-        const chapter = chapters[i];
-        if (!chapter.title || !chapter.title.trim()) {
-          setMessage({ type: 'error', text: `Tiêu đề chương số ${i + 1} đang bị để trống.` });
-          return false;
-        }
-        if (chapter.lessons && chapter.lessons.length > 0) {
-          for (let j = 0; j < chapter.lessons.length; j++) {
-            const lesson = chapter.lessons[j];
-            if (!lesson.title || !lesson.title.trim()) {
-              setMessage({ type: 'error', text: `Tên bài học thứ ${j + 1} của chương "${chapter.title}" lý đang bị để trống.` });
-              return false;
-            }
-            if (!lesson.videoUrl || !lesson.videoUrl.trim()) {
-              setMessage({ type: 'error', text: `Đường dẫn video cho bài học "${lesson.title}" không được để trống.` });
-              return false;
-            }
-            if (!lesson.videoUrl.trim().startsWith('http://') && !lesson.videoUrl.trim().startsWith('https://')) {
-              setMessage({ type: 'error', text: `Đường dẫn video bài "${lesson.title}" phải là một URL hợp lệ bắt đầu bằng http:// hoặc https://` });
-              return false;
-            }
+      setChapters(prev => prev.map((chap, cIdx) => ({
+        ...chap,
+        title: chap.title.trim() || `Chương ${cIdx + 1}`,
+        lessons: chap.lessons.map((les, lIdx) => {
+          let vUrl = les.videoUrl ? les.videoUrl.trim() : '';
+          if (!vUrl) {
+            vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
+          } else if (!vUrl.startsWith('http://') && !vUrl.startsWith('https://')) {
+            vUrl = 'https://' + vUrl.replace(/^\/+/, '');
           }
-        }
-      }
+          return {
+            title: les.title.trim() || `Bài học ${lIdx + 1}`,
+            videoUrl: vUrl
+          };
+        })
+      })));
     }
 
     return true;
