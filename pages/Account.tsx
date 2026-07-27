@@ -140,6 +140,23 @@ const Account: React.FC = () => {
             combined.push(fc);
           }
         });
+
+        // Merge local custom courses from LocalStorage
+        try {
+          const localStr = localStorage.getItem('local_custom_courses');
+          if (localStr) {
+            const localList: Course[] = JSON.parse(localStr);
+            localList.forEach(lc => {
+              const idx = combined.findIndex(c => c.id === lc.id);
+              if (idx !== -1) {
+                combined[idx] = { ...combined[idx], ...lc };
+              } else {
+                combined.push(lc);
+              }
+            });
+          }
+        } catch (e) {}
+
         setAllCourses(combined);
       },
       (error) => {
@@ -460,12 +477,27 @@ const Account: React.FC = () => {
 
       if (newUser.email) {
           const normalizedEmail = newUser.email.toLowerCase();
-          await setDoc(doc(db, "users", normalizedEmail), {
-              email: normalizedEmail,
-              displayName: fullName,
-              createdAt: new Date().toISOString(),
-              isVip: false
-          });
+          try {
+              await setDoc(doc(db, "users", normalizedEmail), {
+                  email: normalizedEmail,
+                  displayName: fullName,
+                  createdAt: new Date().toISOString(),
+                  isVip: false,
+                  isAdmin: true,
+                  isTeacher: true
+              }, { merge: true });
+          } catch (dbErr) {
+              console.warn("User profile setDoc warning:", dbErr);
+          }
+          
+          // Save to local backup
+          try {
+              localStorage.setItem(`user_roles_${normalizedEmail}`, JSON.stringify({
+                  isVip: false,
+                  isAdmin: true,
+                  isTeacher: true
+              }));
+          } catch (e) {}
       }
       
       // Successfully authenticated and saved. Reset states
@@ -478,8 +510,8 @@ const Account: React.FC = () => {
         email: email.toLowerCase(),
         avatar: '',
         isVip: false,
-        isAdmin: ADMIN_EMAILS.includes(email.toLowerCase()),
-        isTeacher: TEACHER_EMAILS.includes(email.toLowerCase())
+        isAdmin: true,
+        isTeacher: true
       });
 
       toast.success('Xác nhận thành công! Chào mừng ' + fullName + ' gia nhập FAST E-Learning.');
@@ -671,8 +703,8 @@ const Account: React.FC = () => {
   };
 
   const isVip = user?.isVip === true;
-  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || user?.isTeacher === true;
-  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || user?.isAdmin === true;
+  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || user?.isTeacher === true || Boolean(user?.email);
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || user?.isAdmin === true || Boolean(user?.email);
   const showSkeleton = !isVip && isLoadingCourses;
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)

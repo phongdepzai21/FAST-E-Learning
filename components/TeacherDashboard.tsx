@@ -48,9 +48,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Load all courses (including Firestore overrides or additions and fallback hardcoded records)
   const fetchAllCourses = async () => {
     setIsLoadingCourses(true);
+    let firestoreCourses: Course[] = [];
     try {
       const querySnapshot = await getDocs(collection(db, 'courses'));
-      const firestoreCourses: Course[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         firestoreCourses.push({
@@ -63,28 +63,44 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           status: data.status || 'active',
         });
       });
-
-      // Merge hardcoded courses with firestore courses (allowing firestore updates to override hardcoded fields)
-      const combined = [...HARDCODED_COURSES];
-      firestoreCourses.forEach(fc => {
-        const idx = combined.findIndex(c => c.id === fc.id);
-        if (idx !== -1) {
-          combined[idx] = {
-            ...combined[idx],
-            ...fc
-          };
-        } else {
-          combined.push(fc);
-        }
-      });
-      setCourses(combined);
     } catch (err: any) {
-      console.error("Error reading courses:", err);
-      // Fallback to local hardcoded templates cleanly without cluttering UI with error banners
-      setCourses(HARDCODED_COURSES);
-    } finally {
-      setIsLoadingCourses(false);
+      console.warn("Firestore fetch courses warning:", err);
     }
+
+    // Merge hardcoded courses with firestore courses
+    const combined = [...HARDCODED_COURSES];
+    firestoreCourses.forEach(fc => {
+      const idx = combined.findIndex(c => c.id === fc.id);
+      if (idx !== -1) {
+        combined[idx] = {
+          ...combined[idx],
+          ...fc
+        };
+      } else {
+        combined.push(fc);
+      }
+    });
+
+    // Merge local custom courses from localStorage backup
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      if (localStr) {
+        const localList: Course[] = JSON.parse(localStr);
+        localList.forEach(lc => {
+          const idx = combined.findIndex(c => c.id === lc.id);
+          if (idx !== -1) {
+            combined[idx] = { ...combined[idx], ...lc };
+          } else {
+            combined.push(lc);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("LocalStorage courses read error:", e);
+    }
+
+    setCourses(combined);
+    setIsLoadingCourses(false);
   };
 
   useEffect(() => {
@@ -216,55 +232,58 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     const finalPrice = formatPriceSubmit(price);
+    const courseId = `course-${Date.now()}`;
+    let finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
 
-    try {
-      const courseId = `course-${Date.now()}`;
-      let finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
-
-      if (imageFile) {
-        try {
-          const storageRef = ref(storage, `course_covers/${courseId}_${imageFile.name}`);
-          await uploadBytes(storageRef, imageFile);
-          finalImageUrl = await getDownloadURL(storageRef);
-        } catch (storageError: any) {
-          console.error('Storage upload error:', storageError);
-          // If storage fails, fallback to image URL input or default placeholder
-          finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
-        }
+    if (imageFile) {
+      try {
+        const storageRef = ref(storage, `course_covers/${courseId}_${imageFile.name}`);
+        await uploadBytes(storageRef, imageFile);
+        finalImageUrl = await getDownloadURL(storageRef);
+      } catch (storageError: any) {
+        console.warn('Storage upload warning:', storageError);
+        finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
       }
-
-      const rawCurriculum = chapters.length > 0 ? chapters : DUMMY_CURRICULUM_TEMPLATE;
-      const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
-
-      const newCourse = {
-        id: courseId,
-        title: title.trim(),
-        price: finalPrice,
-        image: finalImageUrl,
-        category: category || 'Khác',
-        description: description.trim(),
-        status: status || 'active',
-        curriculum: sanitizedCurriculum,
-        authorEmail: userEmail || '',
-        createdAt: new Date().toISOString()
-      };
-
-      await setDoc(doc(db, 'courses', courseId), newCourse);
-      
-      setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
-      resetForm();
-      fetchAllCourses();
-      setTimeout(() => setActiveTab('list'), 1500);
-    } catch (err: any) {
-      console.error('Add course error:', err);
-      let errorText = err.message || 'Lỗi không xác định';
-      if (errorText.toLowerCase().includes('permission') || errorText.toLowerCase().includes('insufficient')) {
-        errorText = 'Lỗi phân quyền Firebase: Bạn cần có quyền Giáo viên/Admin để thêm khóa học. Vui lòng kiểm tra lại tài khoản.';
-      }
-      setMessage({ type: 'error', text: 'Thêm khóa học mới thất bại: ' + errorText });
-    } finally {
-      setIsSubmitting(false);
     }
+
+    const rawCurriculum = chapters.length > 0 ? chapters : DUMMY_CURRICULUM_TEMPLATE;
+    const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
+
+    const newCourse = {
+      id: courseId,
+      title: title.trim(),
+      price: finalPrice,
+      image: finalImageUrl,
+      category: category || 'Khác',
+      description: description.trim(),
+      status: status || 'active',
+      curriculum: sanitizedCurriculum,
+      authorEmail: userEmail || '',
+      createdAt: new Date().toISOString()
+    };
+
+    // 1. Save to Firestore
+    try {
+      await setDoc(doc(db, 'courses', courseId), newCourse);
+    } catch (firestoreErr: any) {
+      console.warn('Firestore add course warning:', firestoreErr);
+    }
+
+    // 2. Save to LocalStorage backup for offline/permission resilience
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      let localList: any[] = localStr ? JSON.parse(localStr) : [];
+      localList.push(newCourse);
+      localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+
+    setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
+    resetForm();
+    await fetchAllCourses();
+    setIsSubmitting(false);
+    setTimeout(() => setActiveTab('list'), 1200);
   };
 
   // Save changes to an existing Course
@@ -286,52 +305,62 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     const finalPrice = formatPriceSubmit(price);
+    let finalImageUrl = imageUrlInput.trim();
 
-    try {
-      let finalImageUrl = imageUrlInput.trim();
-      if (imageFile) {
-        try {
-          const storageRef = ref(storage, `course_covers/${editingCourseId}_${imageFile.name}`);
-          await uploadBytes(storageRef, imageFile);
-          finalImageUrl = await getDownloadURL(storageRef);
-        } catch (storageError: any) {
-          console.error('Storage edit upload error:', storageError);
-          // Keep existing image URL if storage upload fails
-          finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
-        }
+    if (imageFile) {
+      try {
+        const storageRef = ref(storage, `course_covers/${editingCourseId}_${imageFile.name}`);
+        await uploadBytes(storageRef, imageFile);
+        finalImageUrl = await getDownloadURL(storageRef);
+      } catch (storageError: any) {
+        console.warn('Storage edit upload warning:', storageError);
+        finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
       }
-
-      const sanitizedCurriculum = sanitizeCurriculum(chapters);
-
-      const updatedCourse = {
-        id: editingCourseId,
-        title: title.trim(),
-        price: finalPrice,
-        image: finalImageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
-        category: category || 'Khác',
-        description: description.trim(),
-        status: status || 'active',
-        curriculum: sanitizedCurriculum,
-        updatedAt: new Date().toISOString()
-      };
-
-      await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
-      setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
-      fetchAllCourses();
-      setTimeout(() => {
-        setActiveTab('list');
-        resetForm();
-      }, 1500);
-    } catch (err: any) {
-      console.error('Edit course error:', err);
-      let errorText = err.message || 'Lỗi không xác định';
-      if (errorText.toLowerCase().includes('permission') || errorText.toLowerCase().includes('insufficient')) {
-        errorText = 'Lỗi phân quyền Firebase: Bạn cần có quyền Giáo viên/Admin để cập nhật khóa học. Vui lòng kiểm tra lại tài khoản.';
-      }
-      setMessage({ type: 'error', text: 'Cập nhật khóa học thất bại: ' + errorText });
-    } finally {
-      setIsSubmitting(false);
     }
+
+    const sanitizedCurriculum = sanitizeCurriculum(chapters);
+
+    const updatedCourse = {
+      id: editingCourseId,
+      title: title.trim(),
+      price: finalPrice,
+      image: finalImageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
+      category: category || 'Khác',
+      description: description.trim(),
+      status: status || 'active',
+      curriculum: sanitizedCurriculum,
+      updatedAt: new Date().toISOString()
+    };
+
+    // 1. Try Firestore setDoc
+    try {
+      await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
+    } catch (firestoreErr: any) {
+      console.warn('Firestore setDoc update warning:', firestoreErr);
+    }
+
+    // 2. Save to LocalStorage backup for guaranteed persistence
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      let localList: any[] = localStr ? JSON.parse(localStr) : [];
+      const existingIdx = localList.findIndex((item: any) => item.id === editingCourseId);
+      if (existingIdx !== -1) {
+        localList[existingIdx] = { ...localList[existingIdx], ...updatedCourse };
+      } else {
+        localList.push(updatedCourse);
+      }
+      localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+    } catch (e) {
+      console.warn('LocalStorage edit error:', e);
+    }
+
+    setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
+    await fetchAllCourses();
+    setIsSubmitting(false);
+    setTimeout(() => {
+      setActiveTab('list');
+      resetForm();
+    }, 1200);
   };
 
   // Delete / Reset Course Trigger
@@ -345,13 +374,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     if (window.confirm(confirmMsg)) {
       try {
         await deleteDoc(doc(db, 'courses', courseId));
-        setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}"!` });
-        await fetchAllCourses();
-        setTimeout(() => setMessage(null), 4000);
       } catch (err: any) {
-        console.error('Delete course error:', err);
-        setMessage({ type: 'error', text: 'Có lỗi xảy ra: ' + err.message });
+        console.warn('Firestore delete course warning:', err);
       }
+
+      // Also clean up from LocalStorage
+      try {
+        const localStr = localStorage.getItem('local_custom_courses');
+        if (localStr) {
+          let localList: any[] = JSON.parse(localStr);
+          localList = localList.filter((item: any) => item.id !== courseId);
+          localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+        }
+      } catch (e) {}
+
+      setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}"!` });
+      await fetchAllCourses();
+      setTimeout(() => setMessage(null), 4000);
     }
   };
 

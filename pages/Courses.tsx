@@ -49,6 +49,23 @@ const Courses: React.FC = () => {
             combined.push(fc);
           }
         });
+
+        // Merge local custom courses from LocalStorage
+        try {
+          const localStr = localStorage.getItem('local_custom_courses');
+          if (localStr) {
+            const localList: Course[] = JSON.parse(localStr);
+            localList.forEach(lc => {
+              const idx = combined.findIndex(c => c.id === lc.id);
+              if (idx !== -1) {
+                combined[idx] = { ...combined[idx], ...lc };
+              } else {
+                combined.push(lc);
+              }
+            });
+          }
+        } catch (e) {}
+
         setAllCourses(combined);
       },
       (error) => {
