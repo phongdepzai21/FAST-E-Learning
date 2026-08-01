@@ -198,17 +198,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
       if (!id) return;
       try {
           const docRef = doc(db, "courses", id);
-          const fullData = {
-            id,
-            title: course?.title || '',
-            price: course?.price || '',
-            image: course?.image || '',
-            category: course?.category || '',
-            description: course?.description || '',
+          const updatePayload: any = {
             curriculum: editData,
             updatedAt: new Date().toISOString()
           };
-          await setDoc(docRef, fullData, { merge: true });
+          if (course?.title) updatePayload.title = course.title;
+          if (course?.price) updatePayload.price = course.price;
+          if (course?.image) updatePayload.image = course.image;
+          if (course?.category) updatePayload.category = course.category;
+          if (course?.description) updatePayload.description = course.description;
+
+          await setDoc(docRef, updatePayload, { merge: true });
           setCurriculum(editData);
           setIsEditingCurriculum(false);
 
@@ -218,6 +218,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             const idx = localList.findIndex((c: any) => c.id === id);
             if (idx !== -1) {
               localList[idx].curriculum = editData;
+              if (course?.title) localList[idx].title = course.title;
             } else if (course) {
               localList.push({ ...course, curriculum: editData });
             }

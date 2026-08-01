@@ -34,13 +34,7 @@ const Courses: React.FC = () => {
           const data = doc.data();
           firestoreCourses.push({
             id: doc.id,
-            ...(data.title ? { title: data.title } : {}),
-            ...(data.price !== undefined ? { price: data.price } : {}),
-            ...(data.image ? { image: data.image } : {}),
-            ...(data.category ? { category: data.category } : {}),
-            ...(data.description ? { description: data.description } : {}),
-            ...(data.status ? { status: data.status } : {}),
-            ...(data.curriculum ? { curriculum: data.curriculum } : {}),
+            ...data
           } as Course);
         });
         syncCourses(firestoreCourses);

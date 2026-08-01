@@ -1,14 +1,61 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // Fix: Ensure clean import of react-router-dom members
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { NAV_LINKS } from '../constants';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, getDocs } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { NAV_LINKS, ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [avatarBadgeClass, setAvatarBadgeClass] = useState<string>('bg-white border border-gray-300');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user && user.email) {
+        const normalizedEmail = user.email.toLowerCase();
+        const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+        const isTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+
+        if (isAdmin || isTeacher) {
+          setAvatarBadgeClass('bg-blue-500 ring-2 ring-blue-300');
+          return;
+        }
+
+        let isVip = false;
+        try {
+          const localRoles = localStorage.getItem(`user_roles_${normalizedEmail}`);
+          if (localRoles && JSON.parse(localRoles).isVip) {
+            isVip = true;
+          }
+        } catch (e) {}
+
+        try {
+          const snap = await getDocs(collection(db, "users", normalizedEmail, "purchased_courses"));
+          const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
+          const count = snap.docs.filter(d => d.id !== 'vip-lifetime-access').length;
+
+          if (isVip || isVipDoc) {
+            setAvatarBadgeClass('bg-yellow-400 ring-2 ring-yellow-200');
+          } else if (count >= 5) {
+            setAvatarBadgeClass('bg-[#007c76] ring-2 ring-teal-200');
+          } else {
+            setAvatarBadgeClass('bg-white border border-gray-300');
+          }
+        } catch (err) {
+          setAvatarBadgeClass(isVip ? 'bg-yellow-400 ring-2 ring-yellow-200' : 'bg-white border border-gray-300');
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
@@ -47,8 +94,6 @@ const Header: React.FC = () => {
                       <img 
                         src={logoUrl} 
                         alt="FAST Logo" 
-                        // Adjusted classes: h-12 on mobile, h-20 on desktop. 
-                        // object-contain ensures the rectangular aspect ratio is preserved perfectly.
                         className="h-12 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
                         onError={() => setLogoError(true)}
                         loading="eager"
@@ -69,6 +114,7 @@ const Header: React.FC = () => {
               <nav className="hidden md:flex items-center space-x-6">
                 {NAV_LINKS.map((link) => {
                     const isActive = location.pathname === link.path;
+                    const isAccount = link.path === '/account';
                     return (
                         <Link
                             key={link.path}
@@ -77,9 +123,12 @@ const Header: React.FC = () => {
                             isActive 
                               ? 'text-primary font-bold border-b-2 border-primary' 
                               : 'text-text-muted hover:text-primary'
-                            } text-xs md:text-sm py-1 transition-all duration-200 uppercase tracking-widest font-bold`}
+                            } text-xs md:text-sm py-1 transition-all duration-200 uppercase tracking-widest font-bold flex items-center gap-2`}
                         >
                             {link.label}
+                            {isAccount && currentUser && (
+                              <span className={`w-2.5 h-2.5 rounded-full inline-block ${avatarBadgeClass}`} />
+                            )}
                         </Link>
                     );
                 })}
@@ -111,7 +160,6 @@ const Header: React.FC = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                // Fix: setIsOpen was not defined, use setIsMenuOpen instead
                 onClick={() => setIsMenuOpen(false)}
                 className="block px-4 py-3 text-base font-bold text-text hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
               >

@@ -125,13 +125,7 @@ const Account: React.FC = () => {
           const data = doc.data();
           firestoreCourses.push({
             id: doc.id,
-            ...(data.title ? { title: data.title } : {}),
-            ...(data.price !== undefined ? { price: data.price } : {}),
-            ...(data.image ? { image: data.image } : {}),
-            ...(data.category ? { category: data.category } : {}),
-            ...(data.description ? { description: data.description } : {}),
-            ...(data.status ? { status: data.status } : {}),
-            ...(data.curriculum ? { curriculum: data.curriculum } : {}),
+            ...data
           } as Course);
         });
         syncCourses(firestoreCourses);
@@ -710,56 +704,56 @@ const Account: React.FC = () => {
   const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || (user?.isAdmin === true && (user as any)?.rolePromotedByAdmin === true);
   const showSkeleton = !isVip && isLoadingCourses;
 
-  // LOGIC CẤU HÌNH MÀU SẮC AVATAR THEO YÊU CẦU:
+  // LOGIC CẤU HÌNH MÀU SẮC AVATAR THEO YÊU CẦU BẮT BUỘC:
   // 1. Admin & Giáo viên -> Xanh dương (#3b82f6)
   // 2. VIP -> Màu vàng (#eab308)
-  // 3. Đã mua trên 5 khóa (>= 5 khóa) -> Màu xanh #007c76
+  // 3. Đã mua từ 5 khóa trở lên (>= 5 khóa) -> Màu xanh #007c76
   // 4. Không mua VIP (< 5 khóa) -> Màu trắng
   const avatarConfig = useMemo(() => {
-    const courseCount = purchasedCourses.length;
+    const courseCount = purchasedCourses.filter(c => c.courseId !== 'vip-lifetime-access').length;
     if (isAdmin || isTeacher) {
       return {
-        borderClass: 'border-blue-500 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20',
+        borderClass: 'border-2 border-blue-500 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20 bg-blue-50',
         badgeBg: 'bg-blue-500',
         badgeText: 'text-blue-600',
-        fallbackBg: 'bg-blue-600 text-white',
+        fallbackBg: 'bg-blue-600 text-white font-black',
         statusText: isAdmin ? 'ADMIN' : 'GIÁO VIÊN',
-        statusColor: 'text-blue-600',
+        statusColor: 'text-blue-600 font-black',
         badgeTitle: 'Quản trị viên / Giáo viên (Màu xanh dương)'
       };
     }
     if (isVip) {
       return {
-        borderClass: 'border-yellow-400 ring-2 ring-yellow-400/30 shadow-lg shadow-yellow-500/20',
+        borderClass: 'border-2 border-yellow-400 ring-2 ring-yellow-400/40 shadow-lg shadow-yellow-500/20 bg-yellow-50',
         badgeBg: 'bg-yellow-400',
         badgeText: 'text-amber-600',
-        fallbackBg: 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-white',
+        fallbackBg: 'bg-yellow-400 text-gray-900 font-black',
         statusText: 'VIP TRỌN ĐỜI',
-        statusColor: 'text-amber-500',
+        statusColor: 'text-amber-500 font-black',
         badgeTitle: 'Thành viên VIP (Màu vàng)'
       };
     }
     if (courseCount >= 5) {
       return {
-        borderClass: 'border-[#007c76] ring-2 ring-[#007c76]/30 shadow-lg shadow-[#007c76]/20',
+        borderClass: 'border-2 border-[#007c76] ring-2 ring-[#007c76]/30 shadow-lg shadow-[#007c76]/20 bg-teal-50',
         badgeBg: 'bg-[#007c76]',
         badgeText: 'text-[#007c76]',
-        fallbackBg: 'bg-[#007c76] text-white',
+        fallbackBg: 'bg-[#007c76] text-white font-black',
         statusText: `${courseCount} KHÓA HỌC`,
-        statusColor: 'text-[#007c76]',
+        statusColor: 'text-[#007c76] font-black',
         badgeTitle: `Đã mua ${courseCount} khóa học (Màu xanh #007c76)`
       };
     }
     return {
-      borderClass: 'border-2 border-white ring-2 ring-slate-200/80 shadow-md',
-      badgeBg: 'bg-white border border-slate-300',
-      badgeText: 'text-slate-500',
-      fallbackBg: 'bg-slate-200 text-slate-700',
+      borderClass: 'border-2 border-gray-300 ring-2 ring-gray-200 shadow-md bg-white',
+      badgeBg: 'bg-white border border-gray-300',
+      badgeText: 'text-gray-500',
+      fallbackBg: 'bg-white text-gray-800 border border-gray-300 font-black',
       statusText: 'HỌC VIÊN',
-      statusColor: 'text-slate-500',
-      badgeTitle: 'Học viên (Khung màu trắng)'
+      statusColor: 'text-gray-500 font-bold',
+      badgeTitle: 'Học viên (Khung & Nền màu trắng)'
     };
-  }, [isAdmin, isTeacher, isVip, purchasedCourses.length]);
+  }, [isAdmin, isTeacher, isVip, purchasedCourses]);
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
   // Nếu là VIP: Hiển thị tất cả khóa TRỪ khóa test 2k. Khóa test 2k chỉ hiện nếu đã mua.

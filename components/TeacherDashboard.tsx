@@ -57,13 +57,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           const data = doc.data();
           firestoreCourses.push({
             id: doc.id,
-            ...(data.title ? { title: data.title } : {}),
-            ...(data.price !== undefined ? { price: data.price } : {}),
-            ...(data.image ? { image: data.image } : {}),
-            ...(data.category ? { category: data.category } : {}),
-            ...(data.description ? { description: data.description } : {}),
-            ...(data.status ? { status: data.status } : {}),
-            ...(data.curriculum ? { curriculum: data.curriculum } : {}),
+            ...data
           } as Course);
         });
 
@@ -117,14 +111,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // Fetch curriculum content or revert to template if empty
     try {
       const courseDocSnap = await getDoc(doc(db, 'courses', course.id));
-      if (courseDocSnap.exists() && courseDocSnap.data().curriculum) {
+      if (courseDocSnap.exists() && courseDocSnap.data().curriculum && Array.isArray(courseDocSnap.data().curriculum) && courseDocSnap.data().curriculum.length > 0) {
         setChapters(courseDocSnap.data().curriculum);
+      } else if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
+        setChapters(course.curriculum);
       } else {
         setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)));
       }
     } catch (err) {
       console.error("Lỗi lấy thông tin giáo trình:", err);
-      setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)));
+      if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
+        setChapters(course.curriculum);
+      } else {
+        setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)));
+      }
     }
 
     setActiveTab('edit');

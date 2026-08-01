@@ -232,12 +232,13 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     return {
       ...existing,
       ...(overlay.title ? { title: overlay.title } : {}),
-      ...(overlay.price !== undefined && overlay.price !== '' ? { price: overlay.price } : {}),
+      ...(overlay.price !== undefined && overlay.price !== null && overlay.price !== '' ? { price: overlay.price } : {}),
       ...(overlay.image ? { image: overlay.image } : {}),
       ...(overlay.category ? { category: overlay.category } : {}),
       ...(overlay.description ? { description: overlay.description } : {}),
       ...(overlay.status ? { status: overlay.status } : {}),
-      ...(overlay.curriculum ? { curriculum: overlay.curriculum } : {}),
+      ...(overlay.curriculum && Array.isArray(overlay.curriculum) && overlay.curriculum.length > 0 ? { curriculum: overlay.curriculum } : {}),
+      ...(overlay.authorEmail ? { authorEmail: overlay.authorEmail } : {}),
     };
   };
 
@@ -247,11 +248,12 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     if (localStr) {
       const localList: Course[] = JSON.parse(localStr);
       localList.forEach(lc => {
+        if (!lc || !lc.id) return;
         const idx = combined.findIndex(c => c.id === lc.id);
         if (idx !== -1) {
           combined[idx] = applyOverlay(combined[idx], lc);
-        } else if (lc.id) {
-          combined.push(lc);
+        } else {
+          combined.push(lc as Course);
         }
       });
     }
@@ -259,10 +261,11 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
 
   // 2. Firestore overlay (HIGHEST PRIORITY - Real-time cloud database for all accounts & users)
   firestoreCourses.forEach(fc => {
+    if (!fc || !fc.id) return;
     const idx = combined.findIndex(c => c.id === fc.id);
     if (idx !== -1) {
       combined[idx] = applyOverlay(combined[idx], fc);
-    } else if (fc.id) {
+    } else {
       combined.push(fc);
     }
   });
