@@ -86,8 +86,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
       const merged = {
         ...initialBase,
-        ...(firestoreData || {}),
-        ...(localData || {})
+        ...(localData || {}),
+        ...(firestoreData || {})
       };
 
       setCourse({
@@ -99,7 +99,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         description: merged.description || initialBase.description,
       });
 
-      const curr = merged.curriculum || firestoreData?.curriculum || localData?.curriculum;
+      const curr = firestoreData?.curriculum || localData?.curriculum || merged.curriculum;
       if (curr && Array.isArray(curr) && curr.length > 0) {
         const updatedCurriculum = curr.map((c: any) => ({
           ...c,
@@ -198,7 +198,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
       if (!id) return;
       try {
           const docRef = doc(db, "courses", id);
-          await setDoc(docRef, { curriculum: editData }, { merge: true });
+          const fullData = {
+            id,
+            title: course?.title || '',
+            price: course?.price || '',
+            image: course?.image || '',
+            category: course?.category || '',
+            description: course?.description || '',
+            curriculum: editData,
+            updatedAt: new Date().toISOString()
+          };
+          await setDoc(docRef, fullData, { merge: true });
           setCurriculum(editData);
           setIsEditingCurriculum(false);
 

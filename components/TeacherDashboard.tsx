@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
@@ -45,36 +45,55 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // Load all courses (including Firestore overrides or additions and fallback hardcoded records)
-  const fetchAllCourses = async () => {
-    setIsLoadingCourses(true);
-    let firestoreCourses: Course[] = [];
-    try {
-      const querySnapshot = await getDocs(collection(db, 'courses'));
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        firestoreCourses.push({
-          id: doc.id,
-          ...(data.title ? { title: data.title } : {}),
-          ...(data.price !== undefined ? { price: data.price } : {}),
-          ...(data.image ? { image: data.image } : {}),
-          ...(data.category ? { category: data.category } : {}),
-          ...(data.description ? { description: data.description } : {}),
-          ...(data.status ? { status: data.status } : {}),
-          ...(data.curriculum ? { curriculum: data.curriculum } : {}),
-        } as Course);
-      });
-    } catch (err: any) {
-      console.warn("Firestore fetch courses warning:", err);
-    }
-
-    const combined = getMergedCourses(firestoreCourses);
-    setCourses(combined);
-    setIsLoadingCourses(false);
-  };
-
+  // Load all courses with real-time Firestore sync across all accounts
   useEffect(() => {
-    fetchAllCourses();
+    setIsLoadingCourses(true);
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'courses'),
+      (querySnapshot) => {
+        const firestoreCourses: Course[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          firestoreCourses.push({
+            id: doc.id,
+            ...(data.title ? { title: data.title } : {}),
+            ...(data.price !== undefined ? { price: data.price } : {}),
+            ...(data.image ? { image: data.image } : {}),
+            ...(data.category ? { category: data.category } : {}),
+            ...(data.description ? { description: data.description } : {}),
+            ...(data.status ? { status: data.status } : {}),
+            ...(data.curriculum ? { curriculum: data.curriculum } : {}),
+          } as Course);
+        });
+
+        const combined = getMergedCourses(firestoreCourses);
+        setCourses(combined);
+        setIsLoadingCourses(false);
+      },
+      (error) => {
+        console.warn("Lỗi đồng bộ danh sách khóa học ở TeacherDashboard:", error);
+        setCourses(getMergedCourses([]));
+        setIsLoadingCourses(false);
+      }
+    );
+
+    const handleCustomUpdate = () => {
+      // Re-trigger sync when local custom events happen
+      try {
+        const localStr = localStorage.getItem('local_custom_courses');
+        setCourses(prev => getMergedCourses());
+      } catch (e) {}
+    };
+
+    window.addEventListener('courses_updated', handleCustomUpdate);
+    window.addEventListener('storage', handleCustomUpdate);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('courses_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleCustomUpdate);
+    };
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -252,7 +271,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
     resetForm();
-    await fetchAllCourses();
     setIsSubmitting(false);
     setTimeout(() => setActiveTab('list'), 1200);
   };
@@ -327,7 +345,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
-    await fetchAllCourses();
     setIsSubmitting(false);
     setTimeout(() => {
       setActiveTab('list');
@@ -362,7 +379,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
       setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}"!` });
       window.dispatchEvent(new CustomEvent('courses_updated'));
-      await fetchAllCourses();
       setTimeout(() => setMessage(null), 4000);
     }
   };

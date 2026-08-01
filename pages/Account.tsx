@@ -709,6 +709,57 @@ const Account: React.FC = () => {
   const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || ADMIN_EMAILS.includes(user?.email || '') || (user?.isTeacher === true && (user as any)?.rolePromotedByAdmin === true);
   const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || (user?.isAdmin === true && (user as any)?.rolePromotedByAdmin === true);
   const showSkeleton = !isVip && isLoadingCourses;
+
+  // LOGIC CẤU HÌNH MÀU SẮC AVATAR THEO YÊU CẦU:
+  // 1. Admin & Giáo viên -> Xanh dương (#3b82f6)
+  // 2. VIP -> Màu vàng (#eab308)
+  // 3. Đã mua trên 5 khóa (>= 5 khóa) -> Màu xanh #007c76
+  // 4. Không mua VIP (< 5 khóa) -> Màu trắng
+  const avatarConfig = useMemo(() => {
+    const courseCount = purchasedCourses.length;
+    if (isAdmin || isTeacher) {
+      return {
+        borderClass: 'border-blue-500 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20',
+        badgeBg: 'bg-blue-500',
+        badgeText: 'text-blue-600',
+        fallbackBg: 'bg-blue-600 text-white',
+        statusText: isAdmin ? 'ADMIN' : 'GIÁO VIÊN',
+        statusColor: 'text-blue-600',
+        badgeTitle: 'Quản trị viên / Giáo viên (Màu xanh dương)'
+      };
+    }
+    if (isVip) {
+      return {
+        borderClass: 'border-yellow-400 ring-2 ring-yellow-400/30 shadow-lg shadow-yellow-500/20',
+        badgeBg: 'bg-yellow-400',
+        badgeText: 'text-amber-600',
+        fallbackBg: 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-white',
+        statusText: 'VIP TRỌN ĐỜI',
+        statusColor: 'text-amber-500',
+        badgeTitle: 'Thành viên VIP (Màu vàng)'
+      };
+    }
+    if (courseCount >= 5) {
+      return {
+        borderClass: 'border-[#007c76] ring-2 ring-[#007c76]/30 shadow-lg shadow-[#007c76]/20',
+        badgeBg: 'bg-[#007c76]',
+        badgeText: 'text-[#007c76]',
+        fallbackBg: 'bg-[#007c76] text-white',
+        statusText: `${courseCount} KHÓA HỌC`,
+        statusColor: 'text-[#007c76]',
+        badgeTitle: `Đã mua ${courseCount} khóa học (Màu xanh #007c76)`
+      };
+    }
+    return {
+      borderClass: 'border-2 border-white ring-2 ring-slate-200/80 shadow-md',
+      badgeBg: 'bg-white border border-slate-300',
+      badgeText: 'text-slate-500',
+      fallbackBg: 'bg-slate-200 text-slate-700',
+      statusText: 'HỌC VIÊN',
+      statusColor: 'text-slate-500',
+      badgeTitle: 'Học viên (Khung màu trắng)'
+    };
+  }, [isAdmin, isTeacher, isVip, purchasedCourses.length]);
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
   // Nếu là VIP: Hiển thị tất cả khóa TRỪ khóa test 2k. Khóa test 2k chỉ hiện nếu đã mua.
@@ -811,10 +862,24 @@ const Account: React.FC = () => {
                 >
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-black text-gray-800 leading-none">{user.name || 'Học viên'}</p>
-                    <p className="text-[10px] font-bold text-[#007c76] uppercase mt-1">ID: #FAST-{(user.email || '').split('@')[0] || 'USER'}</p>
+                    <p className={`text-[10px] font-bold uppercase mt-1 ${avatarConfig.statusColor}`}>
+                      {avatarConfig.statusText} • ID: #FAST-{(user.email || '').split('@')[0] || 'USER'}
+                    </p>
                   </div>
-                  <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-2 p-0.5 overflow-hidden shadow-md ${isVip ? 'border-yellow-400' : 'border-[#007c76]/20'}`}>
-                    {user.avatar ? <img src={user.avatar} className="w-full h-full rounded-full object-cover" alt="Avatar" /> : <div className="w-full h-full rounded-full bg-[#007c76] flex items-center justify-center text-white font-black">{(user.name || 'H').charAt(0)}</div>}
+                  <div className="relative">
+                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-2 p-0.5 overflow-hidden transition-all ${avatarConfig.borderClass}`}>
+                      {user.avatar ? (
+                        <img src={user.avatar} className="w-full h-full rounded-full object-cover" alt="Avatar" />
+                      ) : (
+                        <div className={`w-full h-full rounded-full flex items-center justify-center font-black text-xs md:text-sm ${avatarConfig.fallbackBg}`}>
+                          {(user.name || 'H').charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <span 
+                      title={avatarConfig.badgeTitle}
+                      className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full ring-2 ring-white ${avatarConfig.badgeBg}`} 
+                    />
                   </div>
                 </button>
 

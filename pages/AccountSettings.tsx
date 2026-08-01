@@ -16,6 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore'; 
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
+import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 
 const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   const navigate = useNavigate();
@@ -49,6 +50,85 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   // Delete Account States
   const [deleteSelfEmail, setDeleteSelfEmail] = useState('');
   const [showDeleteZone, setShowDeleteZone] = useState(false);
+
+  // User status for Avatar color rules
+  const [userStatus, setUserStatus] = useState<{ isVip: boolean; isAdmin: boolean; isTeacher: boolean; coursesCount: number }>({
+    isVip: false,
+    isAdmin: false,
+    isTeacher: false,
+    coursesCount: 0
+  });
+
+  useEffect(() => {
+    if (!user || !user.email) return;
+    const normalizedEmail = user.email.toLowerCase();
+
+    const isAdminStatus = ADMIN_EMAILS.includes(normalizedEmail);
+    const isTeacherStatus = TEACHER_EMAILS.includes(normalizedEmail);
+
+    let isVipStatus = false;
+    try {
+      const localRoles = localStorage.getItem(`user_roles_${normalizedEmail}`);
+      if (localRoles) {
+        const parsed = JSON.parse(localRoles);
+        if (parsed.isVip) isVipStatus = true;
+      }
+    } catch (e) {}
+
+    const fetchUserStats = async () => {
+      try {
+        const querySnap = await getDocs(collection(db, "users", normalizedEmail, "purchased_courses"));
+        const count = querySnap.size;
+        const isVipDoc = querySnap.docs.some(d => d.id === 'vip-lifetime-access');
+        setUserStatus({
+          isVip: isVipStatus || isVipDoc,
+          isAdmin: isAdminStatus,
+          isTeacher: isTeacherStatus,
+          coursesCount: count
+        });
+      } catch (err) {
+        setUserStatus({
+          isVip: isVipStatus,
+          isAdmin: isAdminStatus,
+          isTeacher: isTeacherStatus,
+          coursesCount: 0
+        });
+      }
+    };
+
+    fetchUserStats();
+  }, [user]);
+
+  // Dynamic Avatar styling according to user request:
+  // 1. Admin & Giáo viên -> Xanh dương (#3b82f6)
+  // 2. VIP -> Vàng (#eab308)
+  // 3. Đã mua trên 5 khóa (>= 5) -> Xanh #007c76
+  // 4. Không mua VIP (< 5) -> Màu trắng
+  const avatarBorderClass = React.useMemo(() => {
+    if (userStatus.isAdmin || userStatus.isTeacher) {
+      return 'border-4 border-blue-500 ring-4 ring-blue-500/30 shadow-blue-500/20';
+    }
+    if (userStatus.isVip) {
+      return 'border-4 border-yellow-400 ring-4 ring-yellow-400/30 shadow-amber-500/20';
+    }
+    if (userStatus.coursesCount >= 5) {
+      return 'border-4 border-[#007c76] ring-4 ring-[#007c76]/30 shadow-[#007c76]/20';
+    }
+    return 'border-4 border-white ring-2 ring-slate-200 shadow-xl';
+  }, [userStatus]);
+
+  const avatarBadgeInfo = React.useMemo(() => {
+    if (userStatus.isAdmin || userStatus.isTeacher) {
+      return { bg: 'bg-blue-600 text-white', label: userStatus.isAdmin ? 'Admin' : 'Giáo viên' };
+    }
+    if (userStatus.isVip) {
+      return { bg: 'bg-yellow-400 text-gray-900', label: 'VIP' };
+    }
+    if (userStatus.coursesCount >= 5) {
+      return { bg: 'bg-[#007c76] text-white', label: `${userStatus.coursesCount} khóa` };
+    }
+    return { bg: 'bg-white text-gray-600 border border-gray-300', label: 'Học viên' };
+  }, [userStatus]);
 
   useEffect(() => {
     if (location.state && location.state.section === 'security') {
@@ -343,14 +423,19 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 
                 <div className="flex flex-col items-center mb-6 md:mb-8 p-6 bg-gray-50 rounded-3xl border border-dashed border-gray-200 relative">
                     <div className="relative">
-                        {/* Ảnh hiển thị */}
-                        <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white mb-4">
+                        {/* Ảnh hiển thị với viền màu linh hoạt theo cấp bậc */}
+                        <div className={`w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden bg-white mb-4 transition-all ${avatarBorderClass}`}>
                             <img 
                                 src={previewUrl || photoURL || "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"} 
                                 alt="Avatar Preview" 
                                 className="w-full h-full object-cover transition-all" 
                             />
                         </div>
+
+                        {/* Badge Nhãn vai trò/Cấp bậc */}
+                        <span className={`absolute bottom-3 right-0 text-[10px] font-black px-2.5 py-1 rounded-full shadow-md uppercase tracking-wider ${avatarBadgeInfo.bg}`}>
+                            {avatarBadgeInfo.label}
+                        </span>
 
                         {/* Nếu đang Preview ảnh mới: Hiển thị Badge "Mới" */}
                         {previewUrl && (
