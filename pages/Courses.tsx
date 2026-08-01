@@ -155,18 +155,25 @@ const Courses: React.FC = () => {
   return (
     <main className="min-h-screen bg-[#f8fafc] pb-20 animate-fade-in">
       {/* Search & Hero Header */}
-      <div className="bg-[#007c76] pt-16 pb-32 md:pb-40 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-48 -mt-48"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-green-400/10 rounded-full blur-3xl -ml-32 -mb-32"></div>
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <span className="text-white/70 font-black uppercase tracking-[0.4em] text-[10px] md:text-xs mb-4 block">Học viện FAST E-Learning</span>
-          <h1 className="text-3xl md:text-6xl font-black text-white mb-8 md:mb-12 uppercase tracking-tighter leading-none">
-            Nâng tầm kiến thức <br/> <span className="text-green-300">An toàn thực phẩm</span>
+      <div className="bg-gradient-to-br from-[#007c76] via-[#00746f] to-[#005f5b] pt-16 pb-32 md:pb-40 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-48 -mt-48"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl -ml-32 -mb-32"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 w-full">
+          <div className="flex justify-center mb-6">
+            <span className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-5 py-2 text-xs md:text-sm font-black uppercase tracking-[0.2em] rounded-full border border-white/20 text-white shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-yellow-300 animate-pulse"></span>
+              Học viện FAST E-Learning
+            </span>
+          </div>
+          
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter leading-tight mb-8 md:mb-12">
+            <span className="text-white block leading-none mb-2">Nâng Tầm Kiến Thức</span>
+            <span className="text-yellow-300 block leading-none">An Toàn Thực Phẩm</span>
           </h1>
 
           {/* Search Bar Container */}
-          <div className="max-w-2xl mx-auto relative group">
+          <div className="max-w-2xl mx-auto relative group shadow-2xl">
              <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
                 <svg className="h-5 w-5 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
              </div>
@@ -175,10 +182,10 @@ const Courses: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Tìm khóa học bạn đang quan tâm..."
-                className="w-full pl-14 pr-6 py-5 md:py-6 bg-white rounded-3xl shadow-2xl text-gray-800 font-bold focus:outline-none focus:ring-4 focus:ring-green-400/20 transition-all text-sm md:text-base border-none"
+                className="w-full pl-14 pr-36 py-5 md:py-6 bg-white rounded-3xl text-gray-800 font-bold focus:outline-none focus:ring-4 focus:ring-white/30 transition-all text-sm md:text-base border-none shadow-xl"
              />
              <div className="absolute right-3 inset-y-3 hidden md:block">
-                <button className="h-full bg-[#007c76] text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all">Tìm kiếm</button>
+                <button className="h-full bg-gray-900 hover:bg-black text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-md">Tìm kiếm</button>
              </div>
           </div>
         </div>
