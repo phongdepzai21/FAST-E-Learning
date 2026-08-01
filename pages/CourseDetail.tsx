@@ -199,7 +199,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                if (localRolesStr) {
                    try {
                        const localRoles = JSON.parse(localRolesStr);
-                       if (localRoles.isAdmin) {
+                       if (localRoles.isAdmin === true && localRoles.rolePromotedByAdmin === true) {
                            setIsAdmin(true);
                            isPrivileged = true;
                        }

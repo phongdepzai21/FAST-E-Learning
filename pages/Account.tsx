@@ -229,14 +229,18 @@ const Account: React.FC = () => {
             let isTeacherStatus = TEACHER_EMAILS.includes(userEmail);
 
             if (userEmail) {
-                // Try fetching from localStorage backup first for maximum speed and offline-first support
+                const isSpecialEmail = ADMIN_EMAILS.includes(userEmail) || TEACHER_EMAILS.includes(userEmail);
+
+                // Fetch from localStorage backup first
                 const localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
                 if (localRolesStr) {
                     try {
                         const localRoles = JSON.parse(localRolesStr);
                         if (localRoles.isVip === true) isVipStatus = true;
-                        if (localRoles.isAdmin === true) isAdminStatus = true;
-                        if (localRoles.isTeacher === true) isTeacherStatus = true;
+                        if (isSpecialEmail || localRoles.rolePromotedByAdmin === true) {
+                            if (localRoles.isAdmin === true) isAdminStatus = true;
+                            if (localRoles.isTeacher === true) isTeacherStatus = true;
+                        }
                     } catch (e) {}
                 }
 
@@ -246,14 +250,30 @@ const Account: React.FC = () => {
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
                         if (userData.isVip === true) isVipStatus = true;
-                        if (userData.isAdmin === true) isAdminStatus = true;
-                        if (userData.isTeacher === true) isTeacherStatus = true;
                         
-                        // Sync back to localStorage for consistency
+                        if (isSpecialEmail || userData.rolePromotedByAdmin === true) {
+                            isAdminStatus = userData.isAdmin === true || ADMIN_EMAILS.includes(userEmail);
+                            isTeacherStatus = userData.isTeacher === true || TEACHER_EMAILS.includes(userEmail) || isAdminStatus;
+                        } else {
+                            // Enforce strict regular user default
+                            isAdminStatus = ADMIN_EMAILS.includes(userEmail);
+                            isTeacherStatus = TEACHER_EMAILS.includes(userEmail);
+                        }
+                        
+                        // Clean up & sync valid roles back to localStorage
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
                             isVip: isVipStatus,
                             isAdmin: isAdminStatus,
-                            isTeacher: isTeacherStatus
+                            isTeacher: isTeacherStatus,
+                            rolePromotedByAdmin: userData.rolePromotedByAdmin === true
+                        }));
+                    } else {
+                        // Clean up stale localStorage for unpromoted regular accounts
+                        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
+                            isVip: isVipStatus,
+                            isAdmin: isAdminStatus,
+                            isTeacher: isTeacherStatus,
+                            rolePromotedByAdmin: false
                         }));
                     }
                 } catch (err) {
@@ -702,8 +722,8 @@ const Account: React.FC = () => {
   };
 
   const isVip = user?.isVip === true;
-  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || user?.isTeacher === true;
-  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || user?.isAdmin === true;
+  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || ADMIN_EMAILS.includes(user?.email || '') || (user?.isTeacher === true && (user as any)?.rolePromotedByAdmin === true);
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || (user?.isAdmin === true && (user as any)?.rolePromotedByAdmin === true);
   const showSkeleton = !isVip && isLoadingCourses;
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
@@ -898,6 +918,7 @@ const Account: React.FC = () => {
                                 isVip: true,
                                 isAdmin: true,
                                 isTeacher: true,
+                                rolePromotedByAdmin: true,
                                 updatedAt: new Date().toISOString()
                               }, { merge: true });
 
@@ -905,7 +926,8 @@ const Account: React.FC = () => {
                               localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
                                 isVip: true,
                                 isAdmin: true,
-                                isTeacher: true
+                                isTeacher: true,
+                                rolePromotedByAdmin: true
                               }));
                               
                               // Immediately update local state
@@ -913,7 +935,8 @@ const Account: React.FC = () => {
                                 ...prev,
                                 isVip: true,
                                 isAdmin: true,
-                                isTeacher: true
+                                isTeacher: true,
+                                rolePromotedByAdmin: true
                               } : null);
                               
                               setAdminSuccess("Kích hoạt quyền Quản trị viên tối cao thành công! Quyền hạn đã được lưu trữ an toàn trên cả hệ thống Cloud Database.");
