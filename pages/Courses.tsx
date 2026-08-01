@@ -33,6 +33,7 @@ const Courses: React.FC = () => {
             category: data.category || '',
             description: data.description || '',
             status: data.status || 'active',
+            curriculum: data.curriculum || undefined,
           });
         });
         

@@ -5,7 +5,7 @@ import { COURSES, ADMIN_EMAILS } from '../constants';
 import { auth, db, storage } from '../firebase';
 // Fix: Standardizing modular Firebase imports and resolving missing exported member errors
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
@@ -63,65 +63,76 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
-    const fetchCurriculum = async () => {
-        if (!id) return;
-        try {
-            const docRef = doc(db, "courses", id);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setCourse({
-                  id: docSnap.id,
-                  title: data.title || '',
-                  price: data.price || '',
-                  image: data.image || '',
-                  category: data.category || '',
-                  description: data.description || '',
-                });
-                
-                if (data.curriculum) {
-                    const updatedCurriculum = data.curriculum.map((c: any) => ({
-                        ...c,
-                        lessons: c.lessons.map((l: any) => {
-                            const title = typeof l === 'string' ? l : l.title;
-                            const videoUrl = title.includes("HACCP") 
-                                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                                : l.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
-                            return { title, videoUrl };
-                        })
-                    }));
-                    setCurriculum(updatedCurriculum);
-                } else {
-                    const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-                        title: c.title,
-                        lessons: c.lessons.map(l => ({ 
-                           title: l, 
-                           videoUrl: l.includes("HACCP") 
-                              ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                              : "https://www.w3schools.com/html/mov_bbb.mp4" 
-                        }))
-                    }));
-                    setCurriculum(formattedDummy);
-                }
-            } else {
-                const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-                    title: c.title,
-                    lessons: c.lessons.map(l => ({ 
-                       title: l, 
-                       videoUrl: l.includes("HACCP") 
-                          ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                          : "https://www.w3schools.com/html/mov_bbb.mp4" 
-                    }))
-                }));
-                setCurriculum(formattedDummy);
-            }
-        } catch (error) {
-            console.error("Error fetching curriculum:", error);
-        }
+    if (!id) return;
+
+    // Helper to format raw curriculum chapters
+    const parseCurriculum = (rawChapters: any[]) => {
+      if (!Array.isArray(rawChapters)) return [];
+      return rawChapters.map((c: any) => ({
+        title: typeof c === 'string' ? c : (c.title || ''),
+        lessons: Array.isArray(c.lessons)
+          ? c.lessons.map((l: any) => {
+              const lessonTitle = typeof l === 'string' ? l : (l.title || '');
+              let vUrl = typeof l === 'object' && l.videoUrl ? l.videoUrl : '';
+              if (!vUrl) {
+                vUrl = lessonTitle.includes("HACCP")
+                  ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1"
+                  : "https://www.w3schools.com/html/mov_bbb.mp4";
+              }
+              return { title: lessonTitle, videoUrl: vUrl };
+            })
+          : []
+      }));
     };
-    fetchCurriculum();
-  }, [id, course]);
+
+    const docRef = doc(db, "courses", id);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCourse({
+          id: docSnap.id,
+          title: data.title || '',
+          price: data.price || '0đ',
+          image: data.image || '',
+          category: data.category || '',
+          description: data.description || '',
+          status: data.status || 'active',
+        });
+
+        if (Array.isArray(data.curriculum) && data.curriculum.length > 0) {
+          setCurriculum(parseCurriculum(data.curriculum));
+        } else {
+          const initialCourse = COURSES.find(c => c.id === id);
+          const rawCurr = initialCourse?.curriculum || DUMMY_CURRICULUM;
+          setCurriculum(parseCurriculum(rawCurr));
+        }
+      } else {
+        // Fallback: check hardcoded courses or localStorage
+        let fallbackCourse = COURSES.find(c => c.id === id);
+        if (!fallbackCourse) {
+          try {
+            const localStr = localStorage.getItem('local_custom_courses');
+            if (localStr) {
+              const localList = JSON.parse(localStr);
+              fallbackCourse = localList.find((c: any) => c.id === id);
+            }
+          } catch (e) {}
+        }
+
+        if (fallbackCourse) {
+          setCourse(fallbackCourse);
+          const rawCurr = fallbackCourse.curriculum || DUMMY_CURRICULUM;
+          setCurriculum(parseCurriculum(rawCurr));
+        } else {
+          setCurriculum(parseCurriculum(DUMMY_CURRICULUM));
+        }
+      }
+    }, (error) => {
+      console.warn("CourseDetail onSnapshot warning:", error);
+    });
+
+    return () => unsubscribe();
+  }, [id]);
 
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
