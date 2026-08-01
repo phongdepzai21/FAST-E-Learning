@@ -1,6 +1,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 import { COURSES, CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
+import { Course } from '../types';
 
 interface Message {
   role: 'user' | 'model';
@@ -29,6 +32,28 @@ const FloatingContact: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading, isOpen]);
+
+  const [liveCourses, setLiveCourses] = useState<Course[]>(() => getMergedCourses([]));
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'courses'),
+      (querySnapshot) => {
+        const firestoreCourses: Course[] = [];
+        querySnapshot.forEach((doc) => {
+          firestoreCourses.push({
+            id: doc.id,
+            ...doc.data()
+          } as Course);
+        });
+        setLiveCourses(getMergedCourses(firestoreCourses));
+      },
+      (error) => {
+        console.warn("Error listening to courses in FloatingContact:", error);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   // Focus vào ô nhập liệu khi mở chat
   useEffect(() => {
@@ -72,8 +97,7 @@ const FloatingContact: React.FC = () => {
 
   // Tạo System Prompt thông minh dựa trên dữ liệu thật
   const systemContext = useMemo(() => {
-    const allCourses = getMergedCourses([]);
-    const courseData = allCourses.map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`).join('\n');
+    const courseData = liveCourses.map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`).join('\n');
     const serviceData = CONSULTING_SERVICES.map(s => `- Dịch vụ tư vấn: "${s.title}". Mô tả: ${s.description}.`).join('\n');
     const teamData = TEAM.map(t => `- Chuyên gia: ${t.name} (${t.role})`).join('\n');
     
@@ -104,7 +128,7 @@ const FloatingContact: React.FC = () => {
       6. Không bịa đặt thông tin không có trong dữ liệu.
       7. Nếu học viên hỏi về cách học: Hướng dẫn họ chọn bài học trong chương trình, video sẽ tự động phát. Có thể thả tim (Like) bài học. Tiến độ sẽ tự động cập nhật khi xem hết video.
     `;
-  }, []);
+  }, [liveCourses]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
