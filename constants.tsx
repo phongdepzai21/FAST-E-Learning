@@ -235,20 +235,25 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       ...(overlay.price !== undefined && overlay.price !== null && overlay.price !== '' ? { price: overlay.price } : {}),
       ...(overlay.image ? { image: overlay.image } : {}),
       ...(overlay.category ? { category: overlay.category } : {}),
-      ...(overlay.description ? { description: overlay.description } : {}),
+      ...(overlay.description !== undefined ? { description: overlay.description } : {}),
       ...(overlay.status ? { status: overlay.status } : {}),
       ...(overlay.curriculum && Array.isArray(overlay.curriculum) && overlay.curriculum.length > 0 ? { curriculum: overlay.curriculum } : {}),
-      ...(overlay.authorEmail ? { authorEmail: overlay.authorEmail } : {}),
+      ...(overlay.authorEmail !== undefined ? { authorEmail: overlay.authorEmail } : {}),
     };
   };
 
-  // 1. LocalStorage custom courses overlay (fallback for local changes)
+  const firestoreIds = new Set(firestoreCourses.map(fc => fc.id));
+
+  // 1. LocalStorage custom courses overlay (fallback for local changes or offline mode)
   try {
     const localStr = localStorage.getItem('local_custom_courses');
     if (localStr) {
       const localList: Course[] = JSON.parse(localStr);
       localList.forEach(lc => {
         if (!lc || !lc.id) return;
+        // Skip stale local copy if real-time Firestore has this document
+        if (firestoreIds.has(lc.id)) return;
+
         const idx = combined.findIndex(c => c.id === lc.id);
         if (idx !== -1) {
           combined[idx] = applyOverlay(combined[idx], lc);
@@ -259,7 +264,7 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     }
   } catch (e) {}
 
-  // 2. Firestore overlay (HIGHEST PRIORITY - Real-time cloud database for all accounts & users)
+  // 2. Firestore overlay (HIGHEST PRIORITY - Real-time cloud database)
   firestoreCourses.forEach(fc => {
     if (!fc || !fc.id) return;
     const idx = combined.findIndex(c => c.id === fc.id);

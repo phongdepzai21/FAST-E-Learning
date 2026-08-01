@@ -48,6 +48,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Load all courses with real-time Firestore sync across all accounts
   useEffect(() => {
     setIsLoadingCourses(true);
+    let latestFirestoreCourses: Course[] = [];
+
+    const syncCourses = (fsList?: Course[]) => {
+      if (fsList) latestFirestoreCourses = fsList;
+      setCourses(getMergedCourses(latestFirestoreCourses));
+      setIsLoadingCourses(false);
+    };
 
     const unsubscribe = onSnapshot(
       collection(db, 'courses'),
@@ -61,23 +68,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           } as Course);
         });
 
-        const combined = getMergedCourses(firestoreCourses);
-        setCourses(combined);
-        setIsLoadingCourses(false);
+        syncCourses(firestoreCourses);
       },
       (error) => {
         console.warn("Lỗi đồng bộ danh sách khóa học ở TeacherDashboard:", error);
-        setCourses(getMergedCourses([]));
-        setIsLoadingCourses(false);
+        syncCourses();
       }
     );
 
     const handleCustomUpdate = () => {
-      // Re-trigger sync when local custom events happen
-      try {
-        const localStr = localStorage.getItem('local_custom_courses');
-        setCourses(prev => getMergedCourses());
-      } catch (e) {}
+      syncCourses();
     };
 
     window.addEventListener('courses_updated', handleCustomUpdate);
