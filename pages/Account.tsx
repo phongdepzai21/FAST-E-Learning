@@ -477,14 +477,17 @@ const Account: React.FC = () => {
 
       if (newUser.email) {
           const normalizedEmail = newUser.email.toLowerCase();
+          const isUserAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+          const isUserTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+
           try {
               await setDoc(doc(db, "users", normalizedEmail), {
                   email: normalizedEmail,
                   displayName: fullName,
                   createdAt: new Date().toISOString(),
                   isVip: false,
-                  isAdmin: true,
-                  isTeacher: true
+                  isAdmin: isUserAdmin,
+                  isTeacher: isUserTeacher
               }, { merge: true });
           } catch (dbErr) {
               console.warn("User profile setDoc warning:", dbErr);
@@ -494,25 +497,21 @@ const Account: React.FC = () => {
           try {
               localStorage.setItem(`user_roles_${normalizedEmail}`, JSON.stringify({
                   isVip: false,
-                  isAdmin: true,
-                  isTeacher: true
+                  isAdmin: isUserAdmin,
+                  isTeacher: isUserTeacher
               }));
           } catch (e) {}
+
+          // Manually set the profile in the React state immediately to avoid delays/race conditions
+          setUser({
+            name: fullName,
+            email: normalizedEmail,
+            avatar: '',
+            isVip: false,
+            isAdmin: isUserAdmin,
+            isTeacher: isUserTeacher
+          });
       }
-      
-      // Successfully authenticated and saved. Reset states
-      setIsOtpPending(false);
-      setGeneratedOtp('');
-      
-      // Manually set the profile in the React state immediately to avoid delays/race conditions
-      setUser({
-        name: fullName,
-        email: email.toLowerCase(),
-        avatar: '',
-        isVip: false,
-        isAdmin: true,
-        isTeacher: true
-      });
 
       toast.success('Xác nhận thành công! Chào mừng ' + fullName + ' gia nhập FAST E-Learning.');
 
@@ -703,8 +702,8 @@ const Account: React.FC = () => {
   };
 
   const isVip = user?.isVip === true;
-  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || user?.isTeacher === true || Boolean(user?.email);
-  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || user?.isAdmin === true || Boolean(user?.email);
+  const isTeacher = TEACHER_EMAILS.includes(user?.email || '') || user?.isTeacher === true;
+  const isAdmin = ADMIN_EMAILS.includes(user?.email || '') || user?.isAdmin === true;
   const showSkeleton = !isVip && isLoadingCourses;
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
