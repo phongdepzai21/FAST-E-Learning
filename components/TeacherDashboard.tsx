@@ -61,6 +61,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           ...(data.category ? { category: data.category } : {}),
           ...(data.description ? { description: data.description } : {}),
           ...(data.status ? { status: data.status } : {}),
+          ...(data.curriculum ? { curriculum: data.curriculum } : {}),
         } as Course);
       });
     } catch (err: any) {

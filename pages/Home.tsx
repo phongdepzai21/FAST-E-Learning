@@ -37,6 +37,7 @@ const Home: React.FC = () => {
             ...(data.category ? { category: data.category } : {}),
             ...(data.description ? { description: data.description } : {}),
             ...(data.status ? { status: data.status } : {}),
+            ...(data.curriculum ? { curriculum: data.curriculum } : {}),
           } as Course);
         });
         syncCourses(firestoreCourses);

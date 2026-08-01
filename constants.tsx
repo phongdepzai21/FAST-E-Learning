@@ -241,17 +241,7 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     };
   };
 
-  // 1. Firestore overlay
-  firestoreCourses.forEach(fc => {
-    const idx = combined.findIndex(c => c.id === fc.id);
-    if (idx !== -1) {
-      combined[idx] = applyOverlay(combined[idx], fc);
-    } else if (fc.id) {
-      combined.push(fc);
-    }
-  });
-
-  // 2. LocalStorage custom courses overlay
+  // 1. LocalStorage custom courses overlay (fallback for local changes)
   try {
     const localStr = localStorage.getItem('local_custom_courses');
     if (localStr) {
@@ -266,6 +256,16 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       });
     }
   } catch (e) {}
+
+  // 2. Firestore overlay (HIGHEST PRIORITY - Real-time cloud database for all accounts & users)
+  firestoreCourses.forEach(fc => {
+    const idx = combined.findIndex(c => c.id === fc.id);
+    if (idx !== -1) {
+      combined[idx] = applyOverlay(combined[idx], fc);
+    } else if (fc.id) {
+      combined.push(fc);
+    }
+  });
 
   return combined;
 };
