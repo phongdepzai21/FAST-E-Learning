@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import CourseCard from '../components/CourseCard';
-import { COURSES as HARDCODED_COURSES } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
@@ -15,10 +15,17 @@ const Courses: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(true);
-  const [allCourses, setAllCourses] = useState<Course[]>(HARDCODED_COURSES);
+  const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
+    let latestFirestoreCourses: Course[] = [];
+
+    const syncCourses = (fsList?: Course[]) => {
+      if (fsList) latestFirestoreCourses = fsList;
+      setAllCourses(getMergedCourses(latestFirestoreCourses));
+    };
+
     const unsubscribeSnapshot = onSnapshot(
       collection(db, 'courses'),
       (querySnapshot) => {
@@ -27,54 +34,30 @@ const Courses: React.FC = () => {
           const data = doc.data();
           firestoreCourses.push({
             id: doc.id,
-            title: data.title || '',
-            price: data.price || '0đ',
-            image: data.image || '',
-            category: data.category || '',
-            description: data.description || '',
-            status: data.status || 'active',
-          });
+            ...(data.title ? { title: data.title } : {}),
+            ...(data.price !== undefined ? { price: data.price } : {}),
+            ...(data.image ? { image: data.image } : {}),
+            ...(data.category ? { category: data.category } : {}),
+            ...(data.description ? { description: data.description } : {}),
+            ...(data.status ? { status: data.status } : {}),
+          } as Course);
         });
-        
-        // Merge hardcoded courses with firestore courses (allowing firestore updates to override hardcoded fields)
-        const combined = [...HARDCODED_COURSES];
-        firestoreCourses.forEach(fc => {
-          const index = combined.findIndex(c => c.id === fc.id);
-          if (index !== -1) {
-            combined[index] = {
-              ...combined[index],
-              ...fc
-            };
-          } else {
-            combined.push(fc);
-          }
-        });
-
-        // Merge local custom courses from LocalStorage
-        try {
-          const localStr = localStorage.getItem('local_custom_courses');
-          if (localStr) {
-            const localList: Course[] = JSON.parse(localStr);
-            localList.forEach(lc => {
-              const idx = combined.findIndex(c => c.id === lc.id);
-              if (idx !== -1) {
-                combined[idx] = { ...combined[idx], ...lc };
-              } else {
-                combined.push(lc);
-              }
-            });
-          }
-        } catch (e) {}
-
-        setAllCourses(combined);
+        syncCourses(firestoreCourses);
       },
       (error) => {
         console.error("Lỗi đồng bộ danh sách khóa học:", error);
+        syncCourses();
       }
     );
 
+    const handleCustomUpdate = () => syncCourses();
+    window.addEventListener('courses_updated', handleCustomUpdate);
+    window.addEventListener('storage', handleCustomUpdate);
+
     return () => {
       unsubscribeSnapshot();
+      window.removeEventListener('courses_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleCustomUpdate);
     };
   }, []);
 
@@ -185,7 +168,7 @@ const Courses: React.FC = () => {
                 className="w-full pl-14 pr-36 py-5 md:py-6 bg-white rounded-3xl text-gray-800 font-bold focus:outline-none focus:ring-4 focus:ring-white/30 transition-all text-sm md:text-base border-none shadow-xl"
              />
              <div className="absolute right-3 inset-y-3 hidden md:block">
-                <button className="h-full bg-gray-900 hover:bg-black text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-md">Tìm kiếm</button>
+                <button className="h-full bg-[#007c76]/10 hover:bg-[#007c76]/20 text-[#007c76] border border-[#007c76]/20 backdrop-blur-sm px-8 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95">Tìm kiếm</button>
              </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { COURSES as HARDCODED_COURSES, TEACHER_EMAILS, ADMIN_EMAILS } from '../constants';
+import { COURSES as HARDCODED_COURSES, TEACHER_EMAILS, ADMIN_EMAILS, getMergedCourses } from '../constants';
 import emailjs from '@emailjs/browser';
 import CourseCard from '../components/CourseCard';
 import TeacherDashboard from '../components/TeacherDashboard';
@@ -106,10 +106,17 @@ const Account: React.FC = () => {
   // Default to TRUE to prevent flash
   const [purchasedCourses, setPurchasedCourses] = useState<PurchasedCourseData[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
-  const [allCourses, setAllCourses] = useState<Course[]>(HARDCODED_COURSES);
+  const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
+    let latestFirestoreCourses: Course[] = [];
+
+    const syncCourses = (fsList?: Course[]) => {
+      if (fsList) latestFirestoreCourses = fsList;
+      setAllCourses(getMergedCourses(latestFirestoreCourses));
+    };
+
     const unsubscribeSnapshot = onSnapshot(
       collection(db, 'courses'),
       (querySnapshot) => {
@@ -118,54 +125,30 @@ const Account: React.FC = () => {
           const data = doc.data();
           firestoreCourses.push({
             id: doc.id,
-            title: data.title || '',
-            price: data.price || '0đ',
-            image: data.image || '',
-            category: data.category || '',
-            description: data.description || '',
-            status: data.status || 'active',
-          });
+            ...(data.title ? { title: data.title } : {}),
+            ...(data.price !== undefined ? { price: data.price } : {}),
+            ...(data.image ? { image: data.image } : {}),
+            ...(data.category ? { category: data.category } : {}),
+            ...(data.description ? { description: data.description } : {}),
+            ...(data.status ? { status: data.status } : {}),
+          } as Course);
         });
-        
-        // Merge hardcoded courses with firestore courses (allowing firestore updates to override hardcoded fields)
-        const combined = [...HARDCODED_COURSES];
-        firestoreCourses.forEach(fc => {
-          const index = combined.findIndex(c => c.id === fc.id);
-          if (index !== -1) {
-            combined[index] = {
-              ...combined[index],
-              ...fc
-            };
-          } else {
-            combined.push(fc);
-          }
-        });
-
-        // Merge local custom courses from LocalStorage
-        try {
-          const localStr = localStorage.getItem('local_custom_courses');
-          if (localStr) {
-            const localList: Course[] = JSON.parse(localStr);
-            localList.forEach(lc => {
-              const idx = combined.findIndex(c => c.id === lc.id);
-              if (idx !== -1) {
-                combined[idx] = { ...combined[idx], ...lc };
-              } else {
-                combined.push(lc);
-              }
-            });
-          }
-        } catch (e) {}
-
-        setAllCourses(combined);
+        syncCourses(firestoreCourses);
       },
       (error) => {
         console.error("Lỗi đồng bộ danh sách khóa học ở tài khoản:", error);
+        syncCourses();
       }
     );
 
+    const handleCustomUpdate = () => syncCourses();
+    window.addEventListener('courses_updated', handleCustomUpdate);
+    window.addEventListener('storage', handleCustomUpdate);
+
     return () => {
       unsubscribeSnapshot();
+      window.removeEventListener('courses_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleCustomUpdate);
     };
   }, []);
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { COURSES, CONSULTING_SERVICES, TEAM } from '../constants';
+import { COURSES, CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
 
 interface Message {
   role: 'user' | 'model';
@@ -72,7 +72,8 @@ const FloatingContact: React.FC = () => {
 
   // Tạo System Prompt thông minh dựa trên dữ liệu thật
   const systemContext = useMemo(() => {
-    const courseData = COURSES.map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`).join('\n');
+    const allCourses = getMergedCourses([]);
+    const courseData = allCourses.map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`).join('\n');
     const serviceData = CONSULTING_SERVICES.map(s => `- Dịch vụ tư vấn: "${s.title}". Mô tả: ${s.description}.`).join('\n');
     const teamData = TEAM.map(t => `- Chuyên gia: ${t.name} (${t.role})`).join('\n');
     

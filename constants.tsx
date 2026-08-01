@@ -224,3 +224,48 @@ export const COLORS = {
   white: '#ffffff',
   dark: '#374151'
 };
+
+export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
+  const combined: Course[] = COURSES.map(c => ({ ...c }));
+
+  const applyOverlay = (existing: Course, overlay: Partial<Course>): Course => {
+    return {
+      ...existing,
+      ...(overlay.title ? { title: overlay.title } : {}),
+      ...(overlay.price !== undefined && overlay.price !== '' ? { price: overlay.price } : {}),
+      ...(overlay.image ? { image: overlay.image } : {}),
+      ...(overlay.category ? { category: overlay.category } : {}),
+      ...(overlay.description ? { description: overlay.description } : {}),
+      ...(overlay.status ? { status: overlay.status } : {}),
+      ...(overlay.curriculum ? { curriculum: overlay.curriculum } : {}),
+    };
+  };
+
+  // 1. Firestore overlay
+  firestoreCourses.forEach(fc => {
+    const idx = combined.findIndex(c => c.id === fc.id);
+    if (idx !== -1) {
+      combined[idx] = applyOverlay(combined[idx], fc);
+    } else if (fc.id) {
+      combined.push(fc);
+    }
+  });
+
+  // 2. LocalStorage custom courses overlay
+  try {
+    const localStr = localStorage.getItem('local_custom_courses');
+    if (localStr) {
+      const localList: Course[] = JSON.parse(localStr);
+      localList.forEach(lc => {
+        const idx = combined.findIndex(c => c.id === lc.id);
+        if (idx !== -1) {
+          combined[idx] = applyOverlay(combined[idx], lc);
+        } else if (lc.id) {
+          combined.push(lc);
+        }
+      });
+    }
+  } catch (e) {}
+
+  return combined;
+};

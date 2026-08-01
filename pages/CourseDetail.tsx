@@ -5,7 +5,7 @@ import { COURSES, ADMIN_EMAILS } from '../constants';
 import { auth, db, storage } from '../firebase';
 // Fix: Standardizing modular Firebase imports and resolving missing exported member errors
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
@@ -63,65 +63,97 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
-    const fetchCurriculum = async () => {
-        if (!id) return;
-        try {
-            const docRef = doc(db, "courses", id);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setCourse({
-                  id: docSnap.id,
-                  title: data.title || '',
-                  price: data.price || '',
-                  image: data.image || '',
-                  category: data.category || '',
-                  description: data.description || '',
-                });
-                
-                if (data.curriculum) {
-                    const updatedCurriculum = data.curriculum.map((c: any) => ({
-                        ...c,
-                        lessons: c.lessons.map((l: any) => {
-                            const title = typeof l === 'string' ? l : l.title;
-                            const videoUrl = title.includes("HACCP") 
-                                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                                : l.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
-                            return { title, videoUrl };
-                        })
-                    }));
-                    setCurriculum(updatedCurriculum);
-                } else {
-                    const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-                        title: c.title,
-                        lessons: c.lessons.map(l => ({ 
-                           title: l, 
-                           videoUrl: l.includes("HACCP") 
-                              ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                              : "https://www.w3schools.com/html/mov_bbb.mp4" 
-                        }))
-                    }));
-                    setCurriculum(formattedDummy);
-                }
-            } else {
-                const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-                    title: c.title,
-                    lessons: c.lessons.map(l => ({ 
-                       title: l, 
-                       videoUrl: l.includes("HACCP") 
-                          ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                          : "https://www.w3schools.com/html/mov_bbb.mp4" 
-                    }))
-                }));
-                setCurriculum(formattedDummy);
-            }
-        } catch (error) {
-            console.error("Error fetching curriculum:", error);
+    if (!id) return;
+
+    const loadFromLocalAndFallback = (firestoreData?: any) => {
+      const initialBase = COURSES.find(c => c.id === id) || {
+        id,
+        title: 'Khóa học',
+        price: '599.000đ',
+        image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
+        category: 'Chung',
+        description: 'Chi tiết khóa học'
+      };
+
+      let localData: any = null;
+      try {
+        const localStr = localStorage.getItem('local_custom_courses');
+        if (localStr) {
+          const localList = JSON.parse(localStr);
+          localData = localList.find((c: any) => c.id === id);
         }
+      } catch (e) {}
+
+      const merged = {
+        ...initialBase,
+        ...(firestoreData || {}),
+        ...(localData || {})
+      };
+
+      setCourse({
+        id: merged.id,
+        title: merged.title || initialBase.title,
+        price: merged.price || initialBase.price,
+        image: merged.image || initialBase.image,
+        category: merged.category || initialBase.category,
+        description: merged.description || initialBase.description,
+      });
+
+      const curr = merged.curriculum || firestoreData?.curriculum || localData?.curriculum;
+      if (curr && Array.isArray(curr) && curr.length > 0) {
+        const updatedCurriculum = curr.map((c: any) => ({
+          ...c,
+          lessons: (c.lessons || []).map((l: any) => {
+            const title = typeof l === 'string' ? l : (l.title || '');
+            const videoUrl = typeof l === 'object' && l.videoUrl ? l.videoUrl : (
+              title.includes("HACCP") 
+                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+                : "https://www.w3schools.com/html/mov_bbb.mp4"
+            );
+            return { title, videoUrl };
+          })
+        }));
+        setCurriculum(updatedCurriculum);
+      } else {
+        const formattedDummy = DUMMY_CURRICULUM.map(c => ({
+          title: c.title,
+          lessons: c.lessons.map(l => ({ 
+            title: l, 
+            videoUrl: l.includes("HACCP") 
+              ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+              : "https://www.w3schools.com/html/mov_bbb.mp4" 
+          }))
+        }));
+        setCurriculum(formattedDummy);
+      }
     };
-    fetchCurriculum();
-  }, [id, course]);
+
+    const docRef = doc(db, "courses", id);
+    const unsubscribeSnapshot = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          loadFromLocalAndFallback(docSnap.data());
+        } else {
+          loadFromLocalAndFallback();
+        }
+      },
+      (error) => {
+        console.warn("Lỗi đọc dữ liệu khóa học realtime:", error);
+        loadFromLocalAndFallback();
+      }
+    );
+
+    const handleCustomUpdate = () => loadFromLocalAndFallback();
+    window.addEventListener('courses_updated', handleCustomUpdate);
+    window.addEventListener('storage', handleCustomUpdate);
+
+    return () => {
+      unsubscribeSnapshot();
+      window.removeEventListener('courses_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleCustomUpdate);
+    };
+  }, [id]);
 
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
@@ -169,6 +201,20 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           await setDoc(docRef, { curriculum: editData }, { merge: true });
           setCurriculum(editData);
           setIsEditingCurriculum(false);
+
+          try {
+            const localStr = localStorage.getItem('local_custom_courses');
+            let localList = localStr ? JSON.parse(localStr) : [];
+            const idx = localList.findIndex((c: any) => c.id === id);
+            if (idx !== -1) {
+              localList[idx].curriculum = editData;
+            } else if (course) {
+              localList.push({ ...course, curriculum: editData });
+            }
+            localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+          } catch (e) {}
+
+          window.dispatchEvent(new CustomEvent('courses_updated'));
           alert("Lưu chương trình học thành công!");
       } catch (error) {
           console.error("Error saving curriculum:", error);

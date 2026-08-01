@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES } from '../constants';
+import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
 import { Course } from '../types';
 
 interface TeacherDashboardProps {
@@ -55,50 +55,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         const data = doc.data();
         firestoreCourses.push({
           id: doc.id,
-          title: data.title || '',
-          price: data.price || '0đ',
-          image: data.image || '',
-          category: data.category || 'Khác',
-          description: data.description || '',
-          status: data.status || 'active',
-        });
+          ...(data.title ? { title: data.title } : {}),
+          ...(data.price !== undefined ? { price: data.price } : {}),
+          ...(data.image ? { image: data.image } : {}),
+          ...(data.category ? { category: data.category } : {}),
+          ...(data.description ? { description: data.description } : {}),
+          ...(data.status ? { status: data.status } : {}),
+        } as Course);
       });
     } catch (err: any) {
       console.warn("Firestore fetch courses warning:", err);
     }
 
-    // Merge hardcoded courses with firestore courses
-    const combined = [...HARDCODED_COURSES];
-    firestoreCourses.forEach(fc => {
-      const idx = combined.findIndex(c => c.id === fc.id);
-      if (idx !== -1) {
-        combined[idx] = {
-          ...combined[idx],
-          ...fc
-        };
-      } else {
-        combined.push(fc);
-      }
-    });
-
-    // Merge local custom courses from localStorage backup
-    try {
-      const localStr = localStorage.getItem('local_custom_courses');
-      if (localStr) {
-        const localList: Course[] = JSON.parse(localStr);
-        localList.forEach(lc => {
-          const idx = combined.findIndex(c => c.id === lc.id);
-          if (idx !== -1) {
-            combined[idx] = { ...combined[idx], ...lc };
-          } else {
-            combined.push(lc);
-          }
-        });
-      }
-    } catch (e) {
-      console.warn("LocalStorage courses read error:", e);
-    }
-
+    const combined = getMergedCourses(firestoreCourses);
     setCourses(combined);
     setIsLoadingCourses(false);
   };
@@ -280,6 +249,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
+    window.dispatchEvent(new CustomEvent('courses_updated'));
     resetForm();
     await fetchAllCourses();
     setIsSubmitting(false);
@@ -355,6 +325,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
+    window.dispatchEvent(new CustomEvent('courses_updated'));
     await fetchAllCourses();
     setIsSubmitting(false);
     setTimeout(() => {
@@ -389,6 +360,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       } catch (e) {}
 
       setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}"!` });
+      window.dispatchEvent(new CustomEvent('courses_updated'));
       await fetchAllCourses();
       setTimeout(() => setMessage(null), 4000);
     }
