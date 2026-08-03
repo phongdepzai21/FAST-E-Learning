@@ -16,19 +16,15 @@ import Handbook from './Handbook';
 
 const DUMMY_CURRICULUM = [
     { 
-      title: "Chương 1: Tổng quan và Cơ sở pháp lý", 
-      lessons: ["Giới thiệu về FAST E-Learning", "Tầm quan trọng của An toàn thực phẩm", "Hệ thống văn bản pháp luật hiện hành", "Trách nhiệm của chủ cơ sở"] 
-    },
-    { 
-      title: "Chương 2: Các nguyên tắc quản lý chất lượng", 
+      title: "Các nguyên tắc quản lý chất lượng", 
       lessons: ["Phân tích bối cảnh tổ chức", "Xây dựng chính sách an toàn thực phẩm", "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", "Quản lý rủi ro và cơ hội"] 
     },
     { 
-      title: "Chương 3: Triển khai vận hành thực tế", 
+      title: "Triển khai vận hành thực tế", 
       lessons: ["Kiểm soát vệ sinh cá nhân và nhà xưởng", "Quản lý nguồn gốc nguyên liệu (Traceability)", "Thiết lập điểm kiểm soát tới hạn (CCP)", "Quy trình xử lý sự cố và thu hồi"] 
     },
     { 
-      title: "Chương 4: Đánh giá và Cải tiến liên tục", 
+      title: "Đánh giá và Cải tiến liên tục", 
       lessons: ["Kỹ năng đánh giá nội bộ", "Xem xét của lãnh đạo", "Hành động khắc phục", "Văn hóa an toàn thực phẩm trong doanh nghiệp"] 
     }
 ];
@@ -101,19 +97,45 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
       const curr = firestoreData?.curriculum || localData?.curriculum || merged.curriculum;
       if (curr && Array.isArray(curr) && curr.length > 0) {
-        const updatedCurriculum = curr.map((c: any) => ({
-          ...c,
-          lessons: (c.lessons || []).map((l: any) => {
-            const title = typeof l === 'string' ? l : (l.title || '');
-            const videoUrl = typeof l === 'object' && l.videoUrl ? l.videoUrl : (
-              title.includes("HACCP") 
-                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                : "https://www.w3schools.com/html/mov_bbb.mp4"
-            );
-            return { title, videoUrl };
+        const updatedCurriculum = curr
+          .filter((c: any) => {
+            const cTitle = (c.title || '').toLowerCase();
+            return !cTitle.includes("tổng quan và cơ sở pháp lý") && !cTitle.includes("giới thiệu về fast e-learning");
           })
-        }));
-        setCurriculum(updatedCurriculum);
+          .map((c: any) => {
+            const cleanTitle = (c.title || '').replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
+            return {
+              ...c,
+              title: cleanTitle || c.title || 'Phần học',
+              lessons: (c.lessons || [])
+                .map((l: any) => {
+                  const title = typeof l === 'string' ? l : (l.title || '');
+                  const videoUrl = typeof l === 'object' && l.videoUrl ? l.videoUrl : (
+                    title.includes("HACCP") 
+                      ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+                      : "https://www.w3schools.com/html/mov_bbb.mp4"
+                  );
+                  return { title, videoUrl };
+                })
+                .filter((l: any) => !l.title.toLowerCase().includes("giới thiệu về fast e-learning"))
+            };
+          })
+          .filter((c: any) => c.lessons && c.lessons.length > 0);
+
+        if (updatedCurriculum.length > 0) {
+          setCurriculum(updatedCurriculum);
+        } else {
+          const formattedDummy = DUMMY_CURRICULUM.map(c => ({
+            title: c.title,
+            lessons: c.lessons.map(l => ({ 
+              title: l, 
+              videoUrl: l.includes("HACCP") 
+                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+                : "https://www.w3schools.com/html/mov_bbb.mp4" 
+            }))
+          }));
+          setCurriculum(formattedDummy);
+        }
       } else {
         const formattedDummy = DUMMY_CURRICULUM.map(c => ({
           title: c.title,
@@ -543,7 +565,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         <section className={`transition-all duration-1000 delay-300 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3"><span className="w-1.5 h-8 bg-primary rounded-full shrink-0"></span>Chương trình học</h2>
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{curriculum.length} Chương</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{curriculum.length} Phần</span>
             </div>
 
             {isOwned && courseProgress >= 100 && (
@@ -582,13 +604,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                         setEditData(newData);
                                     }}
                                     className="font-black text-lg border-b-2 border-gray-200 focus:border-primary outline-none w-full mr-4 pb-1 transition-colors"
-                                    placeholder="Tên chương"
+                                    placeholder="Tên phần học"
                                 />
                                 <button onClick={() => {
                                     const newData = [...editData];
                                     newData.splice(cIdx, 1);
                                     setEditData(newData);
-                                }} className="text-red-500 hover:text-red-700 text-sm font-bold shrink-0 bg-red-50 px-3 py-1 rounded-lg transition-colors">Xóa chương</button>
+                                }} className="text-red-500 hover:text-red-700 text-sm font-bold shrink-0 bg-red-50 px-3 py-1 rounded-lg transition-colors">Xóa phần</button>
                             </div>
                             <div className="space-y-4 pl-4 border-l-2 border-gray-100">
                                 {chapter.lessons.map((lesson: any, lIdx: number) => (
@@ -633,15 +655,15 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         </div>
                     ))}
                     <button onClick={() => {
-                        setEditData([...editData, { title: "Chương mới", lessons: [] }]);
-                    }} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-2xl hover:bg-gray-50 hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> Thêm chương mới</button>
+                        setEditData([...editData, { title: "Phần học mới", lessons: [] }]);
+                    }} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-2xl hover:bg-gray-50 hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> Thêm phần học mới</button>
                 </div>
             ) : (
                 <div className="space-y-3">
                     {curriculum.map((item, idx) => (
                         <div key={idx} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-all hover:shadow-md">
                             <button onClick={() => setActiveModule(activeModule === idx ? null : idx)} className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-4"><span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${activeModule === idx ? 'bg-primary text-white scale-110' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span><span className="font-black text-gray-700 text-left md:text-lg">{item.title}</span></div>
+                                <div className="flex items-center gap-4"><span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${activeModule === idx ? 'bg-primary text-white scale-110' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span><span className="font-black text-gray-700 text-left md:text-lg">{item.title.replace(/^Chương\s*\d*[:\s-]*/i, '')}</span></div>
                                 <svg className={`w-6 h-6 text-gray-400 transition-transform duration-300 ${activeModule === idx ? 'rotate-180 text-primary' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                             </button>
                             <div className={`overflow-hidden transition-all duration-500 ease-in-out ${activeModule === idx ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>

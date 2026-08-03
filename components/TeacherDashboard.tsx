@@ -13,9 +13,9 @@ const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 
 
 const DUMMY_CURRICULUM_TEMPLATE = [
   { 
-    title: "Chương 1: Tổng quan và Cơ sở pháp lý", 
+    title: "Các nguyên tắc quản lý chất lượng", 
     lessons: [
-      { title: "Giới thiệu về khóa học", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+      { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
       { title: "Tầm quan trọng của tiêu chuẩn an toàn", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
     ] 
   }
@@ -175,7 +175,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     if (chapters.length > 0) {
       setChapters(prev => prev.map((chap, cIdx) => ({
         ...chap,
-        title: chap.title.trim() || `Chương ${cIdx + 1}`,
+        title: chap.title.replace(/^Chương\s*\d*[:\s-]*/i, '').trim() || `Phần ${cIdx + 1}`,
         lessons: chap.lessons.map((les, lIdx) => {
           let vUrl = les.videoUrl ? les.videoUrl.trim() : '';
           if (!vUrl) {
@@ -198,7 +198,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const sanitizeCurriculum = (inputChapters: any[]) => {
     if (!Array.isArray(inputChapters)) return [];
     return inputChapters.map((chap, cIdx) => ({
-      title: String(chap?.title || `Chương ${cIdx + 1}`).trim(),
+      title: String(chap?.title || '').replace(/^Chương\s*\d*[:\s-]*/i, '').trim() || `Phần ${cIdx + 1}`,
       lessons: Array.isArray(chap?.lessons) 
         ? chap.lessons.map((les: any, lIdx: number) => ({
             title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
@@ -401,7 +401,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const addChapter = () => {
     setChapters(prev => [
       ...prev,
-      { title: `Chương ${prev.length + 1}: [Nhập tiêu đề chương]`, lessons: [] }
+      { title: `Phần ${prev.length + 1}: [Nhập tiêu đề phần]`, lessons: [] }
     ]);
   };
 
@@ -473,17 +473,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const loadDefaultTemplate = () => {
     setChapters([
       {
-        title: "Chương 1: Khởi động và Cơ sở học tập",
+        title: "Các Nguyên Tắc Quản Lý Cốt Lõi",
         lessons: [
-          { title: "Bài 1: Giới thiệu hệ thống học trực tuyến", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-          { title: "Bài 2: Tầm quan trọng của An toàn & Tiêu chuẩn Vệ sinh", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+          { title: "Bài 1: Tầm quan trọng của An toàn & Tiêu chuẩn Vệ sinh", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+          { title: "Bài 2: Các quy tắc phân tích rủi ro và quản trị", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
         ]
       },
       {
-        title: "Chương 2: Kiến Thức Chuyên Sâu Cốt Lõi",
+        title: "Triển Khai Vận Hành Thực Tế",
         lessons: [
-          { title: "Bài 3: Các quy tắc phân tích rủi ro và quản trị", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-          { title: "Bài 4: Thực hành quy trình giám sát độc lập", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+          { title: "Bài 3: Thực hành quy trình giám sát độc lập", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+          { title: "Bài 4: Quy trình kiểm soát và xử lý sự cố", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
         ]
       }
     ]);
@@ -771,13 +771,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             {/* Curriculum Drag List mockup */}
             {chapters.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                <p className="text-gray-400 text-sm font-semibold">Chương trình học trống. Thêm chương và bài giảng để học viên bắt đầu.</p>
+                <p className="text-gray-400 text-sm font-semibold">Chương trình học trống. Thêm phần bài giảng để học viên bắt đầu.</p>
                 <button
                   type="button"
                   onClick={addChapter}
                   className="mt-3 text-xs font-black text-[#007c76] uppercase tracking-wider hover:underline"
                 >
-                  + Thêm chương học đầu tiên
+                  + Thêm phần học đầu tiên
                 </button>
               </div>
             ) : (
@@ -795,7 +795,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                           type="text"
                           value={chapter.title}
                           onChange={(e) => updateChapterTitle(cIdx, e.target.value)}
-                          placeholder="Nhập tên chương (Ví dụ: Chương 1: Giới thiệu chung)"
+                          placeholder="Nhập tên phần học (Ví dụ: Giới thiệu chung)"
                           className="w-full text-sm font-black text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-[#007c76] focus:ring-0 outline-none py-1 transition-all"
                         />
                       </div>
@@ -825,7 +825,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                           onClick={() => deleteChapter(cIdx)}
                           className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
                         >
-                          Xóa chương
+                          Xóa phần
                         </button>
                       </div>
                     </div>
@@ -898,7 +898,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                         onClick={() => addLesson(cIdx)}
                         className="w-full py-2 bg-dashed border border-dashed border-[#007c76]/30 hover:border-[#007c76] text-[#007c76] hover:bg-[#007c76]/5 rounded-xl text-xs font-bold transition-all cursor-pointer mt-2 text-center"
                       >
-                        + Bấm để thêm bài giảng vào chương này
+                        + Bấm để thêm bài giảng vào phần này
                       </button>
                     </div>
 
