@@ -11,15 +11,37 @@ interface TeacherDashboardProps {
 
 const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Testing', 'Khác'];
 
-const DUMMY_CURRICULUM_TEMPLATE = [
-  { 
-    title: "Các nguyên tắc quản lý chất lượng", 
-    lessons: [
-      { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-      { title: "Tầm quan trọng của tiêu chuẩn an toàn", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-    ] 
-  }
+const DEFAULT_FLAT_LESSONS = [
+  { title: "Các nguyên tắc quản lý chất lượng cốt lõi", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Tầm quan trọng của tiêu chuẩn an toàn & vệ sinh", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Các quy tắc phân tích rủi ro và quản trị HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
+  { title: "Thực hành quy trình giám sát độc lập và xử lý sự cố", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
 ];
+
+const extractFlatLessons = (rawCurr: any): Array<{ title: string; videoUrl: string }> => {
+  if (!rawCurr || !Array.isArray(rawCurr)) return DEFAULT_FLAT_LESSONS;
+
+  const result: Array<{ title: string; videoUrl: string }> = [];
+
+  rawCurr.forEach((item) => {
+    if (item && Array.isArray(item.lessons)) {
+      item.lessons.forEach((l: any) => {
+        const title = (typeof l === 'string' ? l : (l?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
+        if (!title || title.toLowerCase().includes("giới thiệu về fast e-learning")) return;
+        const videoUrl = typeof l === 'object' && l?.videoUrl ? l.videoUrl : "https://www.w3schools.com/html/mov_bbb.mp4";
+        result.push({ title, videoUrl });
+      });
+    } else if (item) {
+      const title = (typeof item === 'string' ? item : (item?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
+      if (title && !title.toLowerCase().includes("giới thiệu về fast e-learning")) {
+        const videoUrl = typeof item === 'object' && item?.videoUrl ? item.videoUrl : "https://www.w3schools.com/html/mov_bbb.mp4";
+        result.push({ title, videoUrl });
+      }
+    }
+  });
+
+  return result.length > 0 ? result : DEFAULT_FLAT_LESSONS;
+};
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Navigation internal tab
@@ -39,8 +61,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'active' | 'draft'>('active');
 
-  // Curriculum State
-  const [chapters, setChapters] = useState<{ title: string; lessons: { title: string; videoUrl: string }[] }[]>([]);
+  // Curriculum State (Flat Lessons)
+  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -111,20 +133,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // Fetch curriculum content or revert to template if empty
     try {
       const courseDocSnap = await getDoc(doc(db, 'courses', course.id));
-      if (courseDocSnap.exists() && courseDocSnap.data().curriculum && Array.isArray(courseDocSnap.data().curriculum) && courseDocSnap.data().curriculum.length > 0) {
-        setChapters(courseDocSnap.data().curriculum);
-      } else if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
-        setChapters(course.curriculum);
+      if (courseDocSnap.exists() && courseDocSnap.data().curriculum) {
+        setFlatLessons(extractFlatLessons(courseDocSnap.data().curriculum));
       } else {
-        setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)));
+        setFlatLessons(extractFlatLessons(course.curriculum));
       }
     } catch (err) {
       console.error("Lỗi lấy thông tin giáo trình:", err);
-      if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
-        setChapters(course.curriculum);
-      } else {
-        setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE)));
-      }
+      setFlatLessons(extractFlatLessons(course.curriculum));
     }
 
     setActiveTab('edit');
@@ -171,41 +187,33 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       setImageUrlInput('https://' + imageUrlInput.trim().replace(/^\/+/, ''));
     }
 
-    // Auto format video URLs in chapters if missing protocol
-    if (chapters.length > 0) {
-      setChapters(prev => prev.map((chap, cIdx) => ({
-        ...chap,
-        title: chap.title.replace(/^Chương\s*\d*[:\s-]*/i, '').trim() || `Phần ${cIdx + 1}`,
-        lessons: chap.lessons.map((les, lIdx) => {
-          let vUrl = les.videoUrl ? les.videoUrl.trim() : '';
-          if (!vUrl) {
-            vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-          } else if (!vUrl.startsWith('http://') && !vUrl.startsWith('https://')) {
-            vUrl = 'https://' + vUrl.replace(/^\/+/, '');
-          }
-          return {
-            title: les.title.trim() || `Bài học ${lIdx + 1}`,
-            videoUrl: vUrl
-          };
-        })
-      })));
+    // Auto format video URLs in flatLessons if missing protocol
+    if (flatLessons.length > 0) {
+      setFlatLessons(prev => prev.map((les, lIdx) => {
+        let vUrl = les.videoUrl ? les.videoUrl.trim() : '';
+        if (!vUrl) {
+          vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
+        } else if (!vUrl.startsWith('http://') && !vUrl.startsWith('https://')) {
+          vUrl = 'https://' + vUrl.replace(/^\/+/, '');
+        }
+        return {
+          title: les.title.trim() || `Bài học ${lIdx + 1}`,
+          videoUrl: vUrl
+        };
+      }));
     }
 
     return true;
   };
 
   // Helper to sanitize curriculum data ensuring no undefined values are sent to Firestore
-  const sanitizeCurriculum = (inputChapters: any[]) => {
-    if (!Array.isArray(inputChapters)) return [];
-    return inputChapters.map((chap, cIdx) => ({
-      title: String(chap?.title || '').replace(/^Chương\s*\d*[:\s-]*/i, '').trim() || `Phần ${cIdx + 1}`,
-      lessons: Array.isArray(chap?.lessons) 
-        ? chap.lessons.map((les: any, lIdx: number) => ({
-            title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
-            videoUrl: String(les?.videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4').trim()
-          }))
-        : []
+  const sanitizeCurriculum = (inputLessons: any[]) => {
+    if (!Array.isArray(inputLessons)) return [];
+    const cleanLessons = inputLessons.map((les, lIdx) => ({
+      title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
+      videoUrl: String(les?.videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4').trim()
     }));
+    return [{ title: "Danh sách bài giảng", lessons: cleanLessons }];
   };
 
   // Create a brand new Custom Course
@@ -235,7 +243,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
     }
 
-    const rawCurriculum = chapters.length > 0 ? chapters : DUMMY_CURRICULUM_TEMPLATE;
+    const rawCurriculum = flatLessons.length > 0 ? flatLessons : DEFAULT_FLAT_LESSONS;
     const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
 
     const newCourse = {
@@ -268,7 +276,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage save error:', e);
     }
 
-    setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với đầy đủ chương trình học thành công!` });
+    setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với danh sách bài giảng thành công!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
     resetForm();
     setIsSubmitting(false);
@@ -307,7 +315,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
     }
 
-    const sanitizedCurriculum = sanitizeCurriculum(chapters);
+    const sanitizedCurriculum = sanitizeCurriculum(flatLessons);
 
     const updatedCourse = {
       id: editingCourseId,
@@ -343,7 +351,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage edit error:', e);
     }
 
-    setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & giáo trình "${title}" thành công!` });
+    setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & bài giảng "${title}" thành công!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
     setIsSubmitting(false);
     setTimeout(() => {
@@ -392,101 +400,45 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setImageUrlInput('');
     setImageFile(null);
     setStatus('active');
-    setChapters([]);
+    setFlatLessons(DEFAULT_FLAT_LESSONS);
     const fileInput = document.getElementById('cover-upload-form') as HTMLInputElement;
     if (fileInput) fileInput.value = '';
   };
 
-  // Helper methods for interactive dynamic curriculum builder
-  const addChapter = () => {
-    setChapters(prev => [
+  // Helper methods for dynamic flat lesson list builder
+  const addFlatLesson = () => {
+    setFlatLessons(prev => [
       ...prev,
-      { title: `Phần ${prev.length + 1}: [Nhập tiêu đề phần]`, lessons: [] }
+      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
     ]);
   };
 
-  const deleteChapter = (cIdx: number) => {
-    setChapters(prev => prev.filter((_, idx) => idx !== cIdx));
+  const deleteFlatLesson = (lIdx: number) => {
+    setFlatLessons(prev => prev.filter((_, idx) => idx !== lIdx));
   };
 
-  const moveChapter = (cIdx: number, direction: 'up' | 'down') => {
-    setChapters(prev => {
-      const nextIdx = direction === 'up' ? cIdx - 1 : cIdx + 1;
+  const moveFlatLesson = (lIdx: number, direction: 'up' | 'down') => {
+    setFlatLessons(prev => {
+      const nextIdx = direction === 'up' ? lIdx - 1 : lIdx + 1;
       if (nextIdx < 0 || nextIdx >= prev.length) return prev;
       const result = [...prev];
-      const temp = result[cIdx];
-      result[cIdx] = result[nextIdx];
+      const temp = result[lIdx];
+      result[lIdx] = result[nextIdx];
       result[nextIdx] = temp;
       return result;
     });
   };
 
-  const addLesson = (cIdx: number) => {
-    setChapters(prev => {
+  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl', value: string) => {
+    setFlatLessons(prev => {
       const result = [...prev];
-      result[cIdx].lessons.push({ 
-        title: `Bài học ${result[cIdx].lessons.length + 1}`, 
-        videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' 
-      });
-      return result;
-    });
-  };
-
-  const updateChapterTitle = (cIdx: number, value: string) => {
-    setChapters(prev => {
-      const result = [...prev];
-      result[cIdx].title = value;
-      return result;
-    });
-  };
-
-  const updateLessonValue = (cIdx: number, lIdx: number, field: 'title' | 'videoUrl', value: string) => {
-    setChapters(prev => {
-      const result = [...prev];
-      result[cIdx].lessons[lIdx][field] = value;
-      return result;
-    });
-  };
-
-  const deleteLesson = (cIdx: number, lIdx: number) => {
-    setChapters(prev => {
-      const result = [...prev];
-      result[cIdx].lessons = result[cIdx].lessons.filter((_, idx) => idx !== lIdx);
-      return result;
-    });
-  };
-
-  const moveLesson = (cIdx: number, lIdx: number, direction: 'up' | 'down') => {
-    setChapters(prev => {
-      const nextIdx = direction === 'up' ? lIdx - 1 : lIdx + 1;
-      if (nextIdx < 0 || nextIdx >= prev[cIdx].lessons.length) return prev;
-      const result = [...prev];
-      const lessons = [...result[cIdx].lessons];
-      const temp = lessons[lIdx];
-      lessons[lIdx] = lessons[nextIdx];
-      lessons[nextIdx] = temp;
-      result[cIdx].lessons = lessons;
+      result[lIdx] = { ...result[lIdx], [field]: value };
       return result;
     });
   };
 
   const loadDefaultTemplate = () => {
-    setChapters([
-      {
-        title: "Các Nguyên Tắc Quản Lý Cốt Lõi",
-        lessons: [
-          { title: "Bài 1: Tầm quan trọng của An toàn & Tiêu chuẩn Vệ sinh", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-          { title: "Bài 2: Các quy tắc phân tích rủi ro và quản trị", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-        ]
-      },
-      {
-        title: "Triển Khai Vận Hành Thực Tế",
-        lessons: [
-          { title: "Bài 3: Thực hành quy trình giám sát độc lập", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-          { title: "Bài 4: Quy trình kiểm soát và xử lý sự cố", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-        ]
-      }
-    ]);
+    setFlatLessons(JSON.parse(JSON.stringify(DEFAULT_FLAT_LESSONS)));
   };
 
   return (
@@ -513,7 +465,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             Danh sách khóa học
           </button>
           <button
-            onClick={() => { setActiveTab('add'); resetForm(); setMessage(null); setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE))); }}
+            onClick={() => { setActiveTab('add'); resetForm(); setMessage(null); setFlatLessons(JSON.parse(JSON.stringify(DEFAULT_FLAT_LESSONS))); }}
             className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'add' ? 'bg-white text-[#007c76] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
           >
             Thêm khóa học mới
@@ -545,7 +497,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             <div className="text-center py-16 bg-gray-50 rounded-[32px] border-2 border-dashed border-gray-100">
               <p className="text-gray-400 font-bold mb-2">Chưa có khóa học nào trên hệ thống.</p>
               <button 
-                onClick={() => { setActiveTab('add'); setChapters(JSON.parse(JSON.stringify(DUMMY_CURRICULUM_TEMPLATE))); }}
+                onClick={() => { setActiveTab('add'); setFlatLessons(JSON.parse(JSON.stringify(DEFAULT_FLAT_LESSONS))); }}
                 className="mt-2 text-xs font-black text-[#007c76] uppercase tracking-widest hover:underline"
               >
                 + Bấm vào đây để tạo mới
@@ -737,173 +689,117 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             </div>
           </div>
 
-          {/* Section 2: Dynamic Curriculum Designer */}
+          {/* Section 2: Dynamic Flat Lesson List */}
           <div className="bg-gray-50/50 p-6 md:p-8 rounded-[32px] border border-gray-100 space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-[#007c76] rounded-full"></span>
-                  2. Thiết kế chương trình đào tạo & Bài học
+                  2. Danh sách bài giảng ({flatLessons.length} bài)
                 </h3>
                 <p className="text-gray-400 text-xs font-semibold mt-1">
-                  Kéo, thả, sắp xếp danh sách các chương mục và tải tài liệu tương tác trực quan.
+                  Quản lý và sắp xếp các bài giảng hiển thị trực tiếp trong khóa học.
                 </p>
               </div>
               
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={loadDefaultTemplate}
-                  className="px-4 py-2 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer"
+                  onClick={addFlatLesson}
+                  className="px-4 py-2 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
                 >
-                  ⚡ Điền nhanh bố cục mẫu
-                </button>
-                <button
-                  type="button"
-                  onClick={addChapter}
-                  className="px-4 py-2 bg-[#007c76]/10 hover:bg-[#007c76]/20 text-[#007c76] rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-                >
-                  + Thêm chương mới
+                  + Thêm bài giảng mới
                 </button>
               </div>
             </div>
 
-            {/* Curriculum Drag List mockup */}
-            {chapters.length === 0 ? (
+            {/* Flat Lesson List */}
+            {flatLessons.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                <p className="text-gray-400 text-sm font-semibold">Chương trình học trống. Thêm phần bài giảng để học viên bắt đầu.</p>
+                <p className="text-gray-400 text-sm font-semibold">Khóa học chưa có bài giảng nào.</p>
                 <button
                   type="button"
-                  onClick={addChapter}
-                  className="mt-3 text-xs font-black text-[#007c76] uppercase tracking-wider hover:underline"
+                  onClick={addFlatLesson}
+                  className="mt-3 text-xs font-black text-[#007c76] uppercase tracking-wider hover:underline cursor-pointer"
                 >
-                  + Thêm phần học đầu tiên
+                  + Thêm bài giảng đầu tiên
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {chapters.map((chapter, cIdx) => (
-                  <div key={cIdx} className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200/80 shadow-xs relative group/chap animate-in fade-in duration-300">
-                    
-                    {/* Chapter Header editing */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-gray-100 pb-4 mb-4 justify-between">
-                      <div className="flex items-center gap-2 w-full sm:max-w-xl">
-                        <span className="bg-gray-100 text-gray-500 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
-                          {cIdx + 1}
-                        </span>
+              <div className="space-y-4">
+                {flatLessons.map((lesson, lIdx) => (
+                  <div key={lIdx} className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <span className="w-8 h-8 rounded-xl bg-[#007c76]/10 text-[#007c76] font-black text-xs flex items-center justify-center shrink-0">
+                        {lIdx + 1}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                      {/* Lesson Title Input */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tên bài giảng</span>
                         <input
                           type="text"
-                          value={chapter.title}
-                          onChange={(e) => updateChapterTitle(cIdx, e.target.value)}
-                          placeholder="Nhập tên phần học (Ví dụ: Giới thiệu chung)"
-                          className="w-full text-sm font-black text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-[#007c76] focus:ring-0 outline-none py-1 transition-all"
+                          value={lesson.title}
+                          onChange={(e) => updateFlatLesson(lIdx, 'title', e.target.value)}
+                          placeholder="Nhập tên bài giảng..."
+                          className="w-full bg-gray-50 text-xs font-bold text-gray-800 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
                         />
                       </div>
 
-                      {/* Chapter Actions */}
-                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
-                        <button
-                          type="button"
-                          disabled={cIdx === 0}
-                          onClick={() => moveChapter(cIdx, 'up')}
-                          className="p-1.5 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg disabled:opacity-30 cursor-pointer"
-                          title="Di chuyển lên"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" /></svg>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={cIdx === chapters.length - 1}
-                          onClick={() => moveChapter(cIdx, 'down')}
-                          className="p-1.5 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-lg disabled:opacity-30 cursor-pointer"
-                          title="Di chuyển xuống"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteChapter(cIdx)}
-                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                        >
-                          Xóa phần
-                        </button>
+                      {/* Lesson Video URL Input */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng (Youtube, MP4, v.v.)</span>
+                        <input
+                          type="text"
+                          value={lesson.videoUrl || ''}
+                          onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
+                          placeholder="https://..."
+                          className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
+                        />
                       </div>
                     </div>
 
-                    {/* Lessons inside Chapter */}
-                    <div className="space-y-3 pl-2 sm:pl-10">
-                      {chapter.lessons && chapter.lessons.map((lesson, lIdx) => (
-                        <div key={lIdx} className="bg-gray-50/50 p-4 rounded-xl border border-gray-150 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                            {/* Lesson Title Input */}
-                            <div className="space-y-1">
-                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Tiêu đề bài học mục {lIdx + 1}</span>
-                              <input
-                                type="text"
-                                value={lesson.title}
-                                onChange={(e) => updateLessonValue(cIdx, lIdx, 'title', e.target.value)}
-                                placeholder="Tên bài giảng... (Ví dụ: Giới thiệu tầm quan trọng)"
-                                className="w-full bg-white text-xs font-bold text-gray-700 py-2 px-3 border border-gray-200 rounded-lg focus:border-[#007c76] outline-none"
-                              />
-                            </div>
-
-                            {/* Lesson Video URL Input */}
-                            <div className="space-y-1">
-                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng (Youtube, MP4, v.v.)</span>
-                              <input
-                                type="text"
-                                value={lesson.videoUrl || ''}
-                                onChange={(e) => updateLessonValue(cIdx, lIdx, 'videoUrl', e.target.value)}
-                                placeholder="Paster link video: https://..."
-                                className="w-full bg-white text-xs font-medium text-gray-600 py-2 px-3 border border-gray-200 rounded-lg focus:border-[#007c76] outline-none"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Lesson Actions */}
-                          <div className="flex items-center gap-1 shrink-0 self-end md:self-auto pt-1 md:pt-4">
-                            <button
-                              type="button"
-                              disabled={lIdx === 0}
-                              onClick={() => moveLesson(cIdx, lIdx, 'up')}
-                              className="p-1 px-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 rounded disabled:opacity-30 cursor-pointer"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              type="button"
-                              disabled={lIdx === chapter.lessons.length - 1}
-                              onClick={() => moveLesson(cIdx, lIdx, 'down')}
-                              className="p-1 px-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-500 rounded disabled:opacity-30 cursor-pointer"
-                            >
-                              ▼
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteLesson(cIdx, lIdx)}
-                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg cursor-pointer"
-                              title="Xóa bài học"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
-
-                        </div>
-                      ))}
-
-                      {/* Add lesson button within chapter */}
+                    {/* Lesson Actions */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto pt-2 md:pt-4">
                       <button
                         type="button"
-                        onClick={() => addLesson(cIdx)}
-                        className="w-full py-2 bg-dashed border border-dashed border-[#007c76]/30 hover:border-[#007c76] text-[#007c76] hover:bg-[#007c76]/5 rounded-xl text-xs font-bold transition-all cursor-pointer mt-2 text-center"
+                        disabled={lIdx === 0}
+                        onClick={() => moveFlatLesson(lIdx, 'up')}
+                        className="p-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl disabled:opacity-30 cursor-pointer text-xs font-bold transition-all"
+                        title="Di chuyển lên"
                       >
-                        + Bấm để thêm bài giảng vào phần này
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={lIdx === flatLessons.length - 1}
+                        onClick={() => moveFlatLesson(lIdx, 'down')}
+                        className="p-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-xl disabled:opacity-30 cursor-pointer text-xs font-bold transition-all"
+                        title="Di chuyển xuống"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteFlatLesson(lIdx)}
+                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl cursor-pointer transition-all"
+                        title="Xóa bài giảng"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
-
                   </div>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={addFlatLesson}
+                  className="w-full py-3 bg-white border-2 border-dashed border-[#007c76]/30 hover:border-[#007c76] text-[#007c76] hover:bg-[#007c76]/5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center mt-4"
+                >
+                  + Thêm bài giảng mới
+                </button>
               </div>
             )}
           </div>

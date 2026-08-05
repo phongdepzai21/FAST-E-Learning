@@ -14,20 +14,48 @@ import Handbook from './Handbook';
 // OPTIMIZATION: Code splitting - Lazy load PaymentModal
 // Removed PaymentModal lazy load
 
-const DUMMY_CURRICULUM = [
-    { 
-      title: "Các nguyên tắc quản lý chất lượng", 
-      lessons: ["Phân tích bối cảnh tổ chức", "Xây dựng chính sách an toàn thực phẩm", "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", "Quản lý rủi ro và cơ hội"] 
-    },
-    { 
-      title: "Triển khai vận hành thực tế", 
-      lessons: ["Kiểm soát vệ sinh cá nhân và nhà xưởng", "Quản lý nguồn gốc nguyên liệu (Traceability)", "Thiết lập điểm kiểm soát tới hạn (CCP)", "Quy trình xử lý sự cố và thu hồi"] 
-    },
-    { 
-      title: "Đánh giá và Cải tiến liên tục", 
-      lessons: ["Kỹ năng đánh giá nội bộ", "Xem xét của lãnh đạo", "Hành động khắc phục", "Văn hóa an toàn thực phẩm trong doanh nghiệp"] 
-    }
+const DUMMY_LESSONS = [
+    { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
+    { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Kiểm soát vệ sinh cá nhân và nhà xưởng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Quản lý nguồn gốc nguyên liệu (Traceability)", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Thiết lập điểm kiểm soát tới hạn (CCP)", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+    { title: "Kỹ năng đánh giá nội bộ", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
 ];
+
+const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }> => {
+  if (!raw || !Array.isArray(raw)) return [];
+  const result: Array<{ title: string; videoUrl: string }> = [];
+
+  raw.forEach((item: any) => {
+    if (item && Array.isArray(item.lessons)) {
+      item.lessons.forEach((l: any) => {
+        const title = (typeof l === 'string' ? l : (l?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
+        if (!title || title.toLowerCase().includes("giới thiệu về fast e-learning")) return;
+        const videoUrl = typeof l === 'object' && l?.videoUrl ? l.videoUrl : (
+          title.includes("HACCP") 
+            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+            : "https://www.w3schools.com/html/mov_bbb.mp4"
+        );
+        result.push({ title, videoUrl });
+      });
+    } else if (item) {
+      const title = (typeof item === 'string' ? item : (item?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
+      if (title && !title.toLowerCase().includes("giới thiệu về fast e-learning")) {
+        const videoUrl = typeof item === 'object' && item?.videoUrl ? item.videoUrl : (
+          title.includes("HACCP") 
+            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
+            : "https://www.w3schools.com/html/mov_bbb.mp4"
+        );
+        result.push({ title, videoUrl });
+      }
+    }
+  });
+
+  return result;
+};
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
@@ -35,9 +63,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const navigate = useNavigate();
   const location = useLocation();
   const [course, setCourse] = useState<Course | undefined>(COURSES.find(c => c.id === id));
-  const activeModuleState = useState<number | null>(0);
-  const activeModule = activeModuleState[0];
-  const setActiveModule = activeModuleState[1];
   
   const [currentUser, setCurrentUser] = useState<{name: string, email: string} | null>(null);
   const [isOwned, setIsOwned] = useState(false);
@@ -48,14 +73,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   
   // State for Video Player Modal
-  const [playingLesson, setPlayingLesson] = useState<{ chapterIdx: number, lessonIdx: number, title: string, videoUrl?: string } | null>(null);
+  const [playingLesson, setPlayingLesson] = useState<{ lessonIdx: number, title: string, videoUrl?: string } | null>(null);
   const [isLiked, setIsLiked] = useState(false);
 
-  const [curriculum, setCurriculum] = useState<any[]>([]);
+  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
   const [isEditingCurriculum, setIsEditingCurriculum] = useState(false);
-  const [editData, setEditData] = useState<any[]>([]);
+  const [editData, setEditData] = useState<Array<{ title: string; videoUrl: string }>>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
@@ -96,57 +121,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
       });
 
       const curr = firestoreData?.curriculum || localData?.curriculum || merged.curriculum;
-      if (curr && Array.isArray(curr) && curr.length > 0) {
-        const updatedCurriculum = curr
-          .filter((c: any) => {
-            const cTitle = (c.title || '').toLowerCase();
-            return !cTitle.includes("tổng quan và cơ sở pháp lý") && !cTitle.includes("giới thiệu về fast e-learning");
-          })
-          .map((c: any) => {
-            const cleanTitle = (c.title || '').replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
-            return {
-              ...c,
-              title: cleanTitle || c.title || 'Phần học',
-              lessons: (c.lessons || [])
-                .map((l: any) => {
-                  const title = typeof l === 'string' ? l : (l.title || '');
-                  const videoUrl = typeof l === 'object' && l.videoUrl ? l.videoUrl : (
-                    title.includes("HACCP") 
-                      ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                      : "https://www.w3schools.com/html/mov_bbb.mp4"
-                  );
-                  return { title, videoUrl };
-                })
-                .filter((l: any) => !l.title.toLowerCase().includes("giới thiệu về fast e-learning"))
-            };
-          })
-          .filter((c: any) => c.lessons && c.lessons.length > 0);
+      const flatList = extractLessonsFlat(curr);
 
-        if (updatedCurriculum.length > 0) {
-          setCurriculum(updatedCurriculum);
-        } else {
-          const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-            title: c.title,
-            lessons: c.lessons.map(l => ({ 
-              title: l, 
-              videoUrl: l.includes("HACCP") 
-                ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-                : "https://www.w3schools.com/html/mov_bbb.mp4" 
-            }))
-          }));
-          setCurriculum(formattedDummy);
-        }
+      if (flatList.length > 0) {
+        setCurriculum(flatList);
       } else {
-        const formattedDummy = DUMMY_CURRICULUM.map(c => ({
-          title: c.title,
-          lessons: c.lessons.map(l => ({ 
-            title: l, 
-            videoUrl: l.includes("HACCP") 
-              ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-              : "https://www.w3schools.com/html/mov_bbb.mp4" 
-          }))
-        }));
-        setCurriculum(formattedDummy);
+        setCurriculum(DUMMY_LESSONS);
       }
     };
 
@@ -179,49 +159,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, cIdx: number, lIdx: number) => {
-      const file = e.target.files?.[0];
-      if (!file || !id) return;
-
-      const fileRef = ref(storage, `courses/${id}/lessons/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(fileRef, file);
-
-      const progressKey = `${cIdx}-${lIdx}`;
-      
-      uploadTask.on('state_changed', 
-          (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(prev => ({ ...prev, [progressKey]: progress }));
-          }, 
-          (error) => {
-              console.error("Upload error:", error);
-              alert("Lỗi tải tệp lên Storage (Vui lòng kiểm tra Storage Rules): " + error.message);
-              setUploadProgress(prev => {
-                  const newProgress = { ...prev };
-                  delete newProgress[progressKey];
-                  return newProgress;
-              });
-          }, 
-          async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              const newData = [...editData];
-              newData[cIdx].lessons[lIdx].videoUrl = downloadURL;
-              setEditData(newData);
-              setUploadProgress(prev => {
-                  const newProgress = { ...prev };
-                  delete newProgress[progressKey];
-                  return newProgress;
-              });
-          }
-      );
-  };
-
   const handleSaveCurriculum = async () => {
       if (!id) return;
       try {
           const docRef = doc(db, "courses", id);
+          const formattedCurriculum = [{ title: "Danh sách bài giảng", lessons: editData }];
           const updatePayload: any = {
-            curriculum: editData,
+            curriculum: formattedCurriculum,
             updatedAt: new Date().toISOString()
           };
           if (course?.title) updatePayload.title = course.title;
@@ -239,16 +183,16 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             let localList = localStr ? JSON.parse(localStr) : [];
             const idx = localList.findIndex((c: any) => c.id === id);
             if (idx !== -1) {
-              localList[idx].curriculum = editData;
+              localList[idx].curriculum = formattedCurriculum;
               if (course?.title) localList[idx].title = course.title;
             } else if (course) {
-              localList.push({ ...course, curriculum: editData });
+              localList.push({ ...course, curriculum: formattedCurriculum });
             }
             localStorage.setItem('local_custom_courses', JSON.stringify(localList));
           } catch (e) {}
 
           window.dispatchEvent(new CustomEvent('courses_updated'));
-          alert("Lưu chương trình học thành công!");
+          alert("Lưu danh sách bài giảng thành công!");
       } catch (error) {
           console.error("Error saving curriculum:", error);
           alert("Có lỗi xảy ra khi lưu.");
@@ -379,27 +323,18 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   useEffect(() => {
      if (isOwned && curriculum.length > 0 && !playingLesson) {
-          let targetChapter = 0;
           let targetLesson = 0;
-          let found = false;
-          
-          for (let cIdx = 0; cIdx < curriculum.length; cIdx++) {
-             for (let lIdx = 0; lIdx < curriculum[cIdx].lessons.length; lIdx++) {
-                if (!completedLessons.includes(`${cIdx}-${lIdx}`)) {
-                    targetChapter = cIdx;
-                    targetLesson = lIdx;
-                    found = true;
-                    break;
-                }
+          for (let lIdx = 0; lIdx < curriculum.length; lIdx++) {
+             if (!completedLessons.includes(`${lIdx}`) && !completedLessons.includes(`0-${lIdx}`)) {
+                 targetLesson = lIdx;
+                 break;
              }
-             if (found) break;
           }
-           
+          const target = curriculum[targetLesson] || curriculum[0];
           setPlayingLesson({
-             chapterIdx: targetChapter,
              lessonIdx: targetLesson,
-             title: curriculum[targetChapter].lessons[targetLesson].title || curriculum[targetChapter].lessons[targetLesson],
-             videoUrl: curriculum[targetChapter].lessons[targetLesson].videoUrl
+             title: target.title,
+             videoUrl: target.videoUrl
           });
      }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -413,24 +348,24 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           const docRef = doc(db, "users", userEmail, "purchased_courses", id);
           
           const docSnap = await getDoc(docRef);
-          let completedLessons: string[] = [];
+          let completedList: string[] = [];
           if (docSnap.exists()) {
-              completedLessons = docSnap.data().completedLessons || [];
+              completedList = docSnap.data().completedLessons || [];
           }
           
-          if (!completedLessons.includes(lessonKey)) {
-              completedLessons.push(lessonKey);
+          if (!completedList.includes(lessonKey)) {
+              completedList.push(lessonKey);
               
-              const totalLessons = curriculum.reduce((acc, chapter) => acc + (chapter.lessons?.length || 0), 0);
-              const newProgress = totalLessons > 0 ? Math.min(Math.round((completedLessons.length / totalLessons) * 100), 100) : 100;
+              const totalLessons = curriculum.length;
+              const newProgress = totalLessons > 0 ? Math.min(Math.round((completedList.length / totalLessons) * 100), 100) : 100;
               
               await setDoc(docRef, { 
                   progress: newProgress,
-                  completedLessons: completedLessons
+                  completedLessons: completedList
               }, { merge: true });
               
               setCourseProgress(newProgress);
-              setCompletedLessons(completedLessons);
+              setCompletedLessons(completedList);
           }
       } catch (error) {
           console.error("Lỗi cập nhật tiến độ:", error);
@@ -478,7 +413,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             />
                         </div>
                     ) : (() => {
-                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].lessons[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
+                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
                             if (currentUrl.includes('dropbox') || currentUrl.includes('dropboxusercontent')) {
                                 let embedUrl = currentUrl;
                                 if (currentUrl.includes('www.dropbox.com')) {
@@ -501,8 +436,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                         {curriculum.length > 0 && (
                                             <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                                                 <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-white">
-                                                    <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">{playingLesson ? curriculum[playingLesson.chapterIdx].title : curriculum[0].title}</p>
-                                                    <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0].lessons[0]?.title}</p>
+                                                    <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
+                                                    <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0]?.title}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -521,18 +456,23 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                         autoPlay={!!playingLesson}
                                         poster={course.image}
                                         onEnded={() => {
-                                            if (playingLesson) {
-                                                handleUpdateProgress(`${playingLesson.chapterIdx}-${playingLesson.lessonIdx}`);
-                                            } else {
-                                                handleUpdateProgress(`0-0`);
+                                            const currentIdx = playingLesson ? playingLesson.lessonIdx : 0;
+                                            handleUpdateProgress(`${currentIdx}`);
+                                            if (currentIdx + 1 < curriculum.length) {
+                                                const next = curriculum[currentIdx + 1];
+                                                setPlayingLesson({
+                                                    lessonIdx: currentIdx + 1,
+                                                    title: next.title,
+                                                    videoUrl: next.videoUrl
+                                                });
                                             }
                                         }}
                                     />
                                     {curriculum.length > 0 && (
                                         <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
                                             <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-white">
-                                                <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">{playingLesson ? curriculum[playingLesson.chapterIdx].title : curriculum[0].title}</p>
-                                                <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0].lessons[0]?.title}</p>
+                                                <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
+                                                <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0]?.title}</p>
                                             </div>
                                         </div>
                                     )}
@@ -542,7 +482,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                 ) : (
                     <div className="relative h-full w-full">
                         <video 
-                            src={curriculum[0]?.lessons[0]?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"} 
+                            src={curriculum[0]?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"} 
                             className="w-full h-full object-cover focus:outline-none"
                             controls
                             controlsList="nodownload pwa-nodownload"
@@ -564,8 +504,11 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         {/* 3. CURRICULUM SECTION */}
         <section className={`transition-all duration-1000 delay-300 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3"><span className="w-1.5 h-8 bg-primary rounded-full shrink-0"></span>Chương trình học</h2>
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{curriculum.length} Phần</span>
+                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
+                    <span className="w-1.5 h-8 bg-primary rounded-full shrink-0"></span>
+                    Danh sách bài giảng
+                </h2>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{curriculum.length} Bài giảng</span>
             </div>
 
             {isOwned && courseProgress >= 100 && (
@@ -581,122 +524,115 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                 <div className="mb-6 flex justify-end">
                     {isEditingCurriculum ? (
                         <div className="flex gap-2">
-                            <button onClick={handleSaveCurriculum} className="bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-green-600">Lưu thay đổi</button>
+                            <button onClick={handleSaveCurriculum} className="bg-green-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-green-600">Lưu danh sách</button>
                             <button onClick={() => setIsEditingCurriculum(false)} className="bg-gray-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-gray-600">Hủy</button>
                         </div>
                     ) : (
-                        <button onClick={() => { setEditData(JSON.parse(JSON.stringify(curriculum))); setIsEditingCurriculum(true); }} className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-600">Chỉnh sửa chương trình học</button>
+                        <button onClick={() => { setEditData(JSON.parse(JSON.stringify(curriculum))); setIsEditingCurriculum(true); }} className="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-600">Chỉnh sửa bài giảng</button>
                     )}
                 </div>
             )}
 
             {isEditingCurriculum ? (
-                <div className="space-y-6">
-                    {editData.map((chapter, cIdx) => (
-                        <div key={cIdx} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                            <div className="flex justify-between items-center mb-6">
-                                <input 
-                                    type="text" 
-                                    value={chapter.title} 
-                                    onChange={(e) => {
-                                        const newData = [...editData];
-                                        newData[cIdx].title = e.target.value;
-                                        setEditData(newData);
-                                    }}
-                                    className="font-black text-lg border-b-2 border-gray-200 focus:border-primary outline-none w-full mr-4 pb-1 transition-colors"
-                                    placeholder="Tên phần học"
-                                />
-                                <button onClick={() => {
+                <div className="space-y-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+                        <h3 className="font-bold text-gray-800 text-lg">Quản lý bài giảng</h3>
+                        <button 
+                            onClick={() => setEditData([...editData, { title: "Bài giảng mới", videoUrl: "" }])}
+                            className="bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#00605b] transition-colors flex items-center gap-1"
+                        >
+                            + Thêm bài giảng
+                        </button>
+                    </div>
+                    {editData.map((lesson, lIdx) => (
+                        <div key={lIdx} className="flex flex-col md:flex-row gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200 items-start md:items-center">
+                            <span className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{lIdx + 1}</span>
+                            <input 
+                                type="text" 
+                                value={lesson.title} 
+                                onChange={(e) => {
                                     const newData = [...editData];
-                                    newData.splice(cIdx, 1);
+                                    newData[lIdx].title = e.target.value;
                                     setEditData(newData);
-                                }} className="text-red-500 hover:text-red-700 text-sm font-bold shrink-0 bg-red-50 px-3 py-1 rounded-lg transition-colors">Xóa phần</button>
-                            </div>
-                            <div className="space-y-4 pl-4 border-l-2 border-gray-100">
-                                {chapter.lessons.map((lesson: any, lIdx: number) => (
-                                    <div key={lIdx} className="flex flex-col gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                        <div className="flex justify-between items-center">
-                                            <input 
-                                                type="text" 
-                                                value={lesson.title} 
-                                                onChange={(e) => {
-                                                    const newData = [...editData];
-                                                    newData[cIdx].lessons[lIdx].title = e.target.value;
-                                                    setEditData(newData);
-                                                }}
-                                                className="font-bold text-sm bg-transparent border-b border-gray-300 focus:border-primary outline-none w-full mr-4 pb-1 transition-colors"
-                                                placeholder="Tên bài học"
-                                            />
-                                            <button onClick={() => {
-                                                const newData = [...editData];
-                                                newData[cIdx].lessons.splice(lIdx, 1);
-                                                setEditData(newData);
-                                            }} className="text-red-500 hover:text-red-700 text-xs font-bold shrink-0">Xóa bài</button>
-                                        </div>
-                                        <input 
-                                            type="text" 
-                                            value={lesson.videoUrl || ''} 
-                                            onChange={(e) => {
-                                                const newData = [...editData];
-                                                newData[cIdx].lessons[lIdx].videoUrl = e.target.value;
-                                                setEditData(newData);
-                                            }}
-                                            className="text-xs text-gray-600 bg-white border border-gray-200 focus:border-primary rounded-lg p-2 outline-none w-full transition-colors"
-                                            placeholder="URL Video (VD: https://...mp4)"
-                                        />
-                                    </div>
-                                ))}
-                                <button onClick={() => {
+                                }}
+                                className="font-bold text-sm bg-white border border-gray-200 focus:border-primary rounded-lg p-2 outline-none flex-1 w-full"
+                                placeholder="Tên bài giảng"
+                            />
+                            <input 
+                                type="text" 
+                                value={lesson.videoUrl || ''} 
+                                onChange={(e) => {
                                     const newData = [...editData];
-                                    newData[cIdx].lessons.push({ title: "Bài học mới", videoUrl: "" });
+                                    newData[lIdx].videoUrl = e.target.value;
                                     setEditData(newData);
-                                }} className="text-primary hover:text-[#00605b] text-sm font-bold mt-2 flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> Thêm bài học</button>
-                            </div>
+                                }}
+                                className="text-xs text-gray-600 bg-white border border-gray-200 focus:border-primary rounded-lg p-2 outline-none flex-1 w-full"
+                                placeholder="URL Video (VD: https://...mp4)"
+                            />
+                            <button 
+                                onClick={() => {
+                                    const newData = [...editData];
+                                    newData.splice(lIdx, 1);
+                                    setEditData(newData);
+                                }} 
+                                className="text-red-500 hover:text-red-700 text-xs font-bold shrink-0 bg-red-50 px-3 py-2 rounded-lg transition-colors"
+                            >
+                                Xóa
+                            </button>
                         </div>
                     ))}
-                    <button onClick={() => {
-                        setEditData([...editData, { title: "Phần học mới", lessons: [] }]);
-                    }} className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-2xl hover:bg-gray-50 hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> Thêm phần học mới</button>
                 </div>
             ) : (
-                <div className="space-y-3">
-                    {curriculum.map((item, idx) => (
-                        <div key={idx} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm transition-all hover:shadow-md">
-                            <button onClick={() => setActiveModule(activeModule === idx ? null : idx)} className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-4"><span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${activeModule === idx ? 'bg-primary text-white scale-110' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span><span className="font-black text-gray-700 text-left md:text-lg">{item.title.replace(/^Chương\s*\d*[:\s-]*/i, '')}</span></div>
-                                <svg className={`w-6 h-6 text-gray-400 transition-transform duration-300 ${activeModule === idx ? 'rotate-180 text-primary' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                            <div className={`overflow-hidden transition-all duration-500 ease-in-out ${activeModule === idx ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                <div className="p-5 pt-0 space-y-3">
-                                    {item.lessons.map((lesson: any, lIdx: number) => (
-                                        <div 
-                                            key={lIdx} 
-                                            onClick={() => {
-                                                if (isOwned) {
-                                                    setPlayingLesson({ chapterIdx: idx, lessonIdx: lIdx, title: lesson.title || lesson, videoUrl: lesson.videoUrl });
-                                                    setIsLiked(false);
-                                                    document.getElementById("video-player-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                                } else {
-                                                    handleRegisterClick();
-                                                }
-                                            }}
-                                            className="flex items-center justify-between p-3 rounded-xl hover:bg-primary/5 group cursor-pointer border border-transparent hover:border-primary/10 transition-colors"
-                                        >
-                                           <div className="flex items-center gap-3">
-                                               {completedLessons.includes(`${idx}-${lIdx}`) ? (
-                                                    <svg className="w-5 h-5 text-green-500 transition-transform scale-110" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM13.707 9.293a1 1 0 00-1.414-1.414L9 11.172 7.707 9.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                               ) : (
-                                                    <svg className="w-5 h-5 text-primary opacity-50 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
-                                               )}
-                                               <span className={`font-bold text-sm md:text-base group-hover:text-primary transition-colors ${completedLessons.includes(`${idx}-${lIdx}`) ? 'text-gray-900' : 'text-gray-600'}`}>{lesson.title || lesson}</span>
-                                           </div>
-                                           <span className="text-[10px] font-bold text-gray-300 uppercase">{isOwned ? (completedLessons.includes(`${idx}-${lIdx}`) ? 'Học lại' : 'Học ngay') : 'Xem trước'}</span>
-                                        </div>
-                                    ))}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-4 md:p-6 space-y-2">
+                    {curriculum.map((lesson, lIdx) => {
+                        const isCompleted = completedLessons.includes(`${lIdx}`) || completedLessons.includes(`0-${lIdx}`);
+                        const isCurrentPlaying = playingLesson?.lessonIdx === lIdx;
+
+                        return (
+                            <div 
+                                key={lIdx} 
+                                onClick={() => {
+                                    if (isOwned) {
+                                        setPlayingLesson({ lessonIdx: lIdx, title: lesson.title, videoUrl: lesson.videoUrl });
+                                        setIsLiked(false);
+                                        document.getElementById("video-player-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                    } else {
+                                        handleRegisterClick();
+                                    }
+                                }}
+                                className={`flex items-center justify-between p-4 rounded-xl group cursor-pointer border transition-all duration-200 ${
+                                    isCurrentPlaying 
+                                        ? 'bg-primary/10 border-primary shadow-sm' 
+                                        : 'bg-gray-50/50 hover:bg-primary/5 border-gray-100 hover:border-primary/20'
+                                }`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                                        isCurrentPlaying 
+                                            ? 'bg-primary text-white scale-105 shadow' 
+                                            : 'bg-white text-gray-500 border border-gray-200'
+                                    }`}>
+                                        {lIdx + 1}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        {isCompleted ? (
+                                            <svg className="w-5 h-5 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM13.707 9.293a1 1 0 00-1.414-1.414L9 11.172 7.707 9.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                        ) : (
+                                            <svg className={`w-5 h-5 shrink-0 ${isCurrentPlaying ? 'text-primary' : 'text-gray-400 group-hover:text-primary'}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                                        )}
+                                        <span className={`font-bold text-sm md:text-base ${isCurrentPlaying ? 'text-primary font-black' : isCompleted ? 'text-gray-900' : 'text-gray-700 group-hover:text-primary'}`}>
+                                            {lesson.title}
+                                        </span>
+                                    </div>
                                 </div>
+                                <span className={`text-[11px] font-extrabold uppercase px-3 py-1 rounded-full ${
+                                    isCurrentPlaying ? 'bg-primary text-white' : 'bg-white text-gray-400 group-hover:text-primary border border-gray-200'
+                                }`}>
+                                    {isOwned ? (isCompleted ? 'Học lại' : isCurrentPlaying ? 'Đang xem' : 'Học ngay') : 'Xem trước'}
+                                </span>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </section>
