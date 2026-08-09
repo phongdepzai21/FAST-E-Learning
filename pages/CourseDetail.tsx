@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState, useMemo, Suspense, lazy } from 'react';
+import React, { useEffect, useState, useMemo, useRef, Suspense, lazy } from 'react';
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { COURSES, ADMIN_EMAILS } from '../constants';
+import { COURSES, ADMIN_EMAILS, getMergedCourses, formatPriceSubmit } from '../constants';
 import { auth, db, storage } from '../firebase';
 // Fix: Standardizing modular Firebase imports and resolving missing exported member errors
 import { onAuthStateChanged } from 'firebase/auth';
@@ -83,49 +83,39 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [editData, setEditData] = useState<Array<{ title: string; videoUrl: string }>>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  const latestFirestoreDataRef = useRef<any>(null);
+
   useEffect(() => {
     if (!id) return;
 
     const loadFromLocalAndFallback = (firestoreData?: any) => {
-      const initialBase = COURSES.find(c => c.id === id) || {
-        id,
-        title: 'Khóa học',
-        price: '599.000đ',
-        image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
-        category: 'Chung',
-        description: 'Chi tiết khóa học'
-      };
+      if (firestoreData) {
+        latestFirestoreDataRef.current = firestoreData;
+      }
+      const dataToUse = firestoreData || latestFirestoreDataRef.current;
+      const fsList = dataToUse ? [{ id, ...dataToUse }] : [];
+      const allMerged = getMergedCourses(fsList);
+      const found = allMerged.find(c => c.id === id);
 
-      let localData: any = null;
-      try {
-        const localStr = localStorage.getItem('local_custom_courses');
-        if (localStr) {
-          const localList = JSON.parse(localStr);
-          localData = localList.find((c: any) => c.id === id);
+      if (found) {
+        setCourse(found);
+        const curr = dataToUse?.curriculum || found.curriculum;
+        const flatList = extractLessonsFlat(curr);
+        if (flatList.length > 0) {
+          setCurriculum(flatList);
+        } else {
+          setCurriculum(DUMMY_LESSONS);
         }
-      } catch (e) {}
-
-      const merged = {
-        ...initialBase,
-        ...(localData || {}),
-        ...(firestoreData || {})
-      };
-
-      setCourse({
-        id: merged.id,
-        title: merged.title || initialBase.title,
-        price: merged.price || initialBase.price,
-        image: merged.image || initialBase.image,
-        category: merged.category || initialBase.category,
-        description: merged.description || initialBase.description,
-      });
-
-      const curr = firestoreData?.curriculum || localData?.curriculum || merged.curriculum;
-      const flatList = extractLessonsFlat(curr);
-
-      if (flatList.length > 0) {
-        setCurriculum(flatList);
       } else {
+        const fallbackBase: Course = {
+          id,
+          title: 'Khóa học',
+          price: '599.000đ',
+          image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
+          category: 'Chung',
+          description: 'Chi tiết khóa học'
+        };
+        setCourse(fallbackBase);
         setCurriculum(DUMMY_LESSONS);
       }
     };

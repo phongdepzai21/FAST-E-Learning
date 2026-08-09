@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
+import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit } from '../constants';
 import { Course } from '../types';
 
 interface TeacherDashboardProps {
@@ -144,28 +144,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     setActiveTab('edit');
-  };
-
-  // Format price helper (e.g. converting 500000 -> 500.000đ)
-  const formatPriceSubmit = (rawPrice: string): string => {
-    const clean = rawPrice.trim();
-    if (!clean) return '0đ';
-    if (
-      clean.toLowerCase() === 'miễn phí' || 
-      clean.toLowerCase() === 'free' || 
-      clean === '0đ' || 
-      clean === '0'
-    ) {
-      return 'Miễn phí';
-    }
-    
-    // Remove "đ", "VND", ".", " " and check if it consists only of digits
-    const digitsOnly = clean.replace(/[đĐvVnNdD.\s,]/g, '');
-    if (/^\d+$/.test(digitsOnly)) {
-      const num = parseInt(digitsOnly, 10);
-      return num.toLocaleString('vi-VN') + 'đ';
-    }
-    return clean;
   };
 
   // Helper validation function for course input fields

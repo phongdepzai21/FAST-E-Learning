@@ -225,55 +225,153 @@ export const COLORS = {
   dark: '#374151'
 };
 
+export const formatPriceSubmit = (rawPrice: string): string => {
+  if (!rawPrice) return 'Miễn phí';
+  const clean = String(rawPrice).trim();
+  if (!clean) return 'Miễn phí';
+  const lower = clean.toLowerCase();
+  if (
+    lower === 'miễn phí' || 
+    lower === 'free' || 
+    lower === '0đ' || 
+    lower === '0'
+  ) {
+    return 'Miễn phí';
+  }
+
+  // Check for 'tr', 'triệu', 'm' suffix (e.g., "2tr", "2.5tr", "2 triệu", "2m")
+  if (/(?:tr|triệu|m)$/i.test(lower)) {
+    const numPart = lower.replace(/(?:tr|triệu|m)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+    const val = parseFloat(numPart);
+    if (!isNaN(val) && val > 0) {
+      return Math.round(val * 1000000).toLocaleString('vi-VN') + 'đ';
+    }
+  }
+
+  // Check for 'k' suffix (e.g., "2000k" -> 2.000.000đ, "2k" -> 2.000đ, "599k" -> 599.000đ)
+  if (/k$/i.test(lower)) {
+    const numPart = lower.replace(/k$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+    const val = parseFloat(numPart);
+    if (!isNaN(val) && val > 0) {
+      return Math.round(val * 1000).toLocaleString('vi-VN') + 'đ';
+    }
+  }
+
+  // Remove "đ", "VND", ".", " " and check digits
+  const digitsOnly = clean.replace(/[đĐvVnNdD.\s,]/g, '');
+  if (/^\d+$/.test(digitsOnly)) {
+    const num = parseInt(digitsOnly, 10);
+    if (num > 0 && num < 100) {
+      return (num * 1000000).toLocaleString('vi-VN') + 'đ';
+    }
+    if (num >= 100 && num < 1000) {
+      return (num * 1000).toLocaleString('vi-VN') + 'đ';
+    }
+    return num.toLocaleString('vi-VN') + 'đ';
+  }
+  return clean;
+};
+
 export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
-  const combined: Course[] = COURSES.map(c => ({ ...c }));
+  const parseTime = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+      const parsed = Date.parse(val);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    if (val && typeof val.toDate === 'function') {
+      return val.toDate().getTime();
+    }
+    if (val && val.seconds) {
+      return val.seconds * 1000;
+    }
+    return 0;
+  };
 
   const applyOverlay = (existing: Course, overlay: Partial<Course>): Course => {
     return {
       ...existing,
       ...(overlay.title ? { title: overlay.title } : {}),
-      ...(overlay.price !== undefined && overlay.price !== null && overlay.price !== '' ? { price: overlay.price } : {}),
+      ...(overlay.price !== undefined && overlay.price !== null && overlay.price !== '' ? { price: formatPriceSubmit(overlay.price) } : {}),
       ...(overlay.image ? { image: overlay.image } : {}),
       ...(overlay.category ? { category: overlay.category } : {}),
       ...(overlay.description !== undefined ? { description: overlay.description } : {}),
       ...(overlay.status ? { status: overlay.status } : {}),
       ...(overlay.curriculum && Array.isArray(overlay.curriculum) && overlay.curriculum.length > 0 ? { curriculum: overlay.curriculum } : {}),
       ...(overlay.authorEmail !== undefined ? { authorEmail: overlay.authorEmail } : {}),
+      ...(overlay.updatedAt ? { updatedAt: overlay.updatedAt } : {}),
     };
   };
 
-  const firestoreIds = new Set(firestoreCourses.map(fc => fc.id));
+  // 1. Base map initialized from hardcoded COURSES
+  const combinedMap = new Map<string, Course>();
+  COURSES.forEach(c => {
+    combinedMap.set(c.id, {
+      ...c,
+      price: formatPriceSubmit(c.price)
+    });
+  });
 
-  // 1. LocalStorage custom courses overlay (fallback for local changes or offline mode)
+  // 2. Map of LocalStorage courses
+  const localMap = new Map<string, Course>();
   try {
     const localStr = localStorage.getItem('local_custom_courses');
     if (localStr) {
       const localList: Course[] = JSON.parse(localStr);
       localList.forEach(lc => {
-        if (!lc || !lc.id) return;
-        // Skip stale local copy if real-time Firestore has this document
-        if (firestoreIds.has(lc.id)) return;
-
-        const idx = combined.findIndex(c => c.id === lc.id);
-        if (idx !== -1) {
-          combined[idx] = applyOverlay(combined[idx], lc);
-        } else {
-          combined.push(lc as Course);
+        if (lc && lc.id) {
+          localMap.set(lc.id, lc);
         }
       });
     }
   } catch (e) {}
 
-  // 2. Firestore overlay (HIGHEST PRIORITY - Real-time cloud database)
+  // 3. Map of Firestore courses
+  const firestoreMap = new Map<string, Course>();
   firestoreCourses.forEach(fc => {
-    if (!fc || !fc.id) return;
-    const idx = combined.findIndex(c => c.id === fc.id);
-    if (idx !== -1) {
-      combined[idx] = applyOverlay(combined[idx], fc);
-    } else {
-      combined.push(fc);
+    if (fc && fc.id) {
+      firestoreMap.set(fc.id, fc);
     }
   });
 
-  return combined;
+  // All unique IDs across hardcoded, Firestore, and LocalStorage
+  const allIds = new Set<string>([
+    ...combinedMap.keys(),
+    ...firestoreMap.keys(),
+    ...localMap.keys()
+  ]);
+
+  allIds.forEach(id => {
+    const base = combinedMap.get(id);
+    const fc = firestoreMap.get(id);
+    const lc = localMap.get(id);
+
+    let winner: Course;
+
+    if (fc && lc) {
+      const fcTime = parseTime(fc.updatedAt);
+      const lcTime = parseTime(lc.updatedAt);
+
+      if (lcTime > 0 && lcTime > fcTime) {
+        // LocalStorage edit is strictly newer than Firestore record
+        winner = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
+      } else {
+        // Firestore record is newer, equal, or LocalStorage has no timestamp -> Firestore wins!
+        winner = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
+      }
+    } else if (fc) {
+      winner = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
+    } else if (lc) {
+      winner = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
+    } else if (base) {
+      winner = base;
+    } else {
+      return;
+    }
+
+    combinedMap.set(id, winner);
+  });
+
+  return Array.from(combinedMap.values());
 };
