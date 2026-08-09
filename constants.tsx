@@ -239,40 +239,62 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     return 'Miễn phí';
   }
 
-  // Check for 'tr', 'triệu', 'm' suffix (e.g., "2tr", "2.5tr", "2 triệu", "2m")
-  if (/(?:tr|triệu|m)$/i.test(lower)) {
-    const numPart = lower.replace(/(?:tr|triệu|m)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+  // 1. Check for 'b', 'tỷ', 'ty' suffix (billion = * 1.000.000.000 / 9 zeros)
+  if (/(?:tỷ|ty|b)$/i.test(lower)) {
+    const numPart = lower.replace(/(?:tỷ|ty|b)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+    const val = parseFloat(numPart);
+    if (!isNaN(val) && val > 0) {
+      return Math.round(val * 1000000000).toLocaleString('vi-VN') + 'đ';
+    }
+  }
+
+  // 2. Check for 'tr', 'triệu', 'trieu', 'm' suffix (million = * 1.000.000 / 6 zeros)
+  if (/(?:tr|triệu|trieu|m)$/i.test(lower)) {
+    const numPart = lower.replace(/(?:tr|triệu|trieu|m)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
     if (!isNaN(val) && val > 0) {
       return Math.round(val * 1000000).toLocaleString('vi-VN') + 'đ';
     }
   }
 
-  // Check for 'k' suffix (e.g., "2k" -> 2.000.000đ, "2.5k" -> 2.500.000đ, "599k" -> 599.000đ, "2000k" -> 2.000.000đ)
-  if (/k$/i.test(lower)) {
-    const numPart = lower.replace(/k$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+  // 3. Check for 'k', 'nghìn', 'ngàn', 'ngan' suffix (thousand = * 1.000 / 3 zeros)
+  if (/(?:nghìn|ngàn|ngan|k)$/i.test(lower)) {
+    const numPart = lower.replace(/(?:nghìn|ngàn|ngan|k)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
     if (!isNaN(val) && val > 0) {
-      if (val < 10) {
-        // "2k" -> 2 triệu (2.000.000đ), "2.5k" -> 2.500.000đ
-        return Math.round(val * 1000000).toLocaleString('vi-VN') + 'đ';
-      }
       return Math.round(val * 1000).toLocaleString('vi-VN') + 'đ';
     }
   }
 
-  // Remove "đ", "VND", ".", " " and check digits
-  const digitsOnly = clean.replace(/[đĐvVnNdD.\s,]/g, '');
+  // 4. If string ends with đ or vnd (e.g. "2.000.000đ" or "599.000đ")
+  if (lower.endsWith('đ') || lower.endsWith('vnd')) {
+    const digitsAndDots = clean.replace(/[^\d.,]/g, '');
+    const numPart = digitsAndDots.replace(/\./g, '').replace(/,/g, '.');
+    const val = parseFloat(numPart);
+    if (!isNaN(val) && val > 0) {
+      return Math.round(val).toLocaleString('vi-VN') + 'đ';
+    }
+  }
+
+  // 5. Plain numbers without suffix
+  const digitsOnly = clean.replace(/[^\d]/g, '');
   if (/^\d+$/.test(digitsOnly)) {
     const num = parseInt(digitsOnly, 10);
     if (num > 0 && num < 10) {
+      // e.g., plain "2" -> 2.000.000đ
       return (num * 1000000).toLocaleString('vi-VN') + 'đ';
     }
     if (num >= 10 && num < 1000) {
+      // e.g., plain "599" -> 599.000đ
+      return (num * 1000).toLocaleString('vi-VN') + 'đ';
+    }
+    if (num >= 1000 && num < 10000) {
+      // e.g., plain "2000" or "2500" -> 2.000.000đ or 2.500.000đ
       return (num * 1000).toLocaleString('vi-VN') + 'đ';
     }
     return num.toLocaleString('vi-VN') + 'đ';
   }
+
   return clean;
 };
 
