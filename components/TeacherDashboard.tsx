@@ -730,14 +730,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                       {/* Lesson Video URL Input */}
                       <div className="space-y-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng (Youtube, MP4, v.v.)</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng</span>
                         <input
                           type="text"
                           value={lesson.videoUrl || ''}
                           onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
-                          placeholder="https://..."
+                          placeholder="Link Youtube (watch, shorts, youtu.be), Google Drive, Dropbox, MP4..."
                           className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
                         />
+                        <span className="text-[10px] text-gray-400 font-medium block">
+                          Hỗ trợ: Link Youtube trực tiếp, Shorts, Dropbox, Google Drive, Vimeo & MP4.
+                        </span>
                       </div>
                     </div>
 

@@ -57,6 +57,56 @@ const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }
   return result;
 };
 
+// Helper to detect and extract video embed URL for YouTube, Dropbox, Drive, Vimeo, and native video
+export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isEmbed: boolean; embedUrl: string } {
+  if (!url) {
+    return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
+  }
+  const cleanUrl = url.trim();
+
+  // 1. YouTube check (watch, embed, shorts, youtu.be, m.youtube)
+  const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    const videoId = ytMatch[1];
+    const apParam = autoPlay ? '1' : '0';
+    return {
+      isEmbed: true,
+      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=${apParam}&rel=0&enablejsapi=1`
+    };
+  }
+
+  // 2. Dropbox check
+  if (cleanUrl.includes('dropbox.com') || cleanUrl.includes('dropboxusercontent.com')) {
+    let embedUrl = cleanUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    if (!embedUrl.includes('#toolbar=0')) {
+      embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'raw=1#toolbar=0';
+    }
+    return { isEmbed: true, embedUrl };
+  }
+
+  // 3. Google Drive check
+  const driveMatch = cleanUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  if (driveMatch && driveMatch[1]) {
+    return {
+      isEmbed: true,
+      embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+    };
+  }
+
+  // 4. Vimeo check
+  const vimeoMatch = cleanUrl.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    const apParam = autoPlay ? '1' : '0';
+    return {
+      isEmbed: true,
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=${apParam}`
+    };
+  }
+
+  // 5. Default native HTML5 video (.mp4, .webm, etc.)
+  return { isEmbed: false, embedUrl: cleanUrl };
+}
+
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const id = embeddedCourseId || paramId;
@@ -230,20 +280,19 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                 setIsOwned(true);
             }
 
-            // DB Check
+            // DB Real-time Check
             if (id) {
-                try {
-                    const docRef = doc(db, "users", normalizedEmail, "purchased_courses", id);
-                    const docSnap = await getDoc(docRef);
+                const docRef = doc(db, "users", normalizedEmail, "purchased_courses", id);
+                const unsubPurchased = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         setIsOwned(true);
                         setCourseProgress(docSnap.data().progress || 0);
                         setCompletedLessons(docSnap.data().completedLessons || []);
                         localStorage.setItem(`course_unlocked_${id}`, 'true');
                     }
-                } catch (error) {
-                    console.error("Lỗi kiểm tra khóa học:", error);
-                }
+                }, (error) => {
+                    console.error("Lỗi kiểm tra khóa học realtime:", error);
+                });
             }
         } else {
             setCurrentUser(null);
@@ -404,29 +453,25 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         </div>
                     ) : (() => {
                             const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
-                            if (currentUrl.includes('dropbox') || currentUrl.includes('dropboxusercontent')) {
-                                let embedUrl = currentUrl;
-                                if (currentUrl.includes('www.dropbox.com')) {
-                                    embedUrl = currentUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-                                }
-                                if (!embedUrl.includes('#toolbar=0')) {
-                                    embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'raw=1#toolbar=0';
-                                }
+                            const embedInfo = getVideoEmbedInfo(currentUrl, !!playingLesson);
+
+                            if (embedInfo.isEmbed) {
                                 return (
-                                    <div className="relative w-full h-full min-h-[600px]">
+                                    <div className="relative w-full h-full min-h-[450px] md:min-h-[550px] bg-black">
                                         <iframe 
-                                            src={embedUrl} 
+                                            key={embedInfo.embedUrl}
+                                            src={embedInfo.embedUrl} 
                                             width="100%" 
-                                            height="600px" 
-                                            className="w-full h-full min-h-[600px] border-0"
+                                            height="100%" 
+                                            className="w-full h-full min-h-[450px] md:min-h-[550px] border-0"
                                             title={playingLesson ? playingLesson.title : "Video bài học"}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                             allowFullScreen
-                                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                                         />
                                         {curriculum.length > 0 && (
                                             <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                                                <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-white">
-                                                    <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
+                                                <div className="bg-black/70 backdrop-blur-md px-4 py-2 rounded-xl text-white shadow-lg border border-white/10">
+                                                    <p className="text-xs font-bold text-teal-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
                                                     <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0]?.title}</p>
                                                 </div>
                                             </div>
@@ -434,11 +479,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                     </div>
                                 );
                             }
+
                             return (
                                 <div className="relative h-full w-full bg-black">
                                     <video 
                                         key={currentUrl}
-                                        src={currentUrl} 
+                                        src={embedInfo.embedUrl} 
                                         className="w-full h-full object-contain focus:outline-none"
                                         controls
                                         controlsList="nodownload pwa-nodownload"
@@ -460,8 +506,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                     />
                                     {curriculum.length > 0 && (
                                         <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-                                            <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-white">
-                                                <p className="text-xs font-bold text-gray-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
+                                            <div className="bg-black/70 backdrop-blur-md px-4 py-2 rounded-xl text-white shadow-lg border border-white/10">
+                                                <p className="text-xs font-bold text-teal-400 mb-0.5 line-clamp-1">Bài {playingLesson ? playingLesson.lessonIdx + 1 : 1} / {curriculum.length}</p>
                                                 <p className="font-black line-clamp-1">{playingLesson ? playingLesson.title : curriculum[0]?.title}</p>
                                             </div>
                                         </div>
@@ -469,25 +515,55 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                 </div>
                             );
                         })()
-                ) : (
-                    <div className="relative h-full w-full">
-                        <video 
-                            src={curriculum[0]?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4"} 
-                            className="w-full h-full object-cover focus:outline-none"
-                            controls
-                            controlsList="nodownload pwa-nodownload"
-                            onContextMenu={(e) => e.preventDefault()}
-                            poster={course.image}
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20 flex flex-col items-center text-center pointer-events-none">
-                            <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
-                            <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
-                                Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
-                            </p>
-                            <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
+                ) : (() => {
+                    const previewUrl = curriculum[0]?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+                    const previewEmbed = getVideoEmbedInfo(previewUrl, false);
+
+                    if (previewEmbed.isEmbed) {
+                        return (
+                            <div className="relative w-full h-full min-h-[450px] md:min-h-[550px] bg-black">
+                                <iframe 
+                                    src={previewEmbed.embedUrl} 
+                                    width="100%" 
+                                    height="100%" 
+                                    className="w-full h-full min-h-[450px] md:min-h-[550px] border-0"
+                                    title="Video Giới Thiệu"
+                                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-6 pt-16 flex flex-col items-center text-center pointer-events-none">
+                                    <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
+                                    <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
+                                        Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
+                                    </p>
+                                    <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">
+                                        {isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="relative h-full w-full">
+                            <video 
+                                src={previewEmbed.embedUrl} 
+                                className="w-full h-full object-cover focus:outline-none"
+                                controls
+                                controlsList="nodownload pwa-nodownload"
+                                onContextMenu={(e) => e.preventDefault()}
+                                poster={course.image}
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20 flex flex-col items-center text-center pointer-events-none">
+                                <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
+                                <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
+                                    Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
+                                </p>
+                                <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
             </div>
         </section>
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // Fix: Ensure clean import of react-router-dom members
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { NAV_LINKS, ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 
@@ -16,45 +16,97 @@ const Header: React.FC = () => {
   const [avatarBadgeClass, setAvatarBadgeClass] = useState<string>('bg-white border border-gray-300');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubs: Array<() => void> = [];
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Clean up previous listeners
+      unsubs.forEach(u => u());
+      unsubs = [];
+
       setCurrentUser(user);
       if (user && user.email) {
         const normalizedEmail = user.email.toLowerCase();
-        const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
-        const isTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+        
+        let localIsVip = false;
+        let localIsAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+        let localIsTeacher = TEACHER_EMAILS.includes(normalizedEmail);
 
-        if (isAdmin || isTeacher) {
-          setAvatarBadgeClass('bg-blue-500 ring-2 ring-blue-300');
-          return;
-        }
-
-        let isVip = false;
         try {
-          const localRoles = localStorage.getItem(`user_roles_${normalizedEmail}`);
-          if (localRoles && JSON.parse(localRoles).isVip) {
-            isVip = true;
+          const localRolesStr = localStorage.getItem(`user_roles_${normalizedEmail}`);
+          if (localRolesStr) {
+            const localRoles = JSON.parse(localRolesStr);
+            if (localRoles.isVip) localIsVip = true;
+            if (localRoles.isAdmin) localIsAdmin = true;
+            if (localRoles.isTeacher) localIsTeacher = true;
           }
         } catch (e) {}
 
-        try {
-          const snap = await getDocs(collection(db, "users", normalizedEmail, "purchased_courses"));
-          const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
-          const count = snap.docs.filter(d => d.id !== 'vip-lifetime-access').length;
-
-          if (isVip || isVipDoc) {
+        const updateBadge = (isVip: boolean, isAdmin: boolean, isTeacher: boolean, purchasedCount: number) => {
+          if (isAdmin || isTeacher) {
+            setAvatarBadgeClass('bg-blue-500 ring-2 ring-blue-300');
+          } else if (isVip) {
             setAvatarBadgeClass('bg-yellow-400 ring-2 ring-yellow-200');
-          } else if (count >= 5) {
+          } else if (purchasedCount >= 5) {
             setAvatarBadgeClass('bg-[#007c76] ring-2 ring-teal-200');
           } else {
             setAvatarBadgeClass('bg-white border border-gray-300');
           }
-        } catch (err) {
-          setAvatarBadgeClass(isVip ? 'bg-yellow-400 ring-2 ring-yellow-200' : 'bg-white border border-gray-300');
-        }
+        };
+
+        // Real-time listener for user document roles
+        let currentIsVip = localIsVip;
+        let currentIsAdmin = localIsAdmin;
+        let currentIsTeacher = localIsTeacher;
+        let currentPurchasedCount = 0;
+
+        const unsubUserDoc = onSnapshot(doc(db, "users", normalizedEmail), (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.isVip !== undefined) currentIsVip = !!data.isVip;
+            if (data.isAdmin !== undefined) currentIsAdmin = !!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
+            if (data.isTeacher !== undefined) currentIsTeacher = !!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
+          }
+          updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
+        }, () => {});
+        unsubs.push(unsubUserDoc);
+
+        // Real-time listener for purchased courses
+        const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
+          const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
+          const count = snap.docs.filter(d => d.id !== 'vip-lifetime-access').length;
+          currentPurchasedCount = count;
+          if (isVipDoc) currentIsVip = true;
+
+          updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
+        }, () => {});
+        unsubs.push(unsubPurchased);
+
+        // Listen to local user_roles_updated
+        const handleLocalRoleUpdate = () => {
+          try {
+            const str = localStorage.getItem(`user_roles_${normalizedEmail}`);
+            if (str) {
+              const r = JSON.parse(str);
+              if (r.isVip !== undefined) currentIsVip = !!r.isVip;
+              if (r.isAdmin !== undefined) currentIsAdmin = !!r.isAdmin;
+              if (r.isTeacher !== undefined) currentIsTeacher = !!r.isTeacher;
+              updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
+            }
+          } catch (e) {}
+        };
+        window.addEventListener('user_roles_updated', handleLocalRoleUpdate);
+        window.addEventListener('storage', handleLocalRoleUpdate);
+        unsubs.push(() => {
+          window.removeEventListener('user_roles_updated', handleLocalRoleUpdate);
+          window.removeEventListener('storage', handleLocalRoleUpdate);
+        });
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      unsubs.forEach(u => u());
+    };
   }, []);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);

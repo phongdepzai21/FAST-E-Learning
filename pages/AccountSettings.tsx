@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore'; 
+import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot } from 'firebase/firestore'; 
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
 import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
@@ -63,40 +63,56 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     if (!user || !user.email) return;
     const normalizedEmail = user.email.toLowerCase();
 
-    const isAdminStatus = ADMIN_EMAILS.includes(normalizedEmail);
-    const isTeacherStatus = TEACHER_EMAILS.includes(normalizedEmail);
+    let localIsAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+    let localIsTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+    let localIsVip = false;
 
-    let isVipStatus = false;
     try {
       const localRoles = localStorage.getItem(`user_roles_${normalizedEmail}`);
       if (localRoles) {
         const parsed = JSON.parse(localRoles);
-        if (parsed.isVip) isVipStatus = true;
+        if (parsed.isVip) localIsVip = true;
+        if (parsed.isAdmin) localIsAdmin = true;
+        if (parsed.isTeacher) localIsTeacher = true;
       }
     } catch (e) {}
 
-    const fetchUserStats = async () => {
-      try {
-        const querySnap = await getDocs(collection(db, "users", normalizedEmail, "purchased_courses"));
-        const count = querySnap.size;
-        const isVipDoc = querySnap.docs.some(d => d.id === 'vip-lifetime-access');
-        setUserStatus({
-          isVip: isVipStatus || isVipDoc,
-          isAdmin: isAdminStatus,
-          isTeacher: isTeacherStatus,
-          coursesCount: count
-        });
-      } catch (err) {
-        setUserStatus({
-          isVip: isVipStatus,
-          isAdmin: isAdminStatus,
-          isTeacher: isTeacherStatus,
-          coursesCount: 0
-        });
-      }
+    let currentIsVip = localIsVip;
+    let currentIsAdmin = localIsAdmin;
+    let currentIsTeacher = localIsTeacher;
+    let currentCount = 0;
+
+    const updateStats = () => {
+      setUserStatus({
+        isVip: currentIsVip,
+        isAdmin: currentIsAdmin,
+        isTeacher: currentIsTeacher,
+        coursesCount: currentCount
+      });
     };
 
-    fetchUserStats();
+    const unsubUser = onSnapshot(doc(db, "users", normalizedEmail), (docSnap) => {
+      if (docSnap.exists()) {
+        const d = docSnap.data();
+        if (d.isVip !== undefined) currentIsVip = !!d.isVip;
+        if (d.isAdmin !== undefined) currentIsAdmin = !!d.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
+        if (d.isTeacher !== undefined) currentIsTeacher = !!d.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
+      }
+      updateStats();
+    }, () => updateStats());
+
+    const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
+      const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
+      const count = snap.docs.filter(d => d.id !== 'vip-lifetime-access').length;
+      currentCount = count;
+      if (isVipDoc) currentIsVip = true;
+      updateStats();
+    }, () => updateStats());
+
+    return () => {
+      unsubUser();
+      unsubPurchased();
+    };
   }, [user]);
 
   // Dynamic Avatar styling according to user request:

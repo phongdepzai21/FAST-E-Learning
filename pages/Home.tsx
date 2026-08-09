@@ -71,7 +71,7 @@ const Home: React.FC = () => {
         unsubscribeSnapshot = onSnapshot(
           collection(db, "users", normalizedEmail, "purchased_courses"), 
           (snapshot: QuerySnapshot<DocumentData>) => {
-            const ids = snapshot.docs.map(doc => doc.data().courseId);
+            const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
             setOwnedCourseIds(ids);
           },
           (error) => console.error("Error syncing courses:", error)

@@ -222,41 +222,50 @@ const Account: React.FC = () => {
                     } catch (e) {}
                 }
 
-                try {
-                    const userDocRef = doc(db, "users", userEmail);
-                    const userDocSnap = await getDoc(userDocRef);
+                // Real-time listener on user doc
+                const userDocRef = doc(db, "users", userEmail);
+                onSnapshot(userDocRef, (userDocSnap) => {
+                    let curVip = isVipStatus;
+                    let curAdmin = isAdminStatus;
+                    let curTeacher = isTeacherStatus;
+
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
-                        if (userData.isVip === true) isVipStatus = true;
+                        if (userData.isVip === true) curVip = true;
                         
                         if (isSpecialEmail || userData.rolePromotedByAdmin === true) {
-                            isAdminStatus = userData.isAdmin === true || ADMIN_EMAILS.includes(userEmail);
-                            isTeacherStatus = userData.isTeacher === true || TEACHER_EMAILS.includes(userEmail) || isAdminStatus;
+                            curAdmin = userData.isAdmin === true || ADMIN_EMAILS.includes(userEmail);
+                            curTeacher = userData.isTeacher === true || TEACHER_EMAILS.includes(userEmail) || curAdmin;
                         } else {
-                            // Enforce strict regular user default
-                            isAdminStatus = ADMIN_EMAILS.includes(userEmail);
-                            isTeacherStatus = TEACHER_EMAILS.includes(userEmail);
+                            curAdmin = ADMIN_EMAILS.includes(userEmail);
+                            curTeacher = TEACHER_EMAILS.includes(userEmail);
                         }
                         
-                        // Clean up & sync valid roles back to localStorage
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-                            isVip: isVipStatus,
-                            isAdmin: isAdminStatus,
-                            isTeacher: isTeacherStatus,
+                            isVip: curVip,
+                            isAdmin: curAdmin,
+                            isTeacher: curTeacher,
                             rolePromotedByAdmin: userData.rolePromotedByAdmin === true
                         }));
                     } else {
-                        // Clean up stale localStorage for unpromoted regular accounts
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-                            isVip: isVipStatus,
-                            isAdmin: isAdminStatus,
-                            isTeacher: isTeacherStatus,
+                            isVip: curVip,
+                            isAdmin: curAdmin,
+                            isTeacher: curTeacher,
                             rolePromotedByAdmin: false
                         }));
                     }
-                } catch (err) {
-                    console.error("Error fetching user VIP status:", err);
-                }
+
+                    setUser(prev => prev ? {
+                      ...prev,
+                      isVip: curVip,
+                      isAdmin: curAdmin,
+                      isTeacher: curTeacher
+                    } : null);
+                    window.dispatchEvent(new CustomEvent('user_roles_updated'));
+                }, (err) => {
+                    console.error("Error watching user VIP status:", err);
+                });
             }
             
             setUser({
@@ -317,9 +326,10 @@ const Account: React.FC = () => {
             const courses: PurchasedCourseData[] = [];
             snapshot.forEach((doc) => {
                 const data = doc.data();
-                if (data.courseId) {
+                const cid = data.courseId || doc.id;
+                if (cid) {
                     courses.push({
-                        courseId: data.courseId,
+                        courseId: cid,
                         progress: data.progress || 0
                     });
                 }
