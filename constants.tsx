@@ -248,11 +248,15 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     }
   }
 
-  // Check for 'k' suffix (e.g., "2000k" -> 2.000.000đ, "2k" -> 2.000đ, "599k" -> 599.000đ)
+  // Check for 'k' suffix (e.g., "2k" -> 2.000.000đ, "2.5k" -> 2.500.000đ, "599k" -> 599.000đ, "2000k" -> 2.000.000đ)
   if (/k$/i.test(lower)) {
     const numPart = lower.replace(/k$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
     if (!isNaN(val) && val > 0) {
+      if (val < 10) {
+        // "2k" -> 2 triệu (2.000.000đ), "2.5k" -> 2.500.000đ
+        return Math.round(val * 1000000).toLocaleString('vi-VN') + 'đ';
+      }
       return Math.round(val * 1000).toLocaleString('vi-VN') + 'đ';
     }
   }
@@ -261,10 +265,10 @@ export const formatPriceSubmit = (rawPrice: string): string => {
   const digitsOnly = clean.replace(/[đĐvVnNdD.\s,]/g, '');
   if (/^\d+$/.test(digitsOnly)) {
     const num = parseInt(digitsOnly, 10);
-    if (num > 0 && num < 100) {
+    if (num > 0 && num < 10) {
       return (num * 1000000).toLocaleString('vi-VN') + 'đ';
     }
-    if (num >= 100 && num < 1000) {
+    if (num >= 10 && num < 1000) {
       return (num * 1000).toLocaleString('vi-VN') + 'đ';
     }
     return num.toLocaleString('vi-VN') + 'đ';
@@ -350,15 +354,17 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     let winner: Course;
 
     if (fc && lc) {
-      const fcTime = parseTime(fc.updatedAt);
-      const lcTime = parseTime(lc.updatedAt);
+      const fcTime = parseTime(fc.updatedAt || fc.createdAt);
+      const lcTime = parseTime(lc.updatedAt || lc.createdAt);
 
       if (lcTime > 0 && lcTime > fcTime) {
         // LocalStorage edit is strictly newer than Firestore record
-        winner = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
+        const baseDoc = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
+        winner = applyOverlay(baseDoc, lc);
       } else {
-        // Firestore record is newer, equal, or LocalStorage has no timestamp -> Firestore wins!
-        winner = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
+        // Firestore record is newer, equal, or LocalStorage has no newer timestamp -> Firestore overlays on top of LocalStorage!
+        const baseDoc = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
+        winner = applyOverlay(baseDoc, fc);
       }
     } else if (fc) {
       winner = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };

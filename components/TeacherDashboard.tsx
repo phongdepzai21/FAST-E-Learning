@@ -224,6 +224,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const rawCurriculum = flatLessons.length > 0 ? flatLessons : DEFAULT_FLAT_LESSONS;
     const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
 
+    const nowIso = new Date().toISOString();
     const newCourse = {
       id: courseId,
       title: title.trim(),
@@ -234,7 +235,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       status: status || 'active',
       curriculum: sanitizedCurriculum,
       authorEmail: userEmail || '',
-      createdAt: new Date().toISOString()
+      createdAt: nowIso,
+      updatedAt: nowIso
     };
 
     // 1. Save to Firestore
