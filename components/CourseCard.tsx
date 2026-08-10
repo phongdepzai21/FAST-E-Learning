@@ -52,7 +52,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = fa
   };
 
   return (
-    <Link to={isOwned ? `/account/course/${course.id}` : `/khoa-hoc/${course.id}`} onClick={handleClick} className="block h-full group relative">
+    <Link to={`/khoa-hoc/${course.id}`} onClick={handleClick} className="block h-full group relative">
         <div className="bg-white rounded-[24px] overflow-hidden shadow-sm hover-lift border border-gray-100 flex flex-col h-full">
             {/* Image Container */}
             <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">

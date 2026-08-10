@@ -40,7 +40,15 @@ const extractFlatLessons = (rawCurr: any): Array<{ title: string; videoUrl: stri
     }
   });
 
-  return result.length > 0 ? result : DEFAULT_FLAT_LESSONS;
+  if (result.length === 0) return DEFAULT_FLAT_LESSONS;
+
+  const final4 = [...result];
+  let idx = 0;
+  while (final4.length < 4) {
+    final4.push(DEFAULT_FLAT_LESSONS[idx % DEFAULT_FLAT_LESSONS.length]);
+    idx++;
+  }
+  return final4.slice(0, 4);
 };
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {

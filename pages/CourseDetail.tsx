@@ -18,15 +18,11 @@ const DUMMY_LESSONS = [
     { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
     { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
     { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-    { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Kiểm soát vệ sinh cá nhân và nhà xưởng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Quản lý nguồn gốc nguyên liệu (Traceability)", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Thiết lập điểm kiểm soát tới hạn (CCP)", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Kỹ năng đánh giá nội bộ", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+    { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
 ];
 
 const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }> => {
-  if (!raw || !Array.isArray(raw)) return [];
+  if (!raw || !Array.isArray(raw)) return DUMMY_LESSONS;
   const result: Array<{ title: string; videoUrl: string }> = [];
 
   raw.forEach((item: any) => {
@@ -54,7 +50,15 @@ const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }
     }
   });
 
-  return result;
+  if (result.length === 0) return DUMMY_LESSONS;
+
+  const final4 = [...result];
+  let idx = 0;
+  while (final4.length < 4) {
+    final4.push(DUMMY_LESSONS[idx % DUMMY_LESSONS.length]);
+    idx++;
+  }
+  return final4.slice(0, 4);
 };
 
 // Helper to detect and extract video embed URL for YouTube, Dropbox, Drive, Vimeo, and native video
@@ -112,7 +116,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const id = embeddedCourseId || paramId;
   const navigate = useNavigate();
   const location = useLocation();
-  const [course, setCourse] = useState<Course | undefined>(COURSES.find(c => c.id === id));
+  const [course, setCourse] = useState<Course | undefined>(() => getMergedCourses([]).find(c => c.id === id));
   
   const [currentUser, setCurrentUser] = useState<{name: string, email: string} | null>(null);
   const [isOwned, setIsOwned] = useState(false);
@@ -325,15 +329,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         }
     }
 
-    setTimeout(() => {
-        localStorage.setItem(`course_unlocked_${id}`, 'true');
-        setIsOwned(true);
-        setIsActivating(false);
-        setShowPaymentModal(false);
-        setShowSuccessNotification(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        setTimeout(() => setShowSuccessNotification(false), 5000);
-    }, 500);
+    localStorage.setItem(`course_unlocked_${id}`, 'true');
+    setIsOwned(true);
+    setIsActivating(false);
+    setShowPaymentModal(false);
+    setShowSuccessNotification(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => setShowSuccessNotification(false), 5000);
   };
 
   const handleRegisterClick = async () => {
@@ -832,12 +834,11 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                     {isOwned ? (
                         <div className="space-y-3">
                             <button onClick={() => {
-                                if (curriculum.length > 0 && curriculum[0].lessons.length > 0) {
+                                if (curriculum.length > 0) {
                                     setPlayingLesson({
-                                        chapterIdx: 0,
                                         lessonIdx: 0,
-                                        title: curriculum[0].lessons[0].title,
-                                        videoUrl: curriculum[0].lessons[0].videoUrl
+                                        title: curriculum[0].title,
+                                        videoUrl: curriculum[0].videoUrl
                                     });
                                 }
                                 document.getElementById("video-player-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
