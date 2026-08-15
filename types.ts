@@ -2,8 +2,6 @@
 export interface Lesson {
   title: string;
   videoUrl?: string;
-  vdohide?: string;
-  videoHide?: string;
   isHidden?: boolean;
 }
 
@@ -16,8 +14,6 @@ export interface Course {
   description?: string;
   status?: 'active' | 'draft' | 'inactive';
   curriculum?: any;
-  vdohide?: string;
-  videoHide?: string;
   authorEmail?: string;
   createdAt?: string;
   updatedAt?: string;

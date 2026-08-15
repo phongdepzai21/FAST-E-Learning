@@ -225,14 +225,14 @@ export const COLORS = {
   dark: '#374151'
 };
 
-export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string; vdohide?: string }> = [
-  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" },
-  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" },
-  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1", vdohide: "" },
-  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" }
+export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string }> = [
+  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
+  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
 ];
 
-export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string; vdohide?: string }> => {
+export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string }> => {
   if (!rawCurr) return DEFAULT_LESSONS;
   if (!Array.isArray(rawCurr)) {
     if (typeof rawCurr === 'object' && rawCurr.lessons && Array.isArray(rawCurr.lessons)) {
@@ -241,7 +241,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
     return DEFAULT_LESSONS;
   }
 
-  const result: Array<{ title: string; videoUrl: string; vdohide?: string }> = [];
+  const result: Array<{ title: string; videoUrl: string }> = [];
 
   rawCurr.forEach((item: any, itemIdx: number) => {
     if (!item) return;
@@ -254,25 +254,22 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
         const videoUrl = typeof l === 'object' && l?.videoUrl 
           ? String(l.videoUrl).trim() 
           : "https://www.w3schools.com/html/mov_bbb.mp4";
-        const vdohide = typeof l === 'object' ? String(l.vdohide || l.videoHide || '').trim() : '';
-        result.push({ title, videoUrl, vdohide });
+        result.push({ title, videoUrl });
       });
     } 
-    // Case 2: item is a direct lesson object { title, videoUrl, vdohide }
+    // Case 2: item is a direct lesson object { title, videoUrl }
     else if (typeof item === 'object') {
       const title = (item.title || `Bài học ${itemIdx + 1}`).trim();
       const videoUrl = item.videoUrl 
         ? String(item.videoUrl).trim() 
         : "https://www.w3schools.com/html/mov_bbb.mp4";
-      const vdohide = String(item.vdohide || item.videoHide || '').trim();
-      result.push({ title, videoUrl, vdohide });
+      result.push({ title, videoUrl });
     }
     // Case 3: item is a string
     else if (typeof item === 'string' && item.trim()) {
       result.push({
         title: item.trim(),
-        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
-        vdohide: ""
+        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"
       });
     }
   });
@@ -280,7 +277,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
   return result.length > 0 ? result : DEFAULT_LESSONS;
 };
 
-// Video embed detection helper for YouTube, vdohide, DoodStream, Streamwish, Streamtape, Filemoon, Dropbox, Drive, Vimeo, Loom, Dailymotion, Bilibili, and HTML5 native video
+// Video embed detection helper for YouTube, DoodStream, Streamwish, Streamtape, Filemoon, Dropbox, Drive, Vimeo, Loom, Dailymotion, Bilibili, and HTML5 native video
 export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isEmbed: boolean; embedUrl: string } {
   if (!url) {
     return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
@@ -327,36 +324,7 @@ export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isE
     };
   }
 
-  // 2. Vdohide (vdohide.com, vdohide.to, vdohide.xyz, vdohide.net, vdohide.top, vdohide.cc, vdohide.site, vdohide.live, etc.)
-  // Common URL patterns: https://vdohide.com/e/CODE, /v/CODE, /d/CODE, /CODE
-  if (/vdohide|vdo-hide|vdo\.hide/i.test(cleanUrl)) {
-    try {
-      const parsed = new URL(cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`);
-      const domain = parsed.hostname || 'vdohide.com';
-      const pathParts = parsed.pathname.split('/').filter(Boolean);
-      const code = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
-      if (code) {
-        return {
-          isEmbed: true,
-          embedUrl: `https://${domain}/e/${code}`
-        };
-      }
-    } catch {
-      const codeMatch = cleanUrl.match(/vdohide[^/]*\/(?:[ved]\/)?([a-zA-Z0-9_-]+)/i);
-      if (codeMatch && codeMatch[1]) {
-        return {
-          isEmbed: true,
-          embedUrl: `https://vdohide.com/e/${codeMatch[1]}`
-        };
-      }
-    }
-    return {
-      isEmbed: true,
-      embedUrl: cleanUrl
-    };
-  }
-
-  // 3. DoodStream (dood.to, dood.so, dood.ws, dood.la, dood.sh, doodstream.com, ds2play.com, dood.re, dood.cx, doods.pro, dood.wf)
+  // 2. DoodStream (dood.to, dood.so, dood.ws, dood.la, dood.sh, doodstream.com, ds2play.com, dood.re, dood.cx, doods.pro, dood.wf)
   if (/dood\.|doodstream\.|ds2play\./i.test(cleanUrl)) {
     const codeMatch = cleanUrl.match(/(?:dood\.[a-z]+|doodstream\.com|ds2play\.com)\/(?:[edv]\/)?([a-zA-Z0-9_-]+)/i);
     if (codeMatch && codeMatch[1]) {

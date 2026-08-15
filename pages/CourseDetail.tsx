@@ -332,7 +332,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             />
                         </div>
                     ) : (() => {
-                            const currentUrl = playingLesson?.vdohide || playingLesson?.videoUrl || (curriculum[0] && (curriculum[0].vdohide || curriculum[0].videoUrl)) || "https://www.w3schools.com/html/mov_bbb.mp4";
+                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
                             const embedInfo = getVideoEmbedInfo(currentUrl, !!playingLesson);
 
                             if (embedInfo.isEmbed) {

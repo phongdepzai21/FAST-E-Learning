@@ -187,14 +187,9 @@ const Classroom: React.FC = () => {
     setUserNote('');
   };
 
-  const [selectedSource, setSelectedSource] = useState<'primary' | 'vdohide'>('primary');
-
   const activeVideoUrl = useMemo(() => {
-    if (selectedSource === 'vdohide' && currentLesson?.vdohide) {
-      return currentLesson.vdohide;
-    }
-    return currentLesson?.videoUrl || currentLesson?.vdohide || "https://www.w3schools.com/html/mov_bbb.mp4";
-  }, [currentLesson, selectedSource]);
+    return currentLesson?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+  }, [currentLesson]);
 
   const videoEmbed = useMemo(() => {
     if (!activeVideoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
@@ -354,34 +349,6 @@ const Classroom: React.FC = () => {
 
             {/* ACTION CONTROLS */}
             <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end shrink-0">
-              {currentLesson?.vdohide && (
-                <div className="flex items-center bg-white/[0.06] p-1 rounded-xl border border-white/[0.08] text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSource('primary')}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                      selectedSource === 'primary' 
-                        ? 'bg-teal-500 text-slate-950 shadow-sm' 
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Server 1
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSource('vdohide')}
-                    className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all ${
-                      selectedSource === 'vdohide' 
-                        ? 'bg-amber-400 text-slate-950 shadow-sm' 
-                        : 'text-amber-400 hover:text-amber-300'
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                    vdohide
-                  </button>
-                </div>
-              )}
-
               <button
                 disabled={currentIdx === 0}
                 onClick={() => {

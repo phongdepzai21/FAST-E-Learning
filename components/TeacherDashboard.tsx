@@ -50,12 +50,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [category, setCategory] = useState(Categories[0]);
   const [description, setDescription] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [vdohide, setVdohide] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'active' | 'draft' | 'inactive'>('active');
 
-  // Curriculum State (Flat Lessons with videoUrl & vdohide)
-  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; vdohide?: string }[]>(DEFAULT_FLAT_LESSONS);
+  // Curriculum State (Flat Lessons with videoUrl)
+  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -88,7 +87,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             category: String(localCourse.category || 'Khác'),
             description: String(localCourse.description || '').trim(),
             status: localCourse.status || 'active',
-            vdohide: String(localCourse.vdohide || localCourse.videoHide || '').trim(),
             curriculum: [{ title: "Danh sách bài giảng", lessons: currLessons }],
             authorEmail: localCourse.authorEmail || userEmail || '',
             updatedAt: localCourse.updatedAt || new Date().toISOString()
@@ -201,7 +199,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setCategory(course.category);
     setDescription(course.description || '');
     setImageUrlInput(course.image);
-    setVdohide(course.vdohide || course.videoHide || '');
     setImageFile(null);
     setStatus(course.status || 'active');
     setMessage(null);
@@ -211,9 +208,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       const courseDocSnap = await getDoc(doc(db, 'courses', course.id));
       if (courseDocSnap.exists()) {
         const cData = courseDocSnap.data();
-        if (cData.vdohide || cData.videoHide) {
-          setVdohide(cData.vdohide || cData.videoHide || '');
-        }
         if (cData.curriculum) {
           setFlatLessons(extractLessonsFlat(cData.curriculum));
         } else {
@@ -259,11 +253,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       if (!vUrl) {
         vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
       }
-      const vHide = les?.vdohide ? String(les.vdohide).trim() : (les?.videoHide ? String(les.videoHide).trim() : '');
       return {
         title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
-        videoUrl: vUrl,
-        vdohide: vHide
+        videoUrl: vUrl
       };
     });
     return [{ title: "Danh sách bài giảng", lessons: cleanLessons }];
@@ -307,7 +299,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       category: category || 'Khác',
       description: description.trim(),
       status: status || 'active',
-      vdohide: vdohide.trim(),
       curriculum: sanitizedCurriculum,
       authorEmail: userEmail || '',
       createdAt: nowIso,
@@ -383,7 +374,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       category: category || 'Khác',
       description: description.trim(),
       status: status || 'active',
-      vdohide: vdohide.trim(),
       curriculum: sanitizedCurriculum,
       updatedAt: nowIso
     });
@@ -548,7 +538,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setCategory(Categories[0]);
     setDescription('');
     setImageUrlInput('');
-    setVdohide('');
     setImageFile(null);
     setStatus('active');
     setFlatLessons(DEFAULT_FLAT_LESSONS);
@@ -560,7 +549,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const addFlatLesson = () => {
     setFlatLessons(prev => [
       ...prev,
-      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', vdohide: '' }
+      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
     ]);
   };
 
@@ -580,7 +569,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     });
   };
 
-  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl' | 'vdohide', value: string) => {
+  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl', value: string) => {
     setFlatLessons(prev => {
       const result = [...prev];
       result[lIdx] = { ...result[lIdx], [field]: value };
@@ -861,23 +850,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black uppercase rounded-md tracking-wider border border-amber-200">vdohide</span>
-                    Video ẩn / VIP của khóa học
-                  </label>
-                  <span className="text-[11px] text-gray-400 font-medium">Tùy chọn</span>
-                </div>
-                <input 
-                  type="text" 
-                  value={vdohide}
-                  onChange={e => setVdohide(e.target.value)}
-                  placeholder="Link vdohide (vdohide.com/e/...), Youtube, Doodstream, Drive, mã <iframe>..."
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
-                />
-              </div>
-
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-bold text-gray-700">Hoặc tải lên từ máy tính (Tải file cục bộ)</label>
                 <input 
@@ -915,7 +887,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   2. Danh sách bài giảng ({flatLessons.length} bài)
                 </h3>
                 <p className="text-gray-400 text-xs font-semibold mt-1">
-                  Quản lý các bài giảng, hỗ trợ liên kết video chính và trường <code>vdohide</code> (video ẩn / VIP).
+                  Quản lý và sắp xếp các bài giảng hiển thị trực tiếp trong khóa học.
                 </p>
               </div>
               
@@ -952,7 +924,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
                       {/* Lesson Title Input */}
                       <div className="space-y-1">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tên bài giảng</span>
@@ -967,33 +939,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                       {/* Lesson Video URL Input */}
                       <div className="space-y-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Video chính (videoUrl)</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng</span>
                         <input
                           type="text"
                           value={lesson.videoUrl || ''}
                           onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
-                          placeholder="Link Youtube, vdohide, Drive, Doodstream, mã <iframe>, MP4..."
+                          placeholder="Link Youtube (watch, shorts, youtu.be), Google Drive, Dropbox, MP4..."
                           className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
-                        />
-                      </div>
-
-                      {/* Lesson vdohide Input */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            vdohide (Video Ẩn / Server 2)
-                          </span>
-                          {lesson.vdohide && (
-                            <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1 rounded">Có sẵn</span>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={lesson.vdohide || ''}
-                          onChange={(e) => updateFlatLesson(lIdx, 'vdohide', e.target.value)}
-                          placeholder="Link vdohide (vdohide.com/e/...), Youtube ẩn, mã <iframe>..."
-                          className="w-full bg-amber-50/30 text-xs font-medium text-gray-700 py-2.5 px-3 border border-amber-200/80 rounded-xl focus:border-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400"
                         />
                       </div>
                     </div>
