@@ -72,10 +72,6 @@ const Classroom: React.FC = () => {
   const [userNote, setUserNote] = useState('');
   const [savedNotes, setSavedNotes] = useState<string[]>([]);
 
-  // Admin Curriculum Edit
-  const [isEditingCurriculum, setIsEditingCurriculum] = useState(false);
-  const [editData, setEditData] = useState<Array<{ title: string; videoUrl: string }>>([]);
-
   // Load Course
   useEffect(() => {
     if (!courseId) return;
@@ -210,19 +206,6 @@ const Classroom: React.FC = () => {
     setSavedNotes(updated);
     localStorage.setItem(`notes_${courseId}`, JSON.stringify(updated));
     setUserNote('');
-  };
-
-  const handleSaveCurriculum = async () => {
-    if (!courseId) return;
-    try {
-      const docRef = doc(db, "courses", courseId);
-      const formattedCurriculum = [{ title: "Danh sách bài giảng", lessons: editData }];
-      await setDoc(docRef, { curriculum: formattedCurriculum, updatedAt: new Date().toISOString() }, { merge: true });
-      setCurriculum(editData);
-      setIsEditingCurriculum(false);
-    } catch (e) {
-      alert("Lỗi khi lưu bài giảng");
-    }
   };
 
   const videoEmbed = useMemo(() => {
@@ -494,66 +477,11 @@ const Classroom: React.FC = () => {
                 </h3>
                 <span className="text-[11px] font-bold text-slate-400">{curriculum.length} Bài giảng video</span>
               </div>
-
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setEditData(JSON.parse(JSON.stringify(curriculum)));
-                    setIsEditingCurriculum(!isEditingCurriculum);
-                  }}
-                  className="text-xs font-bold bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 px-3 py-1.5 rounded-lg border border-amber-500/30 transition-all"
-                >
-                  {isEditingCurriculum ? 'Đóng sửa' : 'Sửa bài'}
-                </button>
-              )}
             </div>
 
-            {/* ADMIN CURRICULUM EDIT FORM */}
-            {isEditingCurriculum ? (
-              <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-                <button
-                  onClick={() => setEditData([...editData, { title: "Bài giảng mới", videoUrl: "" }])}
-                  className="w-full bg-[#007c76] text-white py-2 rounded-xl text-xs font-bold hover:bg-[#00605b]"
-                >
-                  + Thêm bài giảng mới
-                </button>
-                {editData.map((item, idx) => (
-                  <div key={idx} className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                    <input
-                      type="text"
-                      value={item.title}
-                      onChange={(e) => {
-                        const copy = [...editData];
-                        copy[idx].title = e.target.value;
-                        setEditData(copy);
-                      }}
-                      className="w-full bg-slate-800 text-xs font-bold text-white p-2 rounded-lg border border-slate-700"
-                      placeholder="Tên bài giảng"
-                    />
-                    <input
-                      type="text"
-                      value={item.videoUrl}
-                      onChange={(e) => {
-                        const copy = [...editData];
-                        copy[idx].videoUrl = e.target.value;
-                        setEditData(copy);
-                      }}
-                      className="w-full bg-slate-800 text-xs text-slate-300 p-2 rounded-lg border border-slate-700"
-                      placeholder="URL Video"
-                    />
-                  </div>
-                ))}
-                <button
-                  onClick={handleSaveCurriculum}
-                  className="w-full bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-500"
-                >
-                  Lưu thay đổi
-                </button>
-              </div>
-            ) : (
-              /* LESSON LIST */
-              <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[600px]">
-                {curriculum.map((lesson, idx) => {
+            {/* LESSON LIST */}
+            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[600px]">
+              {curriculum.map((lesson, idx) => {
                   const isCompleted = completedLessons.includes(`${idx}`) || completedLessons.includes(`0-${idx}`);
                   const isPlaying = currentIdx === idx;
 
@@ -603,9 +531,8 @@ const Classroom: React.FC = () => {
                   );
                 })}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
       </div>
     </div>

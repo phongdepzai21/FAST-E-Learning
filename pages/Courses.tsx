@@ -120,8 +120,8 @@ const Courses: React.FC = () => {
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
     return allCourses.filter(course => {
-      const isDraft = course.status === 'draft';
-      if (isDraft) return false; // Hide drafts for general view
+      const isDraft = course.status === 'draft' || course.status === 'inactive';
+      if (isDraft) return false; // Hide drafts & inactive courses for general view
 
       const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = activeCategory === 'Tất cả' || 

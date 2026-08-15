@@ -1,5 +1,6 @@
 {
   "name": "FAST E-Learning",
   "description": "Nền tảng học trực tuyến hàng đầu về An toàn thực phẩm tại Việt Nam, cung cấp các khóa học ISO, HACCP và tư vấn chuyên sâu.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -67,7 +67,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [description, setDescription] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<'active' | 'draft'>('active');
+  const [status, setStatus] = useState<'active' | 'draft' | 'inactive'>('active');
 
   // Curriculum State (Flat Lessons)
   const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
@@ -348,6 +348,63 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }, 1200);
   };
 
+  // Toggle Course Visibility / Active Status
+  const handleToggleCourseStatus = async (course: Course) => {
+    const isCurrentlyActive = course.status !== 'draft' && course.status !== 'inactive';
+    const newStatus: 'active' | 'inactive' = isCurrentlyActive ? 'inactive' : 'active';
+    const actionText = isCurrentlyActive ? 'ẩn khóa học (đổi sang "Không hoạt động")' : 'kích hoạt khóa học (đổi sang "Hoạt động")';
+    
+    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText} "${course.title}"?`)) {
+      return;
+    }
+
+    try {
+      const nowIso = new Date().toISOString();
+      const docRef = doc(db, 'courses', course.id);
+      const updatePayload: any = {
+        id: course.id,
+        title: course.title,
+        price: course.price,
+        image: course.image,
+        category: course.category || 'Khác',
+        description: course.description || '',
+        status: newStatus,
+        updatedAt: nowIso
+      };
+      if (course.curriculum) {
+        updatePayload.curriculum = course.curriculum;
+      }
+
+      await setDoc(docRef, updatePayload, { merge: true });
+
+      // Also sync LocalStorage
+      try {
+        const localStr = localStorage.getItem('local_custom_courses');
+        let localList: any[] = localStr ? JSON.parse(localStr) : [];
+        const idx = localList.findIndex((c: any) => c.id === course.id);
+        if (idx !== -1) {
+          localList[idx].status = newStatus;
+          localList[idx].updatedAt = nowIso;
+        } else {
+          localList.push({ ...course, status: newStatus, updatedAt: nowIso });
+        }
+        localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+      } catch (e) {}
+
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      setMessage({
+        type: 'success',
+        text: newStatus === 'inactive'
+          ? `Đã ẩn khóa học "${course.title}" (Trạng thái: Không hoạt động)`
+          : `Đã kích hoạt khóa học "${course.title}" (Trạng thái: Hoạt động)`
+      });
+      setTimeout(() => setMessage(null), 4000);
+    } catch (error) {
+      console.error('Lỗi khi đổi trạng thái khóa học:', error);
+      setMessage({ type: 'error', text: 'Có lỗi xảy ra khi cập nhật trạng thái khóa học.' });
+    }
+  };
+
   // Delete / Reset Course Trigger
   const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
     const isSystemCourse = HARDCODED_COURSES.some(c => c.id === courseId);
@@ -496,20 +553,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-                    <th className="py-4 px-6">Ảnh bìa</th>
-                    <th className="py-4 px-6">Tiêu đề khóa học</th>
-                    <th className="py-4 px-6">Danh mục</th>
-                    <th className="py-4 px-6">Học phí</th>
-                    <th className="py-4 px-6">Trạng thái</th>
-                    <th className="py-4 px-6 text-right">Thao tác</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Ảnh bìa</th>
+                    <th className="py-4 px-6 min-w-[200px]">Tiêu đề khóa học</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Danh mục</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Học phí</th>
+                    <th className="py-4 px-6 whitespace-nowrap">Trạng thái</th>
+                    <th className="py-4 px-6 text-right whitespace-nowrap">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {courses.map((course) => {
                     const isSystem = HARDCODED_COURSES.some(c => c.id === course.id);
+                    const isHiddenOrInactive = course.status === 'draft' || course.status === 'inactive';
                     return (
                       <tr key={course.id} className="hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700">
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <img 
                             src={course.image} 
                             alt={course.title} 
@@ -525,31 +583,66 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
                           </span>
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="py-4 px-6 whitespace-nowrap">
                           <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#007c76]/10 text-[#007c76]">
                             {course.category}
                           </span>
                         </td>
-                        <td className="py-4 px-6 font-extrabold text-[#007c76]">
+                        <td className="py-4 px-6 font-extrabold text-[#007c76] whitespace-nowrap">
                           {course.price}
                         </td>
-                        <td className="py-4 px-6">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
                             course.status === 'draft' 
                               ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                              : course.status === 'inactive'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-200'
                               : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                           }`}>
-                            {course.status === 'draft' ? 'Nháp' : 'Hoạt động'}
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              course.status === 'draft'
+                                ? 'bg-amber-500'
+                                : course.status === 'inactive'
+                                ? 'bg-rose-500'
+                                : 'bg-emerald-500'
+                            }`}></span>
+                            <span>
+                              {course.status === 'draft' ? 'Nháp' : course.status === 'inactive' ? 'Không hoạt động' : 'Hoạt động'}
+                            </span>
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-right">
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2 text-xs font-black">
+                            {/* Nút Ẩn / Hiện (Chuyển trạng thái hoạt động <-> không hoạt động) */}
+                            {isHiddenOrInactive ? (
+                              <button
+                                onClick={() => handleToggleCourseStatus(course)}
+                                title="Kích hoạt để khóa học hiển thị công khai cho học viên"
+                                className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <span>Hiện</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleCourseStatus(course)}
+                                title="Ẩn khóa học khỏi danh sách học viên (chuyển sang Không hoạt động)"
+                                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                <span>Ẩn</span>
+                              </button>
+                            )}
+
+                            {/* Nút Sửa */}
                             <button
                               onClick={() => startEditCourse(course)}
                               className="px-3.5 py-2 bg-gray-50 border border-gray-100 hover:border-[#007c76]/20 text-[#007c76] hover:bg-[#007c76]/5 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
                             >
                               Sửa
                             </button>
+
+                            {/* Nút Xóa / Reset */}
                             <button
                               onClick={() => handleDeleteCourse(course.id, course.title)}
                               className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
@@ -630,11 +723,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 <label className="text-sm font-bold text-gray-700">Trạng thái khóa học *</label>
                 <select 
                   value={status}
-                  onChange={e => setStatus(e.target.value as 'active' | 'draft')}
+                  onChange={e => setStatus(e.target.value as 'active' | 'draft' | 'inactive')}
                   className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
                 >
-                  <option value="active">Hoạt động (Xuất bản công khai)</option>
-                  <option value="draft">Bản nháp (Lưu nháp và ẩn khỏi học viên)</option>
+                  <option value="active">Hoạt động (Hiển thị công khai cho học viên)</option>
+                  <option value="inactive">Không hoạt động (Ẩn khỏi danh sách học viên)</option>
+                  <option value="draft">Bản nháp (Đang biên soạn, ẩn khỏi học viên)</option>
                 </select>
               </div>
 

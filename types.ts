@@ -6,7 +6,7 @@ export interface Course {
   image: string;
   category: string;
   description?: string;
-  status?: 'active' | 'draft';
+  status?: 'active' | 'draft' | 'inactive';
   curriculum?: any;
   authorEmail?: string;
   createdAt?: string;

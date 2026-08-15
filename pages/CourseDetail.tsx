@@ -133,8 +133,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
-  const [isEditingCurriculum, setIsEditingCurriculum] = useState(false);
-  const [editData, setEditData] = useState<Array<{ title: string; videoUrl: string }>>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const latestFirestoreDataRef = useRef<any>(null);
@@ -202,46 +200,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   }, [id]);
 
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
-
-  const handleSaveCurriculum = async () => {
-      if (!id) return;
-      try {
-          const docRef = doc(db, "courses", id);
-          const formattedCurriculum = [{ title: "Danh sách bài giảng", lessons: editData }];
-          const updatePayload: any = {
-            curriculum: formattedCurriculum,
-            updatedAt: new Date().toISOString()
-          };
-          if (course?.title) updatePayload.title = course.title;
-          if (course?.price) updatePayload.price = course.price;
-          if (course?.image) updatePayload.image = course.image;
-          if (course?.category) updatePayload.category = course.category;
-          if (course?.description) updatePayload.description = course.description;
-
-          await setDoc(docRef, updatePayload, { merge: true });
-          setCurriculum(editData);
-          setIsEditingCurriculum(false);
-
-          try {
-            const localStr = localStorage.getItem('local_custom_courses');
-            let localList = localStr ? JSON.parse(localStr) : [];
-            const idx = localList.findIndex((c: any) => c.id === id);
-            if (idx !== -1) {
-              localList[idx].curriculum = formattedCurriculum;
-              if (course?.title) localList[idx].title = course.title;
-            } else if (course) {
-              localList.push({ ...course, curriculum: formattedCurriculum });
-            }
-            localStorage.setItem('local_custom_courses', JSON.stringify(localList));
-          } catch (e) {}
-
-          window.dispatchEvent(new CustomEvent('courses_updated'));
-          alert("Lưu danh sách bài giảng thành công!");
-      } catch (error) {
-          console.error("Error saving curriculum:", error);
-          alert("Có lỗi xảy ra khi lưu.");
-      }
-  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -433,6 +391,30 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   const learningContent = (
     <div className="space-y-8 animate-fade-in">
+        {isOwned && (
+            <div className="bg-gradient-to-r from-[#007c76] to-[#005a56] text-white p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-[#007c76]/15 border border-teal-600/30">
+                <div className="flex items-center gap-4 text-center sm:text-left">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" /></svg>
+                    </div>
+                    <div>
+                        <div className="flex items-center justify-center sm:justify-start gap-2">
+                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-wider">Đã sở hữu</span>
+                            <span className="text-teal-200 text-xs font-semibold">| Bạn có quyền truy cập toàn bộ bài học</span>
+                        </div>
+                        <h4 className="text-base md:text-lg font-black tracking-tight mt-0.5">Phòng học trực tuyến chuẩn tập trung</h4>
+                    </div>
+                </div>
+                <Link
+                    to={`/hoc/${id}`}
+                    className="w-full sm:w-auto bg-white text-[#007c76] hover:bg-teal-50 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider shrink-0 transition-all shadow-lg hover:scale-105 flex items-center justify-center gap-2"
+                >
+                    <span>Vào phòng học</span>
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                </Link>
+            </div>
+        )}
+
         {/* VIDEO / CONTENT PLAYER SECTION */}
         <section className={`transition-all duration-1000 delay-200 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <div id="video-player-section" className={`rounded-[32px] overflow-hidden shadow-2xl border-4 border-white bg-black relative group hover:shadow-primary/20 transition-all duration-500 ${id === 'basic-principles' ? 'aspect-auto min-h-[500px] h-[70vh] bg-gray-50 overflow-y-auto' : 'aspect-video'}`}>
@@ -701,57 +683,18 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                   </div>
                               </div>
 
-                              {isAdmin && (
-                                  <div className="flex justify-end">
-                                      {isEditingCurriculum ? (
-                                          <div className="flex gap-2">
-                                              <button onClick={handleSaveCurriculum} className="bg-green-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Lưu</button>
-                                              <button onClick={() => setIsEditingCurriculum(false)} className="bg-gray-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Hủy</button>
-                                          </div>
-                                      ) : (
-                                          <button onClick={() => { setEditData(JSON.parse(JSON.stringify(curriculum))); setIsEditingCurriculum(true); }} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Sửa bài giảng</button>
-                                      )}
-                                  </div>
-                              )}
+                              <div className="pt-2">
+                                <Link
+                                  to={`/hoc/${id}`}
+                                  className="w-full bg-[#007c76] hover:bg-[#00605b] text-white py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#007c76]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                                  Vào phòng học ngay
+                                </Link>
+                              </div>
 
-                              {isEditingCurriculum ? (
-                                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                                      <button 
-                                          onClick={() => setEditData([...editData, { title: "Bài giảng mới", videoUrl: "" }])}
-                                          className="w-full bg-primary text-white py-2 rounded-lg text-xs font-bold"
-                                      >
-                                          + Thêm bài giảng
-                                      </button>
-                                      {editData.map((lesson, lIdx) => (
-                                          <div key={lIdx} className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                                              <input 
-                                                  type="text" 
-                                                  value={lesson.title} 
-                                                  onChange={(e) => {
-                                                      const newData = [...editData];
-                                                      newData[lIdx].title = e.target.value;
-                                                      setEditData(newData);
-                                                  }}
-                                                  className="font-bold text-xs bg-white border border-gray-200 rounded p-1.5 w-full"
-                                                  placeholder="Tên bài giảng"
-                                              />
-                                              <input 
-                                                  type="text" 
-                                                  value={lesson.videoUrl || ''} 
-                                                  onChange={(e) => {
-                                                      const newData = [...editData];
-                                                      newData[lIdx].videoUrl = e.target.value;
-                                                      setEditData(newData);
-                                                  }}
-                                                  className="text-xs bg-white border border-gray-200 rounded p-1.5 w-full"
-                                                  placeholder="URL Video"
-                                              />
-                                          </div>
-                                      ))}
-                                  </div>
-                              ) : (
-                                  <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-                                      {curriculum.map((lesson, lIdx) => {
+                              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                                {curriculum.map((lesson, lIdx) => {
                                           const isCompleted = completedLessons.includes(`${lIdx}`) || completedLessons.includes(`0-${lIdx}`);
                                           const isCurrentPlaying = currentIdx === lIdx;
 
@@ -802,7 +745,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                           );
                                       })}
                                   </div>
-                              )}
                           </div>
                       ) : (
                           <div className="sticky top-28 bg-white p-8 rounded-[40px] shadow-2xl border border-gray-100 text-center space-y-8">
@@ -943,57 +885,18 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             </div>
                         </div>
 
-                        {isAdmin && (
-                            <div className="flex justify-end">
-                                {isEditingCurriculum ? (
-                                    <div className="flex gap-2">
-                                        <button onClick={handleSaveCurriculum} className="bg-green-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Lưu</button>
-                                        <button onClick={() => setIsEditingCurriculum(false)} className="bg-gray-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Hủy</button>
-                                    </div>
-                                ) : (
-                                    <button onClick={() => { setEditData(JSON.parse(JSON.stringify(curriculum))); setIsEditingCurriculum(true); }} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Sửa bài giảng</button>
-                                )}
-                            </div>
-                        )}
+                        <div className="pt-2">
+                            <Link
+                                to={`/hoc/${id}`}
+                                className="w-full bg-[#007c76] hover:bg-[#00605b] text-white py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#007c76]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                                Vào phòng học ngay
+                            </Link>
+                        </div>
 
-                        {isEditingCurriculum ? (
-                            <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                                <button 
-                                    onClick={() => setEditData([...editData, { title: "Bài giảng mới", videoUrl: "" }])}
-                                    className="w-full bg-primary text-white py-2 rounded-lg text-xs font-bold"
-                                >
-                                    + Thêm bài giảng
-                                </button>
-                                {editData.map((lesson, lIdx) => (
-                                    <div key={lIdx} className="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                                        <input 
-                                            type="text" 
-                                            value={lesson.title} 
-                                            onChange={(e) => {
-                                                const newData = [...editData];
-                                                newData[lIdx].title = e.target.value;
-                                                setEditData(newData);
-                                            }}
-                                            className="font-bold text-xs bg-white border border-gray-200 rounded p-1.5 w-full"
-                                            placeholder="Tên bài giảng"
-                                        />
-                                        <input 
-                                            type="text" 
-                                            value={lesson.videoUrl || ''} 
-                                            onChange={(e) => {
-                                                const newData = [...editData];
-                                                newData[lIdx].videoUrl = e.target.value;
-                                                setEditData(newData);
-                                            }}
-                                            className="text-xs bg-white border border-gray-200 rounded p-1.5 w-full"
-                                            placeholder="URL Video"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-                                {curriculum.map((lesson, lIdx) => {
+                        <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+                            {curriculum.map((lesson, lIdx) => {
                                     const isCompleted = completedLessons.includes(`${lIdx}`) || completedLessons.includes(`0-${lIdx}`);
                                     const isCurrentPlaying = currentIdx === lIdx;
 
@@ -1044,7 +947,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                     );
                                 })}
                             </div>
-                        )}
                     </div>
                 ) : (
                     /* ENROLLMENT / PURCHASE CARD WHEN NOT OWNED */

@@ -125,7 +125,7 @@ const Home: React.FC = () => {
             <Link to="/khoa-hoc" className="hidden md:inline-block bg-white text-[#007c76] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl border border-gray-100 hover:shadow-2xl transition-all">Xem tất cả khóa học</Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
-            {allCourses.filter(c => c.status !== 'draft').slice(0, 3).map(course => (
+            {allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').slice(0, 3).map(course => (
               <CourseCard 
                 key={course.id} 
                 course={course} 

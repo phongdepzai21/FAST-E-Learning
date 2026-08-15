@@ -242,7 +242,7 @@ const VipUpgrade: React.FC = () => {
                         "Toàn bộ 20+ khóa học hiện có",
                         "Các khóa học mới trong tương lai",
                         "Tài liệu biểu mẫu ISO/HACCP",
-                        "Vào nhóm kín Zalo cùng chuyên gia",
+                        "Hỗ trợ giải đáp chuyên môn trực tiếp",
                         "Ưu đãi 20% khi dùng dịch vụ tư vấn"
                      ].map((feat, i) => (
                          <div key={i} className="flex items-center gap-3">
@@ -271,7 +271,7 @@ const VipUpgrade: React.FC = () => {
              {[
                  { q: "Tôi có cần trả thêm phí cho các khóa học mới không?", a: "Không. Với gói VIP Trọn Đời, bạn sẽ được tự động truy cập vào tất cả các khóa học mới mà FAST E-Learning phát hành trong tương lai mà không tốn thêm bất kỳ chi phí nào." },
                  { q: "Tôi có thể tải tài liệu học tập không?", a: "Có. Tất cả các tài liệu hướng dẫn, biểu mẫu ISO/HACCP đính kèm khóa học đều có thể tải xuống trọn đời để phục vụ cho công việc thực tế." },
-                 { q: "Hỗ trợ 1-1 hoạt động ra sao?", a: "Bạn sẽ được tham gia vào nhóm Zalo kín dành riêng cho VIP. Tại đó, bạn có thể đặt câu hỏi trực tiếp và được đội ngũ chuyên gia của chúng tôi giải đáp trong vòng 24h làm việc." }
+                 { q: "Hỗ trợ 1-1 hoạt động ra sao?", a: "Bạn sẽ được kết nối trực tiếp với đội ngũ chuyên gia đào tạo của chúng tôi để được giải đáp thắc mắc chuyên môn trong vòng 24h làm việc." }
              ].map((faq, i) => (
                  <div key={i} className="bg-gray-800/30 rounded-2xl p-6 border border-gray-700">
                      <h4 className="font-black text-lg text-white mb-2">{faq.q}</h4>

@@ -40,15 +40,30 @@ interface PurchasedCourseData {
 const MyOwnedCoursesView: React.FC<{
   myCourses: Course[];
   progressMap: Record<string, number>;
-}> = ({ myCourses }) => {
+  onGoToBuyCourses?: () => void;
+}> = ({ myCourses, onGoToBuyCourses }) => {
   return (
     <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-6">
-      <div className="flex items-center justify-between mb-8">
-        <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
-          <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
-          Khóa học của tôi
-        </h3>
-        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{myCourses.length} Khóa học</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+            <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
+            Khóa học của tôi
+          </h3>
+          <p className="text-gray-500 text-xs font-semibold mt-1">Các khóa học bạn đã đăng ký hoặc được cấp quyền truy cập</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{myCourses.length} Khóa học</span>
+          {onGoToBuyCourses && (
+            <button
+              onClick={onGoToBuyCourses}
+              className="bg-[#007c76] hover:bg-[#00605b] text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-[#007c76]/20 transition-all hover:scale-105 flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              Mua thêm khóa học
+            </button>
+          )}
+        </div>
       </div>
 
       {myCourses.length > 0 ? (
@@ -62,15 +77,144 @@ const MyOwnedCoursesView: React.FC<{
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-[40px] p-12 text-center border-2 border-dashed border-gray-100">
-             <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+        <div className="bg-white rounded-[40px] p-10 md:p-14 text-center border-2 border-dashed border-gray-100 max-w-2xl mx-auto shadow-sm">
+             <div className="w-20 h-20 bg-teal-50 text-[#007c76] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
              </div>
-             <h3 className="text-xl font-bold text-gray-400 mb-2">Bạn chưa đăng ký khóa học nào</h3>
-             <p className="text-gray-400 text-sm mb-6">Hãy bắt đầu hành trình nâng cao kiến thức ngay hôm nay!</p>
-             <Link to="/khoa-hoc" className="bg-[#007c76] text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide hover:brightness-110">
-                Danh sách khóa học
-             </Link>
+             <h3 className="text-2xl font-black text-gray-800 mb-2">Chưa có khóa học nào</h3>
+             <p className="text-gray-500 text-sm mb-8 max-w-md mx-auto leading-relaxed">
+               Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu hành trình nâng cao kiến thức và chuẩn hóa chuyên môn!
+             </p>
+             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+               {onGoToBuyCourses ? (
+                 <button 
+                   onClick={onGoToBuyCourses} 
+                   className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                   Mua khóa học ngay
+                 </button>
+               ) : (
+                 <Link 
+                   to="/khoa-hoc" 
+                   className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                   Mua khóa học ngay
+                 </Link>
+               )}
+               <Link 
+                 to="/account/vip-upgrade" 
+                 className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+               >
+                 <span>⭐ Nâng cấp VIP trọn đời</span>
+               </Link>
+             </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const BuyCoursesView: React.FC<{
+  allCourses: Course[];
+  ownedCourseIds: string[];
+  isVip: boolean;
+}> = ({ allCourses, ownedCourseIds, isVip }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    allCourses.forEach(c => {
+      if (c.category) set.add(c.category);
+    });
+    return ['all', ...Array.from(set)];
+  }, [allCourses]);
+
+  const filteredCourses = useMemo(() => {
+    return allCourses.filter(course => {
+      if (course.status === 'draft' || course.status === 'inactive') return false;
+      const matchCat = selectedCategory === 'all' || course.category?.toLowerCase() === selectedCategory.toLowerCase();
+      const matchSearch = !searchQuery || 
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (course.description && course.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [allCourses, selectedCategory, searchQuery]);
+
+  return (
+    <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+            <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
+            Mua khóa học / Danh mục đào tạo
+          </h3>
+          <p className="text-gray-500 text-sm font-medium mt-1">
+            Chọn khóa học phù hợp với định hướng nghề nghiệp và chuẩn hóa kỹ năng của bạn.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link 
+            to="/account/vip-upgrade" 
+            className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
+          >
+            <span>⭐ Nâng cấp VIP trọn đời</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Search & Category Filter */}
+      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <svg className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input 
+              type="text"
+              placeholder="Tìm kiếm theo tên khóa học, mã ISO, tiêu chuẩn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#007c76]/30 focus:border-[#007c76]"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all ${
+                selectedCategory === cat
+                  ? 'bg-[#007c76] text-white shadow-md shadow-[#007c76]/20'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {cat === 'all' ? 'Tất cả danh mục' : cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Course Grid */}
+      {filteredCourses.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredCourses.map(course => {
+            const isOwned = isVip ? (course.id !== 'test-course-2k' || ownedCourseIds.includes(course.id)) : (course.id === 'basic-principles' || ownedCourseIds.includes(course.id));
+            return (
+              <CourseCard 
+                key={course.id} 
+                course={course} 
+                isOwned={isOwned}
+                isVipAvailable={isVip && !isOwned}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white rounded-[32px] p-12 text-center border-2 border-dashed border-gray-100">
+          <p className="text-gray-500 font-bold">Không tìm thấy khóa học nào phù hợp với bộ lọc hiện tại.</p>
         </div>
       )}
     </section>
@@ -90,7 +234,7 @@ const Account: React.FC = () => {
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'teacher-dashboard' | 'settings' | 'course-learning'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'buy-courses' | 'teacher-dashboard' | 'settings' | 'course-learning'>('dashboard');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -804,6 +948,7 @@ const Account: React.FC = () => {
               {[
                 { id: 'dashboard', label: 'Bảng điều khiển', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
                 { id: 'my-courses', label: 'Khóa học của tôi', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
+                { id: 'buy-courses', label: 'Mua khóa học', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z' },
                 { id: 'settings', label: 'Cài đặt tài khoản', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
                 ...(isTeacher ? [{ id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' }] : [])
               ].map((item, idx) => (
@@ -849,6 +994,7 @@ const Account: React.FC = () => {
                 >
                   <option value="dashboard">Bảng điều khiển</option>
                   <option value="my-courses">Khóa học của tôi</option>
+                  <option value="buy-courses">Mua khóa học</option>
                   <option value="settings">Cài đặt tài khoản</option>
                   {isTeacher && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                 </select>
@@ -903,10 +1049,17 @@ const Account: React.FC = () => {
               <AccountSettings embed={true} />
             ) : activeTab === 'course-learning' && courseId ? (
               <CourseDetail embeddedCourseId={courseId} />
+            ) : activeTab === 'buy-courses' ? (
+              <BuyCoursesView 
+                allCourses={allCourses}
+                ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
+                isVip={isVip}
+              />
             ) : activeTab === 'my-courses' ? (
               <MyOwnedCoursesView 
                 myCourses={myCourses} 
                 progressMap={progressMap} 
+                onGoToBuyCourses={() => setActiveTab('buy-courses')}
               />
             ) : (
               <>
@@ -1061,15 +1214,29 @@ const Account: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-white rounded-[40px] p-12 text-center border-2 border-dashed border-gray-100">
-                         <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    <div className="bg-white rounded-[40px] p-10 md:p-14 text-center border-2 border-dashed border-gray-100 max-w-2xl mx-auto shadow-sm">
+                         <div className="w-20 h-20 bg-teal-50 text-[#007c76] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                          </div>
-                         <h3 className="text-xl font-bold text-gray-400 mb-2">Bạn chưa đăng ký khóa học nào</h3>
-                         <p className="text-gray-400 text-sm mb-6">Hãy bắt đầu hành trình nâng cao kiến thức ngay hôm nay!</p>
-                         <Link to="/khoa-hoc" className="bg-[#007c76] text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide hover:brightness-110">
-                            Danh sách khóa học
-                         </Link>
+                         <h3 className="text-2xl font-black text-gray-800 mb-2">Chưa có khóa học nào</h3>
+                         <p className="text-gray-500 text-sm mb-8 max-w-md mx-auto leading-relaxed">
+                           Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu lộ trình học tập nâng cao chuyên môn!
+                         </p>
+                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                           <button 
+                             onClick={() => setActiveTab('buy-courses')} 
+                             className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                           >
+                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                             Mua khóa học ngay
+                           </button>
+                           <Link 
+                             to="/account/vip-upgrade" 
+                             className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                           >
+                             <span>⭐ Nâng cấp VIP trọn đời</span>
+                           </Link>
+                         </div>
                     </div>
                   )}
                 </section>
