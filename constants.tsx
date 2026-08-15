@@ -320,7 +320,7 @@ export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isE
 
     return {
       isEmbed: true,
-      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=${apParam}&rel=0&enablejsapi=1${startParam}`
+      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=${apParam}&rel=0&enablejsapi=1&playsinline=1${startParam}`
     };
   }
 

@@ -8,7 +8,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
-import { useGlobalPlayer } from '../contexts/GlobalPlayerContext';
 import PaymentModal from '../components/PaymentModal';
 import Handbook from './Handbook';
 
@@ -35,8 +34,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-  const { playVideo } = useGlobalPlayer();
 
   const latestFirestoreDataRef = useRef<any>(null);
 
@@ -242,18 +239,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOwned, curriculum, completedLessons.length]);
 
-  useEffect(() => {
-     if (playingLesson && playingLesson.videoUrl && id !== 'basic-principles') {
-       playVideo({
-         videoUrl: playingLesson.videoUrl,
-         title: playingLesson.title,
-         courseId: id,
-         courseTitle: course?.title || 'Khóa học',
-         lessonIndex: playingLesson.lessonIdx
-       });
-     }
-  }, [playingLesson, id, course?.title, playVideo]);
-
   const handleUpdateProgress = async (lessonKey: string) => {
       if (!currentUser || !id) return;
       
@@ -375,6 +360,10 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                         src={embedInfo.embedUrl} 
                                         className="w-full h-full object-contain focus:outline-none"
                                         controls
+                                        playsInline
+                                        // @ts-ignore
+                                        webkit-playsinline="true"
+                                        x5-playsinline="true"
                                         controlsList="nodownload pwa-nodownload"
                                         onContextMenu={(e) => e.preventDefault()}
                                         autoPlay={!!playingLesson}

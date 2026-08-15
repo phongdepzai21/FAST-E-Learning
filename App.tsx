@@ -8,9 +8,7 @@ import Header from './components/Header';
 import ScrollToTop from './components/ScrollToTop';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
-import { GlobalPlayerProvider } from './contexts/GlobalPlayerContext';
 import { ToastContainer } from './components/ToastContainer';
-import FloatingMiniPlayer from './components/FloatingMiniPlayer';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -115,11 +113,8 @@ const App: React.FC = () => (
   <ThemeProvider>
     <ToastProvider>
       <Router>
-        <GlobalPlayerProvider>
-          <ScrollToTop />
-          <AppLayout />
-          <FloatingMiniPlayer />
-        </GlobalPlayerProvider>
+        <ScrollToTop />
+        <AppLayout />
       </Router>
     </ToastProvider>
   </ThemeProvider>

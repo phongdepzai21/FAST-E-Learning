@@ -1,16 +1,18 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
-import { useGlobalPlayer } from '../contexts/GlobalPlayerContext';
 import Handbook from './Handbook';
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPiPActive, setIsPiPActive] = useState(false);
 
   const [course, setCourse] = useState<Course | undefined>(undefined);
   const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>([]);
@@ -188,29 +190,60 @@ const Classroom: React.FC = () => {
     setUserNote('');
   };
 
-  const { playVideo } = useGlobalPlayer();
-
   const activeVideoUrl = useMemo(() => {
     return currentLesson?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
   }, [currentLesson]);
-
-  // Keep Global Player updated so when user leaves to other pages, the video keeps playing seamlessly!
-  useEffect(() => {
-    if (currentLesson && currentLesson.videoUrl && courseId !== 'basic-principles') {
-      playVideo({
-        videoUrl: currentLesson.videoUrl,
-        title: currentLesson.title || `Bài ${currentIdx + 1}`,
-        courseId: courseId,
-        courseTitle: course?.title || 'Khóa học',
-        lessonIndex: currentIdx
-      });
-    }
-  }, [currentLesson, courseId, course?.title, currentIdx, playVideo]);
 
   const videoEmbed = useMemo(() => {
     if (!activeVideoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
     return getVideoEmbedInfo(activeVideoUrl, true);
   }, [activeVideoUrl]);
+
+  // Picture-in-Picture & Background Media Session
+  const togglePiP = async () => {
+    try {
+      if (!videoRef.current) return;
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setIsPiPActive(false);
+      } else if (document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture();
+        setIsPiPActive(true);
+      }
+    } catch (err) {
+      console.warn("Picture-in-Picture error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentLesson) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentLesson.title || 'Bài giảng',
+          artist: course?.title || 'FAST E-Learning',
+          album: 'Khóa học FAST E-Learning',
+          artwork: [
+            { src: course?.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (videoRef.current) videoRef.current.play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (videoRef.current) videoRef.current.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          if (currentIdx > 0) setCurrentIdx(prev => prev - 1);
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          if (currentIdx < curriculum.length - 1) setCurrentIdx(prev => prev + 1);
+        });
+      } catch (err) {
+        // MediaSession fallback
+      }
+    }
+  }, [currentLesson, course, currentIdx, curriculum.length]);
 
   const filteredCurriculum = useMemo(() => {
     if (!searchQuery.trim()) return curriculum;
@@ -331,11 +364,24 @@ const Classroom: React.FC = () => {
                 />
               ) : (
                 <video 
+                  ref={videoRef}
                   key={videoEmbed.embedUrl || currentLesson?.videoUrl}
                   src={videoEmbed.embedUrl || currentLesson?.videoUrl} 
                   controls 
                   autoPlay
+                  playsInline
+                  // @ts-ignore
+                  webkit-playsinline="true"
+                  x5-playsinline="true"
                   className="w-full h-full object-contain"
+                  onPlay={() => {
+                    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+                  }}
+                  onPause={() => {
+                    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+                  }}
+                  onEnterPictureInPicture={() => setIsPiPActive(true)}
+                  onLeavePictureInPicture={() => setIsPiPActive(false)}
                   onEnded={() => {
                     handleUpdateProgress(currentIdx);
                     if (currentIdx < curriculum.length - 1) {
@@ -350,12 +396,16 @@ const Classroom: React.FC = () => {
           {/* SLEEK LESSON CONTROL TOOLBAR */}
           <div className="bg-[#111827]/90 backdrop-blur-md p-5 rounded-2xl border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
             <div className="min-w-0">
-              <div className="flex items-center gap-2.5 mb-1.5">
+              <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                 <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
                   Bài {currentIdx + 1} / {curriculum.length}
                 </span>
                 <span className="text-[11px] font-bold text-slate-400">
                   {isCurrentCompleted ? '• Đã xem xong' : '• Đang tiếp tục'}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Âm thanh phát khi chuyển web
                 </span>
               </div>
               <h2 className="text-lg md:text-xl font-extrabold text-white line-clamp-1 tracking-tight">
@@ -365,6 +415,24 @@ const Classroom: React.FC = () => {
 
             {/* ACTION CONTROLS */}
             <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end shrink-0">
+              {!videoEmbed.isEmbed && (
+                <button
+                  type="button"
+                  onClick={togglePiP}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                    isPiPActive 
+                      ? 'bg-teal-500 text-slate-950 border-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.4)]' 
+                      : 'bg-white/[0.06] text-slate-300 border-white/[0.08] hover:text-white hover:bg-white/[0.1]'
+                  }`}
+                  title="Bật cửa sổ nổi (Picture-in-Picture) để vừa xem bài giảng vừa mở tab/website khác"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h4m6-6h4m0 0v4m0-4l-5 5" />
+                  </svg>
+                  <span className="hidden sm:inline">{isPiPActive ? 'Đang mở PiP' : 'Phát nổi PiP'}</span>
+                </button>
+              )}
+
               <button
                 disabled={currentIdx === 0}
                 onClick={() => {
