@@ -9,6 +9,8 @@ interface CourseCardProps {
   isVipAvailable?: boolean;
   progress?: number;
   onSelect?: (course: Course) => void;
+  onClaimCourse?: (course: Course) => void;
+  isClaiming?: boolean;
 }
 
 const getOptimizedUrl = (url: string, width: number) => {
@@ -30,7 +32,15 @@ const CATEGORY_STYLES: Record<string, { bg: string, text: string }> = {
   'QUẢN TRỊ': { bg: 'bg-slate-50', text: 'text-slate-600' },
 };
 
-const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = false, isVipAvailable = false, progress = 0, onSelect }) => {
+const CourseCard: React.FC<CourseCardProps> = React.memo(({ 
+  course, 
+  isOwned = false, 
+  isVipAvailable = false, 
+  progress = 0, 
+  onSelect,
+  onClaimCourse,
+  isClaiming = false
+}) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   
@@ -51,6 +61,14 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = fa
     }
   };
 
+  const handleClaimClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClaimCourse && !isClaiming) {
+      onClaimCourse(course);
+    }
+  };
+
   const targetUrl = isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`;
 
   return (
@@ -64,7 +82,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = fa
                     src={getOptimizedUrl(course.image, 600)}
                     alt={course.title}
                     loading="lazy"
-                    decoding="async" // OPTIMIZATION: Decode off main thread
+                    decoding="async"
                     onLoad={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
                     className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`}
@@ -77,8 +95,16 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = fa
 
                 {/* Owned Badge */}
                 {isOwned && (
-                   <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1.5 rounded-full z-10 shadow-md text-[10px] font-black uppercase tracking-widest">
+                   <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1.5 rounded-full z-10 shadow-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                       Đã sở hữu
+                   </div>
+                )}
+
+                {/* VIP Available Badge */}
+                {!isOwned && isVipAvailable && (
+                   <div className="absolute top-4 right-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-3 py-1.5 rounded-full z-10 shadow-md text-[10px] font-black uppercase tracking-widest flex items-center gap-1 border border-white/40 animate-pulse">
+                      <span>⭐</span> VIP Free
                    </div>
                 )}
             </div>
@@ -98,17 +124,43 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({ course, isOwned = fa
                 
                 {isOwned ? (
                     <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tiếp tục học</span>
-                        <div className="w-10 h-10 bg-[#007c76]/10 text-[#007c76] rounded-xl flex items-center justify-center group-hover:bg-[#007c76] group-hover:text-white transition-colors">
+                        <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          Vào phòng học ngay
+                        </span>
+                        <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                             <svg className="w-5 h-5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" /></svg>
                         </div>
                     </div>
                 ) : isVipAvailable ? (
-                    <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                        <span className="text-xs font-bold text-yellow-600 uppercase tracking-widest">Nhận khóa học</span>
-                        <div className="w-10 h-10 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center group-hover:bg-yellow-500 group-hover:text-white transition-colors shadow-sm">
-                            <svg className="w-5 h-5 transform group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                        </div>
+                    <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between gap-2">
+                        {onClaimCourse ? (
+                          <button
+                            type="button"
+                            onClick={handleClaimClick}
+                            disabled={isClaiming}
+                            className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-amber-500/20 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                          >
+                            {isClaiming ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <span>Đang nhận...</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                                <span>Nhận khóa học ngay</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <>
+                            <span className="text-xs font-bold text-yellow-600 uppercase tracking-widest">Nhận khóa học</span>
+                            <div className="w-10 h-10 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center group-hover:bg-yellow-500 group-hover:text-white transition-colors shadow-sm">
+                                <svg className="w-5 h-5 transform group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                            </div>
+                          </>
+                        )}
                     </div>
                 ) : (
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">

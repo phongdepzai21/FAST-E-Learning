@@ -5,17 +5,22 @@ import CourseCard from '../components/CourseCard';
 import { COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
+import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
 const Courses: React.FC = () => {
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(true);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
+  const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
@@ -56,8 +61,6 @@ const Courses: React.FC = () => {
     };
   }, []);
 
-  const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
-
   // --- LOGIC ĐỒNG BỘ KHÓA HỌC ĐÃ SỞ HỮU (REAL-TIME) ---
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
@@ -67,8 +70,8 @@ const Courses: React.FC = () => {
             unsubscribeSnapshot = null;
         }
         if (user && user.email) {
-            // CRITICAL FIX: Normalize email to lowercase
             const normalizedEmail = user.email.toLowerCase();
+            setCurrentUserEmail(normalizedEmail);
             if (!normalizedEmail) {
                 setOwnedCourseIds([]);
                 setIsLoadingOwnership(false);
@@ -104,6 +107,7 @@ const Courses: React.FC = () => {
                 }
             );
         } else {
+            setCurrentUserEmail(null);
             setOwnedCourseIds([]);
             setIsLoadingOwnership(false);
             setIsVipOrAdmin(false);
@@ -116,6 +120,40 @@ const Courses: React.FC = () => {
         }
     };
   }, []);
+
+  const handleClaimCourse = async (course: Course) => {
+    if (!currentUserEmail) {
+      toast.error('Vui lòng đăng nhập để nhận khóa học.');
+      return;
+    }
+    setClaimingId(course.id);
+    try {
+      const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
+      await setDoc(courseRef, {
+        courseId: course.id,
+        title: course.title || '',
+        price: course.price || '',
+        progress: 0,
+        unlockedAt: new Date().toISOString(),
+        claimedVia: 'INSTANT_CLAIM'
+      }, { merge: true });
+
+      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
+    } catch (err: any) {
+      console.error("Lỗi nhận khóa học:", err);
+      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
+    } finally {
+      setClaimingId(null);
+    }
+  };
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
@@ -198,17 +236,20 @@ const Courses: React.FC = () => {
 
         {filteredCourses.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {filteredCourses.map((course) => (
-                    <CourseCard 
-                        key={course.id} 
-                        course={course}
-                        // Truyền trạng thái sở hữu xuống Card
-                        isOwned={ownedCourseIds.includes(course.id)} 
-                        isVipAvailable={!ownedCourseIds.includes(course.id) && isVipOrAdmin}
-                        // Nếu đã sở hữu, mặc định progress 0 (hoặc lấy từ DB nếu muốn chi tiết hơn)
-                        progress={ownedCourseIds.includes(course.id) ? 0 : undefined} 
-                    />
-                ))}
+                {filteredCourses.map((course) => {
+                    const isOwned = ownedCourseIds.includes(course.id);
+                    return (
+                        <CourseCard 
+                            key={course.id} 
+                            course={course}
+                            isOwned={isOwned} 
+                            isVipAvailable={!isOwned && isVipOrAdmin}
+                            progress={isOwned ? 0 : undefined} 
+                            onClaimCourse={isVipOrAdmin ? handleClaimCourse : undefined}
+                            isClaiming={claimingId === course.id}
+                        />
+                    );
+                })}
             </div>
         ) : (
             <div className="bg-white rounded-[40px] p-20 text-center border-2 border-dashed border-gray-100 flex flex-col items-center">

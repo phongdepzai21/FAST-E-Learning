@@ -41,7 +41,22 @@ const MyOwnedCoursesView: React.FC<{
   myCourses: Course[];
   progressMap: Record<string, number>;
   onGoToBuyCourses?: () => void;
-}> = ({ myCourses, onGoToBuyCourses }) => {
+  isVip?: boolean;
+  isAdmin?: boolean;
+  unownedCount?: number;
+  onClaimAllCourses?: () => void;
+  isClaimingAll?: boolean;
+}> = ({ 
+  myCourses, 
+  onGoToBuyCourses,
+  isVip = false,
+  isAdmin = false,
+  unownedCount = 0,
+  onClaimAllCourses,
+  isClaimingAll = false
+}) => {
+  const isPrivileged = isVip || isAdmin;
+
   return (
     <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -52,15 +67,36 @@ const MyOwnedCoursesView: React.FC<{
           </h3>
           <p className="text-gray-500 text-xs font-semibold mt-1">Các khóa học bạn đã đăng ký hoặc được cấp quyền truy cập</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{myCourses.length} Khóa học</span>
+          
+          {isPrivileged && unownedCount > 0 && onClaimAllCourses && (
+            <button
+              onClick={onClaimAllCourses}
+              disabled={isClaimingAll}
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+            >
+              {isClaimingAll ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Đang nhận...</span>
+                </>
+              ) : (
+                <>
+                  <span>⭐</span>
+                  <span>Nhận {unownedCount} khóa còn lại</span>
+                </>
+              )}
+            </button>
+          )}
+
           {onGoToBuyCourses && (
             <button
               onClick={onGoToBuyCourses}
-              className="bg-[#007c76] hover:bg-[#00605b] text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-[#007c76]/20 transition-all hover:scale-105 flex items-center gap-1.5"
+              className="bg-[#007c76] hover:bg-[#00605b] text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-[#007c76]/20 transition-all hover:scale-105 flex items-center gap-1.5 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-              Mua thêm khóa học
+              Khám phá thêm
             </button>
           )}
         </div>
@@ -83,10 +119,30 @@ const MyOwnedCoursesView: React.FC<{
              </div>
              <h3 className="text-2xl font-black text-gray-800 mb-2">Chưa có khóa học nào</h3>
              <p className="text-gray-500 text-sm mb-8 max-w-md mx-auto leading-relaxed">
-               Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu hành trình nâng cao kiến thức và chuẩn hóa chuyên môn!
+               {isPrivileged 
+                 ? "Bạn có đặc quyền mở khóa toàn bộ khóa học ngay lập tức mà không mất phí!" 
+                 : "Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu hành trình nâng cao kiến thức!"}
              </p>
              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-               {onGoToBuyCourses ? (
+               {isPrivileged && onClaimAllCourses ? (
+                 <button 
+                   onClick={onClaimAllCourses}
+                   disabled={isClaimingAll}
+                   className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                 >
+                   {isClaimingAll ? (
+                     <>
+                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                       <span>Đang mở khóa tất cả...</span>
+                     </>
+                   ) : (
+                     <>
+                       <span>⭐</span>
+                       <span>Nhận tất cả khóa học ngay</span>
+                     </>
+                   )}
+                 </button>
+               ) : onGoToBuyCourses ? (
                  <button 
                    onClick={onGoToBuyCourses} 
                    className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
@@ -103,12 +159,15 @@ const MyOwnedCoursesView: React.FC<{
                    Mua khóa học ngay
                  </Link>
                )}
-               <Link 
-                 to="/account/vip-upgrade" 
-                 className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-               >
-                 <span>⭐ Nâng cấp VIP trọn đời</span>
-               </Link>
+               
+               {!isVip && (
+                 <Link 
+                   to="/account/vip-upgrade" 
+                   className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                 >
+                   <span>⭐ Nâng cấp VIP trọn đời</span>
+                 </Link>
+               )}
              </div>
         </div>
       )}
@@ -120,9 +179,36 @@ const BuyCoursesView: React.FC<{
   allCourses: Course[];
   ownedCourseIds: string[];
   isVip: boolean;
-}> = ({ allCourses, ownedCourseIds, isVip }) => {
+  isAdmin: boolean;
+  onClaimSingleCourse: (course: Course) => Promise<void>;
+  onClaimAllCourses: () => Promise<void>;
+  claimingId: string | null;
+  isClaimingAll: boolean;
+  onGoToMyCourses: () => void;
+}> = ({ 
+  allCourses, 
+  ownedCourseIds, 
+  isVip, 
+  isAdmin, 
+  onClaimSingleCourse, 
+  onClaimAllCourses,
+  claimingId,
+  isClaimingAll,
+  onGoToMyCourses
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const isPrivileged = isVip || isAdmin;
+
+  const activeCourses = useMemo(() => {
+    return allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive');
+  }, [allCourses]);
+
+  const ownedActiveCount = useMemo(() => {
+    return activeCourses.filter(c => ownedCourseIds.includes(c.id)).length;
+  }, [activeCourses, ownedCourseIds]);
+
+  const unownedCount = activeCourses.length - ownedActiveCount;
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -156,14 +242,91 @@ const BuyCoursesView: React.FC<{
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link 
-            to="/account/vip-upgrade" 
-            className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
-          >
-            <span>⭐ Nâng cấp VIP trọn đời</span>
-          </Link>
+          {!isVip && (
+            <Link 
+              to="/account/vip-upgrade" 
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
+            >
+              <span>⭐ Nâng cấp VIP trọn đời</span>
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* VIP / Admin Quick Claim Banner */}
+      {isPrivileged && (
+        <div className="bg-gradient-to-r from-[#003835] via-[#005a54] to-[#003835] border border-teal-500/30 rounded-[32px] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-400/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/30 text-amber-300 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">
+                <span>⭐</span> {isVip ? 'ĐẶC QUYỀN VIP TRỌN ĐỜI' : 'QUYỀN QUẢN TRỊ VIÊN'}
+              </div>
+              <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
+                Nhận Khóa Học Trực Tiếp Không Cần Chuyển Trang
+              </h4>
+              <p className="text-teal-100/80 text-xs md:text-sm font-medium max-w-2xl leading-relaxed">
+                Bạn có thể bấm <strong className="text-amber-300">"Nhận khóa học ngay"</strong> ở từng thẻ khóa học bên dưới, hoặc bấm nút bên cạnh để mở khóa toàn bộ {activeCourses.length} khóa học vào phòng học chỉ với 1 click!
+              </p>
+              <div className="flex items-center gap-4 text-xs font-bold pt-1">
+                <span className="text-teal-200">
+                  Đã sở hữu: <strong className="text-white font-black">{ownedActiveCount}/{activeCourses.length}</strong> khóa học
+                </span>
+                {unownedCount === 0 ? (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-lg font-black text-[11px]">
+                    ✓ Đã nhận trọn bộ toàn bộ khóa học
+                  </span>
+                ) : (
+                  <span className="text-amber-300/90 font-medium">
+                    (Còn {unownedCount} khóa học chưa mở khóa)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto shrink-0">
+              <button
+                type="button"
+                onClick={onClaimAllCourses}
+                disabled={isClaimingAll || unownedCount === 0}
+                className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2.5 ${
+                  unownedCount === 0 
+                    ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 cursor-default'
+                    : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-yellow-600 text-white shadow-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer'
+                }`}
+              >
+                {isClaimingAll ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang nhận tất cả...</span>
+                  </>
+                ) : unownedCount === 0 ? (
+                  <>
+                    <svg className="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                    <span>Đã nhận tất cả khóa học</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                    <span>⭐ Nhận tất cả ({unownedCount} khóa)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={onGoToMyCourses}
+                className="px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl font-bold text-xs uppercase tracking-widest text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Vào phòng học</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search & Category Filter */}
       <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
@@ -201,13 +364,16 @@ const BuyCoursesView: React.FC<{
       {filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredCourses.map(course => {
-            const isOwned = isVip ? (course.id !== 'test-course-2k' || ownedCourseIds.includes(course.id)) : (course.id === 'basic-principles' || ownedCourseIds.includes(course.id));
+            const isOwned = ownedCourseIds.includes(course.id);
+            const isVipAvailable = isPrivileged && !isOwned;
             return (
               <CourseCard 
                 key={course.id} 
                 course={course} 
                 isOwned={isOwned}
-                isVipAvailable={isVip && !isOwned}
+                isVipAvailable={isVipAvailable}
+                onClaimCourse={isPrivileged ? onClaimSingleCourse : undefined}
+                isClaiming={claimingId === course.id}
               />
             );
           })}
@@ -910,12 +1076,121 @@ const Account: React.FC = () => {
   }, [isAdmin, isTeacher, isVip, purchasedCourses]);
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
-  // Nếu là VIP: Hiển thị tất cả khóa TRỪ khóa test 2k. Khóa test 2k chỉ hiện nếu đã mua.
+  // Nếu là VIP / Admin: Hiển thị tất cả khóa TRỪ khóa test 2k (nếu chưa mua) hoặc tất cả khóa đã nhận trong purchasedCourses.
+  const isPrivileged = isVip || isAdmin;
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [isClaimingAll, setIsClaimingAll] = useState(false);
+
+  const ownedCourseIds = useMemo(() => purchasedCourses.map(pc => pc.courseId), [purchasedCourses]);
+
+  const activeCourses = useMemo(() => {
+    return allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive');
+  }, [allCourses]);
+
+  const unownedCoursesCount = useMemo(() => {
+    return activeCourses.filter(c => !ownedCourseIds.includes(c.id)).length;
+  }, [activeCourses, ownedCourseIds]);
+
+  const handleClaimSingleCourse = async (course: Course) => {
+    if (!user?.email) {
+      toast.error('Vui lòng đăng nhập để nhận khóa học.');
+      return;
+    }
+    setClaimingId(course.id);
+    try {
+      const normalizedEmail = user.email.toLowerCase();
+      const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", course.id);
+      await setDoc(courseRef, {
+        courseId: course.id,
+        title: course.title || '',
+        price: course.price || '',
+        progress: 0,
+        unlockedAt: new Date().toISOString(),
+        claimedVia: isVip ? 'VIP_INSTANT' : (isAdmin ? 'ADMIN_INSTANT' : 'FREE_CLAIM')
+      }, { merge: true });
+
+      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      setPurchasedCourses(prev => {
+        if (prev.some(p => p.courseId === course.id)) return prev;
+        return [...prev, { courseId: course.id, progress: 0 }];
+      });
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
+    } catch (err: any) {
+      console.error("Lỗi nhận khóa học:", err);
+      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      setPurchasedCourses(prev => {
+        if (prev.some(p => p.courseId === course.id)) return prev;
+        return [...prev, { courseId: course.id, progress: 0 }];
+      });
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const handleClaimAllCourses = async () => {
+    if (!user?.email) {
+      toast.error('Vui lòng đăng nhập để nhận khóa học.');
+      return;
+    }
+    const unowned = activeCourses.filter(c => !purchasedCourses.some(pc => pc.courseId === c.id));
+    if (unowned.length === 0) {
+      toast.info('Bạn đã sở hữu toàn bộ các khóa học trên hệ thống!');
+      return;
+    }
+
+    setIsClaimingAll(true);
+    try {
+      const normalizedEmail = user.email.toLowerCase();
+      await Promise.all(unowned.map(async (c) => {
+        const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", c.id);
+        localStorage.setItem('course_unlocked_' + c.id, 'true');
+        return setDoc(courseRef, {
+          courseId: c.id,
+          title: c.title || '',
+          price: c.price || '',
+          progress: 0,
+          unlockedAt: new Date().toISOString(),
+          claimedVia: isVip ? 'VIP_ALL' : 'ADMIN_ALL'
+        }, { merge: true });
+      }));
+
+      setPurchasedCourses(prev => {
+        const existingIds = new Set(prev.map(p => p.courseId));
+        const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
+        return [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+      });
+
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`🎉 Đã mở khóa thành công tất cả ${unowned.length} khóa học vào phòng học của bạn!`);
+    } catch (err: any) {
+      console.error("Lỗi nhận tất cả khóa học:", err);
+      unowned.forEach(c => {
+        localStorage.setItem('course_unlocked_' + c.id, 'true');
+      });
+      setPurchasedCourses(prev => {
+        const existingIds = new Set(prev.map(p => p.courseId));
+        const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
+        return [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+      });
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`🎉 Đã mở khóa tất cả ${unowned.length} khóa học trên thiết bị của bạn!`);
+    } finally {
+      setIsClaimingAll(false);
+    }
+  };
+
   const myCourses = useMemo(() => {
-      return isVip 
-          ? allCourses.filter(c => c.id !== 'test-course-2k' || purchasedCourses.some(pc => pc.courseId === c.id))
+      return isPrivileged 
+          ? allCourses.filter(c => (c.status !== 'draft' && c.status !== 'inactive') || purchasedCourses.some(pc => pc.courseId === c.id))
           : allCourses.filter(c => c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id));
-  }, [isVip, purchasedCourses, allCourses]);
+  }, [isPrivileged, purchasedCourses, allCourses]);
   
   const progressMap = useMemo(() => {
       return purchasedCourses.reduce((acc, curr) => {
@@ -1054,12 +1329,23 @@ const Account: React.FC = () => {
                 allCourses={allCourses}
                 ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
                 isVip={isVip}
+                isAdmin={isAdmin}
+                onClaimSingleCourse={handleClaimSingleCourse}
+                onClaimAllCourses={handleClaimAllCourses}
+                claimingId={claimingId}
+                isClaimingAll={isClaimingAll}
+                onGoToMyCourses={() => setActiveTab('my-courses')}
               />
             ) : activeTab === 'my-courses' ? (
               <MyOwnedCoursesView 
                 myCourses={myCourses} 
                 progressMap={progressMap} 
                 onGoToBuyCourses={() => setActiveTab('buy-courses')}
+                isVip={isVip}
+                isAdmin={isAdmin}
+                unownedCount={unownedCoursesCount}
+                onClaimAllCourses={handleClaimAllCourses}
+                isClaimingAll={isClaimingAll}
               />
             ) : (
               <>
