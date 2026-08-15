@@ -24,6 +24,7 @@ const AccountSettings = lazy(() => import('./pages/AccountSettings'));
 const VipUpgrade = lazy(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Classroom = lazy(() => import('./pages/Classroom'));
 
 // Lazy load Components phụ trợ & Footer
 const FloatingContact = lazy(() => import('./components/FloatingContact'));
@@ -40,6 +41,7 @@ const PageLoader = () => (
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const isAccountPath = location.pathname.startsWith('/account');
+  const isClassroomPath = location.pathname.startsWith('/hoc');
   const [isDelayedLoaded, setIsDelayedLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -61,7 +63,7 @@ const AppLayout: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const shouldHideBars = isAccountPath && user;
+  const shouldHideBars = (isAccountPath && user) || isClassroomPath;
   const hideBarsTemporarily = isAccountPath && !authResolved;
   const showBars = !shouldHideBars && !hideBarsTemporarily;
 
@@ -75,6 +77,8 @@ const AppLayout: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/khoa-hoc" element={<Courses />} />
             <Route path="/khoa-hoc/:id" element={<CourseDetail />} />
+            <Route path="/hoc/:courseId" element={<Classroom />} />
+            <Route path="/hoc-bai/:courseId" element={<Classroom />} />
             <Route path="/tu-van" element={<Consulting />} />
             <Route path="/cam-nang" element={<Handbook />} />
             <Route path="/ve-chung-toi" element={<About />} />
