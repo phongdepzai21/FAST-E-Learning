@@ -9,10 +9,10 @@ import Handbook from './Handbook';
 import { getVideoEmbedInfo } from './CourseDetail';
 
 const DUMMY_LESSONS = [
-    { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-    { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+  { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
+  { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
 ];
 
 const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }> => {
@@ -70,7 +70,8 @@ const Classroom: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'discussion'>('overview');
   const [userNote, setUserNote] = useState('');
-  const [savedNotes, setSavedNotes] = useState<string[]>([]);
+  const [savedNotes, setSavedNotes] = useState<{ id: string; text: string; date: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load Course
   useEffect(() => {
@@ -89,11 +90,11 @@ const Classroom: React.FC = () => {
       } else {
         setCourse({
           id: courseId,
-          title: 'Khóa học',
+          title: 'Khóa học Fast E-Learning',
           price: 'Miễn phí',
           image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
           category: 'Chung',
-          description: 'Nội dung khóa học'
+          description: 'Nội dung khóa học đào tạo chuyên sâu'
         });
         setCurriculum(DUMMY_LESSONS);
       }
@@ -132,8 +133,8 @@ const Classroom: React.FC = () => {
 
         // Realtime Firestore Check
         if (courseId) {
-          const docRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
-          onSnapshot(docRef, (docSnap) => {
+          const userDocRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
+          onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
               setIsOwned(true);
               setCourseProgress(docSnap.data().progress || 0);
@@ -161,7 +162,17 @@ const Classroom: React.FC = () => {
       const notes = localStorage.getItem(`notes_${courseId}`);
       if (notes) {
         try {
-          setSavedNotes(JSON.parse(notes));
+          const parsed = JSON.parse(notes);
+          if (Array.isArray(parsed)) {
+            // Support legacy string arrays or object array
+            const formatted = parsed.map((item: any, i: number) => {
+              if (typeof item === 'string') {
+                return { id: `note-${i}`, text: item, date: 'Gần đây' };
+              }
+              return item;
+            });
+            setSavedNotes(formatted);
+          }
         } catch (e) {}
       }
     }
@@ -189,8 +200,8 @@ const Classroom: React.FC = () => {
 
     if (currentUser?.email && courseId) {
       try {
-        const docRef = doc(db, "users", currentUser.email.toLowerCase(), "purchased_courses", courseId);
-        await setDoc(docRef, {
+        const userDocRef = doc(db, "users", currentUser.email.toLowerCase(), "purchased_courses", courseId);
+        await setDoc(userDocRef, {
           progress: newProgress,
           completedLessons: newCompleted
         }, { merge: true });
@@ -202,7 +213,12 @@ const Classroom: React.FC = () => {
 
   const handleSaveNote = () => {
     if (!userNote.trim() || !courseId) return;
-    const updated = [userNote.trim(), ...savedNotes];
+    const newNoteObj = {
+      id: `${Date.now()}`,
+      text: userNote.trim(),
+      date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('vi-VN')
+    };
+    const updated = [newNoteObj, ...savedNotes];
     setSavedNotes(updated);
     localStorage.setItem(`notes_${courseId}`, JSON.stringify(updated));
     setUserNote('');
@@ -213,74 +229,108 @@ const Classroom: React.FC = () => {
     return getVideoEmbedInfo(currentLesson.videoUrl, true);
   }, [currentLesson]);
 
+  const filteredCurriculum = useMemo(() => {
+    if (!searchQuery.trim()) return curriculum;
+    const q = searchQuery.toLowerCase().trim();
+    return curriculum.filter((item, idx) => 
+      item.title.toLowerCase().includes(q) || `bài ${idx + 1}`.includes(q)
+    );
+  }, [curriculum, searchQuery]);
+
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col font-sans">
-      {/* CLASSROOM TOP NAVBAR */}
-      <header className="sticky top-0 z-50 bg-[#1e293b]/90 backdrop-blur-md border-b border-slate-800 px-4 md:px-8 py-3.5 flex items-center justify-between shadow-xl">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-white">
+      
+      {/* GLOWING AMBIENT BACKGROUND ACCENTS */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[300px] bg-teal-600/10 rounded-full blur-3xl transform -translate-y-1/2"></div>
+        <div className="absolute top-1/3 right-10 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* MODERN GLASS TOP NAVBAR */}
+      <header className="sticky top-0 z-50 bg-[#0f172a]/85 backdrop-blur-xl border-b border-white/[0.08] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-2xl transition-all">
+        <div className="flex items-center gap-3 md:gap-5">
           <button 
             onClick={() => navigate('/account')} 
-            className="flex items-center gap-2 text-xs md:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-2 rounded-xl transition-all border border-slate-700"
+            className="flex items-center gap-2 text-xs md:text-sm font-bold bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 hover:text-white px-3.5 py-2 rounded-xl transition-all border border-white/[0.08] shadow-sm active:scale-95"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
-            Quay lại
+            <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+            <span>Trang cá nhân</span>
           </button>
           
-          <div className="h-6 w-[1px] bg-slate-700 hidden sm:block"></div>
+          <div className="h-6 w-[1px] bg-white/[0.1] hidden sm:block"></div>
 
           <div className="min-w-0">
-            <span className="text-[10px] uppercase font-black tracking-widest text-[#00a89d] block">
-              PHÒNG HỌC FAST E-LEARNING
-            </span>
-            <h1 className="text-sm md:text-base font-black text-white line-clamp-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] uppercase font-black tracking-widest bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
+                Phòng học trực tuyến
+              </span>
+              {course?.category && (
+                <span className="hidden md:inline text-[10px] font-bold text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
+                  {course.category}
+                </span>
+              )}
+            </div>
+            <h1 className="text-sm md:text-base font-black text-white line-clamp-1 mt-0.5 tracking-tight">
               {course?.title || 'Khóa học'}
             </h1>
           </div>
         </div>
 
-        {/* PROGRESS & ACCOUNT PROFILE */}
-        <div className="flex items-center gap-4 md:gap-6">
-          <div className="hidden sm:flex flex-col items-end min-w-[120px]">
-            <span className="text-xs font-bold text-slate-400">Tiến độ: <strong className="text-[#00a89d]">{courseProgress}%</strong></span>
-            <div className="w-28 bg-slate-800 h-2 rounded-full overflow-hidden mt-1 border border-slate-700">
-              <div className="bg-[#00a89d] h-full transition-all duration-500 rounded-full" style={{ width: `${courseProgress}%` }}></div>
+        {/* PROGRESS & PROFILE BADGE */}
+        <div className="flex items-center gap-3 md:gap-6">
+          <div className="hidden sm:flex flex-col items-end min-w-[130px]">
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <span className="text-slate-400">Tiến độ khóa:</span>
+              <span className="text-teal-400 font-extrabold">{courseProgress}%</span>
+            </div>
+            <div className="w-32 bg-slate-800/80 h-2 rounded-full overflow-hidden mt-1.5 border border-white/[0.08] p-0.5">
+              <div 
+                className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full transition-all duration-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" 
+                style={{ width: `${courseProgress}%` }}
+              ></div>
             </div>
           </div>
 
           {currentUser ? (
-            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
-              <div className="w-7 h-7 rounded-full bg-[#00a89d] text-white flex items-center justify-center font-black text-xs uppercase shadow">
+            <div className="flex items-center gap-2.5 bg-white/[0.06] hover:bg-white/[0.09] px-3.5 py-1.5 rounded-full border border-white/[0.08] transition-all">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-slate-950 flex items-center justify-center font-black text-xs uppercase shadow-md">
                 {currentUser.name.charAt(0)}
               </div>
-              <span className="text-xs font-bold text-slate-200 hidden md:inline max-w-[120px] truncate">{currentUser.name}</span>
+              <div className="hidden md:flex flex-col text-left">
+                <span className="text-xs font-bold text-slate-200 leading-tight max-w-[110px] truncate">{currentUser.name}</span>
+                <span className="text-[9px] font-medium text-teal-400/90 leading-tight">Học viên</span>
+              </div>
             </div>
           ) : (
-            <Link to="/account" className="bg-[#007c76] text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-[#00605b] transition-colors shadow-md">
+            <Link to="/account" className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black px-4 py-2 rounded-xl transition-all shadow-lg shadow-teal-900/30">
               Đăng nhập
             </Link>
           )}
         </div>
       </header>
 
-      {/* NOT OWNED WARNING BANNER */}
+      {/* NOT OWNED NOTICE BANNER */}
       {!isOwned && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-center flex items-center justify-center gap-3">
-          <span className="text-amber-400 font-bold text-xs md:text-sm">
-            ⚠️ Bạn đang xem thử bài học. Hãy đăng ký khóa học để lưu tiến độ hoàn thành!
+        <div className="relative z-10 bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border-b border-amber-500/20 px-4 py-2.5 text-center flex items-center justify-center gap-3">
+          <span className="text-amber-300 font-bold text-xs md:text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            Bạn đang xem thử bài giảng mẫu. Hãy đăng ký khóa học để lưu tiến độ và nhận chứng chỉ hoàn thành!
           </span>
-          <Link to={`/khoa-hoc/${courseId}`} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-lg transition-all shadow">
+          <Link to={`/khoa-hoc/${courseId}`} className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-lg transition-all shadow hover:shadow-amber-400/20 active:scale-95 shrink-0">
             Đăng ký ngay
           </Link>
         </div>
       )}
 
-      {/* MAIN CLASSROOM WORKSPACE */}
-      <div className="flex-1 max-w-[1700px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* MAIN WORKSPACE GRID */}
+      <main className="relative z-10 flex-1 max-w-[1720px] w-full mx-auto p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         
-        {/* LEFT COLUMN: PLAYER & LESSON DETAILS (8 COLS) */}
+        {/* LEFT COLUMN: THEATER PLAYER & DETAILS (8 COLS) */}
         <div className="lg:col-span-8 flex flex-col space-y-6">
-          {/* VIDEO / HANDBOOK PLAYER BOX */}
-          <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl relative group">
+          
+          {/* MODERN THEATER SCREEN CHASSIS */}
+          <div className="bg-[#111827] rounded-3xl overflow-hidden border border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] relative group">
             <div className={`w-full ${courseId === 'basic-principles' ? 'min-h-[550px] md:min-h-[650px] bg-slate-950 overflow-y-auto' : 'aspect-video bg-black flex items-center justify-center'}`}>
               {courseId === 'basic-principles' ? (
                 <div className="h-full w-full bg-white text-slate-900 relative">
@@ -313,39 +363,45 @@ const Classroom: React.FC = () => {
             </div>
           </div>
 
-          {/* LESSON CONTROL BAR */}
-          <div className="bg-[#1e293b] p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          {/* SLEEK LESSON CONTROL TOOLBAR */}
+          <div className="bg-[#111827]/90 backdrop-blur-md p-5 rounded-2xl border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
             <div className="min-w-0">
-              <span className="text-[11px] font-black text-[#00a89d] uppercase tracking-wider block mb-1">
-                Bài {currentIdx + 1} / {curriculum.length}
-              </span>
-              <h2 className="text-lg md:text-xl font-black text-white line-clamp-1">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
+                  Bài {currentIdx + 1} / {curriculum.length}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {isCurrentCompleted ? '• Đã xem xong' : '• Đang tiếp tục'}
+                </span>
+              </div>
+              <h2 className="text-lg md:text-xl font-extrabold text-white line-clamp-1 tracking-tight">
                 {currentLesson?.title || 'Bài giảng'}
               </h2>
             </div>
 
+            {/* ACTION CONTROLS */}
             <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end shrink-0">
               <button
                 disabled={currentIdx === 0}
                 onClick={() => {
                   if (currentIdx > 0) setCurrentIdx(currentIdx - 1);
                 }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
-                Bài trước
+                <span>Bài trước</span>
               </button>
 
               <button
                 onClick={() => handleUpdateProgress(currentIdx)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md ${
+                className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
                   isCurrentCompleted 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                    : 'bg-[#007c76] hover:bg-[#00605b] text-white'
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-emerald-950/40' 
+                    : 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 shadow-teal-900/40'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                {isCurrentCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
+                <span>{isCurrentCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}</span>
               </button>
 
               <button
@@ -353,188 +409,264 @@ const Classroom: React.FC = () => {
                 onClick={() => {
                   if (currentIdx < curriculum.length - 1) setCurrentIdx(currentIdx + 1);
                 }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-700"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
               >
-                Bài tiếp
+                <span>Bài tiếp</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
               </button>
 
               <button
                 onClick={() => setIsLiked(!isLiked)}
-                className={`p-2 rounded-xl border transition-all ${
-                  isLiked ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-rose-400'
+                className={`p-2.5 rounded-xl border transition-all active:scale-95 ${
+                  isLiked 
+                    ? 'bg-rose-500/20 text-rose-400 border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.3)]' 
+                    : 'bg-white/[0.06] text-slate-400 border-white/[0.08] hover:text-rose-400 hover:bg-white/[0.1]'
                 }`}
-                title="Thích bài học"
+                title={isLiked ? 'Bỏ thích' : 'Yêu thích bài học'}
               >
-                <svg className={`w-5 h-5 ${isLiked ? 'fill-current text-rose-400' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                <svg className={`w-4 h-4 ${isLiked ? 'fill-current text-rose-400' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
               </button>
             </div>
           </div>
 
-          {/* LESSON TABS / NOTES / OVERVIEW */}
-          <div className="bg-[#1e293b] rounded-2xl border border-slate-800 p-6 space-y-6">
-            <div className="flex border-b border-slate-800 gap-6">
+          {/* MODERN LESSON TABS: OVERVIEW, NOTES, DISCUSSION */}
+          <div className="bg-[#111827]/90 backdrop-blur-md rounded-3xl border border-white/[0.08] p-6 shadow-xl space-y-6">
+            <div className="flex border-b border-white/[0.08] gap-8">
               {[
-                { id: 'overview', label: 'Tổng quan bài học' },
-                { id: 'notes', label: 'Ghi chú cá nhân' },
-                { id: 'discussion', label: 'Thảo luận & Hỏi đáp' }
+                { id: 'overview', label: 'Tổng quan bài học', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                { id: 'notes', label: `Ghi chú cá nhân (${savedNotes.length})`, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+                { id: 'discussion', label: 'Hỗ trợ & Hỏi đáp', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`pb-3 text-sm font-bold border-b-2 transition-all ${
+                  className={`pb-3.5 text-xs sm:text-sm font-extrabold flex items-center gap-2 border-b-2 transition-all ${
                     activeTab === tab.id 
-                      ? 'border-[#00a89d] text-[#00a89d]' 
+                      ? 'border-teal-400 text-teal-300 shadow-[0_2px_12px_rgba(45,212,191,0.2)]' 
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {tab.label}
+                  <svg className="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon} /></svg>
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </div>
 
+            {/* TAB CONTENT: OVERVIEW */}
             {activeTab === 'overview' && (
               <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-                <p>
-                  <strong>Mô tả:</strong> Bài học nằm trong lộ trình đào tạo chuyên sâu của Fast E-Learning. Vui lòng xem kỹ video và ghi chú các nội dung chính.
-                </p>
-                <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-                  <span className="text-xs font-black uppercase text-[#00a89d]">Tài liệu tham khảo:</span>
-                  <p className="text-xs text-slate-400">Bạn có thể truy cập cẩm nang hướng dẫn đầy đủ tại trang Cẩm nang hoặc tải tài liệu đính kèm.</p>
+                <div className="flex items-start gap-3 p-4 bg-white/[0.03] rounded-2xl border border-white/[0.06]">
+                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0 mt-0.5 border border-teal-500/20">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm mb-1">Mục tiêu học tập bài học này:</h4>
+                    <p className="text-slate-400 text-xs sm:text-sm">
+                      Nắm vững các thuật ngữ chuyên môn, hiểu rõ phương pháp triển khai thực tế theo tiêu chuẩn ISO/HACCP và ứng dụng ngay vào doanh nghiệp.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/[0.06] flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-teal-400">Tài liệu tham khảo chuyên ngành</span>
+                    <p className="text-xs text-slate-300">Đọc cẩm nang tiêu chuẩn hoặc xem bài viết bổ trợ đi kèm khóa học.</p>
+                  </div>
+                  <Link to="/cam-nang" className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-teal-300 text-xs font-bold border border-white/[0.08] transition-all shrink-0">
+                    Xem cẩm nang
+                  </Link>
                 </div>
               </div>
             )}
 
+            {/* TAB CONTENT: NOTES */}
             {activeTab === 'notes' && (
-              <div className="space-y-4">
-                <div className="flex gap-2">
+              <div className="space-y-5">
+                <div className="flex gap-2.5">
                   <input
                     type="text"
                     value={userNote}
                     onChange={(e) => setUserNote(e.target.value)}
-                    placeholder="Viết ghi chú ngắn cho bài học này..."
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00a89d]"
+                    placeholder="Viết ghi chú quan trọng cho bài học này (Nhấn Enter để lưu)..."
+                    className="flex-1 bg-[#090d16] border border-white/[0.1] rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 transition-all"
                     onKeyDown={(e) => e.key === 'Enter' && handleSaveNote()}
                   />
                   <button
                     onClick={handleSaveNote}
-                    className="bg-[#007c76] hover:bg-[#00605b] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow"
+                    className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-lg active:scale-95 shrink-0"
                   >
                     Lưu ghi chú
                   </button>
                 </div>
 
                 {savedNotes.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {savedNotes.map((note, i) => (
-                      <div key={i} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs text-slate-300 flex justify-between items-center">
-                        <span>• {note}</span>
+                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                    {savedNotes.map((note) => (
+                      <div key={note.id} className="p-3.5 bg-white/[0.03] hover:bg-white/[0.05] rounded-2xl border border-white/[0.06] text-xs text-slate-200 flex justify-between items-start gap-4 transition-all">
+                        <div className="space-y-1">
+                          <p className="leading-relaxed font-medium">{note.text}</p>
+                          <span className="text-[10px] text-slate-500 block">{note.date}</span>
+                        </div>
                         <button 
                           onClick={() => {
-                            const updated = savedNotes.filter((_, idx) => idx !== i);
+                            const updated = savedNotes.filter(n => n.id !== note.id);
                             setSavedNotes(updated);
                             localStorage.setItem(`notes_${courseId}`, JSON.stringify(updated));
                           }}
-                          className="text-slate-500 hover:text-rose-400"
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors"
+                          title="Xóa ghi chú này"
                         >
-                          ✕
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 italic">Chưa có ghi chú nào cho khóa học này.</p>
+                  <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-2xl bg-white/[0.01]">
+                    <svg className="w-8 h-8 text-slate-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    <p className="text-xs text-slate-400 font-medium">Chưa có ghi chú nào cho bài học này.</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Nhập nội dung ở khung phía trên để lưu lại kiến thức bổ ích.</p>
+                  </div>
                 )}
               </div>
             )}
 
+            {/* TAB CONTENT: DISCUSSION & SUPPORT */}
             {activeTab === 'discussion' && (
-              <div className="p-6 bg-slate-900/50 rounded-xl border border-slate-800 text-center space-y-3">
-                <p className="text-xs font-bold text-slate-400">Hỗ trợ học tập Fast QMS & ISO</p>
-                <p className="text-sm font-bold text-slate-200">Bạn có thắc mắc trong bài học này?</p>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  Liên hệ hotline giảng viên hoặc gửi thắc mắc trực tiếp qua kênh tư vấn hỗ trợ của Fast E-Learning để được giải đáp trong 24h.
-                </p>
+              <div className="p-6 bg-white/[0.02] rounded-2xl border border-white/[0.06] text-center space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto border border-teal-500/20">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white">Bạn gặp vướng mắc cần giải đáp chuyên môn?</h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                    Đội ngũ chuyên gia tiêu chuẩn ISO & HACCP tại Fast E-Learning luôn sẵn sàng hỗ trợ trực tiếp để giúp bạn áp dụng thành công.
+                  </p>
+                </div>
                 <Link
                   to="/tu-van"
-                  className="inline-block bg-[#007c76] text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-[#00605b] transition-all shadow-md mt-2"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 text-xs font-black px-6 py-3 rounded-xl transition-all shadow-lg shadow-teal-950/40 active:scale-95"
                 >
-                  Gửi câu hỏi hỗ trợ
+                  <span>Gửi câu hỏi hỗ trợ giảng viên</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </Link>
               </div>
             )}
           </div>
         </div>
 
-        {/* RIGHT COLUMN: PLAYLIST SIDEBAR (4 COLS) */}
+        {/* RIGHT COLUMN: REFINED PLAYLIST SIDEBAR (4 COLS) */}
         <div className="lg:col-span-4 flex flex-col space-y-6">
-          <div className="bg-[#1e293b] rounded-3xl p-6 border border-slate-800 shadow-xl flex flex-col h-full min-h-[500px]">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-              <div>
-                <h3 className="font-black text-white text-base flex items-center gap-2 uppercase tracking-wide">
-                  <span className="w-1.5 h-4 bg-[#00a89d] rounded-full"></span>
-                  Danh sách bài học
-                </h3>
-                <span className="text-[11px] font-bold text-slate-400">{curriculum.length} Bài giảng video</span>
+          <div className="bg-[#111827]/90 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-white/[0.08] shadow-2xl flex flex-col h-full min-h-[550px]">
+            
+            {/* PLAYLIST HEADER */}
+            <div className="pb-4 border-b border-white/[0.08] mb-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-extrabold text-white text-base flex items-center gap-2 tracking-tight">
+                    <span className="w-1.5 h-4 bg-teal-400 rounded-full"></span>
+                    Danh sách bài giảng
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-400">{curriculum.length} bài học video</span>
+                </div>
+                <span className="text-[11px] font-black text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20">
+                  {completedLessons.length}/{curriculum.length} Đã xong
+                </span>
+              </div>
+
+              {/* SEARCH LESSONS */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm bài học..."
+                  className="w-full bg-[#090d16] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition-all pl-9"
+                />
+                <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
             </div>
 
-            {/* LESSON LIST */}
-            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[600px]">
-              {curriculum.map((lesson, idx) => {
-                  const isCompleted = completedLessons.includes(`${idx}`) || completedLessons.includes(`0-${idx}`);
-                  const isPlaying = currentIdx === idx;
+            {/* LESSON ITEMS LIST */}
+            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[620px] custom-scrollbar">
+              {filteredCurriculum.map((lesson, originalIdx) => {
+                // Find actual index in real curriculum array
+                const idx = curriculum.findIndex(c => c.title === lesson.title);
+                const actualIdx = idx !== -1 ? idx : originalIdx;
+                const isCompleted = completedLessons.includes(`${actualIdx}`) || completedLessons.includes(`0-${actualIdx}`);
+                const isPlaying = currentIdx === actualIdx;
 
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => setCurrentIdx(idx)}
-                      className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 flex items-center justify-between gap-3 ${
+                return (
+                  <div
+                    key={actualIdx}
+                    onClick={() => setCurrentIdx(actualIdx)}
+                    className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 flex items-center justify-between gap-3 group relative overflow-hidden ${
+                      isPlaying 
+                        ? 'bg-gradient-to-r from-teal-950/60 to-slate-900/90 border-teal-500/40 shadow-lg shadow-teal-950/30' 
+                        : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/[0.06]'
+                    }`}
+                  >
+                    {isPlaying && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 to-emerald-400"></div>
+                    )}
+
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-all ${
                         isPlaying 
-                          ? 'bg-[#00a89d]/15 border-[#00a89d] shadow-lg shadow-[#00a89d]/10' 
-                          : 'bg-slate-900/60 hover:bg-slate-800/80 border-slate-800/80'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                          isPlaying 
-                            ? 'bg-[#00a89d] text-white shadow' 
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          ? 'bg-teal-400 text-slate-950 shadow-md shadow-teal-400/20 font-black' 
+                          : isCompleted
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-white/[0.05] text-slate-400 border border-white/[0.08] group-hover:text-slate-200'
+                      }`}>
+                        {actualIdx + 1}
+                      </span>
+
+                      <div className="min-w-0">
+                        <p className={`text-xs md:text-sm font-bold line-clamp-1 transition-colors ${
+                          isPlaying ? 'text-teal-300 font-extrabold' : 'text-slate-200 group-hover:text-white'
                         }`}>
-                          {idx + 1}
-                        </span>
-
-                        <div className="min-w-0">
-                          <p className={`text-xs md:text-sm font-bold line-clamp-1 ${
-                            isPlaying ? 'text-[#00a89d] font-black' : 'text-slate-200'
-                          }`}>
-                            {lesson.title}
-                          </p>
-                          <p className="text-[10px] font-medium text-slate-500 mt-0.5">
-                            {isPlaying ? '▶ Đang phát' : isCompleted ? '✓ Đã học' : 'Chưa học'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {isCompleted ? (
-                          <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                          </div>
-                        ) : isPlaying ? (
-                          <span className="w-2.5 h-2.5 bg-[#00a89d] rounded-full animate-ping block"></span>
-                        ) : (
-                          <svg className="w-4 h-4 text-slate-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
-                        )}
+                          {lesson.title}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5 flex items-center gap-1.5">
+                          {isPlaying ? (
+                            <span className="text-teal-400 font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
+                              Đang phát
+                            </span>
+                          ) : isCompleted ? (
+                            <span className="text-emerald-400 font-bold">✓ Đã học xong</span>
+                          ) : (
+                            'Chưa học'
+                          )}
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="shrink-0">
+                      {isCompleted ? (
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                      ) : isPlaying ? (
+                        <div className="flex items-end gap-0.5 h-4 px-1">
+                          <span className="w-1 h-3.5 bg-teal-400 rounded-full animate-pulse"></span>
+                          <span className="w-1 h-2 bg-teal-300 rounded-full animate-pulse delay-75"></span>
+                          <span className="w-1 h-4 bg-teal-400 rounded-full animate-pulse delay-150"></span>
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-white/[0.04] group-hover:bg-white/[0.1] text-slate-500 group-hover:text-slate-300 flex items-center justify-center transition-all">
+                          <svg className="w-3 h-3 translate-x-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        </div>
 
-      </div>
+      </main>
     </div>
   );
 };

@@ -335,6 +335,7 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
   COURSES.forEach(c => {
     combinedMap.set(c.id, {
       ...c,
+      status: c.status || 'active',
       price: formatPriceSubmit(c.price)
     });
   });

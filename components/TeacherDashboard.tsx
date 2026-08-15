@@ -317,6 +317,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       updatedAt: new Date().toISOString()
     };
 
+    // Optimistically update React state immediately
+    setCourses(prev => prev.map(c => c.id === editingCourseId ? { ...c, ...updatedCourse } : c));
+
     // 1. Try Firestore setDoc
     try {
       await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
@@ -358,51 +361,70 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       return;
     }
 
+    const nowIso = new Date().toISOString();
+
+    // 1. Optimistically update local React state for instantaneous UI feedback
+    setCourses(prev => prev.map(c => c.id === course.id ? { ...c, status: newStatus, updatedAt: nowIso } : c));
+
+    // 2. Always persist to LocalStorage backup
     try {
-      const nowIso = new Date().toISOString();
+      const localStr = localStorage.getItem('local_custom_courses');
+      let localList: any[] = localStr ? JSON.parse(localStr) : [];
+      const idx = localList.findIndex((c: any) => c.id === course.id);
+      if (idx !== -1) {
+        localList[idx] = {
+          ...localList[idx],
+          ...course,
+          status: newStatus,
+          updatedAt: nowIso
+        };
+      } else {
+        localList.push({
+          id: course.id,
+          title: course.title || '',
+          price: course.price || '0đ',
+          image: course.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
+          category: course.category || 'Khác',
+          description: course.description || '',
+          status: newStatus,
+          updatedAt: nowIso
+        });
+      }
+      localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // 3. Update Firestore with non-undefined fields
+    try {
       const docRef = doc(db, 'courses', course.id);
-      const updatePayload: any = {
-        id: course.id,
-        title: course.title,
-        price: course.price,
-        image: course.image,
-        category: course.category || 'Khác',
-        description: course.description || '',
+      const updatePayload: Record<string, any> = {
+        id: String(course.id),
+        title: String(course.title || ''),
+        price: String(course.price || '0đ'),
+        image: String(course.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
+        category: String(course.category || 'Khác'),
+        description: String(course.description || ''),
         status: newStatus,
         updatedAt: nowIso
       };
-      if (course.curriculum) {
+      if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
         updatePayload.curriculum = course.curriculum;
       }
 
       await setDoc(docRef, updatePayload, { merge: true });
-
-      // Also sync LocalStorage
-      try {
-        const localStr = localStorage.getItem('local_custom_courses');
-        let localList: any[] = localStr ? JSON.parse(localStr) : [];
-        const idx = localList.findIndex((c: any) => c.id === course.id);
-        if (idx !== -1) {
-          localList[idx].status = newStatus;
-          localList[idx].updatedAt = nowIso;
-        } else {
-          localList.push({ ...course, status: newStatus, updatedAt: nowIso });
-        }
-        localStorage.setItem('local_custom_courses', JSON.stringify(localList));
-      } catch (e) {}
-
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      setMessage({
-        type: 'success',
-        text: newStatus === 'inactive'
-          ? `Đã ẩn khóa học "${course.title}" (Trạng thái: Không hoạt động)`
-          : `Đã kích hoạt khóa học "${course.title}" (Trạng thái: Hoạt động)`
-      });
-      setTimeout(() => setMessage(null), 4000);
-    } catch (error) {
-      console.error('Lỗi khi đổi trạng thái khóa học:', error);
-      setMessage({ type: 'error', text: 'Có lỗi xảy ra khi cập nhật trạng thái khóa học.' });
+    } catch (firestoreErr) {
+      console.warn('Firestore toggle status warning (saved to LocalStorage fallback):', firestoreErr);
     }
+
+    window.dispatchEvent(new CustomEvent('courses_updated'));
+    setMessage({
+      type: 'success',
+      text: newStatus === 'inactive'
+        ? `Đã ẩn khóa học "${course.title}" (Trạng thái: Không hoạt động)`
+        : `Đã kích hoạt khóa học "${course.title}" (Trạng thái: Hoạt động)`
+    });
+    setTimeout(() => setMessage(null), 4000);
   };
 
   // Delete / Reset Course Trigger
