@@ -121,6 +121,8 @@ const Courses: React.FC = () => {
     };
   }, []);
 
+  const [isClaimingAll, setIsClaimingAll] = useState(false);
+
   const handleClaimCourse = async (course: Course) => {
     if (!currentUserEmail) {
       toast.error('Vui lòng đăng nhập để nhận khóa học.');
@@ -152,6 +154,49 @@ const Courses: React.FC = () => {
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  const handleClaimAllCourses = async () => {
+    if (!currentUserEmail) {
+      toast.error('Vui lòng đăng nhập để nhận tất cả khóa học.');
+      return;
+    }
+    setIsClaimingAll(true);
+    try {
+      const unowned = allCourses.filter(c => !ownedCourseIds.includes(c.id) && c.status !== 'draft' && c.status !== 'inactive');
+      if (unowned.length === 0) {
+        toast.info('Bạn đã sở hữu toàn bộ các khóa học trên hệ thống!');
+        setIsClaimingAll(false);
+        return;
+      }
+
+      for (const course of unowned) {
+        try {
+          const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
+          await setDoc(courseRef, {
+            courseId: course.id,
+            title: course.title || '',
+            price: course.price || '',
+            progress: 0,
+            unlockedAt: new Date().toISOString(),
+            claimedVia: 'VIP_CLAIM_ALL'
+          }, { merge: true });
+        } catch (e) {
+          console.warn('Firestore claim error for course:', course.id, e);
+        }
+        localStorage.setItem('course_unlocked_' + course.id, 'true');
+      }
+
+      setOwnedCourseIds(allCourses.map(c => c.id));
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+      toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
+    } catch (err: any) {
+      console.error("Lỗi mở khóa tất cả:", err);
+      toast.error(`Lỗi mở khóa: ${err?.message || 'Vui lòng thử lại'}`);
+    } finally {
+      setIsClaimingAll(false);
     }
   };
 
@@ -226,12 +271,32 @@ const Courses: React.FC = () => {
         </div>
 
         {/* Course Grid Results */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
                 <span className="w-2 h-8 bg-[#007c76] rounded-full"></span>
                 {activeCategory === 'Tất cả' ? 'Tất cả bài học' : `Khóa học ${activeCategory}`}
                 <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
             </h2>
+
+            {isVipOrAdmin && (
+                <button
+                    onClick={handleClaimAllCourses}
+                    disabled={isClaimingAll}
+                    className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                >
+                    {isClaimingAll ? (
+                        <>
+                            <svg className="w-4 h-4 animate-spin text-slate-950" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span>Đang kích hoạt toàn bộ...</span>
+                        </>
+                    ) : (
+                        <>
+                            <span>👑 Nhận Tất Cả Khóa Học (VIP / Admin)</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                        </>
+                    )}
+                </button>
+            )}
         </div>
 
         {filteredCourses.length > 0 ? (

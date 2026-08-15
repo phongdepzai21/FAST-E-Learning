@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit } from '../constants';
+import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
+import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 
 interface TeacherDashboardProps {
@@ -11,53 +12,36 @@ interface TeacherDashboardProps {
 
 const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Testing', 'Khác'];
 
-const DEFAULT_FLAT_LESSONS = [
-  { title: "Các nguyên tắc quản lý chất lượng cốt lõi", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { title: "Tầm quan trọng của tiêu chuẩn an toàn & vệ sinh", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { title: "Các quy tắc phân tích rủi ro và quản trị HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-  { title: "Thực hành quy trình giám sát độc lập và xử lý sự cố", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
+const DEFAULT_FLAT_LESSONS = DEFAULT_LESSONS;
 
-const extractFlatLessons = (rawCurr: any): Array<{ title: string; videoUrl: string }> => {
-  if (!rawCurr || !Array.isArray(rawCurr)) return DEFAULT_FLAT_LESSONS;
+const extractFlatLessons = extractLessonsFlat;
 
-  const result: Array<{ title: string; videoUrl: string }> = [];
-
-  rawCurr.forEach((item) => {
-    if (item && Array.isArray(item.lessons)) {
-      item.lessons.forEach((l: any) => {
-        const title = (typeof l === 'string' ? l : (l?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
-        if (!title || title.toLowerCase().includes("giới thiệu về fast e-learning")) return;
-        const videoUrl = typeof l === 'object' && l?.videoUrl ? l.videoUrl : "https://www.w3schools.com/html/mov_bbb.mp4";
-        result.push({ title, videoUrl });
-      });
-    } else if (item) {
-      const title = (typeof item === 'string' ? item : (item?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').trim();
-      if (title && !title.toLowerCase().includes("giới thiệu về fast e-learning")) {
-        const videoUrl = typeof item === 'object' && item?.videoUrl ? item.videoUrl : "https://www.w3schools.com/html/mov_bbb.mp4";
-        result.push({ title, videoUrl });
+// Helper to sanitize any object for Firestore, strictly removing any undefined fields
+const cleanForFirestore = (obj: any): any => {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    Object.keys(obj).forEach((key) => {
+      const val = obj[key];
+      if (val !== undefined) {
+        cleaned[key] = cleanForFirestore(val);
       }
-    }
-  });
-
-  if (result.length === 0) return DEFAULT_FLAT_LESSONS;
-
-  const final4 = [...result];
-  let idx = 0;
-  while (final4.length < 4) {
-    final4.push(DEFAULT_FLAT_LESSONS[idx % DEFAULT_FLAT_LESSONS.length]);
-    idx++;
+    });
+    return cleaned;
   }
-  return final4.slice(0, 4);
+  return obj;
 };
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
+  const toast = useToast();
   // Navigation internal tab
   const [activeTab, setActiveTab] = useState<'list' | 'add' | 'edit'>('list');
 
   // Course management states
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Form input states
   const [editingCourseId, setEditingCourseId] = useState('');
@@ -66,14 +50,61 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [category, setCategory] = useState(Categories[0]);
   const [description, setDescription] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [vdohide, setVdohide] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'active' | 'draft' | 'inactive'>('active');
 
-  // Curriculum State (Flat Lessons)
-  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
+  // Curriculum State (Flat Lessons with videoUrl & vdohide)
+  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; vdohide?: string }[]>(DEFAULT_FLAT_LESSONS);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Auto-sync any local custom courses to Firestore on mount
+  const syncLocalEditsToFirestore = async (currentFsList: Course[]) => {
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      if (!localStr) return;
+      const localList: Course[] = JSON.parse(localStr);
+      if (!Array.isArray(localList) || localList.length === 0) return;
+
+      const fsMap = new Map(currentFsList.map(c => [c.id, c]));
+      let syncedCount = 0;
+
+      for (const localCourse of localList) {
+        if (!localCourse || !localCourse.id) continue;
+        const fsCourse = fsMap.get(localCourse.id);
+        const localTime = new Date(localCourse.updatedAt || localCourse.createdAt || 0).getTime();
+        const fsTime = fsCourse ? new Date(fsCourse.updatedAt || fsCourse.createdAt || 0).getTime() : 0;
+
+        // If local course is newer or missing in Firestore, upload to Firestore!
+        if (!fsCourse || localTime > fsTime) {
+          const currLessons = extractLessonsFlat(localCourse.curriculum);
+          const payload = cleanForFirestore({
+            id: String(localCourse.id),
+            title: String(localCourse.title || '').trim(),
+            price: formatPriceSubmit(localCourse.price || '0đ'),
+            image: String(localCourse.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
+            category: String(localCourse.category || 'Khác'),
+            description: String(localCourse.description || '').trim(),
+            status: localCourse.status || 'active',
+            vdohide: String(localCourse.vdohide || localCourse.videoHide || '').trim(),
+            curriculum: [{ title: "Danh sách bài giảng", lessons: currLessons }],
+            authorEmail: localCourse.authorEmail || userEmail || '',
+            updatedAt: localCourse.updatedAt || new Date().toISOString()
+          });
+          await setDoc(doc(db, 'courses', localCourse.id), payload, { merge: true });
+          syncedCount++;
+        }
+      }
+
+      if (syncedCount > 0) {
+        console.log(`Đã đồng bộ ${syncedCount} khóa học từ máy lên cơ sở dữ liệu Cloud.`);
+      }
+    } catch (e) {
+      console.warn("Lỗi auto-sync local sang cloud:", e);
+    }
+  };
 
   // Load all courses with real-time Firestore sync across all accounts
   useEffect(() => {
@@ -90,15 +121,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       collection(db, 'courses'),
       (querySnapshot) => {
         const firestoreCourses: Course[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
           firestoreCourses.push({
-            id: doc.id,
+            id: docSnap.id,
             ...data
           } as Course);
         });
 
         syncCourses(firestoreCourses);
+        // Also check if any local custom edits need to be pushed
+        syncLocalEditsToFirestore(firestoreCourses);
       },
       (error) => {
         console.warn("Lỗi đồng bộ danh sách khóa học ở TeacherDashboard:", error);
@@ -118,7 +151,41 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       window.removeEventListener('courses_updated', handleCustomUpdate);
       window.removeEventListener('storage', handleCustomUpdate);
     };
-  }, []);
+  }, [userEmail]);
+
+  const handleManualSyncAllToCloud = async () => {
+    setIsSyncingCloud(true);
+    try {
+      let count = 0;
+      for (const c of courses) {
+        const currLessons = extractLessonsFlat(c.curriculum);
+        const payload = cleanForFirestore({
+          id: String(c.id),
+          title: String(c.title || '').trim(),
+          price: formatPriceSubmit(c.price || '0đ'),
+          image: String(c.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
+          category: String(c.category || 'Khác'),
+          description: String(c.description || '').trim(),
+          status: c.status || 'active',
+          curriculum: [{ title: "Danh sách bài giảng", lessons: currLessons }],
+          authorEmail: c.authorEmail || userEmail || '',
+          updatedAt: new Date().toISOString()
+        });
+        await setDoc(doc(db, 'courses', c.id), payload, { merge: true });
+        count++;
+      }
+      toast.success(`✨ Đã đồng bộ thành công ${count} khóa học lên Cloud Firestore! Tất cả thiết bị sẽ nhận video, bài học & học phí mới.`);
+      setMessage({ type: 'success', text: `Đã đồng bộ toàn bộ ${count} khóa học lên Máy chủ Cloud. Tất cả các trang và máy khác đã được cập nhật giá, video và bài học!` });
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+    } catch (err: any) {
+      console.error("Lỗi đồng bộ Cloud:", err);
+      toast.error(`Lỗi đồng bộ: ${err?.message || 'Vui lòng kiểm tra kết nối mạng'}`);
+      setMessage({ type: 'error', text: `Lỗi đồng bộ lên Cloud: ${err?.message || 'Thất bại'}` });
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -134,6 +201,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setCategory(course.category);
     setDescription(course.description || '');
     setImageUrlInput(course.image);
+    setVdohide(course.vdohide || course.videoHide || '');
     setImageFile(null);
     setStatus(course.status || 'active');
     setMessage(null);
@@ -141,14 +209,22 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // Fetch curriculum content or revert to template if empty
     try {
       const courseDocSnap = await getDoc(doc(db, 'courses', course.id));
-      if (courseDocSnap.exists() && courseDocSnap.data().curriculum) {
-        setFlatLessons(extractFlatLessons(courseDocSnap.data().curriculum));
+      if (courseDocSnap.exists()) {
+        const cData = courseDocSnap.data();
+        if (cData.vdohide || cData.videoHide) {
+          setVdohide(cData.vdohide || cData.videoHide || '');
+        }
+        if (cData.curriculum) {
+          setFlatLessons(extractLessonsFlat(cData.curriculum));
+        } else {
+          setFlatLessons(extractLessonsFlat(course.curriculum));
+        }
       } else {
-        setFlatLessons(extractFlatLessons(course.curriculum));
+        setFlatLessons(extractLessonsFlat(course.curriculum));
       }
     } catch (err) {
       console.error("Lỗi lấy thông tin giáo trình:", err);
-      setFlatLessons(extractFlatLessons(course.curriculum));
+      setFlatLessons(extractLessonsFlat(course.curriculum));
     }
 
     setActiveTab('edit');
@@ -156,37 +232,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   // Helper validation function for course input fields
   const validateCourseInput = (): boolean => {
-    // 1. Title verification
     if (!title.trim()) {
       setMessage({ type: 'error', text: 'Tên khóa học bắt buộc không được để trống.' });
       return false;
     }
 
-    // 2. Price/Học phí verification
     if (!price.trim()) {
       setMessage({ type: 'error', text: 'Học phí bắt buộc không được để trống (nhập "Miễn phí" nếu không thu phí).' });
       return false;
     }
 
-    // Auto fix image URL if missing protocol
     if (imageUrlInput.trim() && !imageUrlInput.trim().startsWith('http://') && !imageUrlInput.trim().startsWith('https://')) {
       setImageUrlInput('https://' + imageUrlInput.trim().replace(/^\/+/, ''));
-    }
-
-    // Auto format video URLs in flatLessons if missing protocol
-    if (flatLessons.length > 0) {
-      setFlatLessons(prev => prev.map((les, lIdx) => {
-        let vUrl = les.videoUrl ? les.videoUrl.trim() : '';
-        if (!vUrl) {
-          vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-        } else if (!vUrl.startsWith('http://') && !vUrl.startsWith('https://')) {
-          vUrl = 'https://' + vUrl.replace(/^\/+/, '');
-        }
-        return {
-          title: les.title.trim() || `Bài học ${lIdx + 1}`,
-          videoUrl: vUrl
-        };
-      }));
     }
 
     return true;
@@ -194,11 +251,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   // Helper to sanitize curriculum data ensuring no undefined values are sent to Firestore
   const sanitizeCurriculum = (inputLessons: any[]) => {
-    if (!Array.isArray(inputLessons)) return [];
-    const cleanLessons = inputLessons.map((les, lIdx) => ({
-      title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
-      videoUrl: String(les?.videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4').trim()
-    }));
+    if (!Array.isArray(inputLessons) || inputLessons.length === 0) {
+      return [{ title: "Danh sách bài giảng", lessons: DEFAULT_FLAT_LESSONS }];
+    }
+    const cleanLessons = inputLessons.map((les, lIdx) => {
+      let vUrl = les?.videoUrl ? String(les.videoUrl).trim() : '';
+      if (!vUrl) {
+        vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
+      }
+      const vHide = les?.vdohide ? String(les.vdohide).trim() : (les?.videoHide ? String(les.videoHide).trim() : '');
+      return {
+        title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
+        videoUrl: vUrl,
+        vdohide: vHide
+      };
+    });
     return [{ title: "Danh sách bài giảng", lessons: cleanLessons }];
   };
 
@@ -208,7 +275,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setIsSubmitting(true);
     setMessage(null);
 
-    // Run input validation
     if (!validateCourseInput()) {
       setIsSubmitting(false);
       return;
@@ -233,7 +299,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const sanitizedCurriculum = sanitizeCurriculum(rawCurriculum);
 
     const nowIso = new Date().toISOString();
-    const newCourse = {
+    const newCourse = cleanForFirestore({
       id: courseId,
       title: title.trim(),
       price: finalPrice,
@@ -241,20 +307,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       category: category || 'Khác',
       description: description.trim(),
       status: status || 'active',
+      vdohide: vdohide.trim(),
       curriculum: sanitizedCurriculum,
       authorEmail: userEmail || '',
       createdAt: nowIso,
       updatedAt: nowIso
-    };
+    });
 
-    // 1. Save to Firestore
+    // 1. Save to Firestore (Master Cloud Database)
     try {
       await setDoc(doc(db, 'courses', courseId), newCourse);
+      toast.success(`✨ Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`);
     } catch (firestoreErr: any) {
-      console.warn('Firestore add course warning:', firestoreErr);
+      console.error('Firestore add course error:', firestoreErr);
+      toast.error(`Lỗi lưu vào Cloud: ${firestoreErr?.message || 'Vui lòng thử lại'}`);
     }
 
-    // 2. Save to LocalStorage backup for offline/permission resilience
+    // 2. Save to LocalStorage backup
     try {
       const localStr = localStorage.getItem('local_custom_courses');
       let localList: any[] = localStr ? JSON.parse(localStr) : [];
@@ -264,8 +333,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage save error:', e);
     }
 
-    setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với danh sách bài giảng thành công!` });
+    setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với học phí ${finalPrice} thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
+    window.dispatchEvent(new Event('storage'));
     resetForm();
     setIsSubmitting(false);
     setTimeout(() => setActiveTab('list'), 1200);
@@ -283,7 +353,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       return;
     }
 
-    // Run input validation
     if (!validateCourseInput()) {
       setIsSubmitting(false);
       return;
@@ -304,8 +373,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     const sanitizedCurriculum = sanitizeCurriculum(flatLessons);
+    const nowIso = new Date().toISOString();
 
-    const updatedCourse = {
+    const updatedCourse = cleanForFirestore({
       id: editingCourseId,
       title: title.trim(),
       price: finalPrice,
@@ -313,21 +383,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       category: category || 'Khác',
       description: description.trim(),
       status: status || 'active',
+      vdohide: vdohide.trim(),
       curriculum: sanitizedCurriculum,
-      updatedAt: new Date().toISOString()
-    };
+      updatedAt: nowIso
+    });
 
     // Optimistically update React state immediately
     setCourses(prev => prev.map(c => c.id === editingCourseId ? { ...c, ...updatedCourse } : c));
 
-    // 1. Try Firestore setDoc
+    // 1. Update Firestore
     try {
       await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
+      toast.success(`✨ Đã cập nhật giá "${finalPrice}" và thông tin khóa học lên Cloud Firestore!`);
     } catch (firestoreErr: any) {
-      console.warn('Firestore setDoc update warning:', firestoreErr);
+      console.error('Firestore setDoc update error:', firestoreErr);
+      toast.error(`Lỗi cập nhật Cloud: ${firestoreErr?.message || 'Vui lòng thử lại'}`);
     }
 
-    // 2. Save to LocalStorage backup for guaranteed persistence
+    // 2. Save to LocalStorage backup
     try {
       const localStr = localStorage.getItem('local_custom_courses');
       let localList: any[] = localStr ? JSON.parse(localStr) : [];
@@ -342,8 +415,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage edit error:', e);
     }
 
-    setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & bài giảng "${title}" thành công!` });
+    setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & học phí "${title}" thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
+    window.dispatchEvent(new Event('storage'));
     setIsSubmitting(false);
     setTimeout(() => {
       setActiveTab('list');
@@ -363,7 +437,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     const nowIso = new Date().toISOString();
 
-    // 1. Optimistically update local React state for instantaneous UI feedback
+    // 1. Optimistically update local React state
     setCourses(prev => prev.map(c => c.id === course.id ? { ...c, status: newStatus, updatedAt: nowIso } : c));
 
     // 2. Always persist to LocalStorage backup
@@ -395,34 +469,40 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage error:', e);
     }
 
-    // 3. Update Firestore with non-undefined fields
+    // 3. Update Firestore master collection
     try {
       const docRef = doc(db, 'courses', course.id);
-      const updatePayload: Record<string, any> = {
+      const updatePayload: Record<string, any> = cleanForFirestore({
         id: String(course.id),
         title: String(course.title || ''),
-        price: String(course.price || '0đ'),
+        price: formatPriceSubmit(course.price || '0đ'),
         image: String(course.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
         category: String(course.category || 'Khác'),
         description: String(course.description || ''),
         status: newStatus,
         updatedAt: nowIso
-      };
+      });
       if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
-        updatePayload.curriculum = course.curriculum;
+        updatePayload.curriculum = cleanForFirestore(course.curriculum);
       }
 
       await setDoc(docRef, updatePayload, { merge: true });
-    } catch (firestoreErr) {
-      console.warn('Firestore toggle status warning (saved to LocalStorage fallback):', firestoreErr);
+      toast.success(newStatus === 'inactive' 
+        ? `🔒 Đã ẩn khóa học "${course.title}" trên tất cả thiết bị và người dùng!` 
+        : `✨ Đã hiển thị khóa học "${course.title}" trên tất cả thiết bị!`
+      );
+    } catch (firestoreErr: any) {
+      console.error('Firestore toggle status error:', firestoreErr);
+      toast.error(`Lỗi cập nhật Firestore: ${firestoreErr?.message || 'Thất bại'}`);
     }
 
     window.dispatchEvent(new CustomEvent('courses_updated'));
+    window.dispatchEvent(new Event('storage'));
     setMessage({
       type: 'success',
       text: newStatus === 'inactive'
-        ? `Đã ẩn khóa học "${course.title}" (Trạng thái: Không hoạt động)`
-        : `Đã kích hoạt khóa học "${course.title}" (Trạng thái: Hoạt động)`
+        ? `Đã ẩn khóa học "${course.title}" (Đồng bộ mọi thiết bị: Không hoạt động)`
+        : `Đã kích hoạt khóa học "${course.title}" (Đồng bộ mọi thiết bị: Hoạt động)`
     });
     setTimeout(() => setMessage(null), 4000);
   };
@@ -438,8 +518,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     if (window.confirm(confirmMsg)) {
       try {
         await deleteDoc(doc(db, 'courses', courseId));
+        toast.success(`Đã xóa/reset khóa học "${courseTitle}" trên Cloud Firestore!`);
       } catch (err: any) {
         console.warn('Firestore delete course warning:', err);
+        toast.error(`Lỗi xóa trên Cloud: ${err?.message || 'Thất bại'}`);
       }
 
       // Also clean up from LocalStorage
@@ -452,8 +534,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         }
       } catch (e) {}
 
-      setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}"!` });
+      setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` });
       window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
       setTimeout(() => setMessage(null), 4000);
     }
   };
@@ -465,6 +548,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setCategory(Categories[0]);
     setDescription('');
     setImageUrlInput('');
+    setVdohide('');
     setImageFile(null);
     setStatus('active');
     setFlatLessons(DEFAULT_FLAT_LESSONS);
@@ -476,7 +560,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const addFlatLesson = () => {
     setFlatLessons(prev => [
       ...prev,
-      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
+      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', vdohide: '' }
     ]);
   };
 
@@ -496,7 +580,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     });
   };
 
-  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl', value: string) => {
+  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl' | 'vdohide', value: string) => {
     setFlatLessons(prev => {
       const result = [...prev];
       result[lIdx] = { ...result[lIdx], [field]: value };
@@ -523,20 +607,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           </p>
         </div>
 
-        {/* Tab Controls */}
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
+        {/* Tab Controls & Cloud Sync */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button
-            onClick={() => { setActiveTab('list'); resetForm(); setMessage(null); }}
-            className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'list' ? 'bg-white text-[#007c76] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+            onClick={handleManualSyncAllToCloud}
+            disabled={isSyncingCloud}
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-[#007c76]/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-50"
+            title="Đồng bộ toàn bộ thay đổi lên máy chủ Cloud để tất cả thiết bị khác nhận ngay lập tức"
           >
-            Danh sách khóa học
+            <span className={`w-2 h-2 rounded-full ${isSyncingCloud ? 'bg-amber-500 animate-ping' : 'bg-green-500'}`}></span>
+            {isSyncingCloud ? 'Đang đồng bộ Cloud...' : 'Đồng bộ Cloud (Tất cả máy)'}
           </button>
-          <button
-            onClick={() => { setActiveTab('add'); resetForm(); setMessage(null); setFlatLessons(JSON.parse(JSON.stringify(DEFAULT_FLAT_LESSONS))); }}
-            className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'add' ? 'bg-white text-[#007c76] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-          >
-            Thêm khóa học mới
-          </button>
+
+          <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
+            <button
+              onClick={() => { setActiveTab('list'); resetForm(); setMessage(null); }}
+              className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'list' ? 'bg-white text-[#007c76] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+            >
+              Danh sách khóa học
+            </button>
+            <button
+              onClick={() => { setActiveTab('add'); resetForm(); setMessage(null); setFlatLessons(JSON.parse(JSON.stringify(DEFAULT_FLAT_LESSONS))); }}
+              className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'add' ? 'bg-white text-[#007c76] shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+            >
+              Thêm khóa học mới
+            </button>
+          </div>
         </div>
       </div>
 
@@ -765,6 +861,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 />
               </div>
 
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-black uppercase rounded-md tracking-wider border border-amber-200">vdohide</span>
+                    Video ẩn / VIP của khóa học
+                  </label>
+                  <span className="text-[11px] text-gray-400 font-medium">Tùy chọn</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={vdohide}
+                  onChange={e => setVdohide(e.target.value)}
+                  placeholder="Link vdohide (vdohide.com/e/...), Youtube, Doodstream, Drive, mã <iframe>..."
+                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
+                />
+              </div>
+
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-bold text-gray-700">Hoặc tải lên từ máy tính (Tải file cục bộ)</label>
                 <input 
@@ -802,7 +915,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   2. Danh sách bài giảng ({flatLessons.length} bài)
                 </h3>
                 <p className="text-gray-400 text-xs font-semibold mt-1">
-                  Quản lý và sắp xếp các bài giảng hiển thị trực tiếp trong khóa học.
+                  Quản lý các bài giảng, hỗ trợ liên kết video chính và trường <code>vdohide</code> (video ẩn / VIP).
                 </p>
               </div>
               
@@ -839,7 +952,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
                       {/* Lesson Title Input */}
                       <div className="space-y-1">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tên bài giảng</span>
@@ -854,17 +967,34 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                       {/* Lesson Video URL Input */}
                       <div className="space-y-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Video chính (videoUrl)</span>
                         <input
                           type="text"
                           value={lesson.videoUrl || ''}
                           onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
-                          placeholder="Link Youtube (watch, shorts, youtu.be), Google Drive, Dropbox, MP4..."
+                          placeholder="Link Youtube, vdohide, Drive, Doodstream, mã <iframe>, MP4..."
                           className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
                         />
-                        <span className="text-[10px] text-gray-400 font-medium block">
-                          Hỗ trợ: Link Youtube trực tiếp, Shorts, Dropbox, Google Drive, Vimeo & MP4.
-                        </span>
+                      </div>
+
+                      {/* Lesson vdohide Input */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            vdohide (Video Ẩn / Server 2)
+                          </span>
+                          {lesson.vdohide && (
+                            <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1 rounded">Có sẵn</span>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={lesson.vdohide || ''}
+                          onChange={(e) => updateFlatLesson(lIdx, 'vdohide', e.target.value)}
+                          placeholder="Link vdohide (vdohide.com/e/...), Youtube ẩn, mã <iframe>..."
+                          className="w-full bg-amber-50/30 text-xs font-medium text-gray-700 py-2.5 px-3 border border-amber-200/80 rounded-xl focus:border-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400"
+                        />
                       </div>
                     </div>
 

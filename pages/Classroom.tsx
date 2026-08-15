@@ -1,59 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { COURSES, ADMIN_EMAILS, getMergedCourses } from '../constants';
+import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
 import Handbook from './Handbook';
-import { getVideoEmbedInfo } from './CourseDetail';
-
-const DUMMY_LESSONS = [
-  { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-  { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
-
-const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }> => {
-  if (!raw || !Array.isArray(raw)) return DUMMY_LESSONS;
-  const result: Array<{ title: string; videoUrl: string }> = [];
-
-  raw.forEach((item: any) => {
-    if (item && Array.isArray(item.lessons)) {
-      item.lessons.forEach((l: any) => {
-        const title = (typeof l === 'string' ? l : (l?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
-        if (!title || title.toLowerCase().includes("giới thiệu về fast e-learning")) return;
-        const videoUrl = typeof l === 'object' && l?.videoUrl ? l.videoUrl : (
-          title.includes("HACCP") 
-            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-            : "https://www.w3schools.com/html/mov_bbb.mp4"
-        );
-        result.push({ title, videoUrl });
-      });
-    } else if (item) {
-      const title = (typeof item === 'string' ? item : (item?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
-      if (title && !title.toLowerCase().includes("giới thiệu về fast e-learning")) {
-        const videoUrl = typeof item === 'object' && item?.videoUrl ? item.videoUrl : (
-          title.includes("HACCP") 
-            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-            : "https://www.w3schools.com/html/mov_bbb.mp4"
-        );
-        result.push({ title, videoUrl });
-      }
-    }
-  });
-
-  if (result.length === 0) return DUMMY_LESSONS;
-
-  const final4 = [...result];
-  let idx = 0;
-  while (final4.length < 4) {
-    final4.push(DUMMY_LESSONS[idx % DUMMY_LESSONS.length]);
-    idx++;
-  }
-  return final4.slice(0, 4);
-};
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -77,16 +29,19 @@ const Classroom: React.FC = () => {
   useEffect(() => {
     if (!courseId) return;
 
+    let cachedDocData: any = null;
+
     const loadCourseData = (docData?: any) => {
-      const fsList = docData ? [{ id: courseId, ...docData }] : [];
+      if (docData !== undefined) cachedDocData = docData;
+      const fsList = cachedDocData ? [{ id: courseId, ...cachedDocData }] : [];
       const allMerged = getMergedCourses(fsList);
       const found = allMerged.find(c => c.id === courseId);
 
       if (found) {
         setCourse(found);
-        const curr = docData?.curriculum || found.curriculum;
+        const curr = cachedDocData?.curriculum || found.curriculum;
         const flatList = extractLessonsFlat(curr);
-        setCurriculum(flatList.length > 0 ? flatList : DUMMY_LESSONS);
+        setCurriculum(flatList.length > 0 ? flatList : DEFAULT_LESSONS);
       } else {
         setCourse({
           id: courseId,
@@ -96,7 +51,7 @@ const Classroom: React.FC = () => {
           category: 'Chung',
           description: 'Nội dung khóa học đào tạo chuyên sâu'
         });
-        setCurriculum(DUMMY_LESSONS);
+        setCurriculum(DEFAULT_LESSONS);
       }
     };
 
@@ -109,7 +64,15 @@ const Classroom: React.FC = () => {
       }
     }, () => loadCourseData());
 
-    return () => unsubscribeSnapshot();
+    const handleCustomUpdate = () => loadCourseData();
+    window.addEventListener('courses_updated', handleCustomUpdate);
+    window.addEventListener('storage', handleCustomUpdate);
+
+    return () => {
+      unsubscribeSnapshot();
+      window.removeEventListener('courses_updated', handleCustomUpdate);
+      window.removeEventListener('storage', handleCustomUpdate);
+    };
   }, [courseId]);
 
   // Auth & Ownership Listener
@@ -224,10 +187,19 @@ const Classroom: React.FC = () => {
     setUserNote('');
   };
 
+  const [selectedSource, setSelectedSource] = useState<'primary' | 'vdohide'>('primary');
+
+  const activeVideoUrl = useMemo(() => {
+    if (selectedSource === 'vdohide' && currentLesson?.vdohide) {
+      return currentLesson.vdohide;
+    }
+    return currentLesson?.videoUrl || currentLesson?.vdohide || "https://www.w3schools.com/html/mov_bbb.mp4";
+  }, [currentLesson, selectedSource]);
+
   const videoEmbed = useMemo(() => {
-    if (!currentLesson?.videoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
-    return getVideoEmbedInfo(currentLesson.videoUrl, true);
-  }, [currentLesson]);
+    if (!activeVideoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
+    return getVideoEmbedInfo(activeVideoUrl, true);
+  }, [activeVideoUrl]);
 
   const filteredCurriculum = useMemo(() => {
     if (!searchQuery.trim()) return curriculum;
@@ -342,13 +314,14 @@ const Classroom: React.FC = () => {
                   src={videoEmbed.embedUrl} 
                   className="w-full h-full border-0"
                   title={currentLesson?.title || "Video bài giảng"}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                   allowFullScreen
+                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <video 
-                  key={currentLesson?.videoUrl}
-                  src={currentLesson?.videoUrl} 
+                  key={videoEmbed.embedUrl || currentLesson?.videoUrl}
+                  src={videoEmbed.embedUrl || currentLesson?.videoUrl} 
                   controls 
                   autoPlay
                   className="w-full h-full object-contain"
@@ -381,6 +354,34 @@ const Classroom: React.FC = () => {
 
             {/* ACTION CONTROLS */}
             <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end shrink-0">
+              {currentLesson?.vdohide && (
+                <div className="flex items-center bg-white/[0.06] p-1 rounded-xl border border-white/[0.08] text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSource('primary')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      selectedSource === 'primary' 
+                        ? 'bg-teal-500 text-slate-950 shadow-sm' 
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Server 1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSource('vdohide')}
+                    className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all ${
+                      selectedSource === 'vdohide' 
+                        ? 'bg-amber-400 text-slate-950 shadow-sm' 
+                        : 'text-amber-400 hover:text-amber-300'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                    vdohide
+                  </button>
+                </div>
+              )}
+
               <button
                 disabled={currentIdx === 0}
                 onClick={() => {

@@ -225,6 +225,261 @@ export const COLORS = {
   dark: '#374151'
 };
 
+export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string; vdohide?: string }> = [
+  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" },
+  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" },
+  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1", vdohide: "" },
+  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", vdohide: "" }
+];
+
+export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string; vdohide?: string }> => {
+  if (!rawCurr) return DEFAULT_LESSONS;
+  if (!Array.isArray(rawCurr)) {
+    if (typeof rawCurr === 'object' && rawCurr.lessons && Array.isArray(rawCurr.lessons)) {
+      return extractLessonsFlat(rawCurr.lessons);
+    }
+    return DEFAULT_LESSONS;
+  }
+
+  const result: Array<{ title: string; videoUrl: string; vdohide?: string }> = [];
+
+  rawCurr.forEach((item: any, itemIdx: number) => {
+    if (!item) return;
+
+    // Case 1: item is a chapter object with a .lessons array
+    if (Array.isArray(item.lessons)) {
+      item.lessons.forEach((l: any, lIdx: number) => {
+        if (!l) return;
+        const title = (typeof l === 'string' ? l : (l?.title || `Bài học ${lIdx + 1}`)).trim();
+        const videoUrl = typeof l === 'object' && l?.videoUrl 
+          ? String(l.videoUrl).trim() 
+          : "https://www.w3schools.com/html/mov_bbb.mp4";
+        const vdohide = typeof l === 'object' ? String(l.vdohide || l.videoHide || '').trim() : '';
+        result.push({ title, videoUrl, vdohide });
+      });
+    } 
+    // Case 2: item is a direct lesson object { title, videoUrl, vdohide }
+    else if (typeof item === 'object') {
+      const title = (item.title || `Bài học ${itemIdx + 1}`).trim();
+      const videoUrl = item.videoUrl 
+        ? String(item.videoUrl).trim() 
+        : "https://www.w3schools.com/html/mov_bbb.mp4";
+      const vdohide = String(item.vdohide || item.videoHide || '').trim();
+      result.push({ title, videoUrl, vdohide });
+    }
+    // Case 3: item is a string
+    else if (typeof item === 'string' && item.trim()) {
+      result.push({
+        title: item.trim(),
+        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4",
+        vdohide: ""
+      });
+    }
+  });
+
+  return result.length > 0 ? result : DEFAULT_LESSONS;
+};
+
+// Video embed detection helper for YouTube, vdohide, DoodStream, Streamwish, Streamtape, Filemoon, Dropbox, Drive, Vimeo, Loom, Dailymotion, Bilibili, and HTML5 native video
+export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isEmbed: boolean; embedUrl: string } {
+  if (!url) {
+    return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
+  }
+  let cleanUrl = String(url).trim();
+
+  // 0. Extract src from raw <iframe> tags if user pasted iframe embed code
+  const iframeSrcMatch = cleanUrl.match(/<iframe[^>]*\ssrc=["']([^"']+)["'][^>]*>/i);
+  if (iframeSrcMatch && iframeSrcMatch[1]) {
+    cleanUrl = iframeSrcMatch[1].trim();
+  }
+
+  // Remove wrapping quotes if any
+  cleanUrl = cleanUrl.replace(/^["']|["']$/g, '').trim();
+
+  // 1. YouTube check (watch, embed, shorts, youtu.be, m.youtube, live, youtube-nocookie)
+  const ytMatch = cleanUrl.match(/(?:youtube(?:-nocookie)?\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    const videoId = ytMatch[1];
+    const apParam = autoPlay ? '1' : '0';
+    
+    // Check for timestamp (t=120 or t=2m30s or start=120)
+    let startParam = '';
+    const tMatch = cleanUrl.match(/[?&](?:t|start)=([0-9hms]+)/i);
+    if (tMatch && tMatch[1]) {
+      const rawT = tMatch[1];
+      if (/^\d+$/.test(rawT)) {
+        startParam = `&start=${rawT}`;
+      } else {
+        let totalSeconds = 0;
+        const h = rawT.match(/(\d+)h/i);
+        const m = rawT.match(/(\d+)m/i);
+        const s = rawT.match(/(\d+)s/i);
+        if (h) totalSeconds += parseInt(h[1], 10) * 3600;
+        if (m) totalSeconds += parseInt(m[1], 10) * 60;
+        if (s) totalSeconds += parseInt(s[1], 10);
+        if (totalSeconds > 0) startParam = `&start=${totalSeconds}`;
+      }
+    }
+
+    return {
+      isEmbed: true,
+      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=${apParam}&rel=0&enablejsapi=1${startParam}`
+    };
+  }
+
+  // 2. Vdohide (vdohide.com, vdohide.to, vdohide.xyz, vdohide.net, vdohide.top, vdohide.cc, vdohide.site, vdohide.live, etc.)
+  // Common URL patterns: https://vdohide.com/e/CODE, /v/CODE, /d/CODE, /CODE
+  if (/vdohide|vdo-hide|vdo\.hide/i.test(cleanUrl)) {
+    try {
+      const parsed = new URL(cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`);
+      const domain = parsed.hostname || 'vdohide.com';
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      const code = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+      if (code) {
+        return {
+          isEmbed: true,
+          embedUrl: `https://${domain}/e/${code}`
+        };
+      }
+    } catch {
+      const codeMatch = cleanUrl.match(/vdohide[^/]*\/(?:[ved]\/)?([a-zA-Z0-9_-]+)/i);
+      if (codeMatch && codeMatch[1]) {
+        return {
+          isEmbed: true,
+          embedUrl: `https://vdohide.com/e/${codeMatch[1]}`
+        };
+      }
+    }
+    return {
+      isEmbed: true,
+      embedUrl: cleanUrl
+    };
+  }
+
+  // 3. DoodStream (dood.to, dood.so, dood.ws, dood.la, dood.sh, doodstream.com, ds2play.com, dood.re, dood.cx, doods.pro, dood.wf)
+  if (/dood\.|doodstream\.|ds2play\./i.test(cleanUrl)) {
+    const codeMatch = cleanUrl.match(/(?:dood\.[a-z]+|doodstream\.com|ds2play\.com)\/(?:[edv]\/)?([a-zA-Z0-9_-]+)/i);
+    if (codeMatch && codeMatch[1]) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://dood.to/e/${codeMatch[1]}`
+      };
+    }
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 4. Streamwish / Strwish / Wishembed (streamwish.to, streamwish.com, strwish.com, swish.to, wishembed.pro)
+  if (/streamwish|strwish|wishembed/i.test(cleanUrl)) {
+    const codeMatch = cleanUrl.match(/(?:streamwish\.[a-z]+|strwish\.[a-z]+|wishembed\.[a-z]+)\/(?:[efv]\/)?([a-zA-Z0-9_-]+)/i);
+    if (codeMatch && codeMatch[1]) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://streamwish.to/e/${codeMatch[1]}`
+      };
+    }
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 5. Streamtape (streamtape.com, streamtape.to, streamtape.net, streamta.pe)
+  if (/streamtape|streamta\.pe/i.test(cleanUrl)) {
+    const codeMatch = cleanUrl.match(/(?:streamtape\.[a-z]+|streamta\.pe)\/(?:[ve]\/)?([a-zA-Z0-9_-]+)/i);
+    if (codeMatch && codeMatch[1]) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://streamtape.com/e/${codeMatch[1]}`
+      };
+    }
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 6. Filemoon (filemoon.sx, filemoon.to, filemoon.in, filemoon.top)
+  if (/filemoon\./i.test(cleanUrl)) {
+    const codeMatch = cleanUrl.match(/filemoon\.[a-z]+\/(?:[edv]\/)?([a-zA-Z0-9_-]+)/i);
+    if (codeMatch && codeMatch[1]) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://filemoon.sx/e/${codeMatch[1]}`
+      };
+    }
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 7. Google Drive check (view, preview, open?id=)
+  const driveMatch = cleanUrl.match(/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|open\?id=([a-zA-Z0-9_-]+))/i);
+  if (driveMatch) {
+    const fileId = driveMatch[1] || driveMatch[2];
+    if (fileId) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://drive.google.com/file/d/${fileId}/preview`
+      };
+    }
+  }
+
+  // 8. Vimeo check
+  const vimeoMatch = cleanUrl.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    const apParam = autoPlay ? '1' : '0';
+    return {
+      isEmbed: true,
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=${apParam}`
+    };
+  }
+
+  // 9. Loom check
+  const loomMatch = cleanUrl.match(/loom\.com\/share\/([a-zA-Z0-9]+)/i);
+  if (loomMatch && loomMatch[1]) {
+    return {
+      isEmbed: true,
+      embedUrl: `https://www.loom.com/embed/${loomMatch[1]}`
+    };
+  }
+
+  // 10. Dailymotion
+  const dailyMatch = cleanUrl.match(/(?:dailymotion\.com\/(?:video|embed\/video)\/|dai\.ly\/)([a-zA-Z0-9]+)/i);
+  if (dailyMatch && dailyMatch[1]) {
+    return {
+      isEmbed: true,
+      embedUrl: `https://www.dailymotion.com/embed/video/${dailyMatch[1]}`
+    };
+  }
+
+  // 11. Bilibili
+  const biliMatch = cleanUrl.match(/bilibili\.com\/video\/([a-zA-Z0-9]+)/i);
+  if (biliMatch && biliMatch[1]) {
+    return {
+      isEmbed: true,
+      embedUrl: `https://player.bilibili.com/player.html?bvid=${biliMatch[1]}&autoplay=${autoPlay ? '1' : '0'}`
+    };
+  }
+
+  // 12. Ok.ru
+  const okMatch = cleanUrl.match(/ok\.ru\/(?:video|videoembed)\/([0-9]+)/i);
+  if (okMatch && okMatch[1]) {
+    return {
+      isEmbed: true,
+      embedUrl: `https://ok.ru/videoembed/${okMatch[1]}`
+    };
+  }
+
+  // 13. Dropbox check - convert to raw direct streaming MP4 link for native video tag
+  if (cleanUrl.includes('dropbox.com') || cleanUrl.includes('dropboxusercontent.com')) {
+    let directUrl = cleanUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    if (!directUrl.includes('raw=1') && !directUrl.includes('dl=1')) {
+      directUrl += (directUrl.includes('?') ? '&' : '?') + 'raw=1';
+    }
+    return { isEmbed: false, embedUrl: directUrl };
+  }
+
+  // 14. Check if it's already an embed URL (e.g. /embed/, /preview, /player/, /e/)
+  if (cleanUrl.includes('/embed/') || cleanUrl.includes('/preview') || cleanUrl.includes('/player/') || cleanUrl.includes('/e/')) {
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 15. Native HTML5 video (.mp4, .webm, .ogg, .mov, .m4v, direct streams)
+  return { isEmbed: false, embedUrl: cleanUrl };
+}
+
 export const formatPriceSubmit = (rawPrice: string): string => {
   if (!rawPrice) return 'Miễn phí';
   const clean = String(rawPrice).trim();
@@ -234,12 +489,13 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     lower === 'miễn phí' || 
     lower === 'free' || 
     lower === '0đ' || 
-    lower === '0'
+    lower === '0' ||
+    lower === '0 vnd'
   ) {
     return 'Miễn phí';
   }
 
-  // 1. Check for 'b', 'tỷ', 'ty' suffix (billion = * 1.000.000.000 / 9 zeros)
+  // 1. Check for 'b', 'tỷ', 'ty' suffix (billion)
   if (/(?:tỷ|ty|b)$/i.test(lower)) {
     const numPart = lower.replace(/(?:tỷ|ty|b)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
@@ -248,7 +504,7 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     }
   }
 
-  // 2. Check for 'tr', 'triệu', 'trieu', 'm' suffix (million = * 1.000.000 / 6 zeros)
+  // 2. Check for 'tr', 'triệu', 'trieu', 'm' suffix (million)
   if (/(?:tr|triệu|trieu|m)$/i.test(lower)) {
     const numPart = lower.replace(/(?:tr|triệu|trieu|m)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
@@ -257,7 +513,7 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     }
   }
 
-  // 3. Check for 'k', 'nghìn', 'ngàn', 'ngan' suffix (thousand = * 1.000 / 3 zeros)
+  // 3. Check for 'k', 'nghìn', 'ngàn', 'ngan' suffix (thousand)
   if (/(?:nghìn|ngàn|ngan|k)$/i.test(lower)) {
     const numPart = lower.replace(/(?:nghìn|ngàn|ngan|k)$/i, '').replace(/,/g, '.').replace(/[^\d.]/g, '');
     const val = parseFloat(numPart);
@@ -276,20 +532,17 @@ export const formatPriceSubmit = (rawPrice: string): string => {
     }
   }
 
-  // 5. Plain numbers without suffix
+  // 5. Plain numbers or dotted numbers without suffix
   const digitsOnly = clean.replace(/[^\d]/g, '');
-  if (/^\d+$/.test(digitsOnly)) {
+  if (/^\d+$/.test(digitsOnly) && digitsOnly.length > 0) {
     const num = parseInt(digitsOnly, 10);
+    if (num === 0) return 'Miễn phí';
     if (num > 0 && num < 10) {
       // e.g., plain "2" -> 2.000.000đ
       return (num * 1000000).toLocaleString('vi-VN') + 'đ';
     }
     if (num >= 10 && num < 1000) {
       // e.g., plain "599" -> 599.000đ
-      return (num * 1000).toLocaleString('vi-VN') + 'đ';
-    }
-    if (num >= 1000 && num < 10000) {
-      // e.g., plain "2000" or "2500" -> 2.000.000đ or 2.500.000đ
       return (num * 1000).toLocaleString('vi-VN') + 'đ';
     }
     return num.toLocaleString('vi-VN') + 'đ';
@@ -376,21 +629,21 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
 
     let winner: Course;
 
-    if (fc && lc) {
-      const fcTime = parseTime(fc.updatedAt || fc.createdAt);
-      const lcTime = parseTime(lc.updatedAt || lc.createdAt);
-
-      if (lcTime > 0 && lcTime > fcTime) {
-        // LocalStorage edit is strictly newer than Firestore record
-        const baseDoc = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
-        winner = applyOverlay(baseDoc, lc);
+    // FIRESTORE IS CLOUD MASTER SOURCE OF TRUTH:
+    if (fc) {
+      const baseDoc = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
+      if (lc) {
+        const fcTime = parseTime(fc.updatedAt || fc.createdAt);
+        const lcTime = parseTime(lc.updatedAt || lc.createdAt);
+        // Only prioritize local if local edit is strictly newer
+        if (lcTime > fcTime && (lcTime - fcTime) < 300000) {
+          winner = applyOverlay(baseDoc, lc);
+        } else {
+          winner = applyOverlay(baseDoc, fc);
+        }
       } else {
-        // Firestore record is newer, equal, or LocalStorage has no newer timestamp -> Firestore overlays on top of LocalStorage!
-        const baseDoc = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
-        winner = applyOverlay(baseDoc, fc);
+        winner = baseDoc;
       }
-    } else if (fc) {
-      winner = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
     } else if (lc) {
       winner = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
     } else if (base) {

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, Suspense, lazy } from 'react';
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
-import { COURSES, ADMIN_EMAILS, getMergedCourses, formatPriceSubmit } from '../constants';
+import { COURSES, ADMIN_EMAILS, getMergedCourses, formatPriceSubmit, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db, storage } from '../firebase';
 // Fix: Standardizing modular Firebase imports and resolving missing exported member errors
 import { onAuthStateChanged } from 'firebase/auth';
@@ -10,106 +10,6 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
 import Handbook from './Handbook';
-
-// OPTIMIZATION: Code splitting - Lazy load PaymentModal
-// Removed PaymentModal lazy load
-
-const DUMMY_LESSONS = [
-    { title: "Phân tích bối cảnh tổ chức", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Xây dựng chính sách an toàn thực phẩm", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-    { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-    { title: "Quản lý rủi ro và cơ hội", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
-];
-
-const extractLessonsFlat = (raw: any): Array<{ title: string; videoUrl: string }> => {
-  if (!raw || !Array.isArray(raw)) return DUMMY_LESSONS;
-  const result: Array<{ title: string; videoUrl: string }> = [];
-
-  raw.forEach((item: any) => {
-    if (item && Array.isArray(item.lessons)) {
-      item.lessons.forEach((l: any) => {
-        const title = (typeof l === 'string' ? l : (l?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
-        if (!title || title.toLowerCase().includes("giới thiệu về fast e-learning")) return;
-        const videoUrl = typeof l === 'object' && l?.videoUrl ? l.videoUrl : (
-          title.includes("HACCP") 
-            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-            : "https://www.w3schools.com/html/mov_bbb.mp4"
-        );
-        result.push({ title, videoUrl });
-      });
-    } else if (item) {
-      const title = (typeof item === 'string' ? item : (item?.title || '')).replace(/^Chương\s*\d*[:\s-]*/i, '').replace(/^Phần\s*\d*[:\s-]*/i, '').trim();
-      if (title && !title.toLowerCase().includes("giới thiệu về fast e-learning")) {
-        const videoUrl = typeof item === 'object' && item?.videoUrl ? item.videoUrl : (
-          title.includes("HACCP") 
-            ? "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" 
-            : "https://www.w3schools.com/html/mov_bbb.mp4"
-        );
-        result.push({ title, videoUrl });
-      }
-    }
-  });
-
-  if (result.length === 0) return DUMMY_LESSONS;
-
-  const final4 = [...result];
-  let idx = 0;
-  while (final4.length < 4) {
-    final4.push(DUMMY_LESSONS[idx % DUMMY_LESSONS.length]);
-    idx++;
-  }
-  return final4.slice(0, 4);
-};
-
-// Helper to detect and extract video embed URL for YouTube, Dropbox, Drive, Vimeo, and native video
-export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isEmbed: boolean; embedUrl: string } {
-  if (!url) {
-    return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
-  }
-  const cleanUrl = url.trim();
-
-  // 1. YouTube check (watch, embed, shorts, youtu.be, m.youtube)
-  const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-  if (ytMatch && ytMatch[1]) {
-    const videoId = ytMatch[1];
-    const apParam = autoPlay ? '1' : '0';
-    return {
-      isEmbed: true,
-      embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=${apParam}&rel=0&enablejsapi=1`
-    };
-  }
-
-  // 2. Dropbox check
-  if (cleanUrl.includes('dropbox.com') || cleanUrl.includes('dropboxusercontent.com')) {
-    let embedUrl = cleanUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-    if (!embedUrl.includes('#toolbar=0')) {
-      embedUrl += (embedUrl.includes('?') ? '&' : '?') + 'raw=1#toolbar=0';
-    }
-    return { isEmbed: true, embedUrl };
-  }
-
-  // 3. Google Drive check
-  const driveMatch = cleanUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
-  if (driveMatch && driveMatch[1]) {
-    return {
-      isEmbed: true,
-      embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`
-    };
-  }
-
-  // 4. Vimeo check
-  const vimeoMatch = cleanUrl.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
-  if (vimeoMatch && vimeoMatch[1]) {
-    const apParam = autoPlay ? '1' : '0';
-    return {
-      isEmbed: true,
-      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=${apParam}`
-    };
-  }
-
-  // 5. Default native HTML5 video (.mp4, .webm, etc.)
-  return { isEmbed: false, embedUrl: cleanUrl };
-}
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
@@ -156,7 +56,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         if (flatList.length > 0) {
           setCurriculum(flatList);
         } else {
-          setCurriculum(DUMMY_LESSONS);
+          setCurriculum(DEFAULT_LESSONS);
         }
       } else {
         const fallbackBase: Course = {
@@ -168,7 +68,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           description: 'Chi tiết khóa học'
         };
         setCourse(fallbackBase);
-        setCurriculum(DUMMY_LESSONS);
+        setCurriculum(DEFAULT_LESSONS);
       }
     };
 
@@ -432,7 +332,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             />
                         </div>
                     ) : (() => {
-                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
+                            const currentUrl = playingLesson?.vdohide || playingLesson?.videoUrl || (curriculum[0] && (curriculum[0].vdohide || curriculum[0].videoUrl)) || "https://www.w3schools.com/html/mov_bbb.mp4";
                             const embedInfo = getVideoEmbedInfo(currentUrl, !!playingLesson);
 
                             if (embedInfo.isEmbed) {
@@ -445,8 +345,9 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                             height="100%" 
                                             className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
                                             title={playingLesson ? playingLesson.title : "Video bài học"}
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                                             allowFullScreen
+                                            referrerPolicy="no-referrer"
                                         />
                                     </div>
                                 );
@@ -750,15 +651,35 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                           <div className="sticky top-28 bg-white p-8 rounded-[40px] shadow-2xl border border-gray-100 text-center space-y-8">
                               <div className="space-y-4">
                                   <div className="relative aspect-video rounded-2xl overflow-hidden shadow-lg mb-4 group"><img src={course.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Thumbnail" /><div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div></div>
-                                  <div className="space-y-2"><p className="text-4xl font-black text-primary tracking-tighter">Miễn phí</p></div>
+                                  <div className="space-y-2">
+                                      <p className="text-3xl md:text-4xl font-black text-[#007c76] tracking-tighter">
+                                          {isVip || isAdmin ? (
+                                              <span className="flex flex-col items-center gap-1">
+                                                  <span className="text-amber-500 text-2xl font-black">👑 Miễn Phí (Đặc Quyền VIP)</span>
+                                                  <span className="text-xs font-bold text-gray-400 line-through">{course.price}</span>
+                                              </span>
+                                          ) : (
+                                              course.price || 'Liên hệ'
+                                          )}
+                                      </p>
+                                  </div>
                               </div>
                               <div className="space-y-4 pt-4 border-t border-gray-100 text-left">
                                   <h4 className="font-black text-gray-800 uppercase tracking-widest text-xs">Khóa học này bao gồm:</h4>
                                   <ul className="space-y-3">
-                                      {[{ icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', text: 'Tài liệu PDF chuyên sâu' }, { icon: 'M13 10V3L4 14h7v7l9-11h-7z', text: 'Truy cập trọn đời' }].map((feat, idx) => (<li key={idx} className="flex items-center gap-3 text-sm text-gray-600 font-bold group"><svg className="w-5 h-5 text-primary shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={feat.icon} /></svg>{feat.text}</li>))}
+                                      {[{ icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', text: 'Tài liệu PDF & bài giảng chuyên sâu' }, { icon: 'M13 10V3L4 14h7v7l9-11h-7z', text: 'Truy cập trọn đời & cập nhật mới' }].map((feat, idx) => (<li key={idx} className="flex items-center gap-3 text-sm text-gray-600 font-bold group"><svg className="w-5 h-5 text-[#007c76] shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={feat.icon} /></svg>{feat.text}</li>))}
                                   </ul>
                               </div>
-                              <button onClick={handleRegisterClick} className="w-full bg-[#a50064] text-white py-5 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl shadow-[#a50064]/20 hover:bg-[#c40076]">{isVip ? 'NHẬN KHÓA HỌC' : 'ĐĂNG KÝ HỌC NGAY'}</button>
+                              <button 
+                                  onClick={handleRegisterClick} 
+                                  className={`w-full py-5 rounded-2xl font-black text-base md:text-lg uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl active:scale-98 cursor-pointer ${
+                                      isVip || isAdmin
+                                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-amber-500/30'
+                                          : 'bg-[#007c76] hover:bg-[#006560] text-white shadow-teal-900/20'
+                                  }`}
+                              >
+                                  {isVip || isAdmin ? '👑 NHẬN KHÓA HỌC (VIP MIỄN PHÍ)' : 'ĐĂNG KÝ HỌC NGAY'}
+                              </button>
                           </div>
                       )}
                   </div>
@@ -953,7 +874,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                     <div className={`sticky top-28 bg-white p-8 rounded-[40px] shadow-2xl border border-gray-100 text-center space-y-8 transition-all duration-1000 delay-500 transform ${isLoaded ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'}`}>
                         <div className="space-y-4">
                             <div className="relative aspect-video rounded-2xl overflow-hidden shadow-lg mb-4 group"><img src={course.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Thumbnail" /><div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div></div>
-                            <div className="space-y-2"><p className="text-4xl font-black text-primary tracking-tighter">Miễn phí</p></div>
+                            <div className="space-y-2"><p className="text-4xl font-black text-primary tracking-tighter">{course.price || 'Miễn phí'}</p></div>
                         </div>
                         <div className="space-y-4 pt-4 border-t border-gray-100 text-left">
                             <h4 className="font-black text-gray-800 uppercase tracking-widest text-xs">Khóa học này bao gồm:</h4>

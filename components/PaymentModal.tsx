@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Course } from '../types';
+import { auth, db } from '../firebase';
+import { ADMIN_EMAILS } from '../constants';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface PaymentModalProps {
     course: Course;
@@ -11,6 +14,27 @@ interface PaymentModalProps {
 const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, onSuccess }) => {
     const [isVerifying, setIsVerifying] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
+
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (user && user.email) {
+            const email = user.email.toLowerCase();
+            let isPrivileged = ADMIN_EMAILS.includes(email);
+            if (!isPrivileged) {
+                const localRolesStr = localStorage.getItem(`user_roles_${email}`);
+                if (localRolesStr) {
+                    try {
+                        const localRoles = JSON.parse(localRolesStr);
+                        if (localRoles.isVip || localRoles.isAdmin) isPrivileged = true;
+                    } catch (e) {}
+                }
+            }
+            setIsVipOrAdmin(isPrivileged);
+        } else {
+            setIsVipOrAdmin(false);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -24,7 +48,36 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 onSuccess(); // Triggers the actual database saving
                 setIsCompleted(false);
             }, 1000);
-        }, 2000);
+        }, 1500);
+    };
+
+    const handleInstantVipClaim = async () => {
+        setIsVerifying(true);
+        const user = auth.currentUser;
+        if (user && user.email && course.id) {
+            try {
+                const userEmail = user.email.toLowerCase();
+                const docRef = doc(db, "users", userEmail, "purchased_courses", course.id);
+                await setDoc(docRef, {
+                    courseId: course.id,
+                    courseTitle: course.title,
+                    purchasedAt: new Date().toISOString(),
+                    price: course.price || "Miễn phí",
+                    status: 'active',
+                    progress: 0,
+                    claimedVia: 'VIP_INSTANT_CLAIM'
+                }, { merge: true });
+                localStorage.setItem(`course_unlocked_${course.id}`, 'true');
+            } catch (e) {
+                console.warn('VIP instant claim warning:', e);
+            }
+        }
+        setIsVerifying(false);
+        setIsCompleted(true);
+        setTimeout(() => {
+            onSuccess();
+            setIsCompleted(false);
+        }, 800);
     };
 
     return (
@@ -33,7 +86,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 <button 
                     onClick={onClose} 
                     disabled={isVerifying || isCompleted}
-                    className="absolute top-4 right-4 text-gray-400 hover:bg-gray-100 p-2 rounded-full transition-colors z-10 disabled:opacity-50"
+                    className="absolute top-4 right-4 text-gray-400 hover:bg-gray-100 p-2 rounded-full transition-colors z-10 disabled:opacity-50 cursor-pointer"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -42,7 +95,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                     <div className="space-y-6 relative z-10">
                         <div className="text-center">
                             <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Thanh toán khóa học</h2>
-                            <p className="text-gray-500 font-medium text-sm mt-1">Xác nhận đơn hàng và chuyển khoản</p>
+                            <p className="text-gray-500 font-medium text-sm mt-1">Xác nhận đơn hàng và kích hoạt khóa học</p>
                         </div>
 
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
@@ -54,6 +107,29 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                                 {course.price}
                             </div>
                         </div>
+
+                        {/* Special VIP/Admin Instant Claim Box */}
+                        {isVipOrAdmin && (
+                            <div className="p-4 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border-2 border-amber-400/40 rounded-2xl flex flex-col gap-2.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-md">
+                                        Đặc quyền VIP / Admin
+                                    </span>
+                                    <span className="text-xs font-bold text-amber-900">Mở khóa miễn phí ngay</span>
+                                </div>
+                                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                                    Tài khoản của bạn có quyền thành viên VIP hoặc Quản trị. Bạn có thể nhận trực tiếp khóa học này mà không cần chuyển khoản.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={handleInstantVipClaim}
+                                    disabled={isVerifying}
+                                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-md shadow-amber-500/20 active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    <span>👑 Nhận Khóa Học Ngay (Miễn phí VIP)</span>
+                                </button>
+                            </div>
+                        )}
 
                         <div className="bg-pink-50/50 p-5 rounded-2xl border border-pink-100">
                             <p className="text-xs font-bold text-[#A50064] mb-3 uppercase tracking-wider text-center">Hướng dẫn thanh toán MoMo Doanh Nghiệp</p>
@@ -82,7 +158,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                         <button 
                             onClick={handleConfirmTransfer}
                             disabled={isVerifying}
-                            className="w-full py-4 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-sm tracking-widest transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-sm tracking-widest transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/10"
                         >
                             {isVerifying ? (
                                 <>
@@ -98,8 +174,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-500 mb-6 border-4 border-green-50 shadow-inner">
                             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                         </div>
-                        <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Thanh toán hoàn tất!</h3>
-                        <p className="text-gray-500 font-medium text-sm">Hệ thống đã xác nhận giao dịch. Khóa học đã được mở.</p>
+                        <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Mở khóa thành công!</h3>
+                        <p className="text-gray-500 font-medium text-sm">Hệ thống đã kích hoạt khóa học vào tài khoản của bạn. Đang tải vào phòng học...</p>
                     </div>
                 )}
             </div>
