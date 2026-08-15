@@ -41,7 +41,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Course management states
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
-  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Form input states
   const [editingCourseId, setEditingCourseId] = useState('');
@@ -150,40 +149,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       window.removeEventListener('storage', handleCustomUpdate);
     };
   }, [userEmail]);
-
-  const handleManualSyncAllToCloud = async () => {
-    setIsSyncingCloud(true);
-    try {
-      let count = 0;
-      for (const c of courses) {
-        const currLessons = extractLessonsFlat(c.curriculum);
-        const payload = cleanForFirestore({
-          id: String(c.id),
-          title: String(c.title || '').trim(),
-          price: formatPriceSubmit(c.price || '0đ'),
-          image: String(c.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
-          category: String(c.category || 'Khác'),
-          description: String(c.description || '').trim(),
-          status: c.status || 'active',
-          curriculum: [{ title: "Danh sách bài giảng", lessons: currLessons }],
-          authorEmail: c.authorEmail || userEmail || '',
-          updatedAt: new Date().toISOString()
-        });
-        await setDoc(doc(db, 'courses', c.id), payload, { merge: true });
-        count++;
-      }
-      toast.success(`✨ Đã đồng bộ thành công ${count} khóa học lên Cloud Firestore! Tất cả thiết bị sẽ nhận video, bài học & học phí mới.`);
-      setMessage({ type: 'success', text: `Đã đồng bộ toàn bộ ${count} khóa học lên Máy chủ Cloud. Tất cả các trang và máy khác đã được cập nhật giá, video và bài học!` });
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      window.dispatchEvent(new Event('storage'));
-    } catch (err: any) {
-      console.error("Lỗi đồng bộ Cloud:", err);
-      toast.error(`Lỗi đồng bộ: ${err?.message || 'Vui lòng kiểm tra kết nối mạng'}`);
-      setMessage({ type: 'error', text: `Lỗi đồng bộ lên Cloud: ${err?.message || 'Thất bại'}` });
-    } finally {
-      setIsSyncingCloud(false);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -596,17 +561,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           </p>
         </div>
 
-        {/* Tab Controls & Cloud Sync */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <button
-            onClick={handleManualSyncAllToCloud}
-            disabled={isSyncingCloud}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-[#007c76]/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-50"
-            title="Đồng bộ toàn bộ thay đổi lên máy chủ Cloud để tất cả thiết bị khác nhận ngay lập tức"
-          >
-            <span className={`w-2 h-2 rounded-full ${isSyncingCloud ? 'bg-amber-500 animate-ping' : 'bg-green-500'}`}></span>
-            {isSyncingCloud ? 'Đang đồng bộ Cloud...' : 'Đồng bộ Cloud (Tất cả máy)'}
-          </button>
+        {/* Tab Controls & Cloud Sync Status */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50/80 border border-emerald-200/70 rounded-xl text-xs font-bold text-emerald-800 shadow-2xs select-none">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Tự động đồng bộ Cloud</span>
+          </div>
 
           <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
             <button

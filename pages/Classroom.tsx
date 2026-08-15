@@ -5,6 +5,7 @@ import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
+import { useGlobalPlayer } from '../contexts/GlobalPlayerContext';
 import Handbook from './Handbook';
 
 const Classroom: React.FC = () => {
@@ -187,9 +188,24 @@ const Classroom: React.FC = () => {
     setUserNote('');
   };
 
+  const { playVideo } = useGlobalPlayer();
+
   const activeVideoUrl = useMemo(() => {
     return currentLesson?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
   }, [currentLesson]);
+
+  // Keep Global Player updated so when user leaves to other pages, the video keeps playing seamlessly!
+  useEffect(() => {
+    if (currentLesson && currentLesson.videoUrl && courseId !== 'basic-principles') {
+      playVideo({
+        videoUrl: currentLesson.videoUrl,
+        title: currentLesson.title || `Bài ${currentIdx + 1}`,
+        courseId: courseId,
+        courseTitle: course?.title || 'Khóa học',
+        lessonIndex: currentIdx
+      });
+    }
+  }, [currentLesson, courseId, course?.title, currentIdx, playVideo]);
 
   const videoEmbed = useMemo(() => {
     if (!activeVideoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
