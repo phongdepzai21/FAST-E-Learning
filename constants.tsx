@@ -226,10 +226,10 @@ export const COLORS = {
 };
 
 export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string }> = [
-  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
-  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" },
+  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "" },
+  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "" },
   { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "" }
 ];
 
 export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string }> => {
@@ -253,7 +253,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
         const title = (typeof l === 'string' ? l : (l?.title || `Bài học ${lIdx + 1}`)).trim();
         const videoUrl = typeof l === 'object' && l?.videoUrl 
           ? String(l.videoUrl).trim() 
-          : "https://www.w3schools.com/html/mov_bbb.mp4";
+          : "";
         result.push({ title, videoUrl });
       });
     } 
@@ -262,14 +262,14 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
       const title = (item.title || `Bài học ${itemIdx + 1}`).trim();
       const videoUrl = item.videoUrl 
         ? String(item.videoUrl).trim() 
-        : "https://www.w3schools.com/html/mov_bbb.mp4";
+        : "";
       result.push({ title, videoUrl });
     }
     // Case 3: item is a string
     else if (typeof item === 'string' && item.trim()) {
       result.push({
         title: item.trim(),
-        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4"
+        videoUrl: ""
       });
     }
   });
@@ -280,7 +280,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
 // Video embed detection helper for YouTube, DoodStream, Streamwish, Streamtape, Filemoon, Dropbox, Drive, Vimeo, Loom, Dailymotion, Bilibili, and HTML5 native video
 export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isEmbed: boolean; embedUrl: string } {
   if (!url) {
-    return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
+    return { isEmbed: false, embedUrl: "" };
   }
   let cleanUrl = String(url).trim();
 
@@ -577,11 +577,33 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
 
   // 3. Map of Firestore courses
   const firestoreMap = new Map<string, Course>();
-  firestoreCourses.forEach(fc => {
-    if (fc && fc.id) {
-      firestoreMap.set(fc.id, fc);
+  
+  // Read cached firestore courses from localStorage first
+  try {
+    const cachedFs = localStorage.getItem('cached_firestore_courses');
+    if (cachedFs) {
+      const parsed: Course[] = JSON.parse(cachedFs);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(fc => {
+          if (fc && fc.id) {
+            firestoreMap.set(fc.id, fc);
+          }
+        });
+      }
     }
-  });
+  } catch (e) {}
+
+  if (firestoreCourses && firestoreCourses.length > 0) {
+    firestoreCourses.forEach(fc => {
+      if (fc && fc.id) {
+        firestoreMap.set(fc.id, fc);
+      }
+    });
+    // Save fresh firestore courses to cache
+    try {
+      localStorage.setItem('cached_firestore_courses', JSON.stringify(Array.from(firestoreMap.values())));
+    } catch (e) {}
+  }
 
   // All unique IDs across hardcoded, Firestore, and LocalStorage
   const allIds = new Set<string>([

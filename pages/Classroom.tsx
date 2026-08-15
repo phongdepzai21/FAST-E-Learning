@@ -14,8 +14,22 @@ const Classroom: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPiPActive, setIsPiPActive] = useState(false);
 
-  const [course, setCourse] = useState<Course | undefined>(undefined);
-  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>([]);
+  const [course, setCourse] = useState<Course | undefined>(() => {
+    if (!courseId) return undefined;
+    const initialList = getMergedCourses([]);
+    return initialList.find(c => c.id === courseId);
+  });
+  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>(() => {
+    if (!courseId) return [];
+    const initialList = getMergedCourses([]);
+    const found = initialList.find(c => c.id === courseId);
+    if (found && found.curriculum) {
+      const flatList = extractLessonsFlat(found.curriculum);
+      if (flatList.length > 0) return flatList;
+    }
+    return [];
+  });
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string } | null>(null);
   const [isOwned, setIsOwned] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -56,6 +70,7 @@ const Classroom: React.FC = () => {
         });
         setCurriculum(DEFAULT_LESSONS);
       }
+      setIsDataLoaded(true);
     };
 
     const docRef = doc(db, "courses", courseId);
@@ -191,11 +206,11 @@ const Classroom: React.FC = () => {
   };
 
   const activeVideoUrl = useMemo(() => {
-    return currentLesson?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+    return currentLesson?.videoUrl ? String(currentLesson.videoUrl).trim() : "";
   }, [currentLesson]);
 
   const videoEmbed = useMemo(() => {
-    if (!activeVideoUrl) return { isEmbed: false, embedUrl: "https://www.w3schools.com/html/mov_bbb.mp4" };
+    if (!activeVideoUrl) return { isEmbed: false, embedUrl: "" };
     return getVideoEmbedInfo(activeVideoUrl, true);
   }, [activeVideoUrl]);
 
@@ -352,7 +367,12 @@ const Classroom: React.FC = () => {
                 <div className="h-full w-full bg-white text-slate-900 relative">
                   <Handbook />
                 </div>
-              ) : videoEmbed.isEmbed ? (
+              ) : !isDataLoaded && curriculum.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                  <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang tải bài giảng...</p>
+                </div>
+              ) : videoEmbed.isEmbed && videoEmbed.embedUrl ? (
                 <iframe 
                   key={videoEmbed.embedUrl}
                   src={videoEmbed.embedUrl} 
@@ -362,11 +382,11 @@ const Classroom: React.FC = () => {
                   allowFullScreen
                   referrerPolicy="no-referrer"
                 />
-              ) : (
+              ) : activeVideoUrl ? (
                 <video 
                   ref={videoRef}
-                  key={videoEmbed.embedUrl || currentLesson?.videoUrl}
-                  src={videoEmbed.embedUrl || currentLesson?.videoUrl} 
+                  key={activeVideoUrl}
+                  src={videoEmbed.embedUrl || activeVideoUrl} 
                   controls 
                   autoPlay
                   playsInline
@@ -374,6 +394,7 @@ const Classroom: React.FC = () => {
                   webkit-playsinline="true"
                   x5-playsinline="true"
                   className="w-full h-full object-contain"
+                  poster={course?.image}
                   onPlay={() => {
                     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                   }}
@@ -389,6 +410,14 @@ const Classroom: React.FC = () => {
                     }
                   }}
                 />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 p-8 text-center text-slate-400">
+                  <svg className="w-12 h-12 text-slate-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm font-bold text-white">Chưa có video cho bài học này</p>
+                  <p className="text-xs text-slate-500">Giảng viên đang cập nhật video bài giảng.</p>
+                </div>
               )}
             </div>
           </div>

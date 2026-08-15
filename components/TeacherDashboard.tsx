@@ -54,6 +54,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   // Curriculum State (Flat Lessons with videoUrl)
   const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportMode, setBulkImportMode] = useState<'append' | 'replace'>('append');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -211,13 +214,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Helper to sanitize curriculum data ensuring no undefined values are sent to Firestore
   const sanitizeCurriculum = (inputLessons: any[]) => {
     if (!Array.isArray(inputLessons) || inputLessons.length === 0) {
-      return [{ title: "Danh sách bài giảng", lessons: DEFAULT_FLAT_LESSONS }];
+      return [{ title: "Danh sách bài giảng", lessons: [] }];
     }
     const cleanLessons = inputLessons.map((les, lIdx) => {
-      let vUrl = les?.videoUrl ? String(les.videoUrl).trim() : '';
-      if (!vUrl) {
-        vUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-      }
+      const vUrl = les?.videoUrl ? String(les.videoUrl).trim() : '';
       return {
         title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
         videoUrl: vUrl
@@ -514,8 +514,66 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const addFlatLesson = () => {
     setFlatLessons(prev => [
       ...prev,
-      { title: `Bài giảng ${prev.length + 1}`, videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4' }
+      { title: `Bài giảng ${prev.length + 1}`, videoUrl: '' }
     ]);
+  };
+
+  const handleProcessBulkImport = () => {
+    if (!bulkImportText.trim()) {
+      setShowBulkImportModal(false);
+      return;
+    }
+
+    const lines = bulkImportText.split('\n').map(l => l.trim()).filter(Boolean);
+    const parsedLessons: { title: string; videoUrl: string }[] = [];
+
+    lines.forEach((line, idx) => {
+      // Formats supported:
+      // 1. "Tiêu đề | https://youtube.com/..."
+      // 2. "Tiêu đề - https://youtube.com/..."
+      // 3. "Tiêu đề \t https://youtube.com/..."
+      // 4. "https://youtube.com/..."
+      // 5. "Tiêu đề bài học"
+      let parsedTitle = '';
+      let parsedUrl = '';
+
+      if (line.includes('|')) {
+        const parts = line.split('|');
+        parsedTitle = parts[0].trim();
+        parsedUrl = parts.slice(1).join('|').trim();
+      } else if (line.includes('\t')) {
+        const parts = line.split('\t');
+        parsedTitle = parts[0].trim();
+        parsedUrl = parts.slice(1).join('\t').trim();
+      } else if (line.includes(' - http://') || line.includes(' - https://')) {
+        const separatorIdx = line.indexOf(' - http');
+        parsedTitle = line.substring(0, separatorIdx).trim();
+        parsedUrl = line.substring(separatorIdx + 3).trim();
+      } else if (line.startsWith('http://') || line.startsWith('https://') || line.startsWith('<iframe')) {
+        parsedUrl = line.trim();
+        parsedTitle = `Bài giảng ${idx + 1}`;
+      } else {
+        parsedTitle = line.trim();
+        parsedUrl = '';
+      }
+
+      parsedLessons.push({
+        title: parsedTitle || `Bài giảng ${idx + 1}`,
+        videoUrl: parsedUrl
+      });
+    });
+
+    if (parsedLessons.length > 0) {
+      if (bulkImportMode === 'replace') {
+        setFlatLessons(parsedLessons);
+      } else {
+        setFlatLessons(prev => [...prev, ...parsedLessons]);
+      }
+      toast.showToast(`Đã nhập thành công ${parsedLessons.length} bài giảng vào danh sách!`, 'success');
+    }
+
+    setBulkImportText('');
+    setShowBulkImportModal(false);
   };
 
   const deleteFlatLesson = (lIdx: number) => {
@@ -857,10 +915,20 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Nhập hàng loạt video
+                </button>
+                <button
+                  type="button"
                   onClick={addFlatLesson}
                   className="px-4 py-2 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
                 >
-                  + Thêm bài giảng mới
+                  + Thêm 1 bài giảng
                 </button>
               </div>
             </div>
@@ -974,6 +1042,102 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             </button>
           </div>
         </form>
+      )}
+
+      {/* MODAL: NHẬP HÀNG LOẠT BÀI GIẢNG / VIDEO (TIẾT KIỆM THỜI GIAN KHI CÓ 10, 50, 153 VIDEO) */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full border border-gray-100 shadow-2xl space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+                  <span className="w-2 h-6 bg-indigo-600 rounded-full"></span>
+                  Nhập Hàng Loạt Video / Bài Giảng
+                </h3>
+                <p className="text-xs text-gray-500 font-medium mt-1">
+                  Dán danh sách video YouTube, MP4, Google Drive... để tự động tạo danh sách bài giảng trong vài giây.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center font-bold transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Guide box */}
+            <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 text-xs space-y-1.5 text-indigo-950 font-medium">
+              <p className="font-bold text-indigo-900">Hỗ trợ các định dạng (mỗi bài 1 dòng):</p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-700 font-mono text-[11px]">
+                <li><span className="text-indigo-700 font-bold">Bài 1: Giới thiệu khóa học</span> | https://www.youtube.com/watch?v=...</li>
+                <li><span className="text-indigo-700 font-bold">Bài 2: Hướng dẫn cơ bản</span> - https://storage.googleapis.com/.../video.mp4</li>
+                <li>https://youtu.be/xyz123 (Chỉ dán link - hệ thống sẽ tự đặt tên Bài 1, Bài 2...)</li>
+              </ul>
+            </div>
+
+            {/* Mode selector */}
+            <div className="flex items-center gap-4 text-xs font-bold text-gray-700">
+              <span className="text-gray-500 font-medium">Chế độ nhập:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="append"
+                  checked={bulkImportMode === 'append'}
+                  onChange={() => setBulkImportMode('append')}
+                  className="accent-indigo-600"
+                />
+                Thêm tiếp vào sau ({flatLessons.length} bài hiện có)
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="replace"
+                  checked={bulkImportMode === 'replace'}
+                  onChange={() => setBulkImportMode('replace')}
+                  className="accent-indigo-600"
+                />
+                Thay thế toàn bộ danh sách
+              </label>
+            </div>
+
+            {/* Textarea */}
+            <div>
+              <textarea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                rows={9}
+                placeholder={`Dán danh sách bài giảng tại đây...\n\nVí dụ:\nBài 1: Tổng quan an toàn thực phẩm | https://www.youtube.com/watch?v=abc\nBài 2: Các mối nguy hại vi sinh | https://www.youtube.com/watch?v=def\nBài 3: 5 Chìa khóa WHO | https://www.youtube.com/watch?v=ghi`}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs font-mono text-gray-800 focus:bg-white focus:border-indigo-500 focus:outline-none transition-all"
+              />
+              <div className="flex justify-between items-center mt-1.5 text-[11px] text-gray-400 font-semibold">
+                <span>Số dòng nhận diện: {bulkImportText.split('\n').filter(l => l.trim()).length} bài</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(false)}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={handleProcessBulkImport}
+                disabled={!bulkImportText.trim()}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-600/20 cursor-pointer"
+              >
+                Nhập bài giảng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

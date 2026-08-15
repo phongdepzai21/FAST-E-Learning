@@ -30,7 +30,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [playingLesson, setPlayingLesson] = useState<{ lessonIdx: number, title: string, videoUrl?: string } | null>(null);
   const [isLiked, setIsLiked] = useState(false);
 
-  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>([]);
+  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>(() => {
+    const found = getMergedCourses([]).find(c => c.id === id);
+    if (found && found.curriculum) {
+      const flatList = extractLessonsFlat(found.curriculum);
+      if (flatList.length > 0) return flatList;
+    }
+    return [];
+  });
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -332,10 +339,10 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             />
                         </div>
                     ) : (() => {
-                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "https://www.w3schools.com/html/mov_bbb.mp4";
+                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "";
                             const embedInfo = getVideoEmbedInfo(currentUrl, !!playingLesson);
 
-                            if (embedInfo.isEmbed) {
+                            if (embedInfo.isEmbed && embedInfo.embedUrl) {
                                 return (
                                     <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-black">
                                         <iframe 
@@ -353,41 +360,50 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                 );
                             }
 
+                            if (embedInfo.embedUrl || currentUrl) {
+                                return (
+                                    <div className="relative h-full w-full bg-black">
+                                        <video 
+                                            key={currentUrl}
+                                            src={embedInfo.embedUrl || currentUrl} 
+                                            className="w-full h-full object-contain focus:outline-none"
+                                            controls
+                                            playsInline
+                                            // @ts-ignore
+                                            webkit-playsinline="true"
+                                            x5-playsinline="true"
+                                            controlsList="nodownload pwa-nodownload"
+                                            onContextMenu={(e) => e.preventDefault()}
+                                            autoPlay={!!playingLesson}
+                                            poster={course.image}
+                                            onEnded={() => {
+                                                handleUpdateProgress(`${currentIdx}`);
+                                                if (currentIdx + 1 < curriculum.length) {
+                                                    const next = curriculum[currentIdx + 1];
+                                                    setPlayingLesson({
+                                                        lessonIdx: currentIdx + 1,
+                                                        title: next.title,
+                                                        videoUrl: next.videoUrl
+                                                    });
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                );
+                            }
+
                             return (
-                                <div className="relative h-full w-full bg-black">
-                                    <video 
-                                        key={currentUrl}
-                                        src={embedInfo.embedUrl} 
-                                        className="w-full h-full object-contain focus:outline-none"
-                                        controls
-                                        playsInline
-                                        // @ts-ignore
-                                        webkit-playsinline="true"
-                                        x5-playsinline="true"
-                                        controlsList="nodownload pwa-nodownload"
-                                        onContextMenu={(e) => e.preventDefault()}
-                                        autoPlay={!!playingLesson}
-                                        poster={course.image}
-                                        onEnded={() => {
-                                            handleUpdateProgress(`${currentIdx}`);
-                                            if (currentIdx + 1 < curriculum.length) {
-                                                const next = curriculum[currentIdx + 1];
-                                                setPlayingLesson({
-                                                    lessonIdx: currentIdx + 1,
-                                                    title: next.title,
-                                                    videoUrl: next.videoUrl
-                                                });
-                                            }
-                                        }}
-                                    />
+                                <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-400 p-8 text-center">
+                                    <p className="text-sm font-bold text-white">Chưa có video cho bài học này</p>
+                                    <p className="text-xs text-slate-400 mt-1">Giảng viên đang chuẩn bị nội dung bài giảng.</p>
                                 </div>
                             );
                         })()
                 ) : (() => {
-                    const previewUrl = curriculum[0]?.videoUrl || "https://www.w3schools.com/html/mov_bbb.mp4";
+                    const previewUrl = curriculum[0]?.videoUrl || "";
                     const previewEmbed = getVideoEmbedInfo(previewUrl, false);
 
-                    if (previewEmbed.isEmbed) {
+                    if (previewEmbed.isEmbed && previewEmbed.embedUrl) {
                         return (
                             <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-black">
                                 <iframe 
@@ -412,22 +428,37 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         );
                     }
 
+                    if (previewEmbed.embedUrl || previewUrl) {
+                        return (
+                            <div className="relative h-full w-full">
+                                <video 
+                                    src={previewEmbed.embedUrl || previewUrl} 
+                                    className="w-full h-full object-cover focus:outline-none"
+                                    controls
+                                    controlsList="nodownload pwa-nodownload"
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    poster={course.image}
+                                />
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20 flex flex-col items-center text-center pointer-events-none">
+                                    <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
+                                    <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
+                                        Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
+                                    </p>
+                                    <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
+                                </div>
+                            </div>
+                        );
+                    }
+
                     return (
-                        <div className="relative h-full w-full">
-                            <video 
-                                src={previewEmbed.embedUrl} 
-                                className="w-full h-full object-cover focus:outline-none"
-                                controls
-                                controlsList="nodownload pwa-nodownload"
-                                onContextMenu={(e) => e.preventDefault()}
-                                poster={course.image}
-                            />
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20 flex flex-col items-center text-center pointer-events-none">
-                                <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
+                        <div className="relative h-full w-full bg-slate-900 flex items-center justify-center">
+                            <img src={course.image} alt={course.title} className="w-full h-full object-cover opacity-60" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 pt-20 flex flex-col items-center justify-end text-center">
+                                <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">{course.title}</h3>
                                 <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
-                                    Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
+                                    Vui lòng đăng ký tham gia khóa học để xem toàn bộ nội dung giáo trình.
                                 </p>
-                                <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
+                                <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
                             </div>
                         </div>
                     );
