@@ -41,6 +41,15 @@ const Classroom: React.FC = () => {
   const [userNote, setUserNote] = useState('');
   const [savedNotes, setSavedNotes] = useState<{ id: string; text: string; date: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isBackgroundAudioActive, setIsBackgroundAudioActive] = useState(true);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Background audio keep-alive trigger for background tab playback
+  const ensureAudioKeepAlive = () => {
+    if (silentAudioRef.current && isBackgroundAudioActive) {
+      silentAudioRef.current.play().catch(() => {});
+    }
+  };
 
   // Load Course
   useEffect(() => {
@@ -361,7 +370,21 @@ const Classroom: React.FC = () => {
         <div className="lg:col-span-8 flex flex-col space-y-6">
           
           {/* MODERN THEATER SCREEN CHASSIS */}
-          <div className="bg-[#111827] rounded-3xl overflow-hidden border border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] relative group">
+          <div 
+            onClick={ensureAudioKeepAlive}
+            className="bg-[#111827] rounded-3xl overflow-hidden border border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] relative group"
+          >
+            {/* Hidden silent audio keepalive anchor for continuous background audio when switching apps/tabs */}
+            <audio 
+              ref={silentAudioRef}
+              src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
+              loop
+              preload="auto"
+              playsInline
+              // @ts-ignore
+              webkit-playsinline="true"
+            />
+
             <div className={`w-full ${courseId === 'basic-principles' ? 'min-h-[550px] md:min-h-[650px] bg-slate-950 overflow-y-auto' : 'aspect-video bg-black flex items-center justify-center'}`}>
               {courseId === 'basic-principles' ? (
                 <div className="h-full w-full bg-white text-slate-900 relative">
@@ -378,7 +401,7 @@ const Classroom: React.FC = () => {
                   src={videoEmbed.embedUrl} 
                   className="w-full h-full border-0"
                   title={currentLesson?.title || "Video bài giảng"}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
                   allowFullScreen
                   referrerPolicy="strict-origin-when-cross-origin"
                 />

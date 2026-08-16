@@ -324,7 +324,19 @@ export function getVideoEmbedInfo(url: string, autoPlay: boolean = false): { isE
     };
   }
 
-  // 2. DoodStream (dood.to, dood.so, dood.ws, dood.la, dood.sh, doodstream.com, ds2play.com, dood.re, dood.cx, doods.pro, dood.wf)
+  // 2. Vdohide (vdohide.com, vdohide.to, vdohide.net, vdohide.co)
+  if (/vdohide\./i.test(cleanUrl)) {
+    const codeMatch = cleanUrl.match(/(?:vdohide\.[a-z]+)\/(?:[eved]\/)?([a-zA-Z0-9_-]+)/i);
+    if (codeMatch && codeMatch[1]) {
+      return {
+        isEmbed: true,
+        embedUrl: `https://vdohide.com/e/${codeMatch[1]}`
+      };
+    }
+    return { isEmbed: true, embedUrl: cleanUrl };
+  }
+
+  // 3. DoodStream (dood.to, dood.so, dood.ws, dood.la, dood.sh, doodstream.com, ds2play.com, dood.re, dood.cx, doods.pro, dood.wf)
   if (/dood\.|doodstream\.|ds2play\./i.test(cleanUrl)) {
     const codeMatch = cleanUrl.match(/(?:dood\.[a-z]+|doodstream\.com|ds2play\.com)\/(?:[edv]\/)?([a-zA-Z0-9_-]+)/i);
     if (codeMatch && codeMatch[1]) {

@@ -352,7 +352,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                             height="100%" 
                                             className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
                                             title={playingLesson ? playingLesson.title : "Video bài học"}
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
                                             allowFullScreen
                                             referrerPolicy="strict-origin-when-cross-origin"
                                         />
@@ -412,7 +412,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                     height="100%" 
                                     className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
                                     title="Video Giới Thiệu"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
                                     allowFullScreen
                                     referrerPolicy="strict-origin-when-cross-origin"
                                 />
