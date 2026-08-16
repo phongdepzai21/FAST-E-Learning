@@ -354,7 +354,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                             title={playingLesson ? playingLesson.title : "Video bài học"}
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                                             allowFullScreen
-                                            referrerPolicy="no-referrer"
+                                            referrerPolicy="strict-origin-when-cross-origin"
                                         />
                                     </div>
                                 );
@@ -412,8 +412,9 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                     height="100%" 
                                     className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
                                     title="Video Giới Thiệu"
-                                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                                     allowFullScreen
+                                    referrerPolicy="strict-origin-when-cross-origin"
                                 />
                                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-6 pt-16 flex flex-col items-center text-center pointer-events-none">
                                     <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>

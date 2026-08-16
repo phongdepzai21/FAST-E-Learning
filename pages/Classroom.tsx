@@ -380,7 +380,7 @@ const Classroom: React.FC = () => {
                   title={currentLesson?.title || "Video bài giảng"}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                   allowFullScreen
-                  referrerPolicy="no-referrer"
+                  referrerPolicy="strict-origin-when-cross-origin"
                 />
               ) : activeVideoUrl ? (
                 <video 
