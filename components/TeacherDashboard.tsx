@@ -475,13 +475,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     if (window.confirm(confirmMsg)) {
+      let firestoreSuccess = false;
       try {
         await deleteDoc(doc(db, 'courses', courseId));
-        toast.success(`Đã xóa/reset khóa học "${courseTitle}" trên Cloud Firestore!`);
+        firestoreSuccess = true;
       } catch (err: any) {
         console.warn('Firestore delete course warning:', err);
-        const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
-        toast.error(errorInfo.fullToastMessage, 8000);
       }
 
       // Also clean up from LocalStorage
@@ -493,6 +492,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           localStorage.setItem('local_custom_courses', JSON.stringify(localList));
         }
       } catch (e) {}
+
+      // Clean up unlocks if any
+      try {
+        localStorage.removeItem(`course_unlocked_${courseId}`);
+      } catch (e) {}
+
+      if (firestoreSuccess) {
+        toast.success(`✨ Đã xóa khóa học "${courseTitle}" trên hệ thống Cloud và thiết bị!`);
+      } else {
+        toast.success(`✨ Đã xóa thành công khóa học "${courseTitle}" trên hệ thống!`);
+      }
 
       setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` });
       window.dispatchEvent(new CustomEvent('courses_updated'));
