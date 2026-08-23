@@ -106,7 +106,7 @@ const FloatingContact: React.FC = () => {
       Nhiệm vụ của bạn là tư vấn bán hàng, giải đáp thắc mắc về khóa học và dịch vụ tư vấn ISO/HACCP/QA-QC.
 
       THÔNG TIN LIÊN HỆ CÔNG TY:
-      - Hotline/Zalo: 0898 419 149
+      - Hotline/Zalo: 0927 002 668
       - Email: hkc.qms@gmail.com
       - Địa chỉ: Cityland Park Hills, Gò Vấp, TP.HCM
 

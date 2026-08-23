@@ -149,7 +149,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                             <div className="text-center space-y-2 mt-4 pt-4 border-t border-pink-100/50">
                                 <p className="text-[11px] font-medium text-gray-500">Thông tin tài khoản MoMo Doanh Nghiệp:</p>
                                 <div className="bg-white p-3 rounded-xl border border-pink-100 font-mono text-sm font-bold text-gray-800 inline-block">
-                                    Ví MoMo: 0898 419 149 <br/>
+                                    Ví MoMo: 0927 002 668 <br/>
                                     CTK: CÔNG TY TNHH ĐÀO TẠO FAST
                                 </div>
                             </div>

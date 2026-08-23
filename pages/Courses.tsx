@@ -94,12 +94,27 @@ const Courses: React.FC = () => {
                 setIsVipOrAdmin(isPrivileged);
             });
 
+            // Fast local storage cache preload
+            try {
+              const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
+              if (cachedStr) {
+                const cachedIds = JSON.parse(cachedStr);
+                if (Array.isArray(cachedIds) && cachedIds.length > 0) {
+                  setOwnedCourseIds(prev => Array.from(new Set([...prev, ...cachedIds])));
+                }
+              }
+            } catch (e) {}
+
             unsubscribeSnapshot = onSnapshot(
                 collection(db, "users", normalizedEmail, "purchased_courses"),
                 (snapshot: QuerySnapshot<DocumentData>) => {
                     const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
                     setOwnedCourseIds(ids);
                     setIsLoadingOwnership(false);
+                    try {
+                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
+                      ids.forEach(cid => localStorage.setItem(`course_unlocked_${cid}`, 'true'));
+                    } catch (e) {}
                 },
                 (error) => {
                     console.error("Lỗi đồng bộ khóa học:", error);
@@ -113,13 +128,30 @@ const Courses: React.FC = () => {
             setIsVipOrAdmin(false);
         }
     });
+
+    const handleStorageChange = () => {
+      if (currentUserEmail) {
+        try {
+          const cachedStr = localStorage.getItem(`user_courses_${currentUserEmail}`);
+          if (cachedStr) {
+            setOwnedCourseIds(JSON.parse(cachedStr));
+          }
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('courses_updated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
         unsubscribeAuth();
         if (unsubscribeSnapshot) {
             unsubscribeSnapshot();
         }
+        window.removeEventListener('courses_updated', handleStorageChange);
+        window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [currentUserEmail]);
 
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -133,15 +165,24 @@ const Courses: React.FC = () => {
       const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
       await setDoc(courseRef, {
         courseId: course.id,
+        courseTitle: course.title || '',
         title: course.title || '',
         price: course.price || '',
         progress: 0,
         unlockedAt: new Date().toISOString(),
+        purchasedAt: new Date().toISOString(),
+        status: 'active',
         claimedVia: 'INSTANT_CLAIM'
       }, { merge: true });
 
       localStorage.setItem('course_unlocked_' + course.id, 'true');
-      setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
+      setOwnedCourseIds(prev => {
+        const next = prev.includes(course.id) ? prev : [...prev, course.id];
+        try {
+          localStorage.setItem(`user_courses_${currentUserEmail}`, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
@@ -176,10 +217,13 @@ const Courses: React.FC = () => {
           const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
           await setDoc(courseRef, {
             courseId: course.id,
+            courseTitle: course.title || '',
             title: course.title || '',
             price: course.price || '',
             progress: 0,
             unlockedAt: new Date().toISOString(),
+            purchasedAt: new Date().toISOString(),
+            status: 'active',
             claimedVia: 'VIP_CLAIM_ALL'
           }, { merge: true });
         } catch (e) {
@@ -188,7 +232,12 @@ const Courses: React.FC = () => {
         localStorage.setItem('course_unlocked_' + course.id, 'true');
       }
 
-      setOwnedCourseIds(allCourses.map(c => c.id));
+      const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+      const newOwned = Array.from(new Set([...ownedCourseIds, ...allActiveIds]));
+      setOwnedCourseIds(newOwned);
+      try {
+        localStorage.setItem(`user_courses_${currentUserEmail}`, JSON.stringify(newOwned));
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
@@ -199,6 +248,11 @@ const Courses: React.FC = () => {
       setIsClaimingAll(false);
     }
   };
+
+  // Danh sách khóa học chưa sở hữu (chỉ hiển thị nút nhận tất cả khi còn khóa chưa nhận)
+  const unownedCourses = useMemo(() => {
+    return allCourses.filter(c => !ownedCourseIds.includes(c.id) && c.status !== 'draft' && c.status !== 'inactive');
+  }, [allCourses, ownedCourseIds]);
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
@@ -278,7 +332,7 @@ const Courses: React.FC = () => {
                 <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
             </h2>
 
-            {isVipOrAdmin && (
+            {isVipOrAdmin && unownedCourses.length > 0 && (
                 <button
                     onClick={handleClaimAllCourses}
                     disabled={isClaimingAll}
@@ -291,7 +345,7 @@ const Courses: React.FC = () => {
                         </>
                     ) : (
                         <>
-                            <span>👑 Nhận Tất Cả Khóa Học (VIP / Admin)</span>
+                            <span>👑 Nhận {unownedCourses.length} Khóa Học Còn Lại (VIP / Admin)</span>
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
                         </>
                     )}
@@ -332,33 +386,35 @@ const Courses: React.FC = () => {
             </div>
         )}
 
-        {/* VIP PROMOTION BANNER (Moved Here) */}
-        <div className="mt-20 mb-12 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 rounded-[32px] p-8 md:p-10 shadow-2xl shadow-yellow-500/30 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/20 rounded-full blur-3xl group-hover:bg-white/30 transition-all"></div>
-            
-            <div className="relative z-10 text-center md:text-left">
-                <div className="inline-block bg-black/20 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-black/10">
-                    ★ Best Value
+        {/* VIP PROMOTION BANNER (Only shown if NOT VIP/Admin) */}
+        {!isVipOrAdmin && (
+            <div className="mt-20 mb-12 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 rounded-[32px] p-8 md:p-10 shadow-2xl shadow-yellow-500/30 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/20 rounded-full blur-3xl group-hover:bg-white/30 transition-all"></div>
+                
+                <div className="relative z-10 text-center md:text-left">
+                    <div className="inline-block bg-black/20 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-black/10">
+                        ★ Best Value
+                    </div>
+                    <h3 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter leading-none mb-2">
+                        Sở hữu trọn bộ 20+ Khóa học
+                    </h3>
+                    <p className="text-black/70 font-bold text-sm md:text-base max-w-xl">
+                        Tiết kiệm đến 60% học phí khi đăng ký gói Thành viên VIP trọn đời ngay hôm nay.
+                    </p>
                 </div>
-                <h3 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter leading-none mb-2">
-                    Sở hữu trọn bộ 20+ Khóa học
-                </h3>
-                <p className="text-black/70 font-bold text-sm md:text-base max-w-xl">
-                    Tiết kiệm đến 60% học phí khi đăng ký gói Thành viên VIP trọn đời ngay hôm nay.
-                </p>
+                
+                <div className="relative z-10 shrink-0">
+                    <Link 
+                        to="/account/vip-upgrade" 
+                        className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl hover:bg-gray-900"
+                    >
+                        <span>Xem chi tiết gói VIP</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    </Link>
+                </div>
             </div>
-            
-            <div className="relative z-10 shrink-0">
-                <Link 
-                    to="/account/vip-upgrade" 
-                    className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl hover:bg-gray-900"
-                >
-                    <span>Xem chi tiết gói VIP</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                </Link>
-            </div>
-        </div>
+        )}
 
         {/* Support Section */}
         <section className="mt-12 bg-gray-900 rounded-[48px] p-8 md:p-16 text-white flex flex-col md:flex-row items-center justify-between gap-10">
@@ -367,7 +423,7 @@ const Courses: React.FC = () => {
                 <p className="text-gray-400 font-bold max-w-md">Liên hệ ngay để chuyên gia FAST thiết kế khóa học đào tạo riêng cho doanh nghiệp của bạn.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
-                <a href="tel:0898419149" className="bg-[#007c76] text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">Gọi ngay: 0898 419 149</a>
+                <a href="tel:0927002668" className="bg-[#007c76] text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">Gọi ngay: 0927 002 668</a>
                 <button className="bg-white/5 backdrop-blur-xl border border-white/10 text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-white/10 transition-all">Nhận tư vấn qua Email</button>
             </div>
         </section>

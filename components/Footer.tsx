@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import { Link } from "react-router-dom";
 
 const Footer: React.FC = () => {
-  const phoneNumber = "0898 419 149";
-  const rawPhone = "0898419149";
+  const phoneNumber = "0927 002 668";
+  const rawPhone = "0927002668";
   const email = "hkc.qms@gmail.com";
   const facebookLink = "https://www.facebook.com/hethongquanlychatluongfast";
   const gmailLink = "https://mail.google.com/mail/u/0/?fs=1&to=hkc.qms@gmail.com&su=Li%C3%AAn+h%E1%BB%87+t%E1%BB%AB+website+HKC&body=Xin+ch%C3%A0o,+t%C3%B4i+mu%E1%BB%91n+%C4%91%C6%B0%E1%BB%A3c+h%E1%BB%97+tr%E1%BB%A3.&tf=cm";

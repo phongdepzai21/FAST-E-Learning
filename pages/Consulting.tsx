@@ -95,8 +95,8 @@ const Consulting: React.FC = () => {
             Mỗi doanh nghiệp đều có đặc thù riêng. Hãy để chuyên gia của chúng tôi hỗ trợ tư vấn miễn phí cho trường hợp của bạn.
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <a href="tel:0898419149" className="w-full sm:w-auto bg-[#007b6f] text-white py-5 px-10 rounded-2xl font-black text-lg hover:shadow-2xl transition-all uppercase tracking-widest">
-              GỌI HOTLINE: 0898 419 149
+            <a href="tel:0927002668" className="w-full sm:w-auto bg-[#007b6f] text-white py-5 px-10 rounded-2xl font-black text-lg hover:shadow-2xl transition-all uppercase tracking-widest">
+              GỌI HOTLINE: 0927 002 668
             </a>
             <Link to="/lien-he" className="w-full sm:w-auto border-4 border-[#007b6f] text-[#007b6f] py-4 px-10 rounded-2xl font-black text-lg hover:bg-gray-50 transition-all uppercase tracking-widest">
               ĐỂ LẠI TIN NHẮN

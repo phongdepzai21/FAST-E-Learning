@@ -254,7 +254,7 @@ const BuyCoursesView: React.FC<{
       </div>
 
       {/* VIP / Admin Quick Claim Banner */}
-      {isPrivileged && (
+      {isPrivileged && unownedCount > 0 && (
         <div className="bg-gradient-to-r from-[#003835] via-[#005a54] to-[#003835] border border-teal-500/30 rounded-[32px] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-400/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
@@ -265,24 +265,18 @@ const BuyCoursesView: React.FC<{
                 <span>⭐</span> {isVip ? 'ĐẶC QUYỀN VIP TRỌN ĐỜI' : 'QUYỀN QUẢN TRỊ VIÊN'}
               </div>
               <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
-                Nhận Khóa Học Trực Tiếp Không Cần Chuyển Trang
+                Có {unownedCount} Khóa Học Mới Chưa Kích Hoạt
               </h4>
               <p className="text-teal-100/80 text-xs md:text-sm font-medium max-w-2xl leading-relaxed">
-                Bạn có thể bấm <strong className="text-amber-300">"Nhận khóa học ngay"</strong> ở từng thẻ khóa học bên dưới, hoặc bấm nút bên cạnh để mở khóa toàn bộ {activeCourses.length} khóa học vào phòng học chỉ với 1 click!
+                Bạn có thể bấm <strong className="text-amber-300">"Nhận khóa học ngay"</strong> ở từng khóa học bên dưới, hoặc bấm nút bên cạnh để mở khóa toàn bộ {unownedCount} khóa học mới vào phòng học chỉ với 1 click!
               </p>
               <div className="flex items-center gap-4 text-xs font-bold pt-1">
                 <span className="text-teal-200">
                   Đã sở hữu: <strong className="text-white font-black">{ownedActiveCount}/{activeCourses.length}</strong> khóa học
                 </span>
-                {unownedCount === 0 ? (
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-lg font-black text-[11px]">
-                    ✓ Đã nhận trọn bộ toàn bộ khóa học
-                  </span>
-                ) : (
-                  <span className="text-amber-300/90 font-medium">
-                    (Còn {unownedCount} khóa học chưa mở khóa)
-                  </span>
-                )}
+                <span className="text-amber-300/90 font-medium">
+                  (Còn {unownedCount} khóa học chưa mở khóa)
+                </span>
               </div>
             </div>
 
@@ -290,22 +284,13 @@ const BuyCoursesView: React.FC<{
               <button
                 type="button"
                 onClick={onClaimAllCourses}
-                disabled={isClaimingAll || unownedCount === 0}
-                className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2.5 ${
-                  unownedCount === 0 
-                    ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 cursor-default'
-                    : 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-yellow-600 text-white shadow-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer'
-                }`}
+                disabled={isClaimingAll}
+                className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2.5 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-yellow-600 text-white shadow-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer"
               >
                 {isClaimingAll ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Đang nhận tất cả...</span>
-                  </>
-                ) : unownedCount === 0 ? (
-                  <>
-                    <svg className="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                    <span>Đã nhận tất cả khóa học</span>
                   </>
                 ) : (
                   <>
@@ -325,6 +310,33 @@ const BuyCoursesView: React.FC<{
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* When all courses are already owned */}
+      {isPrivileged && unownedCount === 0 && (
+        <div className="bg-gradient-to-r from-[#003835] via-[#005a54] to-[#003835] border border-teal-500/30 rounded-[32px] p-6 md:p-8 text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div>
+              <h4 className="text-lg md:text-xl font-black uppercase tracking-tight text-white">
+                Bạn đã sở hữu trọn bộ toàn bộ {activeCourses.length} khóa học
+              </h4>
+              <p className="text-teal-100/80 text-xs md:text-sm font-medium">
+                Tất cả khóa học đều đã được kích hoạt vĩnh viễn vào tài khoản của bạn.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onGoToMyCourses}
+            className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 shrink-0"
+          >
+            <span>Vào học ngay</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+          </button>
         </div>
       )}
 
@@ -1097,22 +1109,29 @@ const Account: React.FC = () => {
       return;
     }
     setClaimingId(course.id);
+    const normalizedEmail = user.email.toLowerCase();
     try {
-      const normalizedEmail = user.email.toLowerCase();
       const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", course.id);
       await setDoc(courseRef, {
         courseId: course.id,
+        courseTitle: course.title || '',
         title: course.title || '',
         price: course.price || '',
         progress: 0,
         unlockedAt: new Date().toISOString(),
+        purchasedAt: new Date().toISOString(),
+        status: 'active',
         claimedVia: isVip ? 'VIP_INSTANT' : (isAdmin ? 'ADMIN_INSTANT' : 'FREE_CLAIM')
       }, { merge: true });
 
       localStorage.setItem('course_unlocked_' + course.id, 'true');
       setPurchasedCourses(prev => {
         if (prev.some(p => p.courseId === course.id)) return prev;
-        return [...prev, { courseId: course.id, progress: 0 }];
+        const next = [...prev, { courseId: course.id, progress: 0 }];
+        try {
+          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(next.map(p => p.courseId)));
+        } catch (e) {}
+        return next;
       });
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
@@ -1122,7 +1141,11 @@ const Account: React.FC = () => {
       localStorage.setItem('course_unlocked_' + course.id, 'true');
       setPurchasedCourses(prev => {
         if (prev.some(p => p.courseId === course.id)) return prev;
-        return [...prev, { courseId: course.id, progress: 0 }];
+        const next = [...prev, { courseId: course.id, progress: 0 }];
+        try {
+          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(next.map(p => p.courseId)));
+        } catch (e) {}
+        return next;
       });
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
@@ -1144,17 +1167,20 @@ const Account: React.FC = () => {
     }
 
     setIsClaimingAll(true);
+    const normalizedEmail = user.email.toLowerCase();
     try {
-      const normalizedEmail = user.email.toLowerCase();
       await Promise.all(unowned.map(async (c) => {
         const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", c.id);
         localStorage.setItem('course_unlocked_' + c.id, 'true');
         return setDoc(courseRef, {
           courseId: c.id,
+          courseTitle: c.title || '',
           title: c.title || '',
           price: c.price || '',
           progress: 0,
           unlockedAt: new Date().toISOString(),
+          purchasedAt: new Date().toISOString(),
+          status: 'active',
           claimedVia: isVip ? 'VIP_ALL' : 'ADMIN_ALL'
         }, { merge: true });
       }));
@@ -1162,7 +1188,11 @@ const Account: React.FC = () => {
       setPurchasedCourses(prev => {
         const existingIds = new Set(prev.map(p => p.courseId));
         const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
-        return [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+        const updated = [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+        try {
+          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(updated.map(p => p.courseId)));
+        } catch (e) {}
+        return updated;
       });
 
       window.dispatchEvent(new CustomEvent('courses_updated'));
@@ -1176,7 +1206,11 @@ const Account: React.FC = () => {
       setPurchasedCourses(prev => {
         const existingIds = new Set(prev.map(p => p.courseId));
         const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
-        return [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+        const updated = [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
+        try {
+          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(updated.map(p => p.courseId)));
+        } catch (e) {}
+        return updated;
       });
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
