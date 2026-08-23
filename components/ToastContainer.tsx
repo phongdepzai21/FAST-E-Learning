@@ -45,7 +45,7 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
 
       {/* Message and Controls */}
       <div className="flex-grow pr-4">
-        <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100 leading-snug">
+        <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100 leading-snug whitespace-pre-line">
           {toast.message}
         </p>
       </div>

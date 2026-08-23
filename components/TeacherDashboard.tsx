@@ -5,6 +5,7 @@ import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
+import { parseFirestoreError } from '../utils/firestoreErrors';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -276,7 +277,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       toast.success(`✨ Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`);
     } catch (firestoreErr: any) {
       console.error('Firestore add course error:', firestoreErr);
-      toast.error(`Lỗi lưu vào Cloud: ${firestoreErr?.message || 'Vui lòng thử lại'}`);
+      const errorInfo = parseFirestoreError(firestoreErr, `Thêm khóa học "${title}"`);
+      toast.error(errorInfo.fullToastMessage, 8000);
     }
 
     // 2. Save to LocalStorage backup
@@ -352,7 +354,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       toast.success(`✨ Đã cập nhật giá "${finalPrice}" và thông tin khóa học lên Cloud Firestore!`);
     } catch (firestoreErr: any) {
       console.error('Firestore setDoc update error:', firestoreErr);
-      toast.error(`Lỗi cập nhật Cloud: ${firestoreErr?.message || 'Vui lòng thử lại'}`);
+      const errorInfo = parseFirestoreError(firestoreErr, `Cập nhật khóa học "${title}"`);
+      toast.error(errorInfo.fullToastMessage, 8000);
     }
 
     // 2. Save to LocalStorage backup
@@ -448,7 +451,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       );
     } catch (firestoreErr: any) {
       console.error('Firestore toggle status error:', firestoreErr);
-      toast.error(`Lỗi cập nhật Firestore: ${firestoreErr?.message || 'Thất bại'}`);
+      const errorInfo = parseFirestoreError(firestoreErr, `Đổi trạng thái khóa học "${course.title}"`);
+      toast.error(errorInfo.fullToastMessage, 8000);
     }
 
     window.dispatchEvent(new CustomEvent('courses_updated'));
@@ -476,7 +480,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         toast.success(`Đã xóa/reset khóa học "${courseTitle}" trên Cloud Firestore!`);
       } catch (err: any) {
         console.warn('Firestore delete course warning:', err);
-        toast.error(`Lỗi xóa trên Cloud: ${err?.message || 'Thất bại'}`);
+        const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
+        toast.error(errorInfo.fullToastMessage, 8000);
       }
 
       // Also clean up from LocalStorage

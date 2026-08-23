@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
+import { parseFirestoreError } from '../utils/firestoreErrors';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
@@ -199,11 +200,15 @@ const Courses: React.FC = () => {
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
     } catch (err: any) {
       console.error("Lỗi nhận khóa học:", err);
+      const errorInfo = parseFirestoreError(err, `Nhận khóa học "${course.title}"`);
+      
+      // Fallback mở khóa cục bộ
       localStorage.setItem('course_unlocked_' + course.id, 'true');
       setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
-      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
+      
+      toast.error(errorInfo.fullToastMessage, 8000);
     } finally {
       setClaimingId(null);
     }
@@ -223,6 +228,9 @@ const Courses: React.FC = () => {
         return;
       }
 
+      let hasFirestoreError = false;
+      let firstError: any = null;
+
       for (const course of unowned) {
         try {
           const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
@@ -239,6 +247,8 @@ const Courses: React.FC = () => {
           }, { merge: true });
         } catch (e) {
           console.warn('Firestore claim error for course:', course.id, e);
+          hasFirestoreError = true;
+          if (!firstError) firstError = e;
         }
         localStorage.setItem('course_unlocked_' + course.id, 'true');
       }
@@ -252,10 +262,17 @@ const Courses: React.FC = () => {
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
-      toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
+
+      if (hasFirestoreError && firstError) {
+        const errorInfo = parseFirestoreError(firstError, 'Mở khóa toàn bộ khóa học');
+        toast.error(errorInfo.fullToastMessage, 8000);
+      } else {
+        toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
+      }
     } catch (err: any) {
       console.error("Lỗi mở khóa tất cả:", err);
-      toast.error(`Lỗi mở khóa: ${err?.message || 'Vui lòng thử lại'}`);
+      const errorInfo = parseFirestoreError(err, 'Mở khóa toàn bộ khóa học');
+      toast.error(errorInfo.fullToastMessage, 8000);
     } finally {
       setIsClaimingAll(false);
     }
