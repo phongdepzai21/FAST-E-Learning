@@ -97,11 +97,15 @@ const Courses: React.FC = () => {
             // Fast local storage cache preload
             try {
               const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
+              const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
               if (cachedStr) {
                 const cachedIds = JSON.parse(cachedStr);
                 if (Array.isArray(cachedIds) && cachedIds.length > 0) {
-                  setOwnedCourseIds(prev => Array.from(new Set([...prev, ...cachedIds])));
+                  setOwnedCourseIds(cachedIds);
                 }
+              } else if (hasClaimedAll) {
+                const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+                setOwnedCourseIds(allActiveIds);
               }
             } catch (e) {}
 
@@ -109,11 +113,17 @@ const Courses: React.FC = () => {
                 collection(db, "users", normalizedEmail, "purchased_courses"),
                 (snapshot: QuerySnapshot<DocumentData>) => {
                     const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
-                    setOwnedCourseIds(ids);
+                    const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+                    let mergedIds = ids;
+                    if (hasClaimedAll) {
+                      const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+                      mergedIds = Array.from(new Set([...ids, ...allActiveIds]));
+                    }
+                    setOwnedCourseIds(mergedIds);
                     setIsLoadingOwnership(false);
                     try {
-                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
-                      ids.forEach(cid => localStorage.setItem(`course_unlocked_${cid}`, 'true'));
+                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(mergedIds));
+                      mergedIds.forEach(cid => localStorage.setItem(`course_unlocked_${cid}`, 'true'));
                     } catch (e) {}
                 },
                 (error) => {
@@ -130,9 +140,10 @@ const Courses: React.FC = () => {
     });
 
     const handleStorageChange = () => {
-      if (currentUserEmail) {
+      const userEmail = auth.currentUser?.email?.toLowerCase();
+      if (userEmail) {
         try {
-          const cachedStr = localStorage.getItem(`user_courses_${currentUserEmail}`);
+          const cachedStr = localStorage.getItem(`user_courses_${userEmail}`);
           if (cachedStr) {
             setOwnedCourseIds(JSON.parse(cachedStr));
           }
@@ -151,7 +162,7 @@ const Courses: React.FC = () => {
         window.removeEventListener('courses_updated', handleStorageChange);
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, [currentUserEmail]);
+  }, [allCourses]);
 
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
@@ -237,6 +248,7 @@ const Courses: React.FC = () => {
       setOwnedCourseIds(newOwned);
       try {
         localStorage.setItem(`user_courses_${currentUserEmail}`, JSON.stringify(newOwned));
+        localStorage.setItem(`has_claimed_all_${currentUserEmail}`, 'true');
       } catch (e) {}
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
@@ -249,10 +261,11 @@ const Courses: React.FC = () => {
     }
   };
 
-  // Danh sách khóa học chưa sở hữu (chỉ hiển thị nút nhận tất cả khi còn khóa chưa nhận)
+  // Danh sách khóa học chưa sở hữu (chỉ hiển thị nút nhận tất cả khi còn khóa chưa nhận và đã tải xong dữ liệu)
   const unownedCourses = useMemo(() => {
+    if (isLoadingOwnership) return [];
     return allCourses.filter(c => !ownedCourseIds.includes(c.id) && c.status !== 'draft' && c.status !== 'inactive');
-  }, [allCourses, ownedCourseIds]);
+  }, [allCourses, ownedCourseIds, isLoadingOwnership]);
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {

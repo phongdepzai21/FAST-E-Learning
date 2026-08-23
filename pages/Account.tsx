@@ -630,16 +630,29 @@ const Account: React.FC = () => {
   useEffect(() => {
     if (!user?.email) return;
 
-    setIsLoadingCourses(true);
-    
-    // CRITICAL FIX: Use normalized lowercase email for Firestore path
-    // Ensures we are listening to the same document path that PaymentModal writes to.
     const normalizedEmail = user.email.toLowerCase();
     
     if (!normalizedEmail) {
         setIsLoadingCourses(false);
         return;
     }
+
+    // Fast local storage cache preload
+    try {
+      const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
+      const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+      if (cachedStr) {
+        const cachedIds = JSON.parse(cachedStr);
+        if (Array.isArray(cachedIds) && cachedIds.length > 0) {
+          setPurchasedCourses(cachedIds.map((id: string) => ({ courseId: id, progress: 0 })));
+        }
+      } else if (hasClaimedAll && allCourses.length > 0) {
+        const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+        setPurchasedCourses(allActiveIds.map(id => ({ courseId: id, progress: 0 })));
+      }
+    } catch (e) {}
+
+    setIsLoadingCourses(true);
 
     const q = collection(db, "users", normalizedEmail, "purchased_courses");
     
@@ -656,9 +669,22 @@ const Account: React.FC = () => {
                     });
                 }
             });
-            console.log("Synced courses for", normalizedEmail, courses); // Debug
-            setPurchasedCourses(courses);
+            
+            const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+            let finalCourses = courses;
+            if (hasClaimedAll && allCourses.length > 0) {
+              const existingIds = new Set(courses.map(c => c.courseId));
+              const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+              const extra = allActiveIds.filter(id => !existingIds.has(id)).map(id => ({ courseId: id, progress: 0 }));
+              finalCourses = [...courses, ...extra];
+            }
+
+            setPurchasedCourses(finalCourses);
             setIsLoadingCourses(false);
+            try {
+              localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(finalCourses.map(c => c.courseId)));
+              finalCourses.forEach(c => localStorage.setItem(`course_unlocked_${c.courseId}`, 'true'));
+            } catch (e) {}
         },
         (err) => {
             console.error("Error fetching courses:", err);
@@ -666,8 +692,27 @@ const Account: React.FC = () => {
         }
     );
 
-    return () => unsubscribeSnapshot();
-  }, [user?.email]);
+    const handleStorageChange = () => {
+      try {
+        const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
+        if (cachedStr) {
+          const cachedIds = JSON.parse(cachedStr);
+          if (Array.isArray(cachedIds)) {
+            setPurchasedCourses(cachedIds.map((id: string) => ({ courseId: id, progress: 0 })));
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('courses_updated', handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      unsubscribeSnapshot();
+      window.removeEventListener('courses_updated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [user?.email, allCourses]);
 
   const handleLogout = async () => {
     try {
@@ -1100,8 +1145,9 @@ const Account: React.FC = () => {
   }, [allCourses]);
 
   const unownedCoursesCount = useMemo(() => {
+    if (isLoadingCourses) return 0;
     return activeCourses.filter(c => !ownedCourseIds.includes(c.id)).length;
-  }, [activeCourses, ownedCourseIds]);
+  }, [activeCourses, ownedCourseIds, isLoadingCourses]);
 
   const handleClaimSingleCourse = async (course: Course) => {
     if (!user?.email) {
@@ -1185,15 +1231,13 @@ const Account: React.FC = () => {
         }, { merge: true });
       }));
 
-      setPurchasedCourses(prev => {
-        const existingIds = new Set(prev.map(p => p.courseId));
-        const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
-        const updated = [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
-        try {
-          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(updated.map(p => p.courseId)));
-        } catch (e) {}
-        return updated;
-      });
+      const allActiveIds = activeCourses.map(c => c.id);
+      const allPurchased = allActiveIds.map(id => ({ courseId: id, progress: 0 }));
+      setPurchasedCourses(allPurchased);
+      try {
+        localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(allActiveIds));
+        localStorage.setItem(`has_claimed_all_${normalizedEmail}`, 'true');
+      } catch (e) {}
 
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
@@ -1203,15 +1247,13 @@ const Account: React.FC = () => {
       unowned.forEach(c => {
         localStorage.setItem('course_unlocked_' + c.id, 'true');
       });
-      setPurchasedCourses(prev => {
-        const existingIds = new Set(prev.map(p => p.courseId));
-        const newItems = unowned.map(c => ({ courseId: c.id, progress: 0 }));
-        const updated = [...prev, ...newItems.filter(item => !existingIds.has(item.courseId))];
-        try {
-          localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(updated.map(p => p.courseId)));
-        } catch (e) {}
-        return updated;
-      });
+      const allActiveIds = activeCourses.map(c => c.id);
+      const allPurchased = allActiveIds.map(id => ({ courseId: id, progress: 0 }));
+      setPurchasedCourses(allPurchased);
+      try {
+        localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(allActiveIds));
+        localStorage.setItem(`has_claimed_all_${normalizedEmail}`, 'true');
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       toast.success(`🎉 Đã mở khóa tất cả ${unowned.length} khóa học trên thiết bị của bạn!`);
