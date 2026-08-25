@@ -477,6 +477,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   };
 
   const executeToggleCourseStatus = async (course: Course, newStatus: 'active' | 'inactive') => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     const nowIso = new Date().toISOString();
 
     // 1. Optimistically update local React state
@@ -573,6 +574,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   };
 
   const executeDeleteCourse = async (courseId: string, courseTitle: string, isSystemCourse: boolean) => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
     // Optimistically update React state immediately
     if (isSystemCourse) {
       const defaultCourse = HARDCODED_COURSES.find(c => c.id === courseId);
