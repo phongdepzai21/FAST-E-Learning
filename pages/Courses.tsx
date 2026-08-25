@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
-import { parseFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
@@ -200,7 +200,7 @@ const Courses: React.FC = () => {
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
     } catch (err: any) {
       console.error("Lỗi nhận khóa học:", err);
-      const errorInfo = parseFirestoreError(err, `Nhận khóa học "${course.title}"`);
+      const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${auth.currentUser?.email}/purchased_courses/${course.id}`, err);
       
       // Fallback mở khóa cục bộ
       localStorage.setItem('course_unlocked_' + course.id, 'true');
@@ -264,14 +264,14 @@ const Courses: React.FC = () => {
       window.dispatchEvent(new Event('storage'));
 
       if (hasFirestoreError && firstError) {
-        const errorInfo = parseFirestoreError(firstError, 'Mở khóa toàn bộ khóa học');
+        const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, firstError);
         toast.error(errorInfo.fullToastMessage, 8000);
       } else {
         toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
       }
     } catch (err: any) {
       console.error("Lỗi mở khóa tất cả:", err);
-      const errorInfo = parseFirestoreError(err, 'Mở khóa toàn bộ khóa học');
+      const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, err);
       toast.error(errorInfo.fullToastMessage, 8000);
     } finally {
       setIsClaimingAll(false);

@@ -6,7 +6,7 @@ import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
-import { parseFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 
 interface TeacherDashboardProps {
@@ -75,6 +75,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     price?: string;
     description?: string;
     isProcessing?: boolean;
+    position?: { top: number, right: number };
     onConfirm: () => void;
   }>({
     isOpen: false,
@@ -318,7 +319,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       toast.success(`Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`, 4000, 'Tạo thành công');
     } catch (firestoreErr: any) {
       console.error('Firestore add course error:', firestoreErr);
-      const errorInfo = parseFirestoreError(firestoreErr, `Thêm khóa học "${title}"`);
+      const errorInfo = logFirestoreError(`Thêm khóa học "${title}"`, `courses/${courseId}`, firestoreErr, newCourse);
       toast.error(errorInfo.title, 7000, 'Lỗi đồng bộ Cloud', errorInfo.solution);
     }
 
@@ -409,7 +410,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       toast.success(`Đã lưu thay đổi khóa học "${title}" trên Cloud Firestore!`, 4000, 'Đã cập nhật');
     } catch (firestoreErr: any) {
       console.error('Firestore setDoc update error:', firestoreErr);
-      const errorInfo = parseFirestoreError(firestoreErr, `Cập nhật khóa học "${title}"`);
+      const errorInfo = logFirestoreError(`Cập nhật khóa học "${title}"`, `courses/${editingCourseId}`, firestoreErr, updatedCourse);
       toast.error(errorInfo.title, 7000, 'Lỗi lưu Cloud', errorInfo.solution);
     }
 
@@ -449,10 +450,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   };
 
   // Toggle Course Visibility with Custom Confirmation Dialog
-  const promptToggleCourseStatus = (course: Course) => {
+  const promptToggleCourseStatus = (course: Course, e: React.MouseEvent) => {
     const isCurrentlyActive = course.status !== 'draft' && course.status !== 'inactive';
     const newStatus: 'active' | 'inactive' = isCurrentlyActive ? 'inactive' : 'active';
     
+    // Calculate a position near the clicked button
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const position = {
+      top: rect.bottom + 8, // Just below the button
+      right: window.innerWidth - rect.right // Align right edge
+    };
+
     setConfirmModal({
       isOpen: true,
       type: isCurrentlyActive ? 'status-hide' : 'status-show',
@@ -463,6 +471,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       description: isCurrentlyActive
         ? 'Khóa học này sẽ chuyển sang trạng thái "Không hoạt động" và tạm ẩn khỏi danh sách học viên.'
         : 'Khóa học này sẽ hiển thị công khai để tất cả học viên có thể tìm thấy và tham gia học tập.',
+      position,
       onConfirm: () => executeToggleCourseStatus(course, newStatus),
     });
   };
@@ -529,7 +538,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       );
     } catch (firestoreErr: any) {
       console.error('Firestore toggle status error:', firestoreErr);
-      const errorInfo = parseFirestoreError(firestoreErr, `Đổi trạng thái khóa học "${course.title}"`);
+      const errorInfo = logFirestoreError(`Đổi trạng thái khóa học "${course.title}"`, `courses/${course.id}`, firestoreErr, { status: newStatus });
       toast.error(errorInfo.title, 7000, 'Lỗi đổi trạng thái', errorInfo.solution);
     }
 
@@ -600,7 +609,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       );
     } catch (err: any) {
       console.warn('Firestore delete course warning:', err);
-      const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
+      const errorInfo = logFirestoreError(`Xóa khóa học "${courseTitle}"`, `courses/${courseId}`, err);
       toast.info(`Khóa học "${courseTitle}" đã được xóa trên thiết bị của bạn.`, 4000, 'Thiết bị');
     }
 
@@ -863,7 +872,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             {/* Nút Ẩn / Hiện (Chuyển trạng thái hoạt động <-> không hoạt động) */}
                             {isHiddenOrInactive ? (
                               <button
-                                onClick={() => promptToggleCourseStatus(course)}
+                                onClick={(e) => promptToggleCourseStatus(course, e)}
                                 title="Kích hoạt để khóa học hiển thị công khai cho học viên"
                                 className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
                               >
@@ -872,7 +881,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                               </button>
                             ) : (
                               <button
-                                onClick={() => promptToggleCourseStatus(course)}
+                                onClick={(e) => promptToggleCourseStatus(course, e)}
                                 title="Ẩn khóa học khỏi danh sách học viên (chuyển sang Không hoạt động)"
                                 className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
                               >
@@ -1269,8 +1278,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         price={confirmModal.price}
         description={confirmModal.description}
         isProcessing={confirmModal.isProcessing}
+        position={confirmModal.position}
         onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false, position: undefined }))}
       />
 
       {/* Modern Success Banner Modal */}

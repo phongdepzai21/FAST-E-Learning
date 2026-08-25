@@ -9,6 +9,33 @@ export interface FirestoreErrorInfo {
   fullToastMessage: string;
 }
 
+export function logFirestoreError(operation: string, collectionPath: string, err: any, payload?: any): FirestoreErrorInfo {
+  const errorInfo = parseFirestoreError(err, operation);
+  
+  console.group(`🔥 Firestore Error: [${operation}]`);
+  console.error(`📍 Target Path: ${collectionPath}`);
+  console.error(`🔴 Raw Error Code: ${err?.code || 'unknown'}`);
+  console.error(`💬 Raw Error Message: ${err?.message || String(err)}`);
+  
+  if (payload) {
+    console.warn(`📦 Payload Attempted:`, payload);
+  }
+  
+  console.info(`💡 Diagnosis: ${errorInfo.solution}`);
+  
+  // Specific debugging for permission-denied to help diagnose rules issues
+  if (errorInfo.code === 'permission-denied') {
+    console.warn('🔒 PERMISSION DENIED DIAGNOSTICS:');
+    console.warn('1. Check if user is authenticated: Use `auth.currentUser`');
+    console.warn('2. Rule Matching: Verify if user email/uid exactly matches the `isOwner` condition in firestore.rules');
+    console.warn('3. Schema Validation: Check if the payload strictly matches ALL validation schema rules (e.g., string types, booleans, timestamps). A single type mismatch will cause a permission-denied error.');
+  }
+  
+  console.groupEnd();
+
+  return errorInfo;
+}
+
 export function parseFirestoreError(err: any, customActionContext: string = 'Đồng bộ khóa học'): FirestoreErrorInfo {
   const code = (err?.code || '').toLowerCase();
   const rawMsg = (err?.message || String(err || '')).toLowerCase();
@@ -26,7 +53,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'permission-denied',
       title,
       solution,
-      fullToastMessage: `❌ ${customActionContext} thất bại: ${title}\n💡 Hướng dẫn khắc phục: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ❌ ${customActionContext} thất bại: ${title}\n💡 Hướng dẫn khắc phục: ${solution}`
     };
   }
 
@@ -44,7 +71,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'missing-index',
       title,
       solution,
-      fullToastMessage: `⚠️ ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ⚠️ ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
     };
   }
 
@@ -63,7 +90,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'unavailable',
       title,
       solution,
-      fullToastMessage: `📡 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] 📡 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
     };
   }
 
@@ -79,7 +106,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'unauthenticated',
       title,
       solution,
-      fullToastMessage: `🔒 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] 🔒 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
     };
   }
 
@@ -96,7 +123,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'resource-exhausted',
       title,
       solution,
-      fullToastMessage: `⚠️ ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ⚠️ ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
     };
   }
 
@@ -112,7 +139,7 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
       code: 'not-found',
       title,
       solution,
-      fullToastMessage: `🔍 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] 🔍 ${customActionContext}: ${title}\n💡 Hướng dẫn: ${solution}`
     };
   }
 
@@ -123,6 +150,6 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
     code: code || 'unknown',
     title,
     solution,
-    fullToastMessage: `⚠️ ${customActionContext} trên Cloud thất bại: ${title}\n💡 Hướng dẫn: ${solution}`
+    fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ⚠️ ${customActionContext} trên Cloud thất bại: ${title}\n💡 Hướng dẫn: ${solution}`
   };
 }

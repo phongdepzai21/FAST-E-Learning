@@ -27,6 +27,7 @@ export interface ConfirmModalProps {
   price?: string;
   description?: string;
   isProcessing?: boolean;
+  position?: { top: number, right: number }; // Optional anchor position
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -54,6 +55,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
   price,
   description,
   isProcessing = false,
+  position,
   onConfirm,
   onCancel,
 }) => {
@@ -77,11 +79,11 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
     }
     if (isHide) {
       return {
-        icon: <EyeOff className="w-6 h-6 text-amber-600" />,
-        iconBg: 'bg-amber-50 border-amber-200/80 text-amber-600',
-        badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
+        icon: <EyeOff className="w-6 h-6 text-slate-600" />,
+        iconBg: 'bg-slate-50 border-slate-200/80 text-slate-600',
+        badgeBg: 'bg-slate-100 text-slate-800 border-slate-200',
         badgeText: 'Ẩn Khóa học',
-        btnConfirm: 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20',
+        btnConfirm: 'bg-slate-700 hover:bg-slate-800 text-white shadow-slate-900/20',
         confirmLabel: 'Xác nhận Ẩn',
       };
     }
@@ -99,7 +101,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className={`fixed inset-0 z-[9999] p-4 ${position ? '' : 'flex items-center justify-center'}`}>
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -115,7 +117,8 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 border border-gray-100 dark:border-slate-800 shadow-2xl space-y-6 overflow-hidden"
+          style={position ? { position: 'absolute', top: position.top, right: position.right } : {}}
+          className={`relative w-full ${position ? 'max-w-sm' : 'max-w-lg'} bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 border border-gray-100 dark:border-slate-800 shadow-2xl space-y-6 overflow-hidden`}
         >
           {/* Header */}
           <div className="flex items-start justify-between gap-4">

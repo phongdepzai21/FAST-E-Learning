@@ -9,7 +9,7 @@ import CourseDetail from './CourseDetail';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
-import { parseFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
 import { GamificationBadgeSection } from '../components/GamificationBadgeSection';
 import { UserGamificationData } from '../utils/gamification';
 import { recordDailyLearningActivity, evaluateBadges } from '../utils/gamificationService';
@@ -1254,7 +1254,7 @@ const Account: React.FC = () => {
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
     } catch (err: any) {
       console.error("Lỗi nhận khóa học:", err);
-      const errorInfo = parseFirestoreError(err, `Nhận khóa học "${course.title}"`);
+      const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${user.email}/purchased_courses/${course.id}`, err);
       
       // Fallback lưu cục bộ để người dùng vẫn có thể học ngay trên máy
       localStorage.setItem('course_unlocked_' + course.id, 'true');
@@ -1319,7 +1319,7 @@ const Account: React.FC = () => {
       toast.success(`🎉 Đã mở khóa thành công tất cả ${unowned.length} khóa học vào phòng học của bạn!`);
     } catch (err: any) {
       console.error("Lỗi nhận tất cả khóa học:", err);
-      const errorInfo = parseFirestoreError(err, 'Mở khóa toàn bộ khóa học');
+      const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${user.email}/purchased_courses/*`, err);
       
       // Fallback mở khóa cục bộ trên thiết bị
       unowned.forEach(c => {
