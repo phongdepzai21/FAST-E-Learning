@@ -34,8 +34,8 @@ export const GamificationBadgeSection: React.FC<GamificationBadgeSectionProps> =
       {/* HEADER & OVERVIEW STATS */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-gray-100">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/60 text-amber-800 text-[11px] font-extrabold uppercase tracking-wider mb-2">
-            <span>🏆</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-[#007c76] text-[11px] font-extrabold uppercase tracking-wider mb-2">
+            <span>🎖️</span>
             <span>Hệ thống Huy hiệu & Thành tích</span>
           </div>
           <h3 className="text-2xl sm:text-3xl font-black text-gray-800 tracking-tight flex items-center gap-3">

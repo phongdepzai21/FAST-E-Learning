@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -6,6 +7,7 @@ import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPri
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { parseFirestoreError } from '../utils/firestoreErrors';
+import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -35,6 +37,7 @@ const cleanForFirestore = (obj: any): any => {
 };
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
+  const navigate = useNavigate();
   const toast = useToast();
   // Navigation internal tab
   const [activeTab, setActiveTab] = useState<'list' | 'add' | 'edit'>('list');
@@ -61,6 +64,44 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Custom Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: ConfirmActionType;
+    title: string;
+    courseTitle: string;
+    category?: string;
+    price?: string;
+    description?: string;
+    isProcessing?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    type: 'delete',
+    title: '',
+    courseTitle: '',
+    onConfirm: () => {},
+  });
+
+  // Custom Success Notification Modal State
+  const [successModal, setSuccessModal] = useState<{
+    isOpen: boolean;
+    action: 'create' | 'update' | 'status-change' | 'import-lessons';
+    courseTitle: string;
+    details?: {
+      price?: string;
+      category?: string;
+      lessonsCount?: number;
+      status?: string;
+    };
+    courseId?: string;
+  }>({
+    isOpen: false,
+    action: 'create',
+    courseTitle: '',
+  });
+
 
   // Auto-sync any local custom courses to Firestore on mount
   const syncLocalEditsToFirestore = async (currentFsList: Course[]) => {
@@ -274,11 +315,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // 1. Save to Firestore (Master Cloud Database)
     try {
       await setDoc(doc(db, 'courses', courseId), newCourse);
-      toast.success(`✨ Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`);
+      toast.success(`Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`, 4000, 'Tạo thành công');
     } catch (firestoreErr: any) {
       console.error('Firestore add course error:', firestoreErr);
       const errorInfo = parseFirestoreError(firestoreErr, `Thêm khóa học "${title}"`);
-      toast.error(errorInfo.fullToastMessage, 8000);
+      toast.error(errorInfo.title, 7000, 'Lỗi đồng bộ Cloud', errorInfo.solution);
     }
 
     // 2. Save to LocalStorage backup
@@ -294,9 +335,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với học phí ${finalPrice} thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
     window.dispatchEvent(new Event('storage'));
+    
+    // Trigger rich success modal
+    setSuccessModal({
+      isOpen: true,
+      action: 'create',
+      courseTitle: title.trim(),
+      details: {
+        price: finalPrice,
+        category: category || 'Khác',
+        lessonsCount: (sanitizedCurriculum[0]?.lessons || []).length,
+        status: status || 'active',
+      },
+      courseId,
+    });
+
     resetForm();
     setIsSubmitting(false);
-    setTimeout(() => setActiveTab('list'), 1200);
   };
 
   // Save changes to an existing Course
@@ -351,11 +406,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // 1. Update Firestore
     try {
       await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
-      toast.success(`✨ Đã cập nhật giá "${finalPrice}" và thông tin khóa học lên Cloud Firestore!`);
+      toast.success(`Đã lưu thay đổi khóa học "${title}" trên Cloud Firestore!`, 4000, 'Đã cập nhật');
     } catch (firestoreErr: any) {
       console.error('Firestore setDoc update error:', firestoreErr);
       const errorInfo = parseFirestoreError(firestoreErr, `Cập nhật khóa học "${title}"`);
-      toast.error(errorInfo.fullToastMessage, 8000);
+      toast.error(errorInfo.title, 7000, 'Lỗi lưu Cloud', errorInfo.solution);
     }
 
     // 2. Save to LocalStorage backup
@@ -377,22 +432,42 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     window.dispatchEvent(new CustomEvent('courses_updated'));
     window.dispatchEvent(new Event('storage'));
     setIsSubmitting(false);
-    setTimeout(() => {
-      setActiveTab('list');
-      resetForm();
-    }, 1200);
+
+    // Trigger rich success modal
+    setSuccessModal({
+      isOpen: true,
+      action: 'update',
+      courseTitle: title.trim(),
+      details: {
+        price: finalPrice,
+        category: category || 'Khác',
+        lessonsCount: (sanitizedCurriculum[0]?.lessons || []).length,
+        status: status || 'active',
+      },
+      courseId: editingCourseId,
+    });
   };
 
-  // Toggle Course Visibility / Active Status
-  const handleToggleCourseStatus = async (course: Course) => {
+  // Toggle Course Visibility with Custom Confirmation Dialog
+  const promptToggleCourseStatus = (course: Course) => {
     const isCurrentlyActive = course.status !== 'draft' && course.status !== 'inactive';
     const newStatus: 'active' | 'inactive' = isCurrentlyActive ? 'inactive' : 'active';
-    const actionText = isCurrentlyActive ? 'ẩn khóa học (đổi sang "Không hoạt động")' : 'kích hoạt khóa học (đổi sang "Hoạt động")';
     
-    if (!window.confirm(`Bạn có chắc chắn muốn ${actionText} "${course.title}"?`)) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      type: isCurrentlyActive ? 'status-hide' : 'status-show',
+      title: isCurrentlyActive ? 'Xác nhận Ẩn Khóa học' : 'Kích hoạt Khóa học Công khai',
+      courseTitle: course.title,
+      category: course.category,
+      price: course.price,
+      description: isCurrentlyActive
+        ? 'Khóa học này sẽ chuyển sang trạng thái "Không hoạt động" và tạm ẩn khỏi danh sách học viên.'
+        : 'Khóa học này sẽ hiển thị công khai để tất cả học viên có thể tìm thấy và tham gia học tập.',
+      onConfirm: () => executeToggleCourseStatus(course, newStatus),
+    });
+  };
 
+  const executeToggleCourseStatus = async (course: Course, newStatus: 'active' | 'inactive') => {
     const nowIso = new Date().toISOString();
 
     // 1. Optimistically update local React state
@@ -445,14 +520,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
 
       await setDoc(docRef, updatePayload, { merge: true });
-      toast.success(newStatus === 'inactive' 
-        ? `🔒 Đã ẩn khóa học "${course.title}" trên tất cả thiết bị và người dùng!` 
-        : `✨ Đã hiển thị khóa học "${course.title}" trên tất cả thiết bị!`
+      toast.success(
+        newStatus === 'inactive' 
+          ? `Đã ẩn khóa học "${course.title}" trên hệ thống!` 
+          : `Đã kích hoạt khóa học "${course.title}" công khai!`,
+        4000,
+        'Trạng thái'
       );
     } catch (firestoreErr: any) {
       console.error('Firestore toggle status error:', firestoreErr);
       const errorInfo = parseFirestoreError(firestoreErr, `Đổi trạng thái khóa học "${course.title}"`);
-      toast.error(errorInfo.fullToastMessage, 8000);
+      toast.error(errorInfo.title, 7000, 'Lỗi đổi trạng thái', errorInfo.solution);
     }
 
     window.dispatchEvent(new CustomEvent('courses_updated'));
@@ -466,62 +544,75 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  // Delete / Reset Course Trigger
-  const handleDeleteCourse = async (courseId: string, courseTitle: string) => {
+  // Delete / Reset Course Trigger with Custom Confirmation Dialog
+  const promptDeleteCourse = (courseId: string, courseTitle: string) => {
     const isSystemCourse = HARDCODED_COURSES.some(c => c.id === courseId);
-    let confirmMsg = `Bạn có chắc chắn muốn xóa khóa học "${courseTitle}"?`;
+    const targetCourse = courses.find(c => c.id === courseId);
+
+    setConfirmModal({
+      isOpen: true,
+      type: isSystemCourse ? 'reset' : 'delete',
+      title: isSystemCourse ? 'Reset Khóa học về mặc định' : 'Xóa Khóa học vĩnh viễn',
+      courseTitle: courseTitle,
+      category: targetCourse?.category,
+      price: targetCourse?.price,
+      description: isSystemCourse
+        ? 'Khóa học này là học liệu hệ thống. Thao tác này sẽ hủy các chỉnh sửa tùy biến và khôi phục nội dung gốc ban đầu.'
+        : 'Thao tác này sẽ xóa toàn bộ nội dung khóa học và giáo trình bài giảng khỏi cơ sở dữ liệu Cloud và thiết bị.',
+      onConfirm: () => executeDeleteCourse(courseId, courseTitle, isSystemCourse),
+    });
+  };
+
+  const executeDeleteCourse = async (courseId: string, courseTitle: string, isSystemCourse: boolean) => {
+    // Optimistically update React state immediately
     if (isSystemCourse) {
-      confirmMsg = `Khóa học "${courseTitle}" là tài liệu mẫu mặc định của hệ thống. Nhấn OK sẽ xóa bỏ tất cả các chỉnh sửa tùy biến cũ và reset về nội dung gốc hệ thống ban đầu. Bạn có muốn thực hiện không?`;
+      const defaultCourse = HARDCODED_COURSES.find(c => c.id === courseId);
+      if (defaultCourse) {
+        setCourses(prev => prev.map(c => c.id === courseId ? { ...defaultCourse } : c));
+      }
+    } else {
+      setCourses(prev => prev.filter(c => c.id !== courseId));
     }
 
-    if (window.confirm(confirmMsg)) {
-      // Optimistically update React state immediately
-      if (isSystemCourse) {
-        const defaultCourse = HARDCODED_COURSES.find(c => c.id === courseId);
-        if (defaultCourse) {
-          setCourses(prev => prev.map(c => c.id === courseId ? { ...defaultCourse } : c));
-        }
-      } else {
-        setCourses(prev => prev.filter(c => c.id !== courseId));
+    // Also clean up from LocalStorage
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      if (localStr) {
+        let localList: any[] = JSON.parse(localStr);
+        localList = localList.filter((item: any) => item.id !== courseId);
+        localStorage.setItem('local_custom_courses', JSON.stringify(localList));
       }
+    } catch (e) {}
 
-      // Also clean up from LocalStorage
-      try {
-        const localStr = localStorage.getItem('local_custom_courses');
-        if (localStr) {
-          let localList: any[] = JSON.parse(localStr);
-          localList = localList.filter((item: any) => item.id !== courseId);
-          localStorage.setItem('local_custom_courses', JSON.stringify(localList));
-        }
-      } catch (e) {}
+    // Clean up unlocks if any
+    try {
+      localStorage.removeItem(`course_unlocked_${courseId}`);
+    } catch (e) {}
 
-      // Clean up unlocks if any
-      try {
-        localStorage.removeItem(`course_unlocked_${courseId}`);
-      } catch (e) {}
-
-      let firestoreSuccess = false;
-      try {
-        await deleteDoc(doc(db, 'courses', courseId));
-        firestoreSuccess = true;
-        toast.success(`✨ Đã xóa khóa học "${courseTitle}" trên hệ thống Cloud và tất cả thiết bị!`);
-      } catch (err: any) {
-        console.warn('Firestore delete course warning:', err);
-        const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
-        // If firestore threw an error, notify with explanation
-        toast.info(`Khóa học "${courseTitle}" đã được xóa trên thiết bị của bạn.`);
-      }
-
-      setMessage({ 
-        type: 'success', 
-        text: isSystemCourse 
-          ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` 
-          : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` 
-      });
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      window.dispatchEvent(new Event('storage'));
-      setTimeout(() => setMessage(null), 4000);
+    try {
+      await deleteDoc(doc(db, 'courses', courseId));
+      toast.success(
+        isSystemCourse 
+          ? `Đã reset khóa học "${courseTitle}" về nội dung gốc!` 
+          : `Đã xóa thành công khóa học "${courseTitle}"!`,
+        4000,
+        'Đã xóa'
+      );
+    } catch (err: any) {
+      console.warn('Firestore delete course warning:', err);
+      const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
+      toast.info(`Khóa học "${courseTitle}" đã được xóa trên thiết bị của bạn.`, 4000, 'Thiết bị');
     }
+
+    setMessage({ 
+      type: 'success', 
+      text: isSystemCourse 
+        ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` 
+        : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` 
+    });
+    window.dispatchEvent(new CustomEvent('courses_updated'));
+    window.dispatchEvent(new Event('storage'));
+    setTimeout(() => setMessage(null), 4000);
   };
 
   const resetForm = () => {
@@ -597,7 +688,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       } else {
         setFlatLessons(prev => [...prev, ...parsedLessons]);
       }
-      toast.showToast(`Đã nhập thành công ${parsedLessons.length} bài giảng vào danh sách!`, 'success');
+      toast.success(`Đã nhận diện và nhập thành công ${parsedLessons.length} bài giảng vào giáo trình!`, 4000, 'Nhập bài giảng');
     }
 
     setBulkImportText('');
@@ -772,7 +863,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             {/* Nút Ẩn / Hiện (Chuyển trạng thái hoạt động <-> không hoạt động) */}
                             {isHiddenOrInactive ? (
                               <button
-                                onClick={() => handleToggleCourseStatus(course)}
+                                onClick={() => promptToggleCourseStatus(course)}
                                 title="Kích hoạt để khóa học hiển thị công khai cho học viên"
                                 className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
                               >
@@ -781,7 +872,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleToggleCourseStatus(course)}
+                                onClick={() => promptToggleCourseStatus(course)}
                                 title="Ẩn khóa học khỏi danh sách học viên (chuyển sang Không hoạt động)"
                                 className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5"
                               >
@@ -800,7 +891,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                             {/* Nút Xóa / Reset */}
                             <button
-                              onClick={() => handleDeleteCourse(course.id, course.title)}
+                              onClick={() => promptDeleteCourse(course.id, course.title)}
                               className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
                             >
                               {isSystem ? 'Reset' : 'Xóa'}
@@ -1167,6 +1258,40 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           </div>
         </div>
       )}
+
+      {/* Modern Confirmation Dialog */}
+      <CourseConfirmModal
+        isOpen={confirmModal.isOpen}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        courseTitle={confirmModal.courseTitle}
+        category={confirmModal.category}
+        price={confirmModal.price}
+        description={confirmModal.description}
+        isProcessing={confirmModal.isProcessing}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Modern Success Banner Modal */}
+      <CourseSuccessBannerModal
+        isOpen={successModal.isOpen}
+        action={successModal.action}
+        courseTitle={successModal.courseTitle}
+        details={successModal.details}
+        courseId={successModal.courseId}
+        onClose={() => {
+          setSuccessModal(prev => ({ ...prev, isOpen: false }));
+          setActiveTab('list');
+        }}
+        onViewList={() => {
+          setSuccessModal(prev => ({ ...prev, isOpen: false }));
+          setActiveTab('list');
+        }}
+        onContinueEdit={() => {
+          setSuccessModal(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
 
     </div>
   );
