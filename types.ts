@@ -5,6 +5,16 @@ export interface Lesson {
   isHidden?: boolean;
 }
 
+export interface LessonNote {
+  id: string;
+  text: string;
+  date: string;
+  lessonIdx: number;
+  lessonTitle: string;
+  tag?: 'important' | 'concept' | 'warning' | 'question' | 'general';
+  createdAt?: number;
+}
+
 export interface Course {
   id: string;
   title: string;

@@ -475,12 +475,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     if (window.confirm(confirmMsg)) {
-      let firestoreSuccess = false;
-      try {
-        await deleteDoc(doc(db, 'courses', courseId));
-        firestoreSuccess = true;
-      } catch (err: any) {
-        console.warn('Firestore delete course warning:', err);
+      // Optimistically update React state immediately
+      if (isSystemCourse) {
+        const defaultCourse = HARDCODED_COURSES.find(c => c.id === courseId);
+        if (defaultCourse) {
+          setCourses(prev => prev.map(c => c.id === courseId ? { ...defaultCourse } : c));
+        }
+      } else {
+        setCourses(prev => prev.filter(c => c.id !== courseId));
       }
 
       // Also clean up from LocalStorage
@@ -498,13 +500,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         localStorage.removeItem(`course_unlocked_${courseId}`);
       } catch (e) {}
 
-      if (firestoreSuccess) {
-        toast.success(`✨ Đã xóa khóa học "${courseTitle}" trên hệ thống Cloud và thiết bị!`);
-      } else {
-        toast.success(`✨ Đã xóa thành công khóa học "${courseTitle}" trên hệ thống!`);
+      let firestoreSuccess = false;
+      try {
+        await deleteDoc(doc(db, 'courses', courseId));
+        firestoreSuccess = true;
+        toast.success(`✨ Đã xóa khóa học "${courseTitle}" trên hệ thống Cloud và tất cả thiết bị!`);
+      } catch (err: any) {
+        console.warn('Firestore delete course warning:', err);
+        const errorInfo = parseFirestoreError(err, `Xóa khóa học "${courseTitle}"`);
+        // If firestore threw an error, notify with explanation
+        toast.info(`Khóa học "${courseTitle}" đã được xóa trên thiết bị của bạn.`);
       }
 
-      setMessage({ type: 'success', text: isSystemCourse ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` });
+      setMessage({ 
+        type: 'success', 
+        text: isSystemCourse 
+          ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` 
+          : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` 
+      });
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       setTimeout(() => setMessage(null), 4000);

@@ -4,9 +4,11 @@ import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLess
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
-import { Course } from '../types';
+import { Course, LessonNote } from '../types';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
+import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
+import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -56,8 +58,9 @@ const Classroom: React.FC = () => {
   const [hasAutoResumed, setHasAutoResumed] = useState<boolean>(false);
   const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'discussion'>('overview');
+  const [sidebarView, setSidebarView] = useState<'playlist' | 'notes'>('playlist');
   const [userNote, setUserNote] = useState('');
-  const [savedNotes, setSavedNotes] = useState<{ id: string; text: string; date: string }[]>([]);
+  const [savedNotes, setSavedNotes] = useState<LessonNote[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isBackgroundAudioActive, setIsBackgroundAudioActive] = useState(true);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
@@ -146,6 +149,9 @@ const Classroom: React.FC = () => {
           setIsAdmin(true);
         }
 
+        // Trigger daily learning streak recording
+        recordDailyLearningActivity(normalizedEmail);
+
         // Local storage unlock check
         if (courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true') {
           setIsOwned(true);
@@ -160,6 +166,10 @@ const Classroom: React.FC = () => {
               setIsOwned(true);
               setCourseProgress(data.progress || 0);
               setCompletedLessons(data.completedLessons || []);
+              if (Array.isArray(data.notes)) {
+                setSavedNotes(data.notes);
+                localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
+              }
               localStorage.setItem(`course_unlocked_${courseId}`, 'true');
 
               // Tự động khôi phục vị trí bài học cuối cùng từ Firestore
@@ -249,23 +259,54 @@ const Classroom: React.FC = () => {
           progress: newProgress,
           completedLessons: newCompleted
         }, { merge: true });
+
+        // Update gamification milestones
+        const isCourseFullyFinished = newProgress >= 100;
+        updateLearningMilestone(currentUser.email, {
+          incrementLessons: 1,
+          completedCoursesCount: isCourseFullyFinished ? 1 : 0
+        });
       } catch (err) {
         console.error("Lỗi cập nhật tiến độ:", err);
       }
     }
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!userNote.trim() || !courseId) return;
-    const newNoteObj = {
-      id: `${Date.now()}`,
+    const now = new Date();
+    const formattedDate = `${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • ${now.toLocaleDateString('vi-VN')}`;
+    const newNoteObj: LessonNote = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       text: userNote.trim(),
-      date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ', ' + new Date().toLocaleDateString('vi-VN')
+      date: formattedDate,
+      lessonIdx: currentIdx,
+      lessonTitle: currentLesson?.title || `Bài ${currentIdx + 1}`,
+      tag: 'general',
+      createdAt: Date.now()
     };
     const updated = [newNoteObj, ...savedNotes];
     setSavedNotes(updated);
     localStorage.setItem(`notes_${courseId}`, JSON.stringify(updated));
     setUserNote('');
+
+    if (currentUser?.email && courseId) {
+      try {
+        const userDocRef = doc(db, "users", currentUser.email.toLowerCase(), "purchased_courses", courseId);
+        await setDoc(userDocRef, {
+          notes: updated,
+          lastNotesUpdatedAt: new Date().toISOString()
+        }, { merge: true });
+        triggerFeedback('Đã lưu ghi chú lên Cloud!', '☁️');
+
+        // Gamification note milestone
+        updateLearningMilestone(currentUser.email, {
+          totalNotesCreated: updated.length
+        });
+      } catch (err) {
+        console.error("Lỗi lưu ghi chú lên Firestore:", err);
+      }
+    }
   };
 
   // Keyboard Shortcuts Listener for Fast Navigation
@@ -322,21 +363,32 @@ const Classroom: React.FC = () => {
         return;
       }
 
-      // 4. Toggle PiP: 'i' or 'I'
+      // 4. Toggle Personal Notes Sidebar: 'g' or 'G'
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        setSidebarView(prev => {
+          const next = prev === 'notes' ? 'playlist' : 'notes';
+          triggerFeedback(next === 'notes' ? 'Đã mở Ghi chú cá nhân' : 'Đã mở Danh sách bài giảng', '📝');
+          return next;
+        });
+        return;
+      }
+
+      // 5. Toggle PiP: 'i' or 'I'
       if (e.key === 'i' || e.key === 'I') {
         e.preventDefault();
         togglePiP();
         return;
       }
 
-      // 5. Open Shortcuts Help: '?' or '/' or 'h' or 'H'
+      // 6. Open Shortcuts Help: '?' or '/' or 'h' or 'H'
       if (e.key === '?' || e.key === '/' || e.key === 'h' || e.key === 'H') {
         e.preventDefault();
         setShowShortcutsModal(prev => !prev);
         return;
       }
 
-      // 6. Escape to close modals
+      // 7. Escape to close modals
       if (e.key === 'Escape') {
         setShowShortcutsModal(false);
       }
@@ -344,7 +396,7 @@ const Classroom: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser]);
+  }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser, savedNotes]);
 
   const activeVideoUrl = useMemo(() => {
     return currentLesson?.videoUrl ? String(currentLesson.videoUrl).trim() : "";
@@ -449,8 +501,29 @@ const Classroom: React.FC = () => {
           </div>
         </div>
 
-        {/* PROGRESS & PROFILE BADGE & SHORTCUTS HELP */}
-        <div className="flex items-center gap-2 sm:gap-3 md:gap-6">
+        {/* PROGRESS & PROFILE BADGE & SHORTCUTS HELP & NOTES TOGGLE */}
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+          <button
+            onClick={() => setSidebarView(prev => prev === 'notes' ? 'playlist' : 'notes')}
+            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+              sidebarView === 'notes'
+                ? 'bg-teal-500 text-slate-950 border-teal-400 shadow-md shadow-teal-500/20'
+                : 'text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border-white/[0.08]'
+            }`}
+            title="Mở / Đóng thanh ghi chú cá nhân (Phím tắt: G)"
+          >
+            <span>📝</span>
+            <span className="hidden md:inline">Ghi chú</span>
+            <span className="hidden sm:inline-flex px-1.5 py-0.2 text-[10px] font-mono bg-black/40 rounded border border-white/10 text-teal-300">
+              {savedNotes.length}
+            </span>
+            <kbd className={`text-[9px] font-mono px-1.5 py-0.5 rounded border hidden lg:inline-block ${
+              sidebarView === 'notes' ? 'bg-black/20 text-slate-950 border-black/30' : 'bg-black/40 text-teal-300 border-white/20'
+            }`}>
+              G
+            </kbd>
+          </button>
+
           <button
             onClick={() => setShowShortcutsModal(true)}
             className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all"
@@ -827,115 +900,192 @@ const Classroom: React.FC = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: REFINED PLAYLIST SIDEBAR (4 COLS) */}
-        <div className="lg:col-span-4 flex flex-col space-y-6">
-          <div className="bg-[#111827]/90 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-white/[0.08] shadow-2xl flex flex-col h-full min-h-[550px]">
-            
-            {/* PLAYLIST HEADER */}
-            <div className="pb-4 border-b border-white/[0.08] mb-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2 tracking-tight">
-                    <span className="w-1.5 h-4 bg-teal-400 rounded-full"></span>
-                    Danh sách bài giảng
-                  </h3>
-                  <span className="text-[11px] font-bold text-slate-400">{curriculum.length} bài học video</span>
-                </div>
-                <span className="text-[11px] font-black text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20">
-                  {completedLessons.length}/{curriculum.length} Đã xong
-                </span>
-              </div>
+        {/* RIGHT COLUMN: REFINED PLAYLIST & PERSONAL NOTES SIDEBAR (4 COLS) */}
+        <div className="lg:col-span-4 flex flex-col space-y-4">
+          {/* DUAL TAB SWITCHER FOR SIDEBAR */}
+          <div className="flex items-center gap-1.5 p-1 bg-[#111827]/90 backdrop-blur-md rounded-2xl border border-white/[0.08] shadow-lg">
+            <button
+              onClick={() => setSidebarView('playlist')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                sidebarView === 'playlist'
+                  ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md shadow-teal-950/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>📺 Danh sách bài</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                sidebarView === 'playlist' ? 'bg-black/30 text-slate-900 font-black' : 'bg-white/10 text-slate-300'
+              }`}>
+                {completedLessons.length}/{curriculum.length}
+              </span>
+            </button>
 
-              {/* SEARCH LESSONS */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm bài học..."
-                  className="w-full bg-[#090d16] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition-all pl-9"
-                />
-                <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </div>
+            <button
+              onClick={() => setSidebarView('notes')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                sidebarView === 'notes'
+                  ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 shadow-md shadow-teal-950/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>📝 Ghi chú cá nhân</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                sidebarView === 'notes' ? 'bg-black/30 text-slate-900 font-black' : 'bg-white/10 text-slate-300'
+              }`}>
+                {savedNotes.length}
+              </span>
+            </button>
+          </div>
+
+          {/* RENDER PERSONAL NOTES SIDEBAR OR PLAYLIST SIDEBAR */}
+          {sidebarView === 'notes' ? (
+            <div className="h-full min-h-[550px] flex flex-col">
+              <PersonalNotesSidebar
+                courseId={courseId || ''}
+                courseTitle={course?.title || 'Khóa học'}
+                currentLessonIdx={currentIdx}
+                currentLessonTitle={currentLesson?.title || `Bài ${currentIdx + 1}`}
+                userEmail={currentUser?.email}
+                onSelectLesson={(idx) => setCurrentIdx(idx)}
+                onClose={() => setSidebarView('playlist')}
+              />
             </div>
-
-            {/* LESSON ITEMS LIST */}
-            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[620px] custom-scrollbar">
-              {filteredCurriculum.map((lesson, originalIdx) => {
-                // Find actual index in real curriculum array
-                const idx = curriculum.findIndex(c => c.title === lesson.title);
-                const actualIdx = idx !== -1 ? idx : originalIdx;
-                const isCompleted = completedLessons.includes(`${actualIdx}`) || completedLessons.includes(`0-${actualIdx}`);
-                const isPlaying = currentIdx === actualIdx;
-
-                return (
-                  <div
-                    key={actualIdx}
-                    onClick={() => setCurrentIdx(actualIdx)}
-                    className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 flex items-center justify-between gap-3 group relative overflow-hidden ${
-                      isPlaying 
-                        ? 'bg-gradient-to-r from-teal-950/60 to-slate-900/90 border-teal-500/40 shadow-lg shadow-teal-950/30' 
-                        : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/[0.06]'
-                    }`}
+          ) : (
+            <div className="bg-[#111827]/90 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-white/[0.08] shadow-2xl flex flex-col h-full min-h-[550px]">
+              
+              {/* PLAYLIST HEADER */}
+              <div className="pb-4 border-b border-white/[0.08] mb-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-white text-base flex items-center gap-2 tracking-tight">
+                      <span className="w-1.5 h-4 bg-teal-400 rounded-full"></span>
+                      Danh sách bài giảng
+                    </h3>
+                    <span className="text-[11px] font-bold text-slate-400">{curriculum.length} bài học video</span>
+                  </div>
+                  <button
+                    onClick={() => setSidebarView('notes')}
+                    className="text-[11px] font-bold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1 rounded-lg border border-teal-500/20 flex items-center gap-1 transition-all"
+                    title="Mở ghi chú bài học"
                   >
-                    {isPlaying && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 to-emerald-400"></div>
-                    )}
+                    <span>📝 Ghi chú ({savedNotes.length})</span>
+                  </button>
+                </div>
 
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-all ${
+                {/* SEARCH LESSONS */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tìm bài học..."
+                    className="w-full bg-[#090d16] border border-white/[0.08] rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 transition-all pl-9"
+                  />
+                  <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+              </div>
+
+              {/* LESSON ITEMS LIST */}
+              <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[560px] custom-scrollbar">
+                {filteredCurriculum.map((lesson, originalIdx) => {
+                  // Find actual index in real curriculum array
+                  const idx = curriculum.findIndex(c => c.title === lesson.title);
+                  const actualIdx = idx !== -1 ? idx : originalIdx;
+                  const isCompleted = completedLessons.includes(`${actualIdx}`) || completedLessons.includes(`0-${actualIdx}`);
+                  const isPlaying = currentIdx === actualIdx;
+                  const lessonNoteCount = savedNotes.filter(n => n.lessonIdx === actualIdx).length;
+
+                  return (
+                    <div
+                      key={actualIdx}
+                      onClick={() => setCurrentIdx(actualIdx)}
+                      className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 flex items-center justify-between gap-3 group relative overflow-hidden ${
                         isPlaying 
-                          ? 'bg-teal-400 text-slate-950 shadow-md shadow-teal-400/20 font-black' 
-                          : isCompleted
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-white/[0.05] text-slate-400 border border-white/[0.08] group-hover:text-slate-200'
-                      }`}>
-                        {actualIdx + 1}
-                      </span>
+                          ? 'bg-gradient-to-r from-teal-950/60 to-slate-900/90 border-teal-500/40 shadow-lg shadow-teal-950/30' 
+                          : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/[0.06]'
+                      }`}
+                    >
+                      {isPlaying && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 to-emerald-400"></div>
+                      )}
 
-                      <div className="min-w-0">
-                        <p className={`text-xs md:text-sm font-bold line-clamp-1 transition-colors ${
-                          isPlaying ? 'text-teal-300 font-extrabold' : 'text-slate-200 group-hover:text-white'
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-all ${
+                          isPlaying 
+                            ? 'bg-teal-400 text-slate-950 shadow-md shadow-teal-400/20 font-black' 
+                            : isCompleted
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-white/[0.05] text-slate-400 border border-white/[0.08] group-hover:text-slate-200'
                         }`}>
-                          {lesson.title}
-                        </p>
-                        <p className="text-[10px] font-medium text-slate-400 mt-0.5 flex items-center gap-1.5">
-                          {isPlaying ? (
-                            <span className="text-teal-400 font-bold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
-                              Đang phát
-                            </span>
-                          ) : isCompleted ? (
-                            <span className="text-emerald-400 font-bold">✓ Đã học xong</span>
-                          ) : (
-                            'Chưa học'
-                          )}
-                        </p>
+                          {actualIdx + 1}
+                        </span>
+
+                        <div className="min-w-0">
+                          <p className={`text-xs md:text-sm font-bold line-clamp-1 transition-colors ${
+                            isPlaying ? 'text-teal-300 font-extrabold' : 'text-slate-200 group-hover:text-white'
+                          }`}>
+                            {lesson.title}
+                          </p>
+                          <div className="text-[10px] font-medium text-slate-400 mt-0.5 flex items-center gap-2">
+                            {isPlaying ? (
+                              <span className="text-teal-400 font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
+                                Đang phát
+                              </span>
+                            ) : isCompleted ? (
+                              <span className="text-emerald-400 font-bold">✓ Đã học xong</span>
+                            ) : (
+                              'Chưa học'
+                            )}
+
+                            {lessonNoteCount > 0 && (
+                              <span className="text-teal-300 font-bold flex items-center gap-0.5 bg-teal-500/10 px-1.5 py-0.2 rounded border border-teal-500/20">
+                                📝 {lessonNoteCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isCompleted ? (
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                        ) : isPlaying ? (
+                          <div className="flex items-end gap-0.5 h-4 px-1">
+                            <span className="w-1 h-3.5 bg-teal-400 rounded-full animate-pulse"></span>
+                            <span className="w-1 h-2 bg-teal-300 rounded-full animate-pulse delay-75"></span>
+                            <span className="w-1 h-4 bg-teal-400 rounded-full animate-pulse delay-150"></span>
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.04] group-hover:bg-white/[0.1] text-slate-500 group-hover:text-slate-300 flex items-center justify-center transition-all">
+                            <svg className="w-3 h-3 translate-x-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                          </div>
+                        )}
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="shrink-0">
-                      {isCompleted ? (
-                        <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                      ) : isPlaying ? (
-                        <div className="flex items-end gap-0.5 h-4 px-1">
-                          <span className="w-1 h-3.5 bg-teal-400 rounded-full animate-pulse"></span>
-                          <span className="w-1 h-2 bg-teal-300 rounded-full animate-pulse delay-75"></span>
-                          <span className="w-1 h-4 bg-teal-400 rounded-full animate-pulse delay-150"></span>
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-white/[0.04] group-hover:bg-white/[0.1] text-slate-500 group-hover:text-slate-300 flex items-center justify-center transition-all">
-                          <svg className="w-3 h-3 translate-x-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
-                        </div>
-                      )}
-                    </div>
+              {/* QUICK NOTE BUTTON AT BOTTOM OF PLAYLIST */}
+              <div className="pt-3 border-t border-white/[0.08] mt-3">
+                <button
+                  onClick={() => setSidebarView('notes')}
+                  className="w-full py-2.5 px-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-teal-500/30 text-teal-300 hover:text-teal-200 text-xs font-bold flex items-center justify-between transition-all group active:scale-95"
+                >
+                  <div className="flex items-center gap-2">
+                    <span>📝</span>
+                    <span>Ghi chú cho bài học này</span>
                   </div>
-                );
-              })}
+                  <span className="text-[11px] text-slate-400 group-hover:text-white flex items-center gap-1 font-mono">
+                    Mở ghi chú (Phím G) →
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </main>
@@ -971,6 +1121,7 @@ const Classroom: React.FC = () => {
               {[
                 { keys: ['→', 'N', 'L'], label: 'Chuyển sang bài tiếp theo', desc: 'Chuyển ngay tới video bài học kế tiếp' },
                 { keys: ['←', 'P', 'J'], label: 'Quay lại bài trước đó', desc: 'Chuyển về video bài học liền trước' },
+                { keys: ['G'], label: 'Mở / Đóng Ghi chú cá nhân', desc: 'Chuyển đổi thanh ghi chú bài học đồng bộ Cloud' },
                 { keys: ['M'], label: 'Đánh dấu hoàn thành', desc: 'Lưu tiến độ học tập và tích xanh bài học' },
                 { keys: ['I'], label: 'Bật / Tắt cửa sổ nổi (PiP)', desc: 'Xem video ở góc màn hình khi làm việc khác' },
                 { keys: ['?'], label: 'Mở / Đóng bảng phím tắt', desc: 'Hiển thị trợ giúp phím tắt bất kỳ lúc nào' },
