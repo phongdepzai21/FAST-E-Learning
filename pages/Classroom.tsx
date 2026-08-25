@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
 import Handbook from './Handbook';
+import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -35,14 +37,42 @@ const Classroom: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [courseProgress, setCourseProgress] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [currentIdx, setCurrentIdx] = useState(0);
+  
+  // Khởi tạo index bài học từ cache hoặc query param ?bai=X
+  const initialLessonIndex = useMemo(() => {
+    if (!courseId) return 0;
+    const params = new URLSearchParams(location.search);
+    const paramBai = params.get('bai') || params.get('lesson');
+    if (paramBai) {
+      const parsed = parseInt(paramBai, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed - 1; // Convert 1-based to 0-based
+      }
+    }
+    return getCachedLastLessonIdx(courseId);
+  }, [courseId, location.search]);
+
+  const [currentIdx, setCurrentIdx] = useState<number>(initialLessonIndex);
+  const [hasAutoResumed, setHasAutoResumed] = useState<boolean>(false);
   const [isLiked, setIsLiked] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'discussion'>('overview');
   const [userNote, setUserNote] = useState('');
   const [savedNotes, setSavedNotes] = useState<{ id: string; text: string; date: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isBackgroundAudioActive, setIsBackgroundAudioActive] = useState(true);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [shortcutFeedback, setShortcutFeedback] = useState<{ text: string; icon: string } | null>(null);
+  const feedbackTimerRef = useRef<any>(null);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const hasRestoredFromFirestoreRef = useRef(false);
+
+  const triggerFeedback = (text: string, icon: string) => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    setShortcutFeedback({ text, icon });
+    feedbackTimerRef.current = setTimeout(() => {
+      setShortcutFeedback(null);
+    }, 1600);
+  };
 
   // Background audio keep-alive trigger for background tab playback
   const ensureAudioKeepAlive = () => {
@@ -126,10 +156,25 @@ const Classroom: React.FC = () => {
           const userDocRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
           onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
+              const data = docSnap.data();
               setIsOwned(true);
-              setCourseProgress(docSnap.data().progress || 0);
-              setCompletedLessons(docSnap.data().completedLessons || []);
+              setCourseProgress(data.progress || 0);
+              setCompletedLessons(data.completedLessons || []);
               localStorage.setItem(`course_unlocked_${courseId}`, 'true');
+
+              // Tự động khôi phục vị trí bài học cuối cùng từ Firestore
+              const params = new URLSearchParams(location.search);
+              const hasUrlParam = !!(params.get('bai') || params.get('lesson'));
+              if (!hasUrlParam && !hasRestoredFromFirestoreRef.current) {
+                if (typeof data.lastLessonIdx === 'number' && data.lastLessonIdx >= 0) {
+                  const targetIdx = data.lastLessonIdx;
+                  setCurrentIdx(targetIdx);
+                  if (targetIdx > 0) {
+                    setHasAutoResumed(true);
+                  }
+                  hasRestoredFromFirestoreRef.current = true;
+                }
+              }
             }
           });
         }
@@ -144,7 +189,16 @@ const Classroom: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [courseId]);
+  }, [courseId, location.search]);
+
+  // Tự động lưu vị trí bài học hiện tại mỗi khi chuyển bài
+  useEffect(() => {
+    if (!courseId || curriculum.length === 0) return;
+    const targetLesson = curriculum[currentIdx];
+    if (targetLesson) {
+      saveLastAccessedLesson(courseId, currentIdx, targetLesson.title, currentUser?.email);
+    }
+  }, [courseId, currentIdx, curriculum, currentUser?.email]);
 
   // Saved Notes from LocalStorage
   useEffect(() => {
@@ -213,6 +267,84 @@ const Classroom: React.FC = () => {
     localStorage.setItem(`notes_${courseId}`, JSON.stringify(updated));
     setUserNote('');
   };
+
+  // Keyboard Shortcuts Listener for Fast Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is currently typing in an input, textarea or editable field
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        (activeEl as HTMLElement).isContentEditable
+      );
+
+      if (isTyping) {
+        if (e.key === 'Escape') {
+          (activeEl as HTMLElement).blur();
+        }
+        return;
+      }
+
+      // 1. Next lesson: ArrowRight, 'n', 'N', 'l', 'L'
+      if (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N' || e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        if (currentIdx < curriculum.length - 1) {
+          const nextIdx = currentIdx + 1;
+          setCurrentIdx(nextIdx);
+          const nextTitle = curriculum[nextIdx]?.title || `Bài ${nextIdx + 1}`;
+          triggerFeedback(`Bài ${nextIdx + 1}: ${nextTitle}`, '→');
+        } else {
+          triggerFeedback('Đã đến bài học cuối cùng của khóa!', 'ℹ️');
+        }
+        return;
+      }
+
+      // 2. Previous lesson: ArrowLeft, 'p', 'P', 'j', 'J'
+      if (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P' || e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        if (currentIdx > 0) {
+          const prevIdx = currentIdx - 1;
+          setCurrentIdx(prevIdx);
+          const prevTitle = curriculum[prevIdx]?.title || `Bài ${prevIdx + 1}`;
+          triggerFeedback(`Bài ${prevIdx + 1}: ${prevTitle}`, '←');
+        } else {
+          triggerFeedback('Đang ở bài học đầu tiên!', 'ℹ️');
+        }
+        return;
+      }
+
+      // 3. Mark completed: 'm' or 'M'
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleUpdateProgress(currentIdx);
+        triggerFeedback('Đã cập nhật hoàn thành bài học!', '✅');
+        return;
+      }
+
+      // 4. Toggle PiP: 'i' or 'I'
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        togglePiP();
+        return;
+      }
+
+      // 5. Open Shortcuts Help: '?' or '/' or 'h' or 'H'
+      if (e.key === '?' || e.key === '/' || e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        setShowShortcutsModal(prev => !prev);
+        return;
+      }
+
+      // 6. Escape to close modals
+      if (e.key === 'Escape') {
+        setShowShortcutsModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser]);
 
   const activeVideoUrl = useMemo(() => {
     return currentLesson?.videoUrl ? String(currentLesson.videoUrl).trim() : "";
@@ -317,8 +449,18 @@ const Classroom: React.FC = () => {
           </div>
         </div>
 
-        {/* PROGRESS & PROFILE BADGE */}
-        <div className="flex items-center gap-3 md:gap-6">
+        {/* PROGRESS & PROFILE BADGE & SHORTCUTS HELP */}
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-6">
+          <button
+            onClick={() => setShowShortcutsModal(true)}
+            className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all"
+            title="Xem danh sách phím tắt (Nhấn phím ? trên bàn phím)"
+          >
+            <span className="text-sm">⌨️</span>
+            <span className="hidden md:inline">Phím tắt</span>
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 bg-black/40 rounded border border-white/20 text-teal-300">?</kbd>
+          </button>
+
           <div className="hidden sm:flex flex-col items-end min-w-[130px]">
             <div className="flex items-center gap-2 text-xs font-bold">
               <span className="text-slate-400">Tiến độ khóa:</span>
@@ -385,7 +527,17 @@ const Classroom: React.FC = () => {
               webkit-playsinline="true"
             />
 
-            <div className={`w-full ${courseId === 'basic-principles' ? 'min-h-[550px] md:min-h-[650px] bg-slate-950 overflow-y-auto' : 'aspect-video bg-black flex items-center justify-center'}`}>
+            <div className={`w-full ${courseId === 'basic-principles' ? 'min-h-[550px] md:min-h-[650px] bg-slate-950 overflow-y-auto' : 'aspect-video bg-black flex items-center justify-center relative'}`}>
+              {/* HUD NOTIFICATION OVERLAY FOR KEYBOARD SHORTCUTS */}
+              {shortcutFeedback && (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-slate-900/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl border border-teal-500/40 shadow-2xl flex items-center gap-2.5 animate-bounce text-xs sm:text-sm font-bold pointer-events-none">
+                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-black border border-teal-500/30">
+                    {shortcutFeedback.icon}
+                  </span>
+                  <span className="max-w-[280px] sm:max-w-md truncate">{shortcutFeedback.text}</span>
+                </div>
+              )}
+
               {courseId === 'basic-principles' ? (
                 <div className="h-full w-full bg-white text-slate-900 relative">
                   <Handbook />
@@ -476,7 +628,7 @@ const Classroom: React.FC = () => {
                       ? 'bg-teal-500 text-slate-950 border-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.4)]' 
                       : 'bg-white/[0.06] text-slate-300 border-white/[0.08] hover:text-white hover:bg-white/[0.1]'
                   }`}
-                  title="Bật cửa sổ nổi (Picture-in-Picture) để vừa xem bài giảng vừa mở tab/website khác"
+                  title="Bật cửa sổ nổi (Picture-in-Picture) để vừa xem bài giảng vừa mở tab/website khác (Phím: I)"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h4m6-6h4m0 0v4m0-4l-5 5" />
@@ -491,9 +643,11 @@ const Classroom: React.FC = () => {
                   if (currentIdx > 0) setCurrentIdx(currentIdx - 1);
                 }}
                 className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
+                title="Bài trước (Phím tắt: ← hoặc P)"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
                 <span>Bài trước</span>
+                <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">←</kbd>
               </button>
 
               <button
@@ -503,9 +657,13 @@ const Classroom: React.FC = () => {
                     ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-emerald-950/40' 
                     : 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 shadow-teal-900/40'
                 }`}
+                title="Đánh dấu hoàn thành bài học (Phím tắt: M)"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
                 <span>{isCurrentCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}</span>
+                <kbd className={`hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono rounded border ${
+                  isCurrentCompleted ? 'bg-black/30 text-emerald-300 border-emerald-500/30' : 'bg-slate-950/30 text-slate-900 border-slate-950/20'
+                }`}>M</kbd>
               </button>
 
               <button
@@ -514,9 +672,19 @@ const Classroom: React.FC = () => {
                   if (currentIdx < curriculum.length - 1) setCurrentIdx(currentIdx + 1);
                 }}
                 className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
+                title="Bài tiếp theo (Phím tắt: → hoặc N)"
               >
                 <span>Bài tiếp</span>
+                <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">→</kbd>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+              </button>
+
+              <button
+                onClick={() => setShowShortcutsModal(true)}
+                className="p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.06] text-slate-400 hover:text-teal-300 hover:bg-white/[0.1] transition-all active:scale-95 sm:hidden"
+                title="Xem hướng dẫn phím tắt"
+              >
+                ⌨️
               </button>
 
               <button
@@ -771,6 +939,73 @@ const Classroom: React.FC = () => {
         </div>
 
       </main>
+
+      {/* KEYBOARD SHORTCUTS CHEAT SHEET MODAL */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div 
+            className="bg-[#111827] border border-white/[0.12] rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-16 -right-16 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center text-lg border border-teal-500/30">
+                  ⌨️
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Phím tắt thao tác nhanh</h3>
+                  <p className="text-xs text-slate-400">Tăng tốc trải nghiệm học tập trên máy tính</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-slate-400 hover:text-white flex items-center justify-center transition-all"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { keys: ['→', 'N', 'L'], label: 'Chuyển sang bài tiếp theo', desc: 'Chuyển ngay tới video bài học kế tiếp' },
+                { keys: ['←', 'P', 'J'], label: 'Quay lại bài trước đó', desc: 'Chuyển về video bài học liền trước' },
+                { keys: ['M'], label: 'Đánh dấu hoàn thành', desc: 'Lưu tiến độ học tập và tích xanh bài học' },
+                { keys: ['I'], label: 'Bật / Tắt cửa sổ nổi (PiP)', desc: 'Xem video ở góc màn hình khi làm việc khác' },
+                { keys: ['?'], label: 'Mở / Đóng bảng phím tắt', desc: 'Hiển thị trợ giúp phím tắt bất kỳ lúc nào' },
+                { keys: ['Esc'], label: 'Đóng cửa sổ phụ', desc: 'Thoát nhanh khỏi bảng thông tin hoặc ô nhập liệu' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-teal-500/30 transition-all">
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-white">{item.label}</h4>
+                    <p className="text-[11px] text-slate-400">{item.desc}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-3">
+                    {item.keys.map((k, ki) => (
+                      <kbd 
+                        key={ki}
+                        className="px-2.5 py-1 text-xs font-black font-mono bg-[#090d16] text-teal-300 border border-white/[0.15] rounded-xl shadow-inner min-w-[28px] text-center"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs py-3 rounded-2xl transition-all shadow-lg shadow-teal-950/40 active:scale-95"
+              >
+                Đã hiểu, tiếp tục học
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Course } from '../types';
 import { Link } from "react-router-dom";
+import { getCachedLastLessonIdx } from '../utils/lessonTracking';
 
 interface CourseCardProps {
   course: Course;
@@ -43,6 +44,22 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [lastLessonIdx, setLastLessonIdx] = useState<number>(() => {
+    return isOwned ? getCachedLastLessonIdx(course.id) : 0;
+  });
+
+  useEffect(() => {
+    if (isOwned) {
+      setLastLessonIdx(getCachedLastLessonIdx(course.id));
+      const handleSync = (e: any) => {
+        if (e.detail?.courseId === course.id && typeof e.detail.lessonIdx === 'number') {
+          setLastLessonIdx(e.detail.lessonIdx);
+        }
+      };
+      window.addEventListener('lesson_accessed', handleSync);
+      return () => window.removeEventListener('lesson_accessed', handleSync);
+    }
+  }, [course.id, isOwned]);
   
   const style = useMemo(() => {
     const cat = (course.category || 'ISO').toUpperCase();
@@ -69,7 +86,9 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
     }
   };
 
-  const targetUrl = isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`;
+  const targetUrl = isOwned 
+    ? (lastLessonIdx > 0 ? `/hoc/${course.id}?bai=${lastLessonIdx + 1}` : `/hoc/${course.id}`)
+    : `/khoa-hoc/${course.id}`;
 
   return (
     <Link to={targetUrl} onClick={handleClick} className="block h-full group relative">
@@ -126,7 +145,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                         <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          Vào phòng học ngay
+                          {lastLessonIdx > 0 ? `Tiếp tục bài ${lastLessonIdx + 1}` : 'Vào phòng học ngay'}
                         </span>
                         <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                             <svg className="w-5 h-5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" /></svg>

@@ -10,6 +10,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
 import Handbook from './Handbook';
+import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [isLoaded, setIsLoaded] = useState(false);
   const [courseProgress, setCourseProgress] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [lastSavedLessonIdx, setLastSavedLessonIdx] = useState<number | null>(null);
   
   // State for Video Player Modal
   const [playingLesson, setPlayingLesson] = useState<{ lessonIdx: number, title: string, videoUrl?: string } | null>(null);
@@ -154,10 +156,15 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                 const docRef = doc(db, "users", normalizedEmail, "purchased_courses", id);
                 const unsubPurchased = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
+                        const data = docSnap.data();
                         setIsOwned(true);
-                        setCourseProgress(docSnap.data().progress || 0);
-                        setCompletedLessons(docSnap.data().completedLessons || []);
+                        setCourseProgress(data.progress || 0);
+                        setCompletedLessons(data.completedLessons || []);
                         localStorage.setItem(`course_unlocked_${id}`, 'true');
+
+                        if (typeof data.lastLessonIdx === 'number' && data.lastLessonIdx >= 0) {
+                            setLastSavedLessonIdx(data.lastLessonIdx);
+                        }
                     }
                 }, (error) => {
                     console.error("Lỗi kiểm tra khóa học realtime:", error);
@@ -227,14 +234,24 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     handlePaymentSuccess();
   };
 
+  // Tự động khôi phục và đồng bộ bài học đang xem
   useEffect(() => {
      if (isOwned && curriculum.length > 0 && !playingLesson) {
           let targetLesson = 0;
-          for (let lIdx = 0; lIdx < curriculum.length; lIdx++) {
-             if (!completedLessons.includes(`${lIdx}`) && !completedLessons.includes(`0-${lIdx}`)) {
-                 targetLesson = lIdx;
-                 break;
-             }
+          if (lastSavedLessonIdx !== null && lastSavedLessonIdx >= 0 && lastSavedLessonIdx < curriculum.length) {
+              targetLesson = lastSavedLessonIdx;
+          } else {
+              const cached = getCachedLastLessonIdx(id || '', currentUser?.email, curriculum.length);
+              if (cached > 0) {
+                  targetLesson = cached;
+              } else {
+                  for (let lIdx = 0; lIdx < curriculum.length; lIdx++) {
+                     if (!completedLessons.includes(`${lIdx}`) && !completedLessons.includes(`0-${lIdx}`)) {
+                         targetLesson = lIdx;
+                         break;
+                     }
+                  }
+              }
           }
           const target = curriculum[targetLesson] || curriculum[0];
           setPlayingLesson({
@@ -244,7 +261,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           });
      }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwned, curriculum, completedLessons.length]);
+  }, [isOwned, curriculum, completedLessons.length, lastSavedLessonIdx]);
+
+  // Tự động lưu vị trí bài học khi người dùng đổi bài
+  useEffect(() => {
+    if (id && playingLesson && isOwned) {
+      saveLastAccessedLesson(id, playingLesson.lessonIdx, playingLesson.title, currentUser?.email);
+    }
+  }, [id, playingLesson, isOwned, currentUser?.email]);
 
   const handleUpdateProgress = async (lessonKey: string) => {
       if (!currentUser || !id) return;
@@ -264,10 +288,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
               
               const totalLessons = curriculum.length;
               const newProgress = totalLessons > 0 ? Math.min(Math.round((completedList.length / totalLessons) * 100), 100) : 100;
+              const currentLessonNum = playingLesson ? playingLesson.lessonIdx : parseInt(lessonKey, 10);
               
               await setDoc(docRef, { 
                   progress: newProgress,
-                  completedLessons: completedList
+                  completedLessons: completedList,
+                  lastLessonIdx: isNaN(currentLessonNum) ? 0 : currentLessonNum,
+                  lastLessonTitle: playingLesson?.title || '',
+                  lastAccessedAt: new Date().toISOString()
               }, { merge: true });
               
               setCourseProgress(newProgress);
@@ -313,7 +341,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                     </div>
                 </div>
                 <Link
-                    to={`/hoc/${id}`}
+                    to={`/hoc/${id}?bai=${(playingLesson ? playingLesson.lessonIdx : 0) + 1}`}
                     className="w-full sm:w-auto bg-white text-[#007c76] hover:bg-teal-50 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider shrink-0 transition-all shadow-lg hover:scale-105 flex items-center justify-center gap-2"
                 >
                     <span>Vào phòng học</span>
@@ -622,7 +650,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
                               <div className="pt-2">
                                 <Link
-                                  to={`/hoc/${id}`}
+                                  to={`/hoc/${id}?bai=${(playingLesson ? playingLesson.lessonIdx : 0) + 1}`}
                                   className="w-full bg-[#007c76] hover:bg-[#00605b] text-white py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#007c76]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
@@ -844,7 +872,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
                         <div className="pt-2">
                             <Link
-                                to={`/hoc/${id}`}
+                                to={`/hoc/${id}?bai=${(playingLesson ? playingLesson.lessonIdx : 0) + 1}`}
                                 className="w-full bg-[#007c76] hover:bg-[#00605b] text-white py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#007c76]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
