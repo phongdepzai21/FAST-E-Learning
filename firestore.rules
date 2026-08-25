@@ -9,41 +9,36 @@ service cloud.firestore {
       return isSignedIn() && 
              request.auth.token.email != null && 
              (
-               request.auth.token.email.matches('(?i)^h1h4phong@gmail.com$') ||
-               request.auth.token.email.matches('(?i)^hkc.qms@gmail.com$') ||
-               request.auth.token.email.matches('(?i)^trdung153@gmail.com$') ||
-               request.auth.token.email.matches('(?i)^lediem.ngo@gmail.com$')
+               request.auth.token.email == 'h1h4phong@gmail.com' ||
+               request.auth.token.email == 'hkc.qms@gmail.com' ||
+               request.auth.token.email == 'trdung153@gmail.com' ||
+               request.auth.token.email == 'lediem.ngo@gmail.com'
              );
     }
     
     function isOwner(email) {
       return isSignedIn() && 
              request.auth.token.email != null && 
-             request.auth.token.email.matches('(?i)^' + email + '$');
+             request.auth.token.email == email;
     }
 
-    // Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Courses Collection (Public read, Admin write)
     match /courses/{courseId} {
       allow read: if true;
       allow write: if isAdmin();
       
-      // Subcollections of courses
       match /{allSubcollections=**} {
         allow read: if true;
         allow write: if isAdmin();
       }
     }
 
-    // Users Collection (Users can read/write their own profiles, Admins can read/write all)
     match /users/{userEmail} {
       allow read, write: if isOwner(userEmail) || isAdmin();
       
-      // Subcollections of users (e.g., purchased_courses)
       match /{allSubcollections=**} {
         allow read, write: if isOwner(userEmail) || isAdmin();
       }
