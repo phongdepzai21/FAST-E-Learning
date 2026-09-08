@@ -1,119 +1,10 @@
-import React, { useState } from 'react';
-import emailjs from '@emailjs/browser';
+const fs = require('fs');
+let code = fs.readFileSync('pages/Contact.tsx', 'utf8');
 
-// --- CẤU HÌNH EMAILJS (Sử dụng chung key với PaymentModal) ---
-const EMAILJS_SERVICE_ID = "service_q86r4ap"; 
-const EMAILJS_TEMPLATE_ID = "template_1nq488j"; 
-const EMAILJS_PUBLIC_KEY = "P5IG0fzzQJSm5e4P-"; 
-const TARGET_EMAIL = "hkc.qms@gmail.com";
+const targetMainStart = '<main className="bg-gray-50 py-20 font-sans animate-fade-in">';
+const targetMainEnd = '</main>';
 
-const Contact: React.FC = () => {
-  const phoneNumber = "0927 002 668";
-  const rawPhone = "0927002668";
-  const email = "hkc.qms@gmail.com";
-  const gmailLink = "https://mail.google.com/mail/u/0/?fs=1&to=hkc.qms@gmail.com&su=Li%C3%AAn+h%E1%BB%87+t%E1%BB%AB+website+HKC&body=Xin+ch%C3%A0o,+t%C3%B4i+mu%E1%BB%91n+%C4%91%C6%B0%E1%BB%A3c+h%E1%BB%97+tr%E1%BB%A3.&tf=cm";
-
-  // Form State - Added Email
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '', 
-    phone: '',
-    message: ''
-  });
-  
-  // Validation Errors State
-  const [errors, setErrors] = useState<{name?: string; email?: string; phone?: string; message?: string}>({});
-
-  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    // Xóa lỗi khi người dùng bắt đầu nhập lại
-    if (errors[e.target.name as keyof typeof errors]) {
-        setErrors({ ...errors, [e.target.name]: undefined });
-    }
-  };
-
-  const validateForm = () => {
-      const newErrors: {name?: string; email?: string; phone?: string; message?: string} = {};
-      
-      if (!formData.name.trim()) {
-          newErrors.name = "Vui lòng nhập họ và tên.";
-      }
-
-      // Validate Email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!formData.email.trim()) {
-          newErrors.email = "Vui lòng nhập địa chỉ Email.";
-      } else if (!emailRegex.test(formData.email)) {
-          newErrors.email = "Địa chỉ Email không hợp lệ.";
-      }
-
-      // Regex cho số điện thoại Việt Nam: 10 số, bắt đầu bằng 03, 05, 07, 08, 09
-      const phoneRegex = /^(0)(3[2-9]|5[6|8|9]|7[0|6-9]|8[0-6|8|9]|9[0-4|6-9])[0-9]{7}$/;
-      const cleanPhone = formData.phone.replace(/\s/g, '');
-
-      if (!cleanPhone) {
-          newErrors.phone = "Vui lòng nhập số điện thoại.";
-      } else if (!phoneRegex.test(cleanPhone)) {
-          newErrors.phone = "Số điện thoại không hợp lệ (Vui lòng nhập 10 số, đúng đầu số nhà mạng).";
-      }
-
-      if (!formData.message.trim()) {
-          newErrors.message = "Vui lòng nhập nội dung cần tư vấn.";
-      }
-
-      setErrors(newErrors);
-      return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Kiểm tra validation trước khi gửi
-    if (!validateForm()) return;
-
-    setStatus('sending');
-
-    // Chuẩn bị dữ liệu gửi đi
-    // Lưu ý: Mapping fields để tận dụng Template ID hiện có (hoặc template Contact chuẩn)
-    const templateParams = {
-        to_email: TARGET_EMAIL,        
-        to_name: "Admin FAST",
-        
-        // Thông tin người gửi
-        from_name: formData.name,      
-        from_email: formData.email,
-        phone_number: formData.phone,
-        message: formData.message,
-
-        // Fallback mapping cho template OTP cũ (nếu dùng chung)
-        // Map Email + Phone vào otp_code để hiển thị rõ trong email
-        otp_code: `${formData.phone} - ${formData.email}`,      
-        // Map nội dung vào course_name
-        course_name: formData.message, 
-        
-        reply_to: formData.email       
-    };
-
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams, EMAILJS_PUBLIC_KEY)
-      .then((response) => {
-         console.log('SUCCESS!', response.status, response.text);
-         setStatus('success');
-      }, (err) => {
-         console.error('FAILED...', err);
-         setStatus('error');
-      });
-  };
-
-  const resetForm = () => {
-      setFormData({ name: '', email: '', phone: '', message: '' });
-      setStatus('idle');
-      setErrors({});
-  };
-
-  return (
-    <main className="min-h-screen bg-[#f8fafc] font-sans selection:bg-[#007c76]/20 selection:text-[#007c76]">
+const newMain = `<main className="min-h-screen bg-[#f8fafc] font-sans selection:bg-[#007c76]/20 selection:text-[#007c76]">
       {/* Header Section */}
       <section className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="max-w-3xl">
@@ -157,7 +48,7 @@ const Contact: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-[11px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Hotline tư vấn nhanh</p>
-                        <a href={`tel:${rawPhone}`} className="text-xl font-black text-gray-900 hover:text-[#007c76] transition-colors">{phoneNumber}</a>
+                        <a href={\`tel:\${rawPhone}\`} className="text-xl font-black text-gray-900 hover:text-[#007c76] transition-colors">{phoneNumber}</a>
                     </div>
                 </div>
 
@@ -212,7 +103,7 @@ const Contact: React.FC = () => {
                                             name="name"
                                             value={formData.name}
                                             onChange={handleChange}
-                                            className={`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all ${errors.name ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}`}
+                                            className={\`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all \${errors.name ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}\`}
                                             placeholder="Họ và tên của bạn" 
                                             disabled={status === 'sending'}
                                         />
@@ -224,7 +115,7 @@ const Contact: React.FC = () => {
                                             name="phone"
                                             value={formData.phone}
                                             onChange={handleChange}
-                                            className={`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all ${errors.phone ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}`}
+                                            className={\`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all \${errors.phone ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}\`}
                                             placeholder="Số điện thoại liên hệ" 
                                             disabled={status === 'sending'}
                                         />
@@ -238,7 +129,7 @@ const Contact: React.FC = () => {
                                         name="email"
                                         value={formData.email}
                                         onChange={handleChange}
-                                        className={`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all ${errors.email ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}`}
+                                        className={\`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all \${errors.email ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}\`}
                                         placeholder="Địa chỉ Email" 
                                         disabled={status === 'sending'}
                                     />
@@ -251,7 +142,7 @@ const Contact: React.FC = () => {
                                         name="message"
                                         value={formData.message}
                                         onChange={handleChange}
-                                        className={`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all resize-none ${errors.message ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}`}
+                                        className={\`w-full bg-gray-50 border px-5 py-4 rounded-xl font-medium text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all resize-none \${errors.message ? 'border-red-200 focus:border-red-400 focus:ring-red-100 bg-red-50/50' : 'border-gray-100 focus:border-[#007c76] focus:ring-[#007c76]/10'}\`}
                                         placeholder="Khóa học hoặc dịch vụ bạn đang quan tâm..."
                                         disabled={status === 'sending'}
                                     ></textarea>
@@ -292,8 +183,15 @@ const Contact: React.FC = () => {
             </div>
         </div>
       </section>
-    </main>
-  );
-};
+    </main>`;
 
-export default Contact;
+const startIndex = code.indexOf(targetMainStart);
+const endIndex = code.lastIndexOf(targetMainEnd) + targetMainEnd.length;
+
+if (startIndex !== -1 && endIndex !== -1) {
+    const finalCode = code.substring(0, startIndex) + newMain + code.substring(endIndex);
+    fs.writeFileSync('pages/Contact.tsx', finalCode);
+    console.log('Patched Contact.tsx successfully');
+} else {
+    console.error('Could not find boundaries');
+}

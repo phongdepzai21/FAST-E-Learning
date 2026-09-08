@@ -8,6 +8,7 @@ import { Course, LessonNote } from '../types';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
+import ReactPlayer from 'react-player';
 import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
 
 const Classroom: React.FC = () => {
@@ -16,6 +17,10 @@ const Classroom: React.FC = () => {
   const location = useLocation();
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const reactPlayerRef = useRef<any>(null);
+  const [videoTimestamps, setVideoTimestamps] = useState<Record<string, number>>({});
+  const videoTimestampsRef = useRef<Record<string, number>>({});
+  const lastSyncedTimestampRef = useRef<number>(0);
   const [isPiPActive, setIsPiPActive] = useState(false);
 
   const [course, setCourse] = useState<Course | undefined>(() => {
@@ -165,6 +170,10 @@ const Classroom: React.FC = () => {
               const data = docSnap.data();
               setIsOwned(true);
               setCourseProgress(data.progress || 0);
+              if (data.videoTimestamps) {
+                setVideoTimestamps(data.videoTimestamps);
+                videoTimestampsRef.current = data.videoTimestamps;
+              }
               setCompletedLessons(data.completedLessons || []);
               if (Array.isArray(data.notes)) {
                 setSavedNotes(data.notes);
@@ -408,6 +417,35 @@ const Classroom: React.FC = () => {
   }, [activeVideoUrl]);
 
   // Picture-in-Picture & Background Media Session
+  const handleTimestampUpdate = (time: number) => {
+    if (Math.abs(time - (videoTimestampsRef.current[`${currentIdx}`] || 0)) < 1) return;
+    
+    setVideoTimestamps(prev => {
+      const next = { ...prev, [`${currentIdx}`]: time };
+      videoTimestampsRef.current = next;
+      return next;
+    });
+
+    if (Math.abs(time - lastSyncedTimestampRef.current) >= 5) {
+      lastSyncedTimestampRef.current = time;
+      if (currentUser?.email && courseId) {
+        const userDocRef = doc(db, "users", currentUser.email, "purchased_courses", courseId);
+        setDoc(userDocRef, {
+          videoTimestamps: videoTimestampsRef.current
+        }, { merge: true }).catch(e => console.error("Error syncing timestamp:", e));
+      }
+    }
+  };
+
+  const parsedVideoUrl = useMemo(() => {
+    let url = activeVideoUrl;
+    const match = url.match(/<iframe[^>]*\ssrc=["']([^"']+)["'][^>]*>/i);
+    if (match) url = match[1];
+    return url;
+  }, [activeVideoUrl]);
+
+  const canUseReactPlayer = ReactPlayer.canPlay(parsedVideoUrl);
+
   const togglePiP = async () => {
     try {
       if (!videoRef.current) return;
@@ -596,7 +634,7 @@ const Classroom: React.FC = () => {
               loop
               preload="auto"
               playsInline
-              // @ts-ignore
+              
               webkit-playsinline="true"
             />
 
@@ -620,6 +658,34 @@ const Classroom: React.FC = () => {
                   <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang tải bài giảng...</p>
                 </div>
+              ) : canUseReactPlayer ? (
+                <ReactPlayer
+                  ref={reactPlayerRef}
+                  key={parsedVideoUrl}
+                  url={parsedVideoUrl}
+                  width="100%"
+                  height="100%"
+                  controls
+                  playing
+                  playsinline
+                  onReady={() => {
+                    const player = reactPlayerRef.current;
+                    const savedTime = videoTimestampsRef.current[`${currentIdx}`] || 0;
+                    if (savedTime > 0) {
+                      player.seekTo(savedTime, 'seconds');
+                    }
+                  }}
+                  
+                  onProgress={(state) => {
+                    handleTimestampUpdate(state.playedSeconds);
+                  }}
+                  onEnded={() => {
+                    handleUpdateProgress(currentIdx);
+                    if (currentIdx < curriculum.length - 1) {
+                      setCurrentIdx(currentIdx + 1);
+                    }
+                  }}
+                />
               ) : videoEmbed.isEmbed && videoEmbed.embedUrl ? (
                 <iframe 
                   key={videoEmbed.embedUrl}
@@ -638,18 +704,31 @@ const Classroom: React.FC = () => {
                   controls 
                   autoPlay
                   playsInline
-                  // @ts-ignore
+                  
                   webkit-playsinline="true"
                   x5-playsinline="true"
                   className="w-full h-full object-contain"
                   poster={course?.image}
+                  onTimeUpdate={(e) => {
+                    handleTimestampUpdate(e.currentTarget.currentTime);
+                  }}
+                  onLoadedMetadata={(e) => {
+                    const savedTime = videoTimestampsRef.current[`${currentIdx}`] || 0;
+                    if (savedTime > 0 && e.currentTarget.seekable.length > 0) {
+                      e.currentTarget.currentTime = savedTime;
+                    }
+                  }}
                   onPlay={() => {
                     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                   }}
                   onPause={() => {
                     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
                   }}
+                  
+                  // @ts-ignore
                   onEnterPictureInPicture={() => setIsPiPActive(true)}
+                  
+                  // @ts-ignore
                   onLeavePictureInPicture={() => setIsPiPActive(false)}
                   onEnded={() => {
                     handleUpdateProgress(currentIdx);

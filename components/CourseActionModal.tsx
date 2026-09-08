@@ -44,6 +44,9 @@ export interface SuccessNotificationProps {
   };
   onClose: () => void;
   onViewCourse?: () => void;
+  courseId?: string;
+  onViewList?: () => void;
+  onContinueEdit?: () => void;
 }
 
 export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({

@@ -555,9 +555,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   };
 
   // Delete / Reset Course Trigger with Custom Confirmation Dialog
-  const promptDeleteCourse = (courseId: string, courseTitle: string) => {
+  const promptDeleteCourse = (courseId: string, courseTitle: string, e: React.MouseEvent) => {
     const isSystemCourse = HARDCODED_COURSES.some(c => c.id === courseId);
     const targetCourse = courses.find(c => c.id === courseId);
+
+    // Calculate a position near the clicked button
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const position = {
+      top: rect.bottom + 8, // Just below the button
+      right: window.innerWidth - rect.right // Align right edge
+    };
 
     setConfirmModal({
       isOpen: true,
@@ -569,6 +576,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       description: isSystemCourse
         ? 'Khóa học này là học liệu hệ thống. Thao tác này sẽ hủy các chỉnh sửa tùy biến và khôi phục nội dung gốc ban đầu.'
         : 'Thao tác này sẽ xóa toàn bộ nội dung khóa học và giáo trình bài giảng khỏi cơ sở dữ liệu Cloud và thiết bị.',
+      position,
       onConfirm: () => executeDeleteCourse(courseId, courseTitle, isSystemCourse),
     });
   };
@@ -902,7 +910,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                             {/* Nút Xóa / Reset */}
                             <button
-                              onClick={() => promptDeleteCourse(course.id, course.title)}
+                              onClick={(e) => promptDeleteCourse(course.id, course.title, e)}
                               className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
                             >
                               {isSystem ? 'Reset' : 'Xóa'}

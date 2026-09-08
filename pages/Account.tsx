@@ -970,6 +970,8 @@ const Account: React.FC = () => {
       let msg = "Lỗi xác thực và tạo tài khoản.";
       if (err.code === 'auth/email-already-in-use') {
         msg = "Email này hiện đã được sử dụng bởi học viên khác.";
+      } else if (err.code === 'auth/missing-email' || err.code === 'auth/missing-password') {
+        msg = "Vui lòng điền đầy đủ email và mật khẩu của bạn.";
       } else if (err.code === 'auth/invalid-email') {
         msg = "Địa chỉ email không khả dụng hoặc không chính xác.";
       } else if (err.code === 'auth/weak-password') {
@@ -1015,6 +1017,34 @@ const Account: React.FC = () => {
     setError(null);
     const cleanEmail = email.toLowerCase().trim();
     setEmail(cleanEmail);
+
+    if (isRegistering && !fullName.trim()) {
+      setIsAuthenticating(false);
+      setError("Bạn chưa nhập họ và tên. Vui lòng kiểm tra lại.");
+      toast.error("Thiếu họ và tên!");
+      return;
+    }
+
+    if (!cleanEmail || !password) {
+      setIsAuthenticating(false);
+      let errMsg = "Thiếu thông tin";
+      let msg = "";
+      
+      if (!cleanEmail && !password) {
+        msg = "Vui lòng nhập địa chỉ email và mật khẩu của bạn.";
+        errMsg = "Vui lòng nhập đầy đủ thông tin!";
+      } else if (!cleanEmail) {
+        msg = "Bạn chưa nhập địa chỉ email. Vui lòng kiểm tra lại.";
+        errMsg = "Thiếu địa chỉ email!";
+      } else if (!password) {
+        msg = "Bạn chưa nhập mật khẩu. Vui lòng kiểm tra lại.";
+        errMsg = "Thiếu mật khẩu!";
+      }
+      
+      setError(msg);
+      toast.error(errMsg);
+      return;
+    }
     try {
       if (isRegistering) {
         setIsAuthenticating(false);
@@ -1943,8 +1973,8 @@ const Account: React.FC = () => {
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                 </div>
-                                <input 
-                                    required 
+                                <input
+ 
                                     value={fullName} 
                                     onChange={e => setFullName(e.target.value)} 
                                     placeholder="Họ và tên đầy đủ" 
@@ -1957,8 +1987,8 @@ const Account: React.FC = () => {
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                             </div>
-                            <input 
-                                required 
+                            <input
+ 
                                 type="email" 
                                 value={email} 
                                 onChange={e => setEmail(e.target.value)} 
@@ -1971,8 +2001,8 @@ const Account: React.FC = () => {
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                             </div>
-                            <input 
-                                required 
+                            <input
+ 
                                 type={showPassword ? "text" : "password"} 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 

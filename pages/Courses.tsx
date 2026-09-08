@@ -290,7 +290,8 @@ const Courses: React.FC = () => {
       const isDraft = course.status === 'draft' || course.status === 'inactive';
       if (isDraft) return false; // Hide drafts & inactive courses for general view
 
-      const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase());
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = course.title.toLowerCase().includes(term) || (course.category && course.category.toLowerCase().includes(term));
       const matchesCategory = activeCategory === 'Tất cả' || 
                              course.category.toUpperCase().includes(activeCategory.toUpperCase());
       return matchesSearch && matchesCategory;

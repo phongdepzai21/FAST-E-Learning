@@ -1,47 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && 
-             request.auth.token.email != null && 
-             (
-               request.auth.token.email == 'h1h4phong@gmail.com' ||
-               request.auth.token.email == 'hkc.qms@gmail.com' ||
-               request.auth.token.email == 'trdung153@gmail.com' ||
-               request.auth.token.email == 'lediem.ngo@gmail.com'
-             );
-    }
-    
-    function isOwner(email) {
-      return isSignedIn() && 
-             request.auth.token.email != null && 
-             request.auth.token.email == email;
-    }
-
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    match /courses/{courseId} {
-      allow read: if true;
-      allow write: if isAdmin();
-      
-      match /{allSubcollections=**} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
-    }
-
-    match /users/{userEmail} {
-      allow read, write: if isOwner(userEmail) || isAdmin();
-      
-      match /{allSubcollections=**} {
-        allow read, write: if isOwner(userEmail) || isAdmin();
-      }
+      allow read, write: if true;
     }
   }
 }

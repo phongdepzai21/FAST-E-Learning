@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useRef, Suspense, lazy } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { COURSES, ADMIN_EMAILS, getMergedCourses, formatPriceSubmit, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db, storage } from '../firebase';
@@ -754,6 +755,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   return (
     <main className="min-h-screen bg-background pb-20 relative">
+      <Helmet>
+        <title>{course.title} | Học Viện FAST</title>
+        <meta name="description" content={course.description || "Chi tiết khóa học"} />
+        <meta property="og:title" content={course.title} />
+        <meta property="og:description" content={course.description || "Chi tiết khóa học"} />
+        {course.image && <meta property="og:image" content={course.image} />}
+        <meta property="og:type" content="website" />
+      </Helmet>
       {/* CSS Block to prevent Printing and Selection */}
       <style>{`
         @media print {
