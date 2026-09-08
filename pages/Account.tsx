@@ -1044,6 +1044,7 @@ const Account: React.FC = () => {
     
     if (hasError) {
         setIsAuthenticating(false);
+        toast.error("Vui lòng điền đầy đủ thông tin vào các trường được đánh dấu đỏ.");
         return;
     }
     try {
