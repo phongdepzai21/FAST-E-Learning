@@ -414,6 +414,9 @@ const Account: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<React.ReactNode | null>(null);
+  const [emailError, setEmailError] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string>('');
+  const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'teacher-dashboard' | 'settings' | 'course-learning'>('dashboard');
@@ -1015,35 +1018,33 @@ const Account: React.FC = () => {
     e.preventDefault();
     setIsAuthenticating(true);
     setError(null);
+    setEmailError('');
+    setPasswordError('');
+    setNameError('');
+    
     const cleanEmail = email.toLowerCase().trim();
     setEmail(cleanEmail);
 
+    let hasError = false;
+    
     if (isRegistering && !fullName.trim()) {
-      setIsAuthenticating(false);
-      setError("Bạn chưa nhập họ và tên. Vui lòng kiểm tra lại.");
-      toast.error("Thiếu họ và tên!");
-      return;
+      setNameError("Vui lòng nhập họ và tên đầy đủ.");
+      hasError = true;
     }
-
-    if (!cleanEmail || !password) {
-      setIsAuthenticating(false);
-      let errMsg = "Thiếu thông tin";
-      let msg = "";
-      
-      if (!cleanEmail && !password) {
-        msg = "Vui lòng nhập địa chỉ email và mật khẩu của bạn.";
-        errMsg = "Vui lòng nhập đầy đủ thông tin!";
-      } else if (!cleanEmail) {
-        msg = "Bạn chưa nhập địa chỉ email. Vui lòng kiểm tra lại.";
-        errMsg = "Thiếu địa chỉ email!";
-      } else if (!password) {
-        msg = "Bạn chưa nhập mật khẩu. Vui lòng kiểm tra lại.";
-        errMsg = "Thiếu mật khẩu!";
-      }
-      
-      setError(msg);
-      toast.error(errMsg);
-      return;
+    
+    if (!cleanEmail) {
+      setEmailError("Vui lòng nhập địa chỉ email.");
+      hasError = true;
+    }
+    
+    if (!password) {
+      setPasswordError("Vui lòng nhập mật khẩu.");
+      hasError = true;
+    }
+    
+    if (hasError) {
+        setIsAuthenticating(false);
+        return;
     }
     try {
       if (isRegistering) {

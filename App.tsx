@@ -17,6 +17,7 @@ const Courses = lazy(() => import('./pages/Courses'));
 const CourseDetail = lazy(() => import('./pages/CourseDetail'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
+const FAQ = lazy(() => import('./pages/FAQ'));
 const Consulting = lazy(() => import('./pages/Consulting'));
 const Handbook = lazy(() => import('./pages/Handbook'));
 const Account = lazy(() => import('./pages/Account'));
@@ -83,6 +84,7 @@ const AppLayout: React.FC = () => {
             <Route path="/cam-nang" element={<Handbook />} />
             <Route path="/ve-chung-toi" element={<About />} />
             <Route path="/lien-he" element={<Contact />} />
+            <Route path="/faq" element={<FAQ />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
