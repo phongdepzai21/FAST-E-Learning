@@ -360,6 +360,10 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
+                // Prevent duplicate firing during IME composition (Vietnamese typing)
+                if (e.nativeEvent.isComposing || e.keyCode === 229) {
+                  return;
+                }
                 e.preventDefault();
                 handleAddNote();
               }
