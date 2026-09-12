@@ -1,4 +1,6 @@
-import React from 'react'; 
+const fs = require('fs');
+
+const code = `import React from 'react'; 
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CONSULTING_SERVICES } from '../constants';
@@ -139,7 +141,7 @@ const Consulting: React.FC = () => {
               {steps.map((item, idx) => {
                 const isEven = idx % 2 === 0;
                 return (
-                  <div key={idx} className={`relative flex flex-col md:flex-row items-center ${isEven ? 'md:flex-row-reverse' : ''} md:h-48`}>
+                  <div key={idx} className={\`relative flex flex-col md:flex-row items-center \${isEven ? 'md:flex-row-reverse' : ''} md:h-48\`}>
                     {/* Mobile Node */}
                     <div className="md:hidden absolute left-6 top-6 w-8 h-8 -translate-x-1/2 bg-white border-4 border-teal-500 rounded-full shadow-md z-10 flex items-center justify-center">
                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
@@ -151,12 +153,12 @@ const Consulting: React.FC = () => {
                     </div>
 
                     {/* Content Box */}
-                    <div className={`w-full pl-16 md:pl-0 md:w-1/2 ${isEven ? 'md:pl-16 lg:pl-24' : 'md:pr-16 lg:pr-24 text-left md:text-right'}`}>
-                      <div className={`bg-slate-50 p-6 md:p-8 rounded-[24px] border border-slate-100 hover:shadow-[0_10px_30px_rgb(0,0,0,0.06)] hover:border-teal-200 transition-all duration-300 group relative overflow-hidden`}>
-                        <div className={`absolute top-0 w-1.5 h-full bg-teal-500 transition-all ${isEven ? 'left-0' : 'right-0 hidden md:block'}`}></div>
+                    <div className={\`w-full pl-16 md:pl-0 md:w-1/2 \${isEven ? 'md:pl-16 lg:pl-24' : 'md:pr-16 lg:pr-24 text-left md:text-right'}\`}>
+                      <div className={\`bg-slate-50 p-6 md:p-8 rounded-[24px] border border-slate-100 hover:shadow-[0_10px_30px_rgb(0,0,0,0.06)] hover:border-teal-200 transition-all duration-300 group relative overflow-hidden\`}>
+                        <div className={\`absolute top-0 w-1.5 h-full bg-teal-500 transition-all \${isEven ? 'left-0' : 'right-0 hidden md:block'}\`}></div>
                         <div className="md:hidden absolute top-0 left-0 w-1.5 h-full bg-teal-500 transition-all"></div>
                         
-                        <div className={`text-5xl font-black text-slate-200 mb-3 group-hover:text-teal-100 transition-colors ${isEven ? '' : 'md:text-right'}`}>{item.step}</div>
+                        <div className={\`text-5xl font-black text-slate-200 mb-3 group-hover:text-teal-100 transition-colors \${isEven ? '' : 'md:text-right'}\`}>{item.step}</div>
                         <h4 className="text-xl font-black text-slate-900 mb-3">{item.label}</h4>
                         <p className="text-slate-600 font-medium leading-relaxed">{item.desc}</p>
                       </div>
@@ -196,3 +198,5 @@ const Consulting: React.FC = () => {
 };
 
 export default Consulting;
+`
+fs.writeFileSync('pages/Consulting.tsx', code);
