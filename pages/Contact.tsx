@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import emailjs from '@emailjs/browser';
 
 // --- CẤU HÌNH EMAILJS (Sử dụng chung key với PaymentModal) ---
@@ -134,6 +136,9 @@ const Contact: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] font-sans selection:bg-[#007c76]/20 selection:text-[#007c76]">
+      <Helmet>
+        <title>Liên Hệ | FAST E-Learning</title>
+      </Helmet>
       {/* Header Section */}
       <section className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="max-w-3xl">

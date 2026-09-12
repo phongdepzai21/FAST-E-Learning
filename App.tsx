@@ -9,6 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
+import { HelmetProvider } from 'react-helmet-async';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -112,6 +113,7 @@ const AppLayout: React.FC = () => {
 };
 
 const App: React.FC = () => (
+  <HelmetProvider>
   <ThemeProvider>
     <ToastProvider>
       <Router>
@@ -120,6 +122,7 @@ const App: React.FC = () => (
       </Router>
     </ToastProvider>
   </ThemeProvider>
+  </HelmetProvider>
 );
 
 export default App;

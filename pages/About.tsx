@@ -1,5 +1,7 @@
 
-import React from 'react';
+import React from 'react'; 
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { TEAM, SOCIAL_ICONS } from '../constants';
 
 const About: React.FC = () => {
@@ -7,8 +9,14 @@ const About: React.FC = () => {
 
   return (
     <main className="pb-20 animate-fade-in">
+      <Helmet>
+        <title>Về Chúng Tôi | FAST E-Learning</title>
+      </Helmet>
       <section className="bg-[#007c76] py-16 md:py-24 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center mb-6">
+            <Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Về chúng tôi' }]} />
+          </div>
           <h1 className="text-3xl md:text-5xl font-black text-white mb-6 uppercase tracking-tight">Về Chúng Tôi</h1>
           <p className="text-base md:text-xl text-white/95 max-w-4xl mx-auto leading-relaxed font-medium">
             FAST E-Learning là nền tảng tiên phong tại Việt Nam trong lĩnh vực đào tạo trực tuyến 

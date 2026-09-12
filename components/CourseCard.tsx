@@ -94,7 +94,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
     <Link to={targetUrl} onClick={handleClick} className="block h-full group relative">
         <div className="bg-white rounded-[24px] overflow-hidden shadow-sm hover-lift border border-gray-100 flex flex-col h-full">
             {/* Image Container */}
-            <div className="relative aspect-[16/10] overflow-hidden bg-gray-100">
+            <div className="relative aspect-[16/10] overflow-hidden bg-gray-100 group/image">
                 <div className={`absolute inset-0 bg-gray-200 animate-pulse transition-opacity duration-500 ${isLoaded ? 'opacity-0' : 'opacity-100'}`} />
                 
                 <img
@@ -126,6 +126,19 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                       <span>⭐</span> VIP Free
                    </div>
                 )}
+
+                {/* ADVANCED HOVER OVERLAY */}
+                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center p-6 text-center backdrop-blur-[2px]">
+                    {course.description && (
+                        <p className="text-white/90 text-sm line-clamp-3 mb-5 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-100 font-medium">
+                            {course.description}
+                        </p>
+                    )}
+                    <div className="inline-flex items-center gap-2 bg-[#007c76] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-xl transform translate-y-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-150 hover:bg-[#005f5a] hover:scale-105">
+                        Xem chi tiết
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </div>
+                </div>
             </div>
             
             {/* Card Content */}

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 
 const FAQS = [
   {
@@ -24,6 +26,9 @@ const FAQ: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] font-sans selection:bg-[#007c76]/20 selection:text-[#007c76] pt-24 pb-32">
+      <Helmet>
+        <title>Hỏi Đáp (FAQ) | FAST E-Learning</title>
+      </Helmet>
       <section className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
         <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tighter mb-4">Câu Hỏi Thường Gặp <span className="text-[#007c76]">(FAQ)</span></h1>

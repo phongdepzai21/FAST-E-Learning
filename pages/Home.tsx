@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
 import { Course } from '../types';
 import CountUp from 'react-countup';
+import { Helmet } from 'react-helmet-async';
 
 const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
@@ -91,6 +92,10 @@ const Home: React.FC = () => {
 
   return (
     <div className="animate-fade-in">
+      <Helmet>
+        <title>FAST E-Learning | Nền Tảng Đào Tạo An Toàn Thực Phẩm</title>
+        <meta name="description" content="Hệ thống đào tạo trực tuyến về quản lý chất lượng và an toàn thực phẩm. Cung cấp các khóa học chuyên sâu ISO, HACCP, VietGAP." />
+      </Helmet>
       <Hero />
       
       {/* 0. Statistics (Thống kê) */}

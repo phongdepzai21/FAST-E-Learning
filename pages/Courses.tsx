@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import CourseCard from '../components/CourseCard';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -9,6 +10,7 @@ import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDo
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
+import { Helmet } from 'react-helmet-async';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
@@ -19,6 +21,8 @@ const Courses: React.FC = () => {
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(true);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
+  const allCoursesRef = React.useRef(allCourses);
+  React.useEffect(() => { allCoursesRef.current = allCourses; }, []);
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -105,7 +109,7 @@ const Courses: React.FC = () => {
                   setOwnedCourseIds(cachedIds);
                 }
               } else if (hasClaimedAll) {
-                const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+                const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
                 setOwnedCourseIds(allActiveIds);
               }
             } catch (e) {}
@@ -117,7 +121,7 @@ const Courses: React.FC = () => {
                     const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
                     let mergedIds = ids;
                     if (hasClaimedAll) {
-                      const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+                      const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
                       mergedIds = Array.from(new Set([...ids, ...allActiveIds]));
                     }
                     setOwnedCourseIds(mergedIds);
@@ -300,12 +304,19 @@ const Courses: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-[#f8fafc] pb-20 animate-fade-in">
+      <Helmet>
+        <title>Danh Sách Khóa Học | FAST E-Learning</title>
+        <meta name="description" content="Khám phá các khóa học an toàn thực phẩm, quản lý chất lượng chuyên sâu từ FAST E-Learning." />
+      </Helmet>
       {/* Search & Hero Header */}
       <div className="bg-gradient-to-br from-[#007c76] via-[#00746f] to-[#005f5b] pt-16 pb-32 md:pb-40 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-48 -mt-48"></div>
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl -ml-32 -mb-32"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 w-full">
+          <div className="flex justify-center mb-6">
+            <Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Khóa học' }]} />
+          </div>
           <div className="flex justify-center mb-6">
             <span className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-5 py-2 text-xs md:text-sm font-black uppercase tracking-[0.2em] rounded-full border border-white/20 text-white shadow-lg">
               <span className="w-2 h-2 rounded-full bg-yellow-300 animate-pulse"></span>

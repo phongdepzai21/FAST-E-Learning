@@ -10,6 +10,7 @@ import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/f
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 
@@ -826,11 +827,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
          </div>
          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/80 to-transparent"></div>
          <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 transition-all duration-1000 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <nav className="flex items-center gap-2 text-sm font-bold text-gray-400 mb-6 uppercase tracking-widest">
-              <Link to="/khoa-hoc" className="hover:text-primary transition-colors">Khóa học</Link>
-              <span>/</span>
-              <span className="text-primary">{course.category}</span>
-            </nav>
+            <div className="mb-6"><Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Khóa học', path: '/khoa-hoc' }, { label: course.title }]} /></div>
             <div className="max-w-4xl space-y-6">
               <h1 className="text-3xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight">{course.title}</h1>
               <p className="text-lg md:text-xl text-gray-300 font-medium leading-relaxed">{course.description || "Nắm vững các tiêu chuẩn và quy trình vận hành chuyên nghiệp."}</p>

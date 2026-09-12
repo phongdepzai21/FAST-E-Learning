@@ -1,5 +1,7 @@
 
-import React from 'react';
+import React from 'react'; 
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CONSULTING_SERVICES } from '../constants';
 // Fix: Use standard Link export from react-router-dom
 import { Link } from "react-router-dom";
@@ -10,6 +12,9 @@ const Consulting: React.FC = () => {
       {/* Hero Section */}
       <section className="bg-gray-50 py-20 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center mb-6">
+            <Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Tư vấn doanh nghiệp' }]} />
+          </div>
           <h1 className="text-4xl md:text-5xl font-black text-[#007b6f] mb-6 uppercase tracking-tight">Dịch Vụ Tư Vấn Chuyên Sâu</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium">
             FAST mang đến giải pháp toàn diện giúp doanh nghiệp chuẩn hóa quy trình, 

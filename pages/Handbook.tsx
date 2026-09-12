@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+import { Helmet } from 'react-helmet-async';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { ShieldAlert, Thermometer, Info, Target, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface HandbookProps {
@@ -15,6 +17,9 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
       <section className="relative py-20 bg-primary overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=2670')] bg-cover bg-center opacity-10"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <div className="flex justify-center mb-6">
+            <Breadcrumbs theme="light" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Cẩm nang ATTP' }]} />
+          </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase tracking-tight mb-6">
             Cẩm Nang An Toàn Thực Phẩm
           </h1>
@@ -60,6 +65,9 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
           <div className="w-full md:w-3/4">
             {activeTab === 'temperature' && (
               <div className="space-y-8 animate-fade-in">
+      <Helmet>
+        <title>Cẩm Nang ATTP | FAST E-Learning</title>
+      </Helmet>
                 <div>
                   <h2 className="text-3xl font-black text-text uppercase mb-4">Vùng Nhiệt Độ Nguy Hiểm</h2>
                   <p className="text-text-muted text-lg mb-6">

@@ -9,6 +9,7 @@ import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
 import ReactPlayer from 'react-player';
+import { Helmet } from 'react-helmet-async';
 import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
 
 const Classroom: React.FC = () => {
@@ -22,6 +23,7 @@ const Classroom: React.FC = () => {
   const videoTimestampsRef = useRef<Record<string, number>>({});
   const lastSyncedTimestampRef = useRef<number>(0);
   const [isPiPActive, setIsPiPActive] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   const [course, setCourse] = useState<Course | undefined>(() => {
     if (!courseId) return undefined;
@@ -364,6 +366,17 @@ const Classroom: React.FC = () => {
         return;
       }
 
+      // Focus mode: 'f' or 'F'
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setIsFocusMode(prev => {
+          const next = !prev;
+          triggerFeedback(next ? 'Đã bật chế độ tập trung' : 'Đã tắt chế độ tập trung', '🎯');
+          return next;
+        });
+        return;
+      }
+
       // 3. Mark completed: 'm' or 'M'
       if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
@@ -509,7 +522,7 @@ const Classroom: React.FC = () => {
       </div>
 
       {/* MODERN GLASS TOP NAVBAR */}
-      <header className="sticky top-0 z-50 bg-[#0f172a]/85 backdrop-blur-xl border-b border-white/[0.08] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-2xl transition-all">
+      {!isFocusMode && (<header className="sticky top-0 z-50 bg-[#0f172a]/85 backdrop-blur-xl border-b border-white/[0.08] px-4 md:px-8 py-3.5 flex items-center justify-between shadow-2xl transition-all">
         <div className="flex items-center gap-3 md:gap-5">
           <button 
             onClick={() => navigate('/account')} 
@@ -563,6 +576,19 @@ const Classroom: React.FC = () => {
           </button>
 
           <button
+            onClick={() => {
+              setIsFocusMode(true);
+              triggerFeedback('Đã bật chế độ tập trung (Nhấn F để tắt)', '🎯');
+            }}
+            className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all"
+            title="Bật chế độ tập trung (Phím tắt: F)"
+          >
+            <span className="text-sm">🎯</span>
+            <span className="hidden md:inline">Tập trung</span>
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 bg-black/40 rounded border border-white/20 text-teal-300">F</kbd>
+          </button>
+          
+          <button
             onClick={() => setShowShortcutsModal(true)}
             className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all"
             title="Xem danh sách phím tắt (Nhấn phím ? trên bàn phím)"
@@ -601,8 +627,7 @@ const Classroom: React.FC = () => {
             </Link>
           )}
         </div>
-      </header>
-
+      </header>)}
       {/* NOT OWNED NOTICE BANNER */}
       {!isOwned && (
         <div className="relative z-10 bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border-b border-amber-500/20 px-4 py-2.5 text-center flex items-center justify-center gap-3">
@@ -616,11 +641,26 @@ const Classroom: React.FC = () => {
         </div>
       )}
 
+      {/* EXIT FOCUS MODE FLOATING BUTTON */}
+      {isFocusMode && (
+        <button
+          onClick={() => {
+            setIsFocusMode(false);
+            triggerFeedback('Đã tắt chế độ tập trung', '🎯');
+          }}
+          className="fixed top-4 right-4 z-[100] flex items-center gap-2 text-sm font-bold bg-[#0f172a]/90 backdrop-blur-xl border border-white/[0.12] text-white px-4 py-2 rounded-2xl shadow-2xl hover:bg-[#1e293b] hover:scale-105 transition-all group animate-fade-in"
+        >
+          <span className="group-hover:animate-pulse">🎯</span>
+          Thoát tập trung
+          <kbd className="text-[10px] font-mono px-1.5 py-0.5 bg-black/40 rounded border border-white/20 text-teal-300 ml-1">F</kbd>
+        </button>
+      )}
+
       {/* MAIN WORKSPACE GRID */}
-      <main className="relative z-10 flex-1 max-w-[1720px] w-full mx-auto p-4 md:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+      <main className={`relative z-10 flex-1 max-w-[1720px] w-full mx-auto p-4 md:p-6 lg:p-8 ${isFocusMode ? 'flex flex-col' : 'grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8'} transition-all duration-500`}>
         
         {/* LEFT COLUMN: THEATER PLAYER & DETAILS (8 COLS) */}
-        <div className="lg:col-span-8 flex flex-col space-y-6">
+        <div className={`${isFocusMode ? 'w-full max-w-6xl mx-auto' : 'lg:col-span-8'} flex flex-col space-y-6 transition-all duration-500`}>
           
           {/* MODERN THEATER SCREEN CHASSIS */}
           <div 
@@ -980,7 +1020,7 @@ const Classroom: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: REFINED PLAYLIST & PERSONAL NOTES SIDEBAR (4 COLS) */}
-        <div className="lg:col-span-4 flex flex-col space-y-4">
+        {!isFocusMode && (<div className="lg:col-span-4 flex flex-col space-y-4">
           {/* DUAL TAB SWITCHER FOR SIDEBAR */}
           <div className="flex items-center gap-1.5 p-1 bg-[#111827]/90 backdrop-blur-md rounded-2xl border border-white/[0.08] shadow-lg">
             <button
@@ -1165,7 +1205,7 @@ const Classroom: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
+        </div>)}
 
       </main>
 
@@ -1203,6 +1243,7 @@ const Classroom: React.FC = () => {
                 { keys: ['G'], label: 'Mở / Đóng Ghi chú cá nhân', desc: 'Chuyển đổi thanh ghi chú bài học đồng bộ Cloud' },
                 { keys: ['M'], label: 'Đánh dấu hoàn thành', desc: 'Lưu tiến độ học tập và tích xanh bài học' },
                 { keys: ['I'], label: 'Bật / Tắt cửa sổ nổi (PiP)', desc: 'Xem video ở góc màn hình khi làm việc khác' },
+                { keys: ['F'], label: 'Bật / Tắt chế độ tập trung', desc: 'Mở rộng bài học, ẩn toàn bộ thanh bên' },
                 { keys: ['?'], label: 'Mở / Đóng bảng phím tắt', desc: 'Hiển thị trợ giúp phím tắt bất kỳ lúc nào' },
                 { keys: ['Esc'], label: 'Đóng cửa sổ phụ', desc: 'Thoát nhanh khỏi bảng thông tin hoặc ô nhập liệu' },
               ].map((item, i) => (

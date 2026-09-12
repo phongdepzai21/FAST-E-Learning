@@ -26,6 +26,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, collection, onSnapshot, getDoc, deleteDoc, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { Helmet } from 'react-helmet-async';
 
 interface UserProfile {
   name: string;
@@ -436,6 +437,8 @@ const Account: React.FC = () => {
   const [purchasedCourses, setPurchasedCourses] = useState<PurchasedCourseData[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
+  const allCoursesRef = React.useRef(allCourses);
+  React.useEffect(() => { allCoursesRef.current = allCourses; }, [allCourses]);
 
   // Gamification Data State
   const [gamificationData, setGamificationData] = useState<UserGamificationData>({
@@ -666,8 +669,8 @@ const Account: React.FC = () => {
         if (Array.isArray(cachedIds) && cachedIds.length > 0) {
           setPurchasedCourses(cachedIds.map((id: string) => ({ courseId: id, progress: 0 })));
         }
-      } else if (hasClaimedAll && allCourses.length > 0) {
-        const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+      } else if (hasClaimedAll && allCoursesRef.current.length > 0) {
+        const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
         setPurchasedCourses(allActiveIds.map(id => ({ courseId: id, progress: 0 })));
       }
     } catch (e) {}
@@ -692,9 +695,9 @@ const Account: React.FC = () => {
             
             const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
             let finalCourses = courses;
-            if (hasClaimedAll && allCourses.length > 0) {
+            if (hasClaimedAll && allCoursesRef.current.length > 0) {
               const existingIds = new Set(courses.map(c => c.courseId));
-              const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
+              const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
               const extra = allActiveIds.filter(id => !existingIds.has(id)).map(id => ({ courseId: id, progress: 0 }));
               finalCourses = [...courses, ...extra];
             }
@@ -732,7 +735,7 @@ const Account: React.FC = () => {
       window.removeEventListener('courses_updated', handleStorageChange);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user?.email, allCourses]);
+  }, [user?.email]);
 
   // --- EFFECT: GAMIFICATION STATS & BADGES LISTENER ---
   useEffect(() => {
