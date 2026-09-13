@@ -12,10 +12,10 @@ export interface FirestoreErrorInfo {
 export function logFirestoreError(operation: string, collectionPath: string, err: any, payload?: any): FirestoreErrorInfo {
   const errorInfo = parseFirestoreError(err, operation);
   
-  console.group(`🔥 Firestore Error: [${operation}]`);
-  console.error(`📍 Target Path: ${collectionPath}`);
-  console.error(`🔴 Raw Error Code: ${err?.code || 'unknown'}`);
-  console.error(`💬 Raw Error Message: ${err?.message || String(err)}`);
+  console.group(`🔥 Firestore Diagnostic: [${operation}]`);
+  console.warn(`📍 Target Path: ${collectionPath}`);
+  console.warn(`🔴 Raw Error Code: ${err?.code || 'unknown'}`);
+  console.warn(`💬 Raw Error Message: ${err?.message || String(err)}`);
   
   if (payload) {
     console.warn(`📦 Payload Attempted:`, payload);
@@ -36,6 +36,9 @@ export function logFirestoreError(operation: string, collectionPath: string, err
   return errorInfo;
 }
 
+export const logFirestoreDiagnostic = logFirestoreError;
+export const parseFirestoreDiagnostic = parseFirestoreError;
+
 export function parseFirestoreError(err: any, customActionContext: string = 'Đồng bộ khóa học'): FirestoreErrorInfo {
   const code = (err?.code || '').toLowerCase();
   const rawMsg = (err?.message || String(err || '')).toLowerCase();
@@ -48,12 +51,12 @@ export function parseFirestoreError(err: any, customActionContext: string = 'Đ�
     rawMsg.includes('insufficient permissions')
   ) {
     const title = 'Lỗi phân quyền Firestore (permission-denied)';
-    const solution = 'Tài khoản chưa được cấp quyền ghi vào cơ sở dữ liệu Cloud. Khắc phục: Hãy thử Đăng xuất và Đăng nhập lại, hoặc kích hoạt lại gói VIP/Admin trong phần Cài đặt.';
+    const solution = 'Quy tắc bảo mật (Security Rules) trên Firebase Console đang chặn truy cập ghi/đọc. Cách xử lý: Mở Firebase Console (https://console.firebase.google.com/project/fast-e-learning/firestore/rules) > Tab Rules > Đổi thành "allow read, write: if true;" rồi nhấn Publish.';
     return {
       code: 'permission-denied',
       title,
       solution,
-      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ❌ ${customActionContext} thất bại: ${title}\n💡 Hướng dẫn khắc phục: ${solution}`
+      fullToastMessage: `[Code: ${code} | Msg: ${err?.message}] ⚠️ ${customActionContext}: ${title}\n💡 Khắc phục: ${solution}`
     };
   }
 

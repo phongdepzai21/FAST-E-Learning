@@ -13,12 +13,12 @@ export default defineConfig(({ mode }) => {
         drop: ['console', 'debugger'],
       },
       build: {
+        chunkSizeWarningLimit: 1200,
         rollupOptions: {
           output: {
             manualChunks: {
               vendor: ['react', 'react-dom', 'react-router-dom'],
               firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-              genai: ['@google/genai']
             }
           }
         }

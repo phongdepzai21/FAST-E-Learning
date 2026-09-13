@@ -11,11 +11,19 @@ import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
 import ReactPlayer from 'react-player';
 import { Helmet } from 'react-helmet-async';
 import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
+import { useToast } from '../contexts/ToastContext';
+import { WifiOff } from 'lucide-react';
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
+
+  const [isOnline, setIsOnline] = useState<boolean>(() => 
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const wasOfflineRef = useRef<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const reactPlayerRef = useRef<any>(null);
@@ -91,6 +99,45 @@ const Classroom: React.FC = () => {
     }
   };
 
+  // Network Status Monitor: alerts users when internet connection drops or restores
+  useEffect(() => {
+    const handleOffline = () => {
+      setIsOnline(false);
+      wasOfflineRef.current = true;
+      toast.warning(
+        'Mất kết nối mạng Internet. Video bài giảng hoặc tiến trình học có thể không được đồng bộ cho đến khi có mạng trở lại.',
+        7000,
+        'Network Status',
+        'Vui lòng kiểm tra lại kết nối WiFi hoặc dữ liệu di động của bạn. Dữ liệu ghi chú và bài học đã tải vẫn được bảo toàn trên máy.'
+      );
+    };
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (wasOfflineRef.current) {
+        toast.success(
+          'Đã khôi phục kết nối mạng Internet. Tiến trình học tập của bạn đang được tiếp tục đồng bộ.',
+          4500,
+          'Network Status'
+        );
+        wasOfflineRef.current = false;
+      }
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    // Alert immediately if offline when entering Classroom
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      handleOffline();
+    }
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [toast]);
+
   // Load Course
   useEffect(() => {
     if (!courseId) return;
@@ -165,9 +212,10 @@ const Classroom: React.FC = () => {
         }
 
         // Realtime Firestore Check
+        let unsubUserCourse: (() => void) | null = null;
         if (courseId) {
           const userDocRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
-          onSnapshot(userDocRef, (docSnap) => {
+          unsubUserCourse = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data();
               setIsOwned(true);
@@ -197,6 +245,8 @@ const Classroom: React.FC = () => {
                 }
               }
             }
+          }, (err) => {
+            console.warn("Lưu ý đồng bộ Firestore tiến trình bài học:", err?.message || err);
           });
         }
       } else {
@@ -540,6 +590,16 @@ const Classroom: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></span>
                 Phòng học trực tuyến
               </span>
+              {!isOnline && (
+                <span 
+                  id="classroom-network-offline-badge"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] uppercase font-black tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                  title="Mất kết nối Internet"
+                >
+                  <WifiOff className="w-3 h-3 text-amber-400" />
+                  <span>Ngoại tuyến</span>
+                </span>
+              )}
               {course?.category && (
                 <span className="hidden md:inline text-[10px] font-bold text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
                   {course.category}
@@ -725,6 +785,15 @@ const Classroom: React.FC = () => {
                       setCurrentIdx(currentIdx + 1);
                     }
                   }}
+                  onError={() => {
+                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                      toast.warning(
+                        'Không thể tải luồng video do mất kết nối mạng. Vui lòng kiểm tra lại đường truyền Internet.',
+                        6000,
+                        'Network Status'
+                      );
+                    }
+                  }}
                 />
               ) : videoEmbed.isEmbed && videoEmbed.embedUrl ? (
                 <iframe 
@@ -774,6 +843,15 @@ const Classroom: React.FC = () => {
                     handleUpdateProgress(currentIdx);
                     if (currentIdx < curriculum.length - 1) {
                       setCurrentIdx(currentIdx + 1);
+                    }
+                  }}
+                  onError={() => {
+                    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                      toast.warning(
+                        'Không thể phát video do mất kết nối mạng. Vui lòng kiểm tra lại Internet.',
+                        6000,
+                        'Network Status'
+                      );
                     }
                   }}
                 />

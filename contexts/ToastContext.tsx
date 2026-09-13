@@ -20,7 +20,7 @@ interface ToastContextType {
   success: (message: string, duration?: number, title?: string) => void;
   error: (message: string, duration?: number, title?: string, solution?: string) => void;
   info: (message: string, duration?: number, title?: string) => void;
-  warning: (message: string, duration?: number, title?: string) => void;
+  warning: (message: string, duration?: number, title?: string, solution?: string) => void;
   dismiss: (id: string) => void;
 }
 
@@ -68,8 +68,8 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     show(message, 'info', duration ?? 4000, title);
   }, [show]);
 
-  const warning = useCallback((message: string, duration?: number, title?: string) => {
-    show(message, 'warning', duration ?? 5000, title);
+  const warning = useCallback((message: string, duration?: number, title?: string, solution?: string) => {
+    show(message, 'warning', duration ?? 5000, title, solution);
   }, [show]);
 
   return (

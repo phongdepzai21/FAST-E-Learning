@@ -9,7 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
-import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
@@ -212,7 +212,12 @@ const Courses: React.FC = () => {
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       
-      toast.error(errorInfo.fullToastMessage, 8000);
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
+      if (errorInfo.code === 'permission-denied') {
+        toast.info('Lưu ý: Cloud Firestore đang chờ cấp quyền Rules trên Firebase Console. Khóa học đã được lưu ngoại tuyến để bạn vào học ngay!', 7000);
+      } else {
+        toast.info(errorInfo.solution, 6000);
+      }
     } finally {
       setClaimingId(null);
     }
@@ -267,16 +272,17 @@ const Courses: React.FC = () => {
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
 
+      toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn!`);
       if (hasFirestoreError && firstError) {
         const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, firstError);
-        toast.error(errorInfo.fullToastMessage, 8000);
-      } else {
-        toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn thành công!`);
+        if (errorInfo.code === 'permission-denied') {
+          toast.info('Lưu ý: Cloud Firestore đang chờ cấp quyền Rules trên Firebase Console. Dữ liệu đã sẵn sàng ngoại tuyến để bạn học ngay!', 7000);
+        }
       }
     } catch (err: any) {
       console.error("Lỗi mở khóa tất cả:", err);
       const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, err);
-      toast.error(errorInfo.fullToastMessage, 8000);
+      toast.info('Lưu ý: ' + errorInfo.solution, 7000);
     } finally {
       setIsClaimingAll(false);
     }

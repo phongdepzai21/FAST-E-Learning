@@ -6,7 +6,7 @@ import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
-import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 
 interface TeacherDashboardProps {

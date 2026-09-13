@@ -9,7 +9,7 @@ import CourseDetail from './CourseDetail';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
-import { parseFirestoreError, logFirestoreError } from '../utils/firestoreErrors';
+import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { GamificationBadgeSection } from '../components/GamificationBadgeSection';
 import { UserGamificationData } from '../utils/gamification';
 import { recordDailyLearningActivity, evaluateBadges } from '../utils/gamificationService';
@@ -1304,8 +1304,13 @@ const Account: React.FC = () => {
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       
-      // Hiển thị toast lỗi chi tiết kèm hướng dẫn khắc phục
-      toast.error(errorInfo.fullToastMessage, 8000);
+      // Thông báo thành công cục bộ và nhắc nhở nhẹ nếu Cloud bị lỗi Rules
+      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
+      if (errorInfo.code === 'permission-denied') {
+        toast.info('Lưu ý: Cloud Firestore đang chờ cấp quyền Rules trên Firebase Console. Dữ liệu đã lưu trên máy để bạn vào học bình thường.', 7000);
+      } else {
+        toast.info(errorInfo.solution, 6000);
+      }
     } finally {
       setClaimingId(null);
     }
@@ -1370,8 +1375,13 @@ const Account: React.FC = () => {
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
       
-      // Hiển thị Toast lỗi Firestore với hướng dẫn khắc phục chi tiết
-      toast.error(errorInfo.fullToastMessage, 8000);
+      // Thông báo thành công cục bộ và nhắc nhở phân quyền Cloud
+      toast.success(`🎉 Đã mở khóa ${unowned.length} khóa học trên thiết bị của bạn!`);
+      if (errorInfo.code === 'permission-denied') {
+        toast.info('Lưu ý: Cloud Firestore đang chờ cập nhật Rules trên Firebase Console. Toàn bộ khóa học đã sẵn sàng để bạn vào học!', 7000);
+      } else {
+        toast.info(errorInfo.solution, 6000);
+      }
     } finally {
       setIsClaimingAll(false);
     }

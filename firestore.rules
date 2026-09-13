@@ -1,8 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Cho phép đọc và ghi dữ liệu phục vụ ứng dụng học tập, khóa học, tài khoản và đồng bộ tiến trình học
     match /{document=**} {
       allow read, write: if true;
     }
   }
 }
+
