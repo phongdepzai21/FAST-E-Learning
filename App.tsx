@@ -10,6 +10,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/ToastContainer';
 import { HelmetProvider } from 'react-helmet-async';
+import { initCourseSyncService } from './utils/courseSyncService';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -27,6 +28,7 @@ const VipUpgrade = lazy(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Classroom = lazy(() => import('./pages/Classroom'));
+const MomoGateway = lazy(() => import('./pages/MomoGateway'));
 
 // Lazy load Components phụ trợ & Footer
 const FloatingContact = lazy(() => import('./components/FloatingContact'));
@@ -44,9 +46,14 @@ const AppLayout: React.FC = () => {
   const location = useLocation();
   const isAccountPath = location.pathname.startsWith('/account');
   const isClassroomPath = location.pathname.startsWith('/hoc');
+  const isMomoGatewayPath = location.pathname.startsWith('/thanh-toan-momo');
   const [isDelayedLoaded, setIsDelayedLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+
+  useEffect(() => {
+    initCourseSyncService();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -65,7 +72,7 @@ const AppLayout: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const shouldHideBars = (isAccountPath && user) || isClassroomPath;
+  const shouldHideBars = (isAccountPath && user) || isClassroomPath || isMomoGatewayPath;
   const hideBarsTemporarily = isAccountPath && !authResolved;
   const showBars = !shouldHideBars && !hideBarsTemporarily;
 
@@ -86,6 +93,7 @@ const AppLayout: React.FC = () => {
             <Route path="/ve-chung-toi" element={<About />} />
             <Route path="/lien-he" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/thanh-toan-momo" element={<MomoGateway />} />
             <Route path="/account" element={<Account />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />

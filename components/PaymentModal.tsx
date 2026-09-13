@@ -1,186 +1,414 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Course } from '../types';
 import { auth, db } from '../firebase';
 import { ADMIN_EMAILS } from '../constants';
 import { doc, setDoc } from 'firebase/firestore';
+import {
+  parseNumericPrice,
+  formatVND,
+  getVietQrUrl,
+  getMomoQrUrl,
+  generatePaymentMemo,
+  getPaymentConfig,
+} from '../utils/qrService';
 
 interface PaymentModalProps {
-    course: Course;
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
+  course: Course;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, onSuccess }) => {
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [isCompleted, setIsCompleted] = useState(false);
-    const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
+  const navigate = useNavigate();
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'vietqr' | 'momo'>('vietqr');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [config, setConfig] = useState(getPaymentConfig);
 
-    useEffect(() => {
-        const user = auth.currentUser;
-        if (user && user.email) {
-            const email = user.email.toLowerCase();
-            let isPrivileged = ADMIN_EMAILS.includes(email);
-            if (!isPrivileged) {
-                const localRolesStr = localStorage.getItem(`user_roles_${email}`);
-                if (localRolesStr) {
-                    try {
-                        const localRoles = JSON.parse(localRolesStr);
-                        if (localRoles.isVip || localRoles.isAdmin) isPrivileged = true;
-                    } catch (e) {}
-                }
-            }
-            setIsVipOrAdmin(isPrivileged);
-        } else {
-            setIsVipOrAdmin(false);
+  useEffect(() => {
+    setConfig(getPaymentConfig());
+    const user = auth.currentUser;
+    if (user && user.email) {
+      const email = user.email.toLowerCase();
+      let isPrivileged = ADMIN_EMAILS.includes(email);
+      if (!isPrivileged) {
+        const localRolesStr = localStorage.getItem(`user_roles_${email}`);
+        if (localRolesStr) {
+          try {
+            const localRoles = JSON.parse(localRolesStr);
+            if (localRoles.isVip || localRoles.isAdmin) isPrivileged = true;
+          } catch (e) {}
         }
-    }, [isOpen]);
+      }
+      setIsVipOrAdmin(isPrivileged);
+    } else {
+      setIsVipOrAdmin(false);
+    }
+  }, [isOpen]);
 
-    if (!isOpen) return null;
+  if (!isOpen) return null;
 
-    const handleConfirmTransfer = () => {
-        setIsVerifying(true);
-        // Simulate a payment verification process
-        setTimeout(() => {
-            setIsVerifying(false);
-            setIsCompleted(true);
-            setTimeout(() => {
-                onSuccess(); // Triggers the actual database saving
-                setIsCompleted(false);
-            }, 1000);
-        }, 1500);
-    };
+  const numericAmount = parseNumericPrice(course.price);
+  const isFreeCourse = numericAmount === 0;
+  const transferMemo = generatePaymentMemo(course.id, course.title);
 
-    const handleInstantVipClaim = async () => {
-        setIsVerifying(true);
-        const user = auth.currentUser;
-        if (user && user.email && course.id) {
-            try {
-                const userEmail = user.email.toLowerCase();
-                const docRef = doc(db, "users", userEmail, "purchased_courses", course.id);
-                await setDoc(docRef, {
-                    courseId: course.id,
-                    courseTitle: course.title,
-                    purchasedAt: new Date().toISOString(),
-                    price: course.price || "Miễn phí",
-                    status: 'active',
-                    progress: 0,
-                    claimedVia: 'VIP_INSTANT_CLAIM'
-                }, { merge: true });
-                localStorage.setItem(`course_unlocked_${course.id}`, 'true');
-            } catch (e) {
-                console.warn('VIP instant claim warning:', e);
-            }
-        }
-        setIsVerifying(false);
-        setIsCompleted(true);
-        setTimeout(() => {
-            onSuccess();
-            setIsCompleted(false);
-        }, 800);
-    };
+  const vietQrUrl = getVietQrUrl({
+    bankId: config.bankId,
+    accountNo: config.accountNo,
+    accountName: config.accountName,
+    amount: numericAmount,
+    memo: transferMemo,
+    template: 'compact2',
+  });
 
-    return (
-        <div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 backdrop-blur-md px-4">
-            <div className="bg-white max-w-lg w-full rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
-                <button 
-                    onClick={onClose} 
-                    disabled={isVerifying || isCompleted}
-                    className="absolute top-4 right-4 text-gray-400 hover:bg-gray-100 p-2 rounded-full transition-colors z-10 disabled:opacity-50 cursor-pointer"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+  const momoQrUrl = getMomoQrUrl({
+    phone: config.momoPhone,
+    name: config.momoName,
+    amount: numericAmount,
+    memo: transferMemo,
+  });
 
-                {!isCompleted ? (
-                    <div className="space-y-6 relative z-10">
-                        <div className="text-center">
-                            <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Thanh toán khóa học</h2>
-                            <p className="text-gray-500 font-medium text-sm mt-1">Xác nhận đơn hàng và kích hoạt khóa học</p>
-                        </div>
+  const currentQrUrl = activeTab === 'vietqr' ? vietQrUrl : momoQrUrl;
 
-                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex items-center justify-between">
-                            <div className="flex-1 min-w-0 pr-4">
-                                <h3 className="font-bold text-gray-800 text-sm truncate">{course.title}</h3>
-                                <p className="text-xs font-semibold tracking-wider text-gray-400 mt-0.5">Mã KH: {course.id.slice(0, 8).toUpperCase()}</p>
-                            </div>
-                            <div className="text-primary font-black text-lg whitespace-nowrap">
-                                {course.price}
-                            </div>
-                        </div>
+  const copyText = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
-                        {/* Special VIP/Admin Instant Claim Box */}
-                        {isVipOrAdmin && (
-                            <div className="p-4 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border-2 border-amber-400/40 rounded-2xl flex flex-col gap-2.5">
-                                <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-md">
-                                        Đặc quyền VIP / Admin
-                                    </span>
-                                    <span className="text-xs font-bold text-amber-900">Mở khóa miễn phí ngay</span>
-                                </div>
-                                <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                                    Tài khoản của bạn có quyền thành viên VIP hoặc Quản trị. Bạn có thể nhận trực tiếp khóa học này mà không cần chuyển khoản.
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={handleInstantVipClaim}
-                                    disabled={isVerifying}
-                                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-md shadow-amber-500/20 active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
-                                >
-                                    <span>👑 Nhận Khóa Học Ngay (Miễn phí VIP)</span>
-                                </button>
-                            </div>
-                        )}
+  const handleRedirectToMomo = () => {
+    onClose();
+    const targetUrl = `/thanh-toan-momo?courseId=${encodeURIComponent(course.id)}&title=${encodeURIComponent(course.title)}&amount=${numericAmount}&returnUrl=${encodeURIComponent(`/hoc/${course.id}`)}`;
+    navigate(targetUrl);
+  };
 
-                        <div className="bg-pink-50/50 p-5 rounded-2xl border border-pink-100">
-                            <p className="text-xs font-bold text-[#A50064] mb-3 uppercase tracking-wider text-center">Hướng dẫn thanh toán MoMo Doanh Nghiệp</p>
-                            <div className="flex flex-col md:flex-row items-center gap-6 justify-center mb-4">
-                                <div className="w-40 h-40 bg-white p-2 rounded-xl shadow-sm border border-pink-200 shrink-0">
-                                    <div className="w-full h-full bg-[url('https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg')] bg-contain bg-no-repeat bg-center opacity-80"></div>
-                                </div>
-                                <div className="text-left space-y-3">
-                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 1:</strong> Mở ứng dụng MoMo.</p>
-                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 2:</strong> Chọn "Quét Mã" và quét mã QR bên cạnh.</p>
-                                    <p className="text-sm font-medium text-gray-700"><strong>Bước 3:</strong> Nhập số tiền <strong>{course.price}</strong> và nội dung:</p>
-                                    <div className="bg-white p-2 rounded-lg border border-pink-100 font-mono text-sm font-bold text-[#A50064] inline-block">
-                                        FAST {course.id.slice(0, 5).toUpperCase()}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="text-center space-y-2 mt-4 pt-4 border-t border-pink-100/50">
-                                <p className="text-[11px] font-medium text-gray-500">Thông tin tài khoản MoMo Doanh Nghiệp:</p>
-                                <div className="bg-white p-3 rounded-xl border border-pink-100 font-mono text-sm font-bold text-gray-800 inline-block">
-                                    Ví MoMo: 0927 002 668 <br/>
-                                    CTK: CÔNG TY TNHH ĐÀO TẠO FAST
-                                </div>
-                            </div>
-                        </div>
+  const handleConfirmTransfer = () => {
+    setIsVerifying(true);
+    // Simulate a payment verification process
+    setTimeout(() => {
+      setIsVerifying(false);
+      setIsCompleted(true);
+      setTimeout(() => {
+        onSuccess(); // Triggers the actual database saving
+        setIsCompleted(false);
+      }, 1000);
+    }, 1500);
+  };
 
-                        <button 
-                            onClick={handleConfirmTransfer}
-                            disabled={isVerifying}
-                            className="w-full py-4 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-sm tracking-widest transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/10"
-                        >
-                            {isVerifying ? (
-                                <>
-                                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    Đang xác nhận...
-                                </>
-                            ) : 'Đã Chuyển Khoản Thành Công'}
-                        </button>
-                        <p className="text-[10px] text-center text-gray-400 font-medium">Hệ thống sẽ duyệt tự động trong khoảng tốc độ 2-5 phút.</p>
-                    </div>
-                ) : (
-                    <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-500 relative z-10">
-                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-500 mb-6 border-4 border-green-50 shadow-inner">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                        <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Mở khóa thành công!</h3>
-                        <p className="text-gray-500 font-medium text-sm">Hệ thống đã kích hoạt khóa học vào tài khoản của bạn. Đang tải vào phòng học...</p>
-                    </div>
-                )}
+  const handleInstantVipClaim = async () => {
+    setIsVerifying(true);
+    const user = auth.currentUser;
+    if (user && user.email && course.id) {
+      try {
+        const userEmail = user.email.toLowerCase();
+        const docRef = doc(db, 'users', userEmail, 'purchased_courses', course.id);
+        await setDoc(
+          docRef,
+          {
+            courseId: course.id,
+            courseTitle: course.title,
+            purchasedAt: new Date().toISOString(),
+            price: course.price || 'Miễn phí',
+            status: 'active',
+            progress: 0,
+            claimedVia: isFreeCourse ? 'FREE_ACCESS' : 'VIP_INSTANT_CLAIM',
+          },
+          { merge: true }
+        );
+        localStorage.setItem(`course_unlocked_${course.id}`, 'true');
+      } catch (e) {
+        console.warn('Instant claim warning:', e);
+      }
+    }
+    setIsVerifying(false);
+    setIsCompleted(true);
+    setTimeout(() => {
+      onSuccess();
+      setIsCompleted(false);
+    }, 800);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 backdrop-blur-md px-4 overflow-y-auto py-6">
+      <div className="bg-white max-w-lg w-full rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+        <button
+          onClick={onClose}
+          disabled={isVerifying || isCompleted}
+          className="absolute top-4 right-4 text-gray-400 hover:bg-gray-100 p-2 rounded-full transition-colors z-10 disabled:opacity-50 cursor-pointer"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {!isCompleted ? (
+          <div className="space-y-5 relative z-10">
+            <div className="text-center">
+              <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Thanh toán khóa học</h2>
+              <p className="text-gray-500 font-medium text-xs sm:text-sm mt-1">Xác nhận đơn hàng và quét mã QR để mở khóa ngay</p>
             </div>
-        </div>
-    );
+
+            {/* Course Information Summary */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 flex items-center justify-between">
+              <div className="flex-1 min-w-0 pr-3">
+                <h3 className="font-bold text-gray-800 text-sm truncate">{course.title}</h3>
+                <p className="text-xs font-semibold tracking-wider text-gray-400 mt-0.5">
+                  Mã KH: {course.id.slice(0, 8).toUpperCase()}
+                </p>
+              </div>
+              <div className="text-[#007c76] font-black text-lg whitespace-nowrap">
+                {isFreeCourse ? 'Miễn phí' : formatVND(numericAmount)}
+              </div>
+            </div>
+
+            {/* Special VIP/Admin Instant Claim Box */}
+            {isVipOrAdmin && !isFreeCourse && (
+              <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border-2 border-amber-400/40 rounded-2xl flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-md">
+                    Đặc quyền VIP / Admin
+                  </span>
+                  <span className="text-xs font-bold text-amber-900">Mở khóa miễn phí ngay</span>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                  Tài khoản của bạn có quyền thành viên VIP hoặc Quản trị. Bạn có thể nhận trực tiếp khóa học này mà không cần chuyển khoản.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleInstantVipClaim}
+                  disabled={isVerifying}
+                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-md shadow-amber-500/20 active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>👑 Nhận Khóa Học Ngay (Miễn phí VIP)</span>
+                </button>
+              </div>
+            )}
+
+            {/* If Course is 100% Free */}
+            {isFreeCourse ? (
+              <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 text-center space-y-4">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-black text-emerald-900 text-base">Khóa học này hoàn toàn Miễn Phí!</h4>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    Bạn không cần thanh toán bất kỳ chi phí nào. Bấm nút bên dưới để mở khóa và vào học ngay.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleInstantVipClaim}
+                  disabled={isVerifying}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-sm tracking-wider transition-all shadow-lg shadow-emerald-700/20 active:scale-98 cursor-pointer"
+                >
+                  {isVerifying ? 'Đang mở khóa...' : 'Bắt đầu học ngay (Miễn phí)'}
+                </button>
+              </div>
+            ) : (
+              /* Dynamic QR Payment Box */
+              <div className="bg-gradient-to-br from-teal-50/60 via-slate-50 to-pink-50/40 p-4 sm:p-5 rounded-2xl border border-teal-200/70 space-y-4">
+                {/* Method Switcher */}
+                <div className="flex bg-slate-200/80 p-1 rounded-xl text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('vietqr')}
+                    className={`flex-1 py-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 ${
+                      activeTab === 'vietqr'
+                        ? 'bg-white text-[#007c76] shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>VietQR (Ngân hàng 24/7)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('momo')}
+                    className={`flex-1 py-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 ${
+                      activeTab === 'momo'
+                        ? 'bg-[#A50064] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>Ví MoMo</span>
+                  </button>
+                </div>
+
+                {/* QR Code and Instructions */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 justify-center">
+                  <div className="relative w-44 h-44 bg-white p-2 rounded-2xl shadow-md border-2 border-teal-200 shrink-0 flex items-center justify-center">
+                    <img
+                      src={currentQrUrl}
+                      alt={`Mã QR ${formatVND(numericAmount)}`}
+                      className="w-full h-full object-contain rounded-lg"
+                    />
+                  </div>
+
+                  <div className="text-left space-y-2 text-xs text-slate-700 flex-1 w-full">
+                    <p>
+                      <strong>Bước 1:</strong> Mở app {activeTab === 'vietqr' ? 'Ngân hàng bất kỳ' : 'Ví MoMo'}.
+                    </p>
+                    <p>
+                      <strong>Bước 2:</strong> Chọn <strong>"Quét Mã QR"</strong> và quét mã bên cạnh.
+                    </p>
+                    <p>
+                      <strong>Bước 3:</strong> Số tiền <strong>{formatVND(numericAmount)}</strong> và nội dung sẽ được điền tự động:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-white px-2.5 py-1.5 rounded-lg border border-teal-200 font-mono font-bold text-[#007c76] text-xs">
+                        {transferMemo}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyText(transferMemo, 'memo')}
+                        className="px-2 py-1 bg-teal-100 text-teal-800 rounded font-semibold text-[10px] hover:bg-teal-200 cursor-pointer"
+                      >
+                        {copiedField === 'memo' ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Details Box */}
+                <div className="bg-white/90 p-3.5 rounded-xl border border-teal-100 text-xs space-y-1.5">
+                  {activeTab === 'vietqr' ? (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Ngân hàng:</span>
+                        <span className="font-bold text-slate-800">{config.bankName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Số tài khoản:</span>
+                        <span className="font-mono font-bold text-[#007c76] flex items-center gap-1.5">
+                          {config.accountNo}
+                          <button
+                            type="button"
+                            onClick={() => copyText(config.accountNo, 'accNo')}
+                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          >
+                            {copiedField === 'accNo' ? '✓ Đã chép' : 'Copy'}
+                          </button>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Chủ tài khoản:</span>
+                        <span className="font-bold text-slate-800 uppercase">{config.accountName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Số tiền:</span>
+                        <span className="font-bold text-[#007c76] flex items-center gap-1.5">
+                          {formatVND(numericAmount)}
+                          <button
+                            type="button"
+                            onClick={() => copyText(String(numericAmount), 'amount')}
+                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          >
+                            {copiedField === 'amount' ? '✓ Đã chép' : 'Copy'}
+                          </button>
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Ví MoMo:</span>
+                        <span className="font-mono font-bold text-[#A50064] flex items-center gap-1.5">
+                          {config.momoPhone}
+                          <button
+                            type="button"
+                            onClick={() => copyText(config.momoPhone, 'momo')}
+                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          >
+                            {copiedField === 'momo' ? '✓ Đã chép' : 'Copy'}
+                          </button>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Người nhận:</span>
+                        <span className="font-bold text-slate-800 uppercase">{config.momoName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Số tiền:</span>
+                        <span className="font-bold text-[#A50064]">{formatVND(numericAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                {activeTab === 'momo' ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleRedirectToMomo}
+                      className="w-full py-3.5 bg-[#A50064] hover:bg-[#880052] text-white rounded-xl font-black uppercase text-xs sm:text-sm tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-900/20 active:scale-98"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      <span>CHUYỂN SANG CỔNG MOMO ĐỂ THANH TOÁN (KIỂU MẮT BÃO)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmTransfer}
+                      disabled={isVerifying}
+                      className="w-full py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs tracking-wider transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isVerifying ? 'Đang xác nhận quét mã...' : 'Tôi đã quét mã QR MoMo này rồi'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleConfirmTransfer}
+                    disabled={isVerifying}
+                    className="w-full py-3.5 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-xs sm:text-sm tracking-wider transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/10 active:scale-98"
+                  >
+                    {isVerifying ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Đang xác nhận thanh toán...
+                      </>
+                    ) : (
+                      'Tôi Đã Quét Mã & Chuyển Khoản'
+                    )}
+                  </button>
+                )}
+                <p className="text-[10px] text-center text-gray-400 font-medium">
+                  Hệ thống tự động kích hoạt khóa học vào phòng học ngay sau khi quét mã thành công.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-500 relative z-10">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-500 mb-6 border-4 border-green-50 shadow-inner">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Mở khóa thành công!</h3>
+            <p className="text-gray-500 font-medium text-sm">
+              Hệ thống đã kích hoạt khóa học vào tài khoản của bạn. Đang tải vào phòng học...
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default PaymentModal;
+

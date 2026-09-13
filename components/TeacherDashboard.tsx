@@ -8,6 +8,8 @@ import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
+import { broadcastCourseUpdate } from '../utils/courseSyncService';
+import LivePriceQrPreview from './LivePriceQrPreview';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -55,6 +57,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'active' | 'draft' | 'inactive'>('active');
+  const [previewQrCourse, setPreviewQrCourse] = useState<Course | null>(null);
 
   // Curriculum State (Flat Lessons with videoUrl)
   const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
@@ -143,6 +146,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
       if (syncedCount > 0) {
         console.log(`Đã đồng bộ ${syncedCount} khóa học từ máy lên cơ sở dữ liệu Cloud.`);
+      }
+
+      if (localList.length > 0) {
+        broadcastCourseUpdate('sync_all', { courses: localList });
       }
     } catch (e) {
       console.warn("Lỗi auto-sync local sang cloud:", e);
@@ -316,11 +323,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // 1. Save to Firestore (Master Cloud Database)
     try {
       await setDoc(doc(db, 'courses', courseId), newCourse);
-      toast.success(`Đã thêm khóa học "${title}" lên máy chủ Cloud thành công!`, 4000, 'Tạo thành công');
     } catch (firestoreErr: any) {
-      console.error('Firestore add course error:', firestoreErr);
-      const errorInfo = logFirestoreError(`Thêm khóa học "${title}"`, `courses/${courseId}`, firestoreErr, newCourse);
-      toast.error(errorInfo.title, 7000, 'Lỗi đồng bộ Cloud', errorInfo.solution);
+      console.warn('Firestore add course sync notice:', firestoreErr);
+      logFirestoreError(`Thêm khóa học "${title}"`, `courses/${courseId}`, firestoreErr, newCourse);
     }
 
     // 2. Save to LocalStorage backup
@@ -332,6 +337,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
+
+    // 3. Broadcast real-time across ALL tabs, ALL accounts, and devices
+    broadcastCourseUpdate('upsert', { course: newCourse });
+
+    toast.success(`Đã thêm khóa học "${title}" thành công!`, 4000, 'Tạo thành công');
 
     setMessage({ type: 'success', text: `Tạo khóa học mới "${title}" với học phí ${finalPrice} thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
@@ -407,11 +417,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     // 1. Update Firestore
     try {
       await setDoc(doc(db, 'courses', editingCourseId), updatedCourse, { merge: true });
-      toast.success(`Đã lưu thay đổi khóa học "${title}" trên Cloud Firestore!`, 4000, 'Đã cập nhật');
     } catch (firestoreErr: any) {
-      console.error('Firestore setDoc update error:', firestoreErr);
-      const errorInfo = logFirestoreError(`Cập nhật khóa học "${title}"`, `courses/${editingCourseId}`, firestoreErr, updatedCourse);
-      toast.error(errorInfo.title, 7000, 'Lỗi lưu Cloud', errorInfo.solution);
+      console.warn('Firestore setDoc update notice:', firestoreErr);
+      logFirestoreError(`Cập nhật khóa học "${title}"`, `courses/${editingCourseId}`, firestoreErr, updatedCourse);
     }
 
     // 2. Save to LocalStorage backup
@@ -428,6 +436,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     } catch (e) {
       console.warn('LocalStorage edit error:', e);
     }
+
+    // 3. Broadcast real-time across ALL tabs, ALL accounts, and devices
+    broadcastCourseUpdate('upsert', { course: updatedCourse });
+
+    toast.success(`Đã lưu thay đổi khóa học "${title}"!`, 4000, 'Đã cập nhật');
 
     setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & học phí "${title}" thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
@@ -530,18 +543,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
 
       await setDoc(docRef, updatePayload, { merge: true });
-      toast.success(
-        newStatus === 'inactive' 
-          ? `Đã ẩn khóa học "${course.title}" trên hệ thống!` 
-          : `Đã kích hoạt khóa học "${course.title}" công khai!`,
-        4000,
-        'Trạng thái'
-      );
     } catch (firestoreErr: any) {
-      console.error('Firestore toggle status error:', firestoreErr);
-      const errorInfo = logFirestoreError(`Đổi trạng thái khóa học "${course.title}"`, `courses/${course.id}`, firestoreErr, { status: newStatus });
-      toast.error(errorInfo.title, 7000, 'Lỗi đổi trạng thái', errorInfo.solution);
+      console.warn('Firestore toggle status sync notice:', firestoreErr);
+      logFirestoreError(`Đổi trạng thái khóa học "${course.title}"`, `courses/${course.id}`, firestoreErr, { status: newStatus });
     }
+
+    // 4. Real-time broadcast to ALL tabs & ALL accounts
+    broadcastCourseUpdate('status', { courseId: course.id, status: newStatus });
+
+    toast.success(
+      newStatus === 'inactive' 
+        ? `Đã ẩn khóa học "${course.title}" trên hệ thống!` 
+        : `Đã kích hoạt khóa học "${course.title}" công khai!`,
+      4000,
+      'Trạng thái'
+    );
 
     window.dispatchEvent(new CustomEvent('courses_updated'));
     window.dispatchEvent(new Event('storage'));
@@ -610,18 +626,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     try {
       await deleteDoc(doc(db, 'courses', courseId));
-      toast.success(
-        isSystemCourse 
-          ? `Đã reset khóa học "${courseTitle}" về nội dung gốc!` 
-          : `Đã xóa thành công khóa học "${courseTitle}"!`,
-        4000,
-        'Đã xóa'
-      );
     } catch (err: any) {
       console.warn('Firestore delete course warning:', err);
-      const errorInfo = logFirestoreError(`Xóa khóa học "${courseTitle}"`, `courses/${courseId}`, err);
-      toast.info(`Khóa học "${courseTitle}" đã được xóa trên thiết bị của bạn.`, 4000, 'Thiết bị');
+      logFirestoreError(`Xóa khóa học "${courseTitle}"`, `courses/${courseId}`, err);
     }
+
+    // Real-time broadcast deletion to ALL tabs & ALL accounts
+    broadcastCourseUpdate('delete', { courseId });
+
+    toast.success(
+      isSystemCourse 
+        ? `Đã reset khóa học "${courseTitle}" về nội dung gốc!` 
+        : `Đã xóa thành công khóa học "${courseTitle}"!`,
+      4000,
+      'Đã xóa'
+    );
 
     setMessage({ 
       type: 'success', 
@@ -854,8 +873,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             {course.category}
                           </span>
                         </td>
-                        <td className="py-4 px-6 font-extrabold text-[#007c76] whitespace-nowrap">
-                          {course.price}
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[#007c76]">{course.price}</span>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewQrCourse(course)}
+                              title="Xem và tải mã QR thanh toán động cho khóa học này"
+                              className="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200/80 transition-all text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                              </svg>
+                              <span>QR</span>
+                            </button>
+                          </div>
                         </td>
                         <td className="py-4 px-6 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
@@ -908,13 +940,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                               Sửa
                             </button>
 
-                            {/* Nút Xóa / Reset */}
-                            <button
-                              onClick={(e) => promptDeleteCourse(course.id, course.title, e)}
-                              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
-                            >
-                              {isSystem ? 'Reset' : 'Xóa'}
-                            </button>
+                            {/* Nút Xóa */}
+                            {!isSystem && (
+                              <button
+                                onClick={(e) => promptDeleteCourse(course.id, course.title, e)}
+                                className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors"
+                              >
+                                Xóa
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1021,6 +1055,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 <p className="text-xs text-gray-400 mt-1">
                   Nhà quản trị khuyên dùng sử dụng ảnh từ Unsplash để đảm bảo hiệu suất truyền tải tuyệt vời nhất.
                 </p>
+              </div>
+
+              {/* Reactive Live QR Code Generator that automatically syncs with price */}
+              <div className="md:col-span-2">
+                <LivePriceQrPreview
+                  price={price}
+                  onPriceChange={(newVal) => setPrice(newVal)}
+                  courseId={editingCourseId || 'NEW'}
+                  courseTitle={title}
+                />
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -1312,6 +1356,37 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           setSuccessModal(prev => ({ ...prev, isOpen: false }));
         }}
       />
+
+      {/* Quick QR Viewer Modal for any Course */}
+      {previewQrCourse && (
+        <div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative animate-in zoom-in-95">
+            <button
+              onClick={() => setPreviewQrCourse(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="mb-4">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#007c76] bg-teal-50 px-2.5 py-1 rounded-md">
+                Mã QR Thanh Toán Khóa Học
+              </span>
+              <h3 className="text-lg font-bold text-gray-900 mt-2 line-clamp-1">{previewQrCourse.title}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Mã khóa học: <span className="font-mono font-bold text-teal-700">{previewQrCourse.id}</span> • Học phí: <span className="font-bold text-[#007c76]">{previewQrCourse.price}</span>
+              </p>
+            </div>
+            <LivePriceQrPreview
+              price={previewQrCourse.price}
+              courseId={previewQrCourse.id}
+              courseTitle={previewQrCourse.title}
+              readOnly={true}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );

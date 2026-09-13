@@ -13,6 +13,7 @@ import PaymentModal from '../components/PaymentModal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
+import { parseNumericPrice } from '../utils/qrService';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
@@ -236,6 +237,22 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     handlePaymentSuccess();
   };
 
+  const handleMomoDirectPay = () => {
+    if (!currentUser) {
+        navigate('/account', { 
+            state: { 
+                message: "Vui lòng đăng nhập tài khoản để thanh toán qua MoMo.", 
+                from: location.pathname 
+            } 
+        });
+        return;
+    }
+    if (!course) return;
+    const amount = parseNumericPrice(course.price);
+    const targetUrl = `/thanh-toan-momo?courseId=${encodeURIComponent(course.id)}&title=${encodeURIComponent(course.title)}&amount=${amount}&returnUrl=${encodeURIComponent(`/hoc/${course.id}`)}`;
+    navigate(targetUrl);
+  };
+
   // Tự động khôi phục và đồng bộ bài học đang xem
   useEffect(() => {
      if (isOwned && curriculum.length > 0 && !playingLesson) {
@@ -430,66 +447,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             );
                         })()
                 ) : (() => {
-                    const previewUrl = curriculum[0]?.videoUrl || "";
-                    const previewEmbed = getVideoEmbedInfo(previewUrl, false);
-
-                    if (previewEmbed.isEmbed && previewEmbed.embedUrl) {
-                        return (
-                            <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-black">
-                                <iframe 
-                                    src={previewEmbed.embedUrl} 
-                                    width="100%" 
-                                    height="100%" 
-                                    className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
-                                    title="Video Giới Thiệu"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
-                                    allowFullScreen
-                                    referrerPolicy="strict-origin-when-cross-origin"
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-6 pt-16 flex flex-col items-center text-center pointer-events-none">
-                                    <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
-                                    <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
-                                        Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
-                                    </p>
-                                    <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">
-                                        {isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    }
-
-                    if (previewEmbed.embedUrl || previewUrl) {
-                        return (
-                            <div className="relative h-full w-full">
-                                <video 
-                                    src={previewEmbed.embedUrl || previewUrl} 
-                                    className="w-full h-full object-cover focus:outline-none"
-                                    controls
-                                    controlsList="nodownload pwa-nodownload"
-                                    onContextMenu={(e) => e.preventDefault()}
-                                    poster={course.image}
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20 flex flex-col items-center text-center pointer-events-none">
-                                    <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">Video Giới Thiệu</h3>
-                                    <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
-                                        Vui lòng đăng ký tham gia khóa học để xem đầy đủ video và tài liệu.
-                                    </p>
-                                    <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
-                                </div>
-                            </div>
-                        );
-                    }
-
                     return (
-                        <div className="relative h-full w-full bg-slate-900 flex items-center justify-center">
+                        <div className="relative h-full w-full bg-slate-900 flex items-center justify-center min-h-[400px] md:min-h-[500px]">
                             <img src={course.image} alt={course.title} className="w-full h-full object-cover opacity-60" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 pt-20 flex flex-col items-center justify-end text-center">
                                 <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">{course.title}</h3>
                                 <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
                                     Vui lòng đăng ký tham gia khóa học để xem toàn bộ nội dung giáo trình.
                                 </p>
-                                <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300">{isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}</button>
+                                <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto">
+                                    {isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}
+                                </button>
                             </div>
                         </div>
                     );
@@ -736,16 +704,31 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                       {[{ icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', text: 'Tài liệu PDF & bài giảng chuyên sâu' }, { icon: 'M13 10V3L4 14h7v7l9-11h-7z', text: 'Truy cập trọn đời & cập nhật mới' }].map((feat, idx) => (<li key={idx} className="flex items-center gap-3 text-sm text-gray-600 font-bold group"><svg className="w-5 h-5 text-[#007c76] shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={feat.icon} /></svg>{feat.text}</li>))}
                                   </ul>
                               </div>
-                              <button 
-                                  onClick={handleRegisterClick} 
-                                  className={`w-full py-5 rounded-2xl font-black text-base md:text-lg uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl active:scale-98 cursor-pointer ${
-                                      isVip || isAdmin
-                                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-amber-500/30'
-                                          : 'bg-[#007c76] hover:bg-[#006560] text-white shadow-teal-900/20'
-                                  }`}
-                              >
-                                  {isVip || isAdmin ? '👑 NHẬN KHÓA HỌC (VIP MIỄN PHÍ)' : 'ĐĂNG KÝ HỌC NGAY'}
-                              </button>
+                              <div className="space-y-2.5">
+                                  <button 
+                                      onClick={handleRegisterClick} 
+                                      className={`w-full py-4 rounded-2xl font-black text-sm md:text-base uppercase tracking-widest hover:scale-[1.01] transition-all shadow-xl active:scale-98 cursor-pointer ${
+                                          isVip || isAdmin
+                                              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-amber-500/30'
+                                              : 'bg-[#007c76] hover:bg-[#006560] text-white shadow-teal-900/20'
+                                      }`}
+                                  >
+                                      {isVip || isAdmin ? '👑 NHẬN KHÓA HỌC (VIP MIỄN PHÍ)' : 'ĐĂNG KÝ HỌC NGAY (QUÉT MÃ QR)'}
+                                  </button>
+
+                                  {!isVip && !isAdmin && course.price && !course.price.toLowerCase().includes('miễn phí') && course.price !== '0' && course.price !== '0đ' && (
+                                      <button
+                                          type="button"
+                                          onClick={handleMomoDirectPay}
+                                          className="w-full py-3 px-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider bg-[#A50064] hover:bg-[#8e0056] text-white shadow-md shadow-pink-900/15 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                      >
+                                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                          </svg>
+                                          <span>Thanh toán cổng MoMo (Tự động mở khóa)</span>
+                                      </button>
+                                  )}
+                              </div>
                           </div>
                       )}
                   </div>

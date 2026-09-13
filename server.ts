@@ -1,15 +1,163 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+
+// Persistent Data Storage Directory
+const DATA_DIR = path.join(process.cwd(), "data");
+const COURSES_FILE = path.join(DATA_DIR, "courses.json");
+
+function loadCoursesFromDisk(): Record<string, any> {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(COURSES_FILE)) {
+      const content = fs.readFileSync(COURSES_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      return parsed.courses || {};
+    }
+  } catch (err) {
+    console.warn("Failed to read courses from disk:", err);
+  }
+  return {};
+}
+
+function saveCoursesToDisk(courses: Record<string, any>) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      COURSES_FILE,
+      JSON.stringify({ courses, updatedAt: new Date().toISOString() }, null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("Failed to save courses to disk:", err);
+  }
+}
+
+// In-memory courses state synchronized across all users & tabs
+const serverCourses: Record<string, any> = loadCoursesFromDisk();
+// Set of active SSE subscribers
+const sseClients = new Set<express.Response>();
+
+function broadcastCoursesUpdate(event: string, payload: any) {
+  const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "10mb" }));
 
   // API routes
+  // 1. Get current synchronized courses
+  app.get("/api/courses", (req, res) => {
+    res.json({ courses: Object.values(serverCourses) });
+  });
+
+  // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
+  app.get("/api/courses/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    // Send immediate initial snapshot to newly connected client
+    res.write(
+      `event: init\ndata: ${JSON.stringify({
+        courses: Object.values(serverCourses),
+        timestamp: Date.now()
+      })}\n\n`
+    );
+
+    sseClients.add(res);
+
+    // Heartbeat to maintain open connection
+    const keepAlive = setInterval(() => {
+      try {
+        res.write(": keep-alive\n\n");
+      } catch {
+        clearInterval(keepAlive);
+        sseClients.delete(res);
+      }
+    }, 20000);
+
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      sseClients.delete(res);
+    });
+  });
+
+  // 3. Post Course Sync (add, edit, status toggle, delete)
+  app.post("/api/courses/sync", (req, res) => {
+    try {
+      const { action, course, courseId, status, courses } = req.body;
+      const now = new Date().toISOString();
+
+      if (action === "upsert" && course && course.id) {
+        serverCourses[course.id] = {
+          ...serverCourses[course.id],
+          ...course,
+          updatedAt: course.updatedAt || now
+        };
+      } else if (action === "status" && courseId && status) {
+        if (serverCourses[courseId]) {
+          serverCourses[courseId] = {
+            ...serverCourses[courseId],
+            status,
+            updatedAt: now
+          };
+        } else {
+          serverCourses[courseId] = {
+            id: courseId,
+            status,
+            updatedAt: now
+          };
+        }
+      } else if (action === "delete" && courseId) {
+        delete serverCourses[courseId];
+      } else if (action === "sync_all" && Array.isArray(courses)) {
+        courses.forEach((c: any) => {
+          if (c && c.id) {
+            serverCourses[c.id] = { ...serverCourses[c.id], ...c, updatedAt: c.updatedAt || now };
+          }
+        });
+      }
+
+      saveCoursesToDisk(serverCourses);
+
+      const allList = Object.values(serverCourses);
+
+      // Broadcast immediately to ALL other tabs, accounts, and devices
+      broadcastCoursesUpdate("courses_updated", {
+        action,
+        course: course || (courseId ? serverCourses[courseId] : null),
+        courseId,
+        status,
+        courses: allList,
+        timestamp: Date.now()
+      });
+
+      res.json({ success: true, courses: allList });
+    } catch (err: any) {
+      console.error("Course sync error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Gemini Chat
   app.post("/api/gemini/chat", async (req, res) => {
     try {
       const { messages, systemContext } = req.body;

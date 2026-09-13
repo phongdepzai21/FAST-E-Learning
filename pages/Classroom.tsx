@@ -758,6 +758,17 @@ const Classroom: React.FC = () => {
                   <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang tải bài giảng...</p>
                 </div>
+              ) : !isOwned ? (
+                  <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-400 p-8 text-center min-h-[400px]">
+                    <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <p className="text-lg font-bold text-white mb-2">Nội dung đã bị khóa</p>
+                    <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">Vui lòng đăng ký khóa học để truy cập bài giảng và tài liệu đính kèm.</p>
+                    <Link to={`/khoa-hoc/${courseId}`} className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black px-6 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-teal-500/20 active:scale-95 uppercase tracking-wider text-xs">
+                        Đăng ký ngay
+                    </Link>
+                  </div>
               ) : canUseReactPlayer ? (
                 <ReactPlayer
                   ref={reactPlayerRef}

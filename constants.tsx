@@ -573,6 +573,18 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     });
   });
 
+  // Track deleted custom courses
+  let deletedIds = new Set<string>();
+  try {
+    const delStr = localStorage.getItem('deleted_course_ids');
+    if (delStr) {
+      const parsed = JSON.parse(delStr);
+      if (Array.isArray(parsed)) {
+        deletedIds = new Set(parsed);
+      }
+    }
+  } catch (e) {}
+
   // 2. Map of LocalStorage courses
   const localMap = new Map<string, Course>();
   try {
@@ -584,6 +596,22 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
           localMap.set(lc.id, lc);
         }
       });
+    }
+  } catch (e) {}
+
+  // 2b. Map of Server-synced courses (synced via SSE / REST across tabs and accounts)
+  const serverMap = new Map<string, Course>();
+  try {
+    const srvStr = localStorage.getItem('server_custom_courses');
+    if (srvStr) {
+      const srvList: Course[] = JSON.parse(srvStr);
+      if (Array.isArray(srvList)) {
+        srvList.forEach(sc => {
+          if (sc && sc.id) {
+            serverMap.set(sc.id, sc);
+          }
+        });
+      }
     }
   } catch (e) {}
 
@@ -617,39 +645,44 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
     } catch (e) {}
   }
 
-  // All unique IDs across hardcoded, Firestore, and LocalStorage
+  // All unique IDs across hardcoded, Firestore, Server, and LocalStorage
   const allIds = new Set<string>([
     ...combinedMap.keys(),
     ...firestoreMap.keys(),
+    ...serverMap.keys(),
     ...localMap.keys()
   ]);
 
   allIds.forEach(id => {
+    // If it's explicitly deleted and not a core system course, exclude it
+    if (deletedIds.has(id)) {
+      const isSystem = COURSES.some(c => c.id === id);
+      if (!isSystem) return;
+    }
+
     const base = combinedMap.get(id);
     const fc = firestoreMap.get(id);
+    const sc = serverMap.get(id);
     const lc = localMap.get(id);
 
-    let winner: Course;
-
-    // FIRESTORE IS CLOUD MASTER SOURCE OF TRUTH:
-    if (fc) {
-      const baseDoc = base ? applyOverlay(base, fc) : { ...fc, price: formatPriceSubmit(fc.price || '') };
-      if (lc) {
-        const fcTime = parseTime(fc.updatedAt || fc.createdAt);
-        const lcTime = parseTime(lc.updatedAt || lc.createdAt);
-        // Only prioritize local if local edit is strictly newer
-        if (lcTime > fcTime && (lcTime - fcTime) < 300000) {
-          winner = applyOverlay(baseDoc, lc);
-        } else {
-          winner = applyOverlay(baseDoc, fc);
-        }
-      } else {
-        winner = baseDoc;
+    // Pick newest among available sources (server, local, firestore)
+    let topOverride = sc;
+    if (lc) {
+      if (!topOverride || parseTime(lc.updatedAt || lc.createdAt) >= parseTime(topOverride.updatedAt || topOverride.createdAt)) {
+        topOverride = lc;
       }
-    } else if (lc) {
-      winner = base ? applyOverlay(base, lc) : { ...lc, price: formatPriceSubmit(lc.price || '') };
-    } else if (base) {
-      winner = base;
+    }
+    if (fc) {
+      if (!topOverride || parseTime(fc.updatedAt || fc.createdAt) > parseTime(topOverride.updatedAt || topOverride.createdAt)) {
+        topOverride = fc;
+      }
+    }
+
+    let winner: Course;
+    if (base) {
+      winner = topOverride ? applyOverlay(base, topOverride) : base;
+    } else if (topOverride) {
+      winner = { ...topOverride, price: formatPriceSubmit(topOverride.price || '') };
     } else {
       return;
     }
