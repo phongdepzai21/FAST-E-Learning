@@ -3,6 +3,12 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
+
+if (!getApps().length) {
+  initializeApp();
+}
 
 // Persistent Data Storage Directory
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -98,6 +104,47 @@ async function startServer() {
       clearInterval(keepAlive);
       sseClients.delete(res);
     });
+  });
+
+  // Endpoint to generate expiring signed URLs for Firebase Storage videos
+  app.post("/api/video/signed-url", async (req, res) => {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl) return res.status(400).json({ error: "Missing videoUrl" });
+
+      let filePath = '';
+      if (videoUrl.startsWith('gs://')) {
+        const parts = videoUrl.replace('gs://', '').split('/');
+        parts.shift(); // remove bucket
+        filePath = decodeURIComponent(parts.join('/'));
+      } else if (videoUrl.includes('firebasestorage.googleapis.com')) {
+        const oIndex = videoUrl.indexOf('/o/');
+        if (oIndex !== -1) {
+          const pathPart = videoUrl.substring(oIndex + 3).split('?')[0];
+          filePath = decodeURIComponent(pathPart);
+        }
+      }
+
+      // If it's not a Firebase Storage URL, return it directly
+      if (!filePath) {
+        return res.json({ signedUrl: videoUrl });
+      }
+
+      const bucket = getStorage().bucket('fast-e-learning.firebasestorage.app');
+      const file = bucket.file(filePath);
+      
+      const [url] = await file.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 4 * 60 * 60 * 1000 // 4 hours
+      });
+
+      res.json({ signedUrl: url });
+    } catch (err: any) {
+      console.error("Signed URL error:", err);
+      // Fallback to original url if generation fails
+      res.json({ signedUrl: req.body.videoUrl });
+    }
   });
 
   // 3. Post Course Sync (add, edit, status toggle, delete)

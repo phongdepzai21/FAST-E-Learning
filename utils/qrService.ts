@@ -3,8 +3,6 @@ export interface PaymentAccountConfig {
   bankName: string;
   accountNo: string;
   accountName: string;
-  momoPhone: string;
-  momoName: string;
 }
 
 export const POPULAR_BANKS = [
@@ -14,7 +12,7 @@ export const POPULAR_BANKS = [
   { id: 'ACB', name: 'ACB (Á Châu)', shortName: 'ACB' },
   { id: 'VPB', name: 'VPBank (Việt Nam Thịnh Vượng)', shortName: 'VPBank' },
   { id: 'BIDV', name: 'BIDV (Đầu tư & Phát triển)', shortName: 'BIDV' },
-  { id: 'CTG', name: 'VietinBank (Công Thương)', shortName: 'VietinBank' },
+  { id: 'ICB', name: 'VietinBank (Công Thương)', shortName: 'VietinBank' },
   { id: 'TPB', name: 'TPBank (Tiên Phong)', shortName: 'TPBank' },
   { id: 'VIB', name: 'VIB (Quốc Tế)', shortName: 'VIB' },
   { id: 'SHB', name: 'SHB (Sài Gòn - Hà Nội)', shortName: 'SHB' },
@@ -23,12 +21,10 @@ export const POPULAR_BANKS = [
 ];
 
 export const DEFAULT_PAYMENT_CONFIG: PaymentAccountConfig = {
-  bankId: 'MB',
-  bankName: 'MB Bank (Quân Đội)',
-  accountNo: '0927002668',
-  accountName: 'CONG TY TNHH DAO TAO FAST',
-  momoPhone: '0927002668',
-  momoName: 'CÔNG TY TNHH ĐÀO TẠO FAST',
+  bankId: 'ICB',
+  bankName: 'VietinBank (Công Thương)',
+  accountNo: '0989499579',
+  accountName: 'FAST ACADEMY',
 };
 
 /**
@@ -155,25 +151,6 @@ export function getVietQrUrl(params: {
   return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accountName)}`;
 }
 
-/**
- * Generate MoMo dynamic QR code image URL
- */
-export function getMomoQrUrl(params: {
-  phone?: string;
-  name?: string;
-  amount: number;
-  memo: string;
-}): string {
-  const cfg = getPaymentConfig();
-  const phone = (params.phone || cfg.momoPhone || '0927002668').replace(/\s+/g, '');
-  const name = params.name || cfg.momoName || 'CÔNG TY TNHH ĐÀO TẠO FAST';
-  const amount = Math.max(0, Math.round(params.amount));
-  const memo = params.memo || 'FAST DANG KY KHOA HOC';
-
-  // MoMo transfer protocol payload
-  const momoPayload = `2|99|${phone}|${name}||0|0|${amount}|${memo}|transfer_myqr`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(momoPayload)}&margin=10`;
-}
 
 /**
  * Create a clean payment transfer memo from course id or title

@@ -16,6 +16,7 @@
     "esbuild": "^0.28.1",
     "express": "^5.2.1",
     "firebase": "10.13.1",
+    "firebase-admin": "^14.4.0",
     "lucide-react": "^1.18.0",
     "motion": "^12.40.0",
     "react": "^19.2.3",

@@ -14,6 +14,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { parseNumericPrice } from '../utils/qrService';
+import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { id: paramId } = useParams<{ id: string }>();
@@ -43,6 +44,10 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     }
     return [];
   });
+
+  const rawCurrentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "";
+  const { signedUrl: currentUrl, isLoading: isVideoLoading } = useSignedVideoUrl(rawCurrentUrl);
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -237,21 +242,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     handlePaymentSuccess();
   };
 
-  const handleMomoDirectPay = () => {
-    if (!currentUser) {
-        navigate('/account', { 
-            state: { 
-                message: "Vui lòng đăng nhập tài khoản để thanh toán qua MoMo.", 
-                from: location.pathname 
-            } 
-        });
-        return;
-    }
-    if (!course) return;
-    const amount = parseNumericPrice(course.price);
-    const targetUrl = `/thanh-toan-momo?courseId=${encodeURIComponent(course.id)}&title=${encodeURIComponent(course.title)}&amount=${amount}&returnUrl=${encodeURIComponent(`/hoc/${course.id}`)}`;
-    navigate(targetUrl);
-  };
 
   // Tự động khôi phục và đồng bộ bài học đang xem
   useEffect(() => {
@@ -386,7 +376,15 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             />
                         </div>
                     ) : (() => {
-                            const currentUrl = playingLesson?.videoUrl || (curriculum[0] && curriculum[0].videoUrl) || "";
+                            if (isVideoLoading) {
+                                return (
+                                    <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-slate-900 flex flex-col items-center justify-center">
+                                        <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                        <p className="text-teal-400 font-bold tracking-wider animate-pulse uppercase text-sm">Đang tải video...</p>
+                                    </div>
+                                );
+                            }
+
                             const embedInfo = getVideoEmbedInfo(currentUrl, !!playingLesson);
 
                             if (embedInfo.isEmbed && embedInfo.embedUrl) {
@@ -716,18 +714,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                       {isVip || isAdmin ? '👑 NHẬN KHÓA HỌC (VIP MIỄN PHÍ)' : 'ĐĂNG KÝ HỌC NGAY (QUÉT MÃ QR)'}
                                   </button>
 
-                                  {!isVip && !isAdmin && course.price && !course.price.toLowerCase().includes('miễn phí') && course.price !== '0' && course.price !== '0đ' && (
-                                      <button
-                                          type="button"
-                                          onClick={handleMomoDirectPay}
-                                          className="w-full py-3 px-4 rounded-2xl font-black text-xs md:text-sm uppercase tracking-wider bg-[#A50064] hover:bg-[#8e0056] text-white shadow-md shadow-pink-900/15 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                                      >
-                                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                                          </svg>
-                                          <span>Thanh toán cổng MoMo (Tự động mở khóa)</span>
-                                      </button>
-                                  )}
                               </div>
                           </div>
                       )}

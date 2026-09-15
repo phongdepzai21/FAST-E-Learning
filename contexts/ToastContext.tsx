@@ -5,7 +5,7 @@ export type ToastType = 'success' | 'error' | 'info' | 'warning';
 export interface Toast {
   id: string;
   title?: string;
-  message: string;
+  message: string | React.ReactNode;
   solution?: string;
   type: ToastType;
   duration: number; // in ms
@@ -15,12 +15,12 @@ export interface Toast {
 
 interface ToastContextType {
   toasts: Toast[];
-  show: (message: string, type?: ToastType, duration?: number, title?: string, solution?: string) => void;
+  show: (message: string | React.ReactNode, type?: ToastType, duration?: number, title?: string, solution?: string, actionLabel?: string, onAction?: () => void) => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
-  success: (message: string, duration?: number, title?: string) => void;
-  error: (message: string, duration?: number, title?: string, solution?: string) => void;
-  info: (message: string, duration?: number, title?: string) => void;
-  warning: (message: string, duration?: number, title?: string, solution?: string) => void;
+  success: (message: string | React.ReactNode, duration?: number, title?: string, actionLabel?: string, onAction?: () => void) => void;
+  error: (message: string | React.ReactNode, duration?: number, title?: string, solution?: string) => void;
+  info: (message: string | React.ReactNode, duration?: number, title?: string) => void;
+  warning: (message: string | React.ReactNode, duration?: number, title?: string, solution?: string) => void;
   dismiss: (id: string) => void;
 }
 
@@ -34,15 +34,16 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   const show = useCallback((
-    message: string, 
+    message: string | React.ReactNode, 
     type: ToastType = 'info', 
     duration: number = 4500,
     title?: string,
-    solution?: string
+    solution?: string,
+    actionLabel?: string,
+    onAction?: () => void
   ) => {
     const id = Math.random().toString(36).substring(2, 9);
-    const newToast: Toast = { id, message, type, duration, title, solution };
-
+    const newToast: Toast = { id, message, type, duration, title, solution, actionLabel, onAction };
     setToasts((prev) => [...prev, newToast]);
 
     if (duration > 0) {
@@ -56,19 +57,19 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     show(message, type, duration);
   }, [show]);
 
-  const success = useCallback((message: string, duration?: number, title?: string) => {
-    show(message, 'success', duration ?? 4000, title);
+  const success = useCallback((message: string | React.ReactNode, duration?: number, title?: string, actionLabel?: string, onAction?: () => void) => {
+    show(message, 'success', duration ?? 4000, title, undefined, actionLabel, onAction);
   }, [show]);
 
-  const error = useCallback((message: string, duration?: number, title?: string, solution?: string) => {
+  const error = useCallback((message: string | React.ReactNode, duration?: number, title?: string, solution?: string) => {
     show(message, 'error', duration ?? 6000, title, solution);
   }, [show]);
 
-  const info = useCallback((message: string, duration?: number, title?: string) => {
+  const info = useCallback((message: string | React.ReactNode, duration?: number, title?: string) => {
     show(message, 'info', duration ?? 4000, title);
   }, [show]);
 
-  const warning = useCallback((message: string, duration?: number, title?: string, solution?: string) => {
+  const warning = useCallback((message: string | React.ReactNode, duration?: number, title?: string, solution?: string) => {
     show(message, 'warning', duration ?? 5000, title, solution);
   }, [show]);
 

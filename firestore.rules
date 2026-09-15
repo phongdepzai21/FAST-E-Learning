@@ -1,10 +1,140 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cho phép đọc và ghi dữ liệu phục vụ ứng dụng học tập, khóa học, tài khoản và đồng bộ tiến trình học
+    
+    // Default Deny
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // --- Primitives ---
+    function isSignedIn() { 
+      return request.auth != null && request.auth.token.email != null; 
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128; 
+    }
+    
+    function isOwner(email) { 
+      return isSignedIn() && request.auth.token.email.lower() == email.lower(); 
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
+          get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true
+        )
+      );
+    }
+    
+    function isTeacher() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
+             get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isTeacher', false) == true;
+    }
+
+    // --- Validation Helpers ---
+    function isValidUser(data) {
+      return (!('email' in data) || (data.email is string && data.email.size() <= 256)) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+             (!('isVip' in data) || data.isVip is bool) &&
+             (!('isAdmin' in data) || data.isAdmin is bool) &&
+             (!('isTeacher' in data) || data.isTeacher is bool);
+    }
+
+    function isValidPurchasedCourse(data) {
+      return (!('courseId' in data) || (data.courseId is string && data.courseId.size() <= 128)) &&
+             (!('courseTitle' in data) || (data.courseTitle is string && data.courseTitle.size() <= 256)) &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 256)) &&
+             (!('price' in data) || (data.price is string && data.price.size() <= 64)) &&
+             (!('purchasedAt' in data) || (data.purchasedAt is string && data.purchasedAt.size() <= 64)) &&
+             (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+             (!('progress' in data) || (data.progress is int || data.progress is float)) &&
+             (!('completedLessons' in data) || (data.completedLessons is list && data.completedLessons.size() <= 1000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 100000)) &&
+             (!('lastNotesUpdatedAt' in data) || (data.lastNotesUpdatedAt is string && data.lastNotesUpdatedAt.size() <= 64)) &&
+             (!('videoTimestamps' in data) || data.videoTimestamps is map);
+    }
+
+    function isValidGamificationStats(data) {
+      return (!('points' in data) || data.points is int) &&
+             (!('level' in data) || data.level is int) &&
+             (!('streakDays' in data) || data.streakDays is int) &&
+             (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() <= 64)) &&
+             (!('completedLessonsCount' in data) || data.completedLessonsCount is int) &&
+             (!('certificatesEarned' in data) || data.certificatesEarned is int) &&
+             (!('unlockedBadgeIds' in data) || (data.unlockedBadgeIds is list && data.unlockedBadgeIds.size() <= 100)) &&
+             (!('unlockedBadgeDates' in data) || data.unlockedBadgeDates is map);
+    }
+
+    function isValidCourse(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 256)) &&
+             (!('price' in data) || (data.price is string && data.price.size() <= 64)) &&
+             (!('image' in data) || (data.image is string && data.image.size() <= 1024)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 128)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 10000)) &&
+             (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+             (!('curriculum' in data) || data.curriculum is list);
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Users
+    match /users/{userEmail} {
+      allow read: if isOwner(userEmail) || isAdmin();
+      
+      // On create: Only user can create their own profile. Cannot self-assign admin/teacher unless they are the bootstrap admin
+      allow create: if isOwner(userEmail) && isValidId(userEmail) && isValidUser(incoming()) && (
+        isAdmin() || 
+        (incoming().get('isAdmin', false) == false && incoming().get('isTeacher', false) == false && incoming().get('isVip', false) == false)
+      );
+
+      allow update: if isOwner(userEmail) && isValidId(userEmail) && isValidUser(incoming()) && (
+        isAdmin() ||
+        (
+          incoming().get('isAdmin', false) == existing().get('isAdmin', false) &&
+          incoming().get('isTeacher', false) == existing().get('isTeacher', false) &&
+          incoming().get('isVip', false) == existing().get('isVip', false)
+        )
+      );
+
+      allow delete: if isAdmin();
+      
+      // 1.1 Purchased Courses Subcollection
+      match /purchased_courses/{courseId} {
+        allow read: if isOwner(userEmail) || isAdmin();
+        
+        allow create: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
+        allow update: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
+        allow delete: if isAdmin();
+      }
+
+      // 1.2 Gamification Stats
+      match /gamification/stats {
+        allow read: if isOwner(userEmail) || isAdmin();
+        
+        allow create: if isOwner(userEmail) && isValidGamificationStats(incoming());
+        allow update: if isOwner(userEmail) && isValidGamificationStats(incoming());
+        allow delete: if isAdmin();
+      }
+    }
+
+    // 2. Courses (Global)
+    match /courses/{courseId} {
+      allow read: if true; // Publicly readable for catalog listing
+      allow create: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
+      allow update: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
+      allow delete: if isAdmin() || isTeacher();
     }
   }
 }
-

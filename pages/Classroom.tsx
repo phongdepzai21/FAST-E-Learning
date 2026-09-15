@@ -9,10 +9,13 @@ import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
 import ReactPlayer from 'react-player';
+import { CustomVideoPlayer } from "../components/CustomVideoPlayer";
 import { Helmet } from 'react-helmet-async';
 import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
 import { useToast } from '../contexts/ToastContext';
 import { WifiOff } from 'lucide-react';
+
+import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 
 const Classroom: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>();
@@ -470,9 +473,11 @@ const Classroom: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser, savedNotes]);
 
-  const activeVideoUrl = useMemo(() => {
+  const rawVideoUrl = useMemo(() => {
     return currentLesson?.videoUrl ? String(currentLesson.videoUrl).trim() : "";
   }, [currentLesson]);
+
+  const { signedUrl: activeVideoUrl, isLoading: isVideoLoading } = useSignedVideoUrl(rawVideoUrl);
 
   const videoEmbed = useMemo(() => {
     if (!activeVideoUrl) return { isEmbed: false, embedUrl: "" };
@@ -758,6 +763,11 @@ const Classroom: React.FC = () => {
                   <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang tải bài giảng...</p>
                 </div>
+              ) : isVideoLoading ? (
+                <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 gap-4 p-8 text-center min-h-[400px]">
+                  <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm font-bold text-teal-400 uppercase tracking-wider animate-pulse">Đang tải video bài giảng...</p>
+                </div>
               ) : !isOwned ? (
                   <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-400 p-8 text-center min-h-[400px]">
                     <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -770,25 +780,13 @@ const Classroom: React.FC = () => {
                     </Link>
                   </div>
               ) : canUseReactPlayer ? (
-                <ReactPlayer
-                  ref={reactPlayerRef}
+                <CustomVideoPlayer
                   key={parsedVideoUrl}
-                  url={parsedVideoUrl}
-                  width="100%"
-                  height="100%"
-                  controls
-                  playing
-                  playsinline
-                  onReady={() => {
-                    const player = reactPlayerRef.current;
-                    const savedTime = videoTimestampsRef.current[`${currentIdx}`] || 0;
-                    if (savedTime > 0) {
-                      player.seekTo(savedTime, 'seconds');
-                    }
-                  }}
-                  
-                  onProgress={(state) => {
-                    handleTimestampUpdate(state.playedSeconds);
+                  parsedVideoUrl={parsedVideoUrl}
+                  course={course}
+                  savedTime={videoTimestampsRef.current[`${currentIdx}`] || 0}
+                  onProgress={(playedSeconds) => {
+                    handleTimestampUpdate(playedSeconds);
                   }}
                   onEnded={() => {
                     handleUpdateProgress(currentIdx);

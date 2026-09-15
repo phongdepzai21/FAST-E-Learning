@@ -3,7 +3,7 @@ import {
   parseNumericPrice,
   formatVND,
   getVietQrUrl,
-  getMomoQrUrl,
+  
   generatePaymentMemo,
   getPaymentConfig,
   savePaymentConfig,
@@ -26,7 +26,6 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
   courseTitle = '',
   readOnly = false,
 }) => {
-  const [activeMethod, setActiveMethod] = useState<'vietqr' | 'momo'>('vietqr');
   const [config, setConfig] = useState<PaymentAccountConfig>(getPaymentConfig);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -52,14 +51,8 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
     template: 'compact2',
   });
 
-  const momoQrUrl = getMomoQrUrl({
-    phone: config.momoPhone,
-    name: config.momoName,
-    amount,
-    memo,
-  });
 
-  const currentQrUrl = activeMethod === 'vietqr' ? vietQrUrl : momoQrUrl;
+  const currentQrUrl = vietQrUrl;
 
   const copyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
@@ -172,20 +165,6 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
               />
             </div>
 
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Số điện thoại Ví MoMo</label>
-              <input
-                type="text"
-                value={config.momoPhone}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setConfig((prev) => ({ ...prev, momoPhone: val }));
-                  savePaymentConfig({ momoPhone: val });
-                }}
-                placeholder="VD: 0927002668"
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-800"
-              />
-            </div>
           </div>
         </div>
       )}
@@ -236,37 +215,6 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
           {/* Method tabs + QR Box */}
           <div className="md:col-span-5 flex flex-col items-center">
-            {/* Method switcher */}
-            <div className="flex bg-slate-200/70 p-1 rounded-xl w-full max-w-[240px] mb-2.5 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMethod('vietqr');
-                  setQrLoaded(false);
-                }}
-                className={`flex-1 py-1.5 rounded-lg text-center transition-all ${
-                  activeMethod === 'vietqr'
-                    ? 'bg-white text-[#007c76] shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                VietQR (Ngân hàng)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMethod('momo');
-                  setQrLoaded(false);
-                }}
-                className={`flex-1 py-1.5 rounded-lg text-center transition-all ${
-                  activeMethod === 'momo'
-                    ? 'bg-[#A50064] text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Ví MoMo
-              </button>
-            </div>
 
             {/* QR Image Frame */}
             <div className="relative w-48 h-48 bg-white p-2.5 rounded-2xl shadow-md border-2 border-teal-200 flex items-center justify-center overflow-hidden">
@@ -349,8 +297,6 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
 
             {/* Account Info */}
             <div className="bg-white p-3 rounded-xl border border-teal-100 shadow-xs space-y-1.5">
-              {activeMethod === 'vietqr' ? (
-                <>
                   <div className="flex justify-between items-center text-[11px]">
                     <span className="text-slate-500">Ngân hàng thụ hưởng:</span>
                     <span className="font-bold text-slate-800">{config.bankName} ({config.bankId})</span>
@@ -372,36 +318,9 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
                     <span className="text-slate-500">Chủ tài khoản:</span>
                     <span className="font-bold text-slate-800 uppercase">{config.accountName}</span>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-500">Ví điện tử:</span>
-                    <span className="font-bold text-[#A50064]">MoMo Doanh Nghiệp / Cá Nhân</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-500">Số MoMo:</span>
-                    <span className="font-mono font-bold text-[#A50064] flex items-center gap-1">
-                      {config.momoPhone}
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(config.momoPhone, 'momo')}
-                        className="text-[10px] bg-pink-50 text-pink-700 px-1 rounded hover:bg-pink-100"
-                      >
-                        {copiedField === 'momo' ? '✓' : 'Copy'}
-                      </button>
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-500">Người nhận:</span>
-                    <span className="font-bold text-slate-800 uppercase">{config.momoName}</span>
-                  </div>
-                </>
-              )}
-            </div>
-
+</div>
             <div className="text-[11px] text-slate-500 italic">
-              💡 Học viên mở bất kỳ ứng dụng ngân hàng hoặc MoMo quét mã QR trên là số tiền <strong>{formatVND(amount)}</strong> và nội dung sẽ được điền chuẩn xác 100%.
+              💡 Học viên mở bất kỳ ứng dụng ngân hàng quét mã QR trên là số tiền <strong>{formatVND(amount)}</strong> và nội dung sẽ được điền chuẩn xác 100%.
             </div>
           </div>
         </div>

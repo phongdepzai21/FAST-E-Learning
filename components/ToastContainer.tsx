@@ -53,7 +53,7 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
   let mainMsg = toast.message;
   let detectedSolution = toast.solution;
 
-  if (!detectedSolution && mainMsg.includes('💡 Hướng dẫn')) {
+  if (!detectedSolution && typeof mainMsg === 'string' && mainMsg.includes('💡 Hướng dẫn')) {
     const parts = mainMsg.split('💡 Hướng dẫn');
     mainMsg = parts[0].trim();
     detectedSolution = 'Hướng dẫn' + parts[1];
@@ -86,9 +86,9 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
             </span>
           </div>
 
-          <p className="text-xs sm:text-[13px] font-bold text-gray-800 dark:text-zinc-100 leading-relaxed break-words">
+          <div className="text-xs sm:text-[13px] font-bold text-gray-800 dark:text-zinc-100 leading-relaxed break-words">
             {mainMsg}
-          </p>
+          </div>
 
           {/* Collapsible Solution Helper for Friendly Guidance */}
           {detectedSolution && (

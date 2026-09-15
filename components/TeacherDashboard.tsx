@@ -462,6 +462,80 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     });
   };
 
+  // Bulk Toggle Course Visibility
+  const promptBulkToggleCourseStatus = (newStatus: 'active' | 'inactive', e: React.MouseEvent) => {
+    // Calculate a position near the clicked button
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const position = {
+      top: rect.bottom + 8, // Just below the button
+      right: window.innerWidth - rect.right // Align right edge
+    };
+
+    setConfirmModal({
+      isOpen: true,
+      type: newStatus === 'inactive' ? 'status-hide' : 'status-show',
+      title: newStatus === 'inactive' ? 'Xác nhận Ẩn Tất Cả Khóa Học' : 'Kích hoạt Tất Cả Khóa Học',
+      courseTitle: newStatus === 'inactive' ? 'Hàng loạt: Ẩn tất cả' : 'Hàng loạt: Hiện tất cả',
+      description: newStatus === 'inactive'
+        ? 'Bạn có chắc chắn muốn ẩn tất cả khóa học khỏi danh sách học viên? Các khóa học này sẽ chuyển sang trạng thái "Không hoạt động".'
+        : 'Bạn có chắc chắn muốn hiển thị công khai tất cả khóa học? Học viên sẽ có thể tìm thấy và tham gia học tập.',
+      position,
+      onConfirm: () => executeBulkToggleCourseStatus(newStatus),
+    });
+  };
+
+  const executeBulkToggleCourseStatus = async (newStatus: 'active' | 'inactive') => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+    const nowIso = new Date().toISOString();
+
+    // 1. Optimistically update local React state
+    setCourses(prev => prev.map(c => (c.status !== 'draft' && c.status !== newStatus) ? { ...c, status: newStatus, updatedAt: nowIso } : c));
+
+    // 2. Always persist to LocalStorage backup
+    try {
+      const localStr = localStorage.getItem('local_custom_courses');
+      let localList: any[] = localStr ? JSON.parse(localStr) : [];
+      let updatedCount = 0;
+
+      localList = localList.map(c => {
+        if (c.status === 'draft' || c.status === newStatus) return c;
+        updatedCount++;
+        return {
+          ...c,
+          status: newStatus,
+          updatedAt: nowIso
+        };
+      });
+
+      // Update remaining courses in the main list that aren't in localList yet
+      const localIds = new Set(localList.map(c => c.id));
+      courses.forEach(c => {
+        if (!localIds.has(c.id) && c.status !== 'draft' && c.status !== newStatus) {
+          updatedCount++;
+          localList.push({
+            ...c,
+            status: newStatus,
+            updatedAt: nowIso
+          });
+        }
+      });
+
+      localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+
+      // 3. Show notification banner
+      setMessage({
+        type: 'success',
+        text: newStatus === 'inactive'
+          ? `Đã ẩn hàng loạt ${updatedCount} khóa học (Đồng bộ mọi thiết bị: Không hoạt động)`
+          : `Đã kích hoạt hàng loạt ${updatedCount} khóa học (Đồng bộ mọi thiết bị: Hoạt động)`
+      });
+      setTimeout(() => setMessage(null), 4000);
+    } catch (error) {
+      console.error('Error updating bulk course status to local storage', error);
+      toast.error('Có lỗi xảy ra khi lưu thay đổi hàng loạt. Vui lòng thử lại sau!');
+    }
+  };
+
   // Toggle Course Visibility with Custom Confirmation Dialog
   const promptToggleCourseStatus = (course: Course, e: React.MouseEvent) => {
     const isCurrentlyActive = course.status !== 'draft' && course.status !== 'inactive';
@@ -834,7 +908,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm">
+            <div className="space-y-4">
+              <div className="flex justify-end gap-2 px-2">
+                <button
+                  onClick={(e) => promptBulkToggleCourseStatus('active', e)}
+                  className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl uppercase tracking-wider text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  Hiện tất cả
+                </button>
+                <button
+                  onClick={(e) => promptBulkToggleCourseStatus('inactive', e)}
+                  className="px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-xl uppercase tracking-wider text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                  Ẩn tất cả
+                </button>
+              </div>
+              <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
@@ -956,6 +1047,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   })}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

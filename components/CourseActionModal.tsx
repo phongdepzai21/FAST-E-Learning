@@ -104,14 +104,14 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className={`fixed inset-0 z-[9999] p-4 ${position ? '' : 'flex items-center justify-center'}`}>
-        {/* Backdrop */}
+      <div className={`fixed inset-0 z-[9999] ${position ? 'pointer-events-none' : 'p-4 flex items-center justify-center'}`}>
+        {/* Backdrop - Only show if not positioned, OR show invisible backdrop to capture clicks */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onCancel}
-          className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
+          className={`absolute inset-0 ${position ? 'pointer-events-auto bg-transparent' : 'bg-slate-950/60 backdrop-blur-xs'}`}
         />
 
         {/* Modal Card */}
@@ -121,7 +121,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ type: 'spring', damping: 25, stiffness: 350 }}
           style={position ? { position: 'absolute', top: position.top, right: position.right } : {}}
-          className={`relative w-full ${position ? 'max-w-sm' : 'max-w-lg'} bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 border border-gray-100 dark:border-slate-800 shadow-2xl space-y-6 overflow-hidden`}
+          className={`relative w-full ${position ? 'max-w-sm pointer-events-auto shadow-2xl border-gray-200' : 'max-w-lg'} bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 border border-gray-100 dark:border-slate-800 shadow-2xl space-y-6 overflow-hidden`}
         >
           {/* Header */}
           <div className="flex items-start justify-between gap-4">

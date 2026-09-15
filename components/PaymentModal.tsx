@@ -8,7 +8,6 @@ import {
   parseNumericPrice,
   formatVND,
   getVietQrUrl,
-  getMomoQrUrl,
   generatePaymentMemo,
   getPaymentConfig,
 } from '../utils/qrService';
@@ -25,7 +24,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'vietqr' | 'momo'>('vietqr');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [config, setConfig] = useState(getPaymentConfig);
 
@@ -65,26 +63,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     template: 'compact2',
   });
 
-  const momoQrUrl = getMomoQrUrl({
-    phone: config.momoPhone,
-    name: config.momoName,
-    amount: numericAmount,
-    memo: transferMemo,
-  });
-
-  const currentQrUrl = activeTab === 'vietqr' ? vietQrUrl : momoQrUrl;
-
+  const currentQrUrl = vietQrUrl;
   const copyText = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleRedirectToMomo = () => {
-    onClose();
-    const targetUrl = `/thanh-toan-momo?courseId=${encodeURIComponent(course.id)}&title=${encodeURIComponent(course.title)}&amount=${numericAmount}&returnUrl=${encodeURIComponent(`/hoc/${course.id}`)}`;
-    navigate(targetUrl);
-  };
 
   const handleConfirmTransfer = () => {
     setIsVerifying(true);
@@ -215,30 +200,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
               /* Dynamic QR Payment Box */
               <div className="bg-gradient-to-br from-teal-50/60 via-slate-50 to-pink-50/40 p-4 sm:p-5 rounded-2xl border border-teal-200/70 space-y-4">
                 {/* Method Switcher */}
-                <div className="flex bg-slate-200/80 p-1 rounded-xl text-xs font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('vietqr')}
-                    className={`flex-1 py-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 ${
-                      activeTab === 'vietqr'
-                        ? 'bg-white text-[#007c76] shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>VietQR (Ngân hàng 24/7)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('momo')}
-                    className={`flex-1 py-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 ${
-                      activeTab === 'momo'
-                        ? 'bg-[#A50064] text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Ví MoMo</span>
-                  </button>
-                </div>
 
                 {/* QR Code and Instructions */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 justify-center">
@@ -252,7 +213,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
                   <div className="text-left space-y-2 text-xs text-slate-700 flex-1 w-full">
                     <p>
-                      <strong>Bước 1:</strong> Mở app {activeTab === 'vietqr' ? 'Ngân hàng bất kỳ' : 'Ví MoMo'}.
+                      <strong>Bước 1:</strong> Mở app Ngân hàng bất kỳ.
                     </p>
                     <p>
                       <strong>Bước 2:</strong> Chọn <strong>"Quét Mã QR"</strong> và quét mã bên cạnh.
@@ -277,8 +238,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
                 {/* Account Details Box */}
                 <div className="bg-white/90 p-3.5 rounded-xl border border-teal-100 text-xs space-y-1.5">
-                  {activeTab === 'vietqr' ? (
-                    <>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500">Ngân hàng:</span>
                         <span className="font-bold text-slate-800">{config.bankName}</span>
@@ -313,57 +272,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                           </button>
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Ví MoMo:</span>
-                        <span className="font-mono font-bold text-[#A50064] flex items-center gap-1.5">
-                          {config.momoPhone}
-                          <button
-                            type="button"
-                            onClick={() => copyText(config.momoPhone, 'momo')}
-                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
-                          >
-                            {copiedField === 'momo' ? '✓ Đã chép' : 'Copy'}
-                          </button>
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Người nhận:</span>
-                        <span className="font-bold text-slate-800 uppercase">{config.momoName}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Số tiền:</span>
-                        <span className="font-bold text-[#A50064]">{formatVND(numericAmount)}</span>
-                      </div>
-                    </>
-                  )}
                 </div>
 
                 {/* Action Buttons */}
-                {activeTab === 'momo' ? (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleRedirectToMomo}
-                      className="w-full py-3.5 bg-[#A50064] hover:bg-[#880052] text-white rounded-xl font-black uppercase text-xs sm:text-sm tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-900/20 active:scale-98"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      <span>CHUYỂN SANG CỔNG MOMO ĐỂ THANH TOÁN (KIỂU MẮT BÃO)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmTransfer}
-                      disabled={isVerifying}
-                      className="w-full py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs tracking-wider transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {isVerifying ? 'Đang xác nhận quét mã...' : 'Tôi đã quét mã QR MoMo này rồi'}
-                    </button>
-                  </div>
-                ) : (
                   <button
                     onClick={handleConfirmTransfer}
                     disabled={isVerifying}
@@ -385,7 +296,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                       'Tôi Đã Quét Mã & Chuyển Khoản'
                     )}
                   </button>
-                )}
                 <p className="text-[10px] text-center text-gray-400 font-medium">
                   Hệ thống tự động kích hoạt khóa học vào phòng học ngay sau khi quét mã thành công.
                 </p>
