@@ -78,7 +78,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     price?: string;
     description?: string;
     isProcessing?: boolean;
-    position?: { top: number, right: number };
     onConfirm: () => void;
   }>({
     isOpen: false,
@@ -464,13 +463,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   // Bulk Toggle Course Visibility
   const promptBulkToggleCourseStatus = (newStatus: 'active' | 'inactive', e: React.MouseEvent) => {
-    // Calculate a position near the clicked button
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const position = {
-      top: rect.bottom + 8, // Just below the button
-      right: window.innerWidth - rect.right // Align right edge
-    };
-
     setConfirmModal({
       isOpen: true,
       type: newStatus === 'inactive' ? 'status-hide' : 'status-show',
@@ -479,7 +471,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       description: newStatus === 'inactive'
         ? 'Bạn có chắc chắn muốn ẩn tất cả khóa học khỏi danh sách học viên? Các khóa học này sẽ chuyển sang trạng thái "Không hoạt động".'
         : 'Bạn có chắc chắn muốn hiển thị công khai tất cả khóa học? Học viên sẽ có thể tìm thấy và tham gia học tập.',
-      position,
       onConfirm: () => executeBulkToggleCourseStatus(newStatus),
     });
   };
@@ -540,13 +531,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const promptToggleCourseStatus = (course: Course, e: React.MouseEvent) => {
     const isCurrentlyActive = course.status !== 'draft' && course.status !== 'inactive';
     const newStatus: 'active' | 'inactive' = isCurrentlyActive ? 'inactive' : 'active';
-    
-    // Calculate a position near the clicked button
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const position = {
-      top: rect.bottom + 8, // Just below the button
-      right: window.innerWidth - rect.right // Align right edge
-    };
 
     setConfirmModal({
       isOpen: true,
@@ -558,7 +542,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       description: isCurrentlyActive
         ? 'Khóa học này sẽ chuyển sang trạng thái "Không hoạt động" và tạm ẩn khỏi danh sách học viên.'
         : 'Khóa học này sẽ hiển thị công khai để tất cả học viên có thể tìm thấy và tham gia học tập.',
-      position,
       onConfirm: () => executeToggleCourseStatus(course, newStatus),
     });
   };
@@ -1424,9 +1407,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         price={confirmModal.price}
         description={confirmModal.description}
         isProcessing={confirmModal.isProcessing}
-        position={confirmModal.position}
         onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false, position: undefined }))}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       {/* Modern Success Banner Modal */}

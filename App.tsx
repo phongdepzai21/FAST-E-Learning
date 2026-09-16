@@ -12,6 +12,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { HelmetProvider } from 'react-helmet-async';
 import { initCourseSyncService } from './utils/courseSyncService';
 import { LessonUpdateNotifier } from './components/LessonUpdateNotifier';
+import { NetworkStatusNotifier } from './components/NetworkStatusNotifier';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -78,6 +79,7 @@ const AppLayout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background text-text transition-colors duration-300">
       <ToastContainer />
+      <NetworkStatusNotifier />
       <LessonUpdateNotifier />
       {showBars && <Header />}
       <main className="flex-grow">

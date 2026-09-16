@@ -494,7 +494,7 @@ const Classroom: React.FC = () => {
       return next;
     });
 
-    if (Math.abs(time - lastSyncedTimestampRef.current) >= 5) {
+    if (Math.abs(time - lastSyncedTimestampRef.current) >= 30) {
       lastSyncedTimestampRef.current = time;
       if (currentUser?.email && courseId) {
         const userDocRef = doc(db, "users", currentUser.email, "purchased_courses", courseId);
