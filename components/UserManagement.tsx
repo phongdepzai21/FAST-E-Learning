@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity } from 'lucide-react';
+import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 
 interface UserData {
@@ -21,11 +21,41 @@ export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editRoles, setEditRoles] = useState({ isAdmin: false, isTeacher: false, isVip: false });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleUpdateRoles = async () => {
+    if (!selectedUser) return;
+    setIsUpdating(true);
+    try {
+      const userRef = doc(db, 'users', selectedUser.id);
+      await updateDoc(userRef, {
+        isAdmin: editRoles.isAdmin,
+        isTeacher: editRoles.isTeacher,
+        isVip: editRoles.isVip,
+      });
+      
+      setUsers(users.map(u => 
+        u.id === selectedUser.id 
+          ? { ...u, isAdmin: editRoles.isAdmin, isTeacher: editRoles.isTeacher, isVip: editRoles.isVip } 
+          : u
+      ));
+      
+      toast('Thành công', 'Cập nhật phân quyền tài khoản thành công', 'success');
+      setSelectedUser(null);
+    } catch (error) {
+      console.error('Error updating user roles:', error);
+      toast('Lỗi', 'Không thể cập nhật quyền. Hãy chắc chắn bạn là Admin.', 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -173,8 +203,18 @@ export const UserManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-4 px-6 text-right">
-                    <button className="px-4 py-2 bg-gray-50 hover:bg-[#007c76]/10 text-gray-600 hover:text-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all">
-                      Xem chi tiết
+                    <button 
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setEditRoles({
+                          isAdmin: user.isAdmin || false,
+                          isTeacher: user.isTeacher || false,
+                          isVip: user.isVip || false
+                        });
+                      }}
+                      className="px-4 py-2 bg-gray-50 hover:bg-[#007c76]/10 text-gray-600 hover:text-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Phân quyền
                     </button>
                   </td>
                 </tr>
@@ -187,6 +227,131 @@ export const UserManagement: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Phân quyền tài khoản</h3>
+              <button 
+                onClick={() => setSelectedUser(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="w-12 h-12 rounded-full bg-white shadow-sm overflow-hidden flex items-center justify-center shrink-0">
+                  {selectedUser.photoURL ? (
+                    <img src={selectedUser.photoURL} alt={selectedUser.email} className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-6 h-6 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-extrabold text-gray-900">{selectedUser.displayName}</div>
+                  <div className="font-semibold text-gray-500 text-xs mt-0.5">{selectedUser.email}</div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">Quyền hạn hệ thống</p>
+                
+                <label className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${editRoles.isAdmin ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-gray-900">Quản trị viên (Admin)</div>
+                      <div className="text-[11px] font-semibold text-gray-500">Toàn quyền quản lý hệ thống</div>
+                    </div>
+                  </div>
+                  <div className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${editRoles.isAdmin ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only" 
+                      checked={editRoles.isAdmin}
+                      onChange={(e) => setEditRoles({...editRoles, isAdmin: e.target.checked})}
+                    />
+                    <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${editRoles.isAdmin ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </div>
+                </label>
+
+                <label className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${editRoles.isTeacher ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-gray-900">Giảng viên</div>
+                      <div className="text-[11px] font-semibold text-gray-500">Quyền đăng tải và quản lý khóa học</div>
+                    </div>
+                  </div>
+                  <div className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${editRoles.isTeacher ? 'bg-teal-600' : 'bg-gray-300'}`}>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only" 
+                      checked={editRoles.isTeacher}
+                      onChange={(e) => setEditRoles({...editRoles, isTeacher: e.target.checked})}
+                    />
+                    <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${editRoles.isTeacher ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </div>
+                </label>
+
+                <label className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${editRoles.isVip ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+                      <Crown className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-gray-900">Tài khoản VIP</div>
+                      <div className="text-[11px] font-semibold text-gray-500">Truy cập toàn bộ khóa học miễn phí</div>
+                    </div>
+                  </div>
+                  <div className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${editRoles.isVip ? 'bg-amber-500' : 'bg-gray-300'}`}>
+                    <input 
+                      type="checkbox" 
+                      className="sr-only" 
+                      checked={editRoles.isVip}
+                      onChange={(e) => setEditRoles({...editRoles, isVip: e.target.checked})}
+                    />
+                    <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${editRoles.isVip ? 'translate-x-7' : 'translate-x-1'}`} />
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setSelectedUser(null)}
+                className="px-5 py-2.5 rounded-xl text-xs font-black text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer uppercase tracking-wider"
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                onClick={handleUpdateRoles}
+                disabled={isUpdating}
+                className="px-6 py-2.5 rounded-xl text-xs font-black text-white bg-[#007c76] hover:bg-[#00605b] transition-colors cursor-pointer uppercase tracking-wider flex items-center gap-2 disabled:opacity-50"
+              >
+                {isUpdating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Lưu phân quyền
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -99,7 +99,7 @@ service cloud.firestore {
         (incoming().get('isAdmin', false) == false && incoming().get('isTeacher', false) == false && incoming().get('isVip', false) == false)
       );
 
-      allow update: if isOwner(userEmail) && isValidId(userEmail) && isValidUser(incoming()) && (
+      allow update: if (isOwner(userEmail) || isAdmin()) && isValidId(userEmail) && isValidUser(incoming()) && (
         isAdmin() ||
         (
           incoming().get('isAdmin', false) == existing().get('isAdmin', false) &&
