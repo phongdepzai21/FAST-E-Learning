@@ -549,56 +549,62 @@ const Account: React.FC = () => {
             // This fixes the synchronization issue with Courses.tsx and PaymentModal.tsx
             const userEmail = (freshUser.email || '').toLowerCase(); 
             let isVipStatus = false;
-            let isAdminStatus = ADMIN_EMAILS.includes(userEmail);
-            let isTeacherStatus = TEACHER_EMAILS.includes(userEmail);
+            let isAdminStatus = false;
+            let isTeacherStatus = false;
 
             if (userEmail) {
-                const isSpecialEmail = ADMIN_EMAILS.includes(userEmail) || TEACHER_EMAILS.includes(userEmail);
-
                 // Fetch from localStorage backup first
                 const localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
                 if (localRolesStr) {
                     try {
                         const localRoles = JSON.parse(localRolesStr);
                         if (localRoles.isVip === true) isVipStatus = true;
-                        if (isSpecialEmail || localRoles.rolePromotedByAdmin === true) {
-                            if (localRoles.isAdmin === true) isAdminStatus = true;
-                            if (localRoles.isTeacher === true) isTeacherStatus = true;
-                        }
+                        if (localRoles.isAdmin === true) isAdminStatus = true;
+                        if (localRoles.isTeacher === true) isTeacherStatus = true;
                     } catch (e) {}
                 }
 
                 // Real-time listener on user doc
                 const userDocRef = doc(db, "users", userEmail);
-                onSnapshot(userDocRef, (userDocSnap) => {
+                onSnapshot(userDocRef, async (userDocSnap) => {
                     let curVip = isVipStatus;
                     let curAdmin = isAdminStatus;
                     let curTeacher = isTeacherStatus;
 
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
-                        if (userData.isVip === true) curVip = true;
+                        curVip = userData.isVip === true;
+                        curAdmin = userData.isAdmin === true;
+                        curTeacher = userData.isTeacher === true || curAdmin;
                         
-                        if (isSpecialEmail || userData.rolePromotedByAdmin === true) {
-                            curAdmin = userData.isAdmin === true || ADMIN_EMAILS.includes(userEmail);
-                            curTeacher = userData.isTeacher === true || TEACHER_EMAILS.includes(userEmail) || curAdmin;
-                        } else {
-                            curAdmin = ADMIN_EMAILS.includes(userEmail);
-                            curTeacher = TEACHER_EMAILS.includes(userEmail);
+                        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
+                            isVip: curVip,
+                            isAdmin: curAdmin,
+                            isTeacher: curTeacher
+                        }));
+                    } else {
+                        // Create default user document
+                        try {
+                            await setDoc(userDocRef, {
+                                email: userEmail,
+                                displayName: freshUser.displayName || 'Học viên',
+                                photoURL: freshUser.photoURL || '',
+                                isAdmin: false,
+                                isTeacher: false,
+                                isVip: false,
+                                createdAt: new Date().toISOString()
+                            });
+                            curVip = false;
+                            curAdmin = false;
+                            curTeacher = false;
+                        } catch (err) {
+                            console.error('Error creating user profile:', err);
                         }
                         
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-                            isVip: curVip,
-                            isAdmin: curAdmin,
-                            isTeacher: curTeacher,
-                            rolePromotedByAdmin: userData.rolePromotedByAdmin === true
-                        }));
-                    } else {
-                        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-                            isVip: curVip,
-                            isAdmin: curAdmin,
-                            isTeacher: curTeacher,
-                            rolePromotedByAdmin: false
+                            isVip: false,
+                            isAdmin: false,
+                            isTeacher: false
                         }));
                     }
 
@@ -1239,8 +1245,8 @@ const Account: React.FC = () => {
   }, [isAdmin, isTeacher, isVip, purchasedCourses]);
   
   // LOGIC HIỂN THỊ KHÓA HỌC (CẬP NHẬT)
-  // Nếu là VIP / Admin: Hiển thị tất cả khóa TRỪ khóa test 2k (nếu chưa mua) hoặc tất cả khóa đã nhận trong purchasedCourses.
-  const isPrivileged = isVip || isAdmin;
+  // Nếu là VIP / Admin / Teacher: Hiển thị tất cả khóa TRỪ khóa test 2k (nếu chưa mua) hoặc tất cả khóa đã nhận trong purchasedCourses.
+  const isPrivileged = isVip || isAdmin || isTeacher;
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [isClaimingAll, setIsClaimingAll] = useState(false);
 
