@@ -91,7 +91,7 @@ service cloud.firestore {
 
     // 1. Users
     match /users/{userEmail} {
-      allow read: if isOwner(userEmail) || isAdmin();
+      allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
       
       // On create: Only user can create their own profile. Cannot self-assign admin/teacher unless they are the bootstrap admin
       allow create: if isOwner(userEmail) && isValidId(userEmail) && isValidUser(incoming()) && (
@@ -112,7 +112,7 @@ service cloud.firestore {
       
       // 1.1 Purchased Courses Subcollection
       match /purchased_courses/{courseId} {
-        allow read: if isOwner(userEmail) || isAdmin();
+        allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
         
         allow create: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
         allow update: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
@@ -121,7 +121,7 @@ service cloud.firestore {
 
       // 1.2 Gamification Stats
       match /gamification/stats {
-        allow read: if isOwner(userEmail) || isAdmin();
+        allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
         
         allow create: if isOwner(userEmail) && isValidGamificationStats(incoming());
         allow update: if isOwner(userEmail) && isValidGamificationStats(incoming());

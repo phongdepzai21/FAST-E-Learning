@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   AlertTriangle, 
@@ -100,7 +101,9 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
   const theme = getTheme();
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 z-[9999] p-4 flex items-center justify-center">
         {/* Backdrop */}
@@ -205,7 +208,8 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 
@@ -234,7 +238,9 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
     }
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
         {/* Backdrop */}
@@ -344,6 +350,7 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
