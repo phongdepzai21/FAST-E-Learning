@@ -1,7 +1,7 @@
 import emailjs from '@emailjs/browser';
 
 export const sendOtpViaEmailJS = async (toEmail: string, toName: string, otpCode: string): Promise<{ success: boolean; reason?: 'MISSING_KEYS' | 'FAILED'; error?: string }> => {
-  const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap";
+  const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_rzb3ipm";
   const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j";
   const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-";
 
