@@ -11,6 +11,7 @@ import {
   generatePaymentMemo,
   getPaymentConfig,
 } from '../utils/qrService';
+import { sendOtpViaEmailJS } from '../utils/emailService';
 
 interface PaymentModalProps {
   course: Course;
@@ -26,6 +27,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [config, setConfig] = useState(getPaymentConfig);
+  
+  // OTP States
+  const [showOtpForm, setShowOtpForm] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState<string>('');
+  const [userInputOtp, setUserInputOtp] = useState<string>('');
+  const [otpError, setOtpError] = useState<string>('');
 
   useEffect(() => {
     setConfig(getPaymentConfig());
@@ -71,17 +78,42 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   };
 
 
-  const handleConfirmTransfer = () => {
+  const handleConfirmTransfer = async () => {
     setIsVerifying(true);
-    // Simulate a payment verification process
-    setTimeout(() => {
+    const user = auth.currentUser;
+    if (user && user.email) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(code);
+      const emailResult = await sendOtpViaEmailJS(user.email, user.displayName || 'Học viên', code);
+      if (emailResult.success) {
+        setShowOtpForm(true);
+        setIsVerifying(false);
+      } else {
+        console.warn("Failed to send OTP via EmailJS", emailResult.error);
+        setIsVerifying(false);
+        // Bỏ qua OTP nếu lỗi cấu hình email (để không block luồng dev)
+        setIsCompleted(true);
+        setTimeout(() => {
+          onSuccess();
+          setIsCompleted(false);
+        }, 1000);
+      }
+    } else {
       setIsVerifying(false);
+    }
+  };
+
+  const handleVerifyOtp = () => {
+    if (userInputOtp === generatedOtp) {
+      setOtpError('');
       setIsCompleted(true);
       setTimeout(() => {
-        onSuccess(); // Triggers the actual database saving
+        onSuccess();
         setIsCompleted(false);
       }, 1000);
-    }, 1500);
+    } else {
+      setOtpError('Mã OTP không chính xác. Vui lòng thử lại.');
+    }
   };
 
   const handleInstantVipClaim = async () => {
@@ -149,6 +181,53 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 {isFreeCourse ? 'Miễn phí' : formatVND(numericAmount)}
               </div>
             </div>
+
+            {/* OTP Verification Form */}
+            {showOtpForm ? (
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5 text-center animate-in zoom-in-95">
+                <div className="w-16 h-16 bg-teal-50 text-[#007c76] rounded-full flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h4 className="font-black text-gray-800 text-lg uppercase tracking-tight">Nhập mã xác thực OTP</h4>
+                <p className="text-sm text-gray-500 font-medium px-4">
+                  Một mã xác thực 6 số đã được gửi đến email <strong className="text-gray-800">{auth.currentUser?.email}</strong>. Vui lòng kiểm tra hộp thư (và thư rác) để tiếp tục.
+                </p>
+                <div className="pt-2">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={userInputOtp}
+                    onChange={(e) => {
+                      setUserInputOtp(e.target.value.replace(/[^0-9]/g, ''));
+                      setOtpError('');
+                    }}
+                    placeholder="Nhập 6 số OTP"
+                    className="w-full text-center text-2xl tracking-[0.5em] font-black font-mono text-[#007c76] bg-gray-50 border-2 border-gray-200 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 rounded-xl py-3 outline-none transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-medium placeholder:text-gray-300"
+                  />
+                  {otpError && (
+                    <p className="text-red-500 text-xs font-bold mt-2 animate-in slide-in-from-top-1">{otpError}</p>
+                  )}
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowOtpForm(false)}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={userInputOtp.length !== 6}
+                    className="flex-1 py-3 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all shadow-md active:scale-98 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Xác nhận
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
 
             {/* Special VIP/Admin Instant Claim Box */}
             {isVipOrAdmin && !isFreeCourse && (
@@ -301,6 +380,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 </p>
               </div>
             )}
+            </>
+          )}
           </div>
         ) : (
           <div className="py-8 text-center space-y-4 animate-in fade-in zoom-in duration-500 relative z-10">

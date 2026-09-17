@@ -6,6 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
+import PurchaseModal from '../components/PurchaseModal';
 
 // Mock Course Object for reference
 const VIP_PACKAGE: Course = {
@@ -23,6 +24,7 @@ const VipUpgrade: React.FC = () => {
   const [isVip, setIsVip] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -126,7 +128,7 @@ const VipUpgrade: React.FC = () => {
       navigate('/account', { state: { message: 'Vui lòng đăng nhập để nâng cấp VIP', from: '/account/vip-upgrade' } });
       return;
     }
-    setShowPaymentModal(true);
+    setShowPurchaseModal(true);
   };
 
   return (
@@ -281,6 +283,17 @@ const VipUpgrade: React.FC = () => {
          </div>
       </div>
 
+      <PurchaseModal
+          isOpen={showPurchaseModal}
+          onClose={() => setShowPurchaseModal(false)}
+          onSuccess={() => {
+              setShowPurchaseModal(false);
+              setShowPaymentModal(true);
+          }}
+          userEmail={currentUser?.email || ''}
+          userName={currentUser?.name || ''}
+          courseName={VIP_PACKAGE.title}
+      />
       <PaymentModal
           course={VIP_PACKAGE}
           isOpen={showPaymentModal}
