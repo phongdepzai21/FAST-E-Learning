@@ -16,8 +16,10 @@ import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { parseNumericPrice } from '../utils/qrService';
 import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
+import { useToast } from '../contexts/ToastContext';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
+  const { showToast, success } = useToast();
   const { id: paramId } = useParams<{ id: string }>();
   const id = embeddedCourseId || paramId;
   const navigate = useNavigate();
@@ -27,7 +29,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [currentUser, setCurrentUser] = useState<{name: string, email: string} | null>(null);
   const [isOwned, setIsOwned] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [courseProgress, setCourseProgress] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
@@ -215,9 +216,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     setIsOwned(true);
     setIsActivating(false);
     setShowPaymentModal(false);
-    setShowSuccessNotification(true);
+    success('Đã mở khóa khóa học thành công!', 5000, 'Thành công');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => setShowSuccessNotification(false), 5000);
   };
 
   const handleRegisterClick = async () => {
@@ -775,20 +775,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           <div className="fixed inset-0 z-[200] bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
               <div className="w-16 h-16 border-4 border-[#007c76] border-t-transparent rounded-full animate-spin mb-6"></div>
               <h3 className="text-xl font-black text-[#007c76] uppercase tracking-wider animate-pulse">Đang kích hoạt khóa học...</h3>
-          </div>
-      )}
-
-      {showSuccessNotification && (
-          <div className="fixed top-20 left-0 right-0 z-[150] bg-green-500 text-white shadow-2xl animate-[slideDown_0.5s_ease-out]">
-              <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-                  <p className="font-black uppercase text-sm md:text-lg tracking-wide flex items-center gap-2">
-                    <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                    Đã mở khóa thành công!
-                  </p>
-                  <button onClick={() => setShowSuccessNotification(false)} className="text-white/80 hover:text-white p-2">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-              </div>
           </div>
       )}
 

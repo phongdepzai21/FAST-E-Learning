@@ -11,7 +11,6 @@ import {
   generatePaymentMemo,
   getPaymentConfig,
 } from '../utils/qrService';
-import { sendOtpViaEmailJS } from '../utils/emailService';
 
 interface PaymentModalProps {
   course: Course;
@@ -103,17 +102,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (userInputOtp === generatedOtp) {
-      setOtpError('');
-      setIsCompleted(true);
-      setTimeout(() => {
-        onSuccess();
-        setIsCompleted(false);
-      }, 1000);
-    } else {
-      setOtpError('Mã OTP không chính xác. Vui lòng thử lại.');
+  const handleVerifyOtp = async () => {
+    setIsVerifying(true);
+    try {
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: auth.currentUser?.email || '', otp: otpCode })
+      });
+      if (response.ok) {
+        setIsCompleted(true);
+        setTimeout(() => {
+          onSuccess();
+        }, 2000);
+      } else {
+        alert("Mã OTP không chính xác.");
+      }
+    } catch (err) {
+      alert("Lỗi xác minh. Vui lòng thử lại sau.");
     }
+    setIsVerifying(false);
   };
 
   const handleInstantVipClaim = async () => {

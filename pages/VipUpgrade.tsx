@@ -7,6 +7,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
 import PurchaseModal from '../components/PurchaseModal';
+import { useToast } from '../contexts/ToastContext';
 
 // Mock Course Object for reference
 const VIP_PACKAGE: Course = {
@@ -20,9 +21,9 @@ const VIP_PACKAGE: Course = {
 
 const VipUpgrade: React.FC = () => {
   const navigate = useNavigate();
+  const { success } = useToast();
   const [currentUser, setCurrentUser] = useState<{name: string, email: string} | null>(null);
   const [isVip, setIsVip] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
@@ -100,7 +101,7 @@ const VipUpgrade: React.FC = () => {
 
       setIsVip(true);
       setShowPaymentModal(false);
-      setShowSuccess(true);
+      success('Chúc mừng! Bạn đã trở thành Thành viên VIP.', 5000, 'Thành công');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: any) {
       console.error("Error activating VIP in Firestore:", error);
@@ -116,7 +117,7 @@ const VipUpgrade: React.FC = () => {
 
       setIsVip(true);
       setShowPaymentModal(false);
-      setShowSuccess(true);
+      success('Kích hoạt dự phòng gói VIP ngoại tuyến thành công!', 5000, 'Thành công');
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
       console.warn(`Lưu trữ VIP dự phòng ngoại tuyến được kích hoạt thành công (Hot reload local storage fallback). Nhật ký lỗi Firestore: "${errorMsg}"`);
@@ -134,25 +135,6 @@ const VipUpgrade: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 font-sans text-white selection:bg-yellow-500 selection:text-black animate-fade-in pb-20">
       
-      {/* Success Notification */}
-      {showSuccess && (
-        <div className="fixed top-0 left-0 right-0 z-[150] bg-gradient-to-r from-yellow-400 to-yellow-600 text-black shadow-2xl animate-in slide-in-from-top duration-500">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-black/10 p-2 rounded-full">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-              </div>
-              <p className="font-black uppercase text-sm md:text-lg tracking-wide">
-                Chúc mừng! Bạn đã trở thành Thành viên VIP.
-              </p>
-            </div>
-            <button onClick={() => setShowSuccess(false)} className="hover:bg-black/10 p-2 rounded-full transition-colors">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Hero Section */}
       <div className="relative overflow-hidden pt-20 pb-20 md:pt-32 md:pb-32">
         {/* Background Effects */}

@@ -204,6 +204,103 @@ async function startServer() {
     }
   });
 
+  // In-memory OTP storage
+  const otpStore = new Map<string, { otp: string, expiresAt: number, attempts: number }>();
+  const otpSendCooldowns = new Map<string, number>();
+
+  // OTP Send Endpoint
+  app.post("/api/otp/send", async (req, res) => {
+    try {
+      const { email, name } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      const emailKey = email.toLowerCase();
+      const now = Date.now();
+      
+      // Rate limit: 60 seconds cooldown between emails
+      const cooldownEnd = otpSendCooldowns.get(emailKey) || 0;
+      if (now < cooldownEnd) {
+        const waitSecs = Math.ceil((cooldownEnd - now) / 1000);
+        return res.status(429).json({ error: `Vui lòng đợi ${waitSecs}s trước khi gửi lại.` });
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+      const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_rzb3ipm";
+      const templateId = process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j";
+      const publicKey = process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-";
+
+      if (!serviceId || !templateId || !publicKey) {
+        return res.status(500).json({ error: "EmailJS configuration is missing" });
+      }
+
+      const payload = {
+        service_id: serviceId,
+        template_id: templateId,
+        user_id: publicKey,
+        template_params: {
+          to_name: name || "Học viên",
+          to_email: email,
+          otp_code: otp
+        }
+      };
+
+      const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("EmailJS API Error:", text);
+        return res.status(500).json({ error: "Lỗi hệ thống gửi email. Vui lòng thử lại sau.", details: text });
+      }
+
+      otpStore.set(emailKey, { otp, expiresAt, attempts: 0 });
+      otpSendCooldowns.set(emailKey, now + 60000); // 60s cooldown
+      res.json({ success: true, message: "OTP sent successfully" });
+    } catch (error: any) {
+      console.error("Server OTP Send Error:", error);
+      res.status(500).json({ error: "Server error sending OTP" });
+    }
+  });
+
+  // OTP Verify Endpoint
+  app.post("/api/otp/verify", (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) return res.status(400).json({ error: "Email and OTP are required" });
+
+      const record = otpStore.get(email.toLowerCase());
+      if (!record) {
+        return res.status(400).json({ error: "Mã OTP không tồn tại hoặc chưa được gửi." });
+      }
+
+      if (Date.now() > record.expiresAt) {
+        otpStore.delete(email.toLowerCase());
+        return res.status(400).json({ error: "Mã OTP đã hết hạn." });
+      }
+
+      if (record.otp !== otp) {
+        record.attempts += 1;
+        if (record.attempts >= 5) {
+          otpStore.delete(email.toLowerCase());
+          otpSendCooldowns.set(email.toLowerCase(), Date.now() + 10 * 60 * 1000); // 10 minutes
+          return res.status(429).json({ error: "Bạn đã nhập sai quá 5 lần. Tính năng OTP bị khóa trong 600s." });
+        }
+        return res.status(400).json({ error: `Mã OTP không chính xác. Bạn còn ${5 - record.attempts} lần thử.` });
+      }
+
+      otpStore.delete(email.toLowerCase());
+      res.json({ success: true, message: "Xác minh thành công" });
+    } catch (error: any) {
+      console.error("Server OTP Verify Error:", error);
+      res.status(500).json({ error: "Server error verifying OTP" });
+    }
+  });
+
   // Gemini Chat
   app.post("/api/gemini/chat", async (req, res) => {
     try {
