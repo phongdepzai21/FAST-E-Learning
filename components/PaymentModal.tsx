@@ -81,25 +81,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     setIsVerifying(true);
     const user = auth.currentUser;
     if (user && user.email) {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(code);
-      const emailResult = await sendOtpViaEmailJS(user.email, user.displayName || 'Học viên', code);
-      if (emailResult.success) {
-        setShowOtpForm(true);
-        setIsVerifying(false);
-      } else {
-        console.warn("Failed to send OTP via EmailJS", emailResult.error);
-        setIsVerifying(false);
-        // Bỏ qua OTP nếu lỗi cấu hình email (để không block luồng dev)
-        setIsCompleted(true);
-        setTimeout(() => {
-          onSuccess();
-          setIsCompleted(false);
-        }, 1000);
+      try {
+        const response = await fetch('/api/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email, name: user.displayName || 'Học viên' })
+        });
+        const data = await response.json();
+        
+        if (response.ok) {
+          setShowOtpForm(true);
+        } else {
+          console.warn("Failed to send OTP via backend", data.error);
+          setOtpError(data.error || "Lỗi gửi mã OTP");
+        }
+      } catch (err) {
+        console.warn("Failed to send OTP", err);
+        setOtpError("Lỗi kết nối máy chủ");
       }
-    } else {
-      setIsVerifying(false);
     }
+    setIsVerifying(false);
   };
 
   const handleVerifyOtp = async () => {
@@ -108,18 +109,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       const response = await fetch('/api/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: auth.currentUser?.email || '', otp: otpCode })
+        body: JSON.stringify({ email: auth.currentUser?.email || '', otp: userInputOtp })
       });
+      const data = await response.json();
       if (response.ok) {
+        setOtpError('');
         setIsCompleted(true);
         setTimeout(() => {
           onSuccess();
+          setIsCompleted(false);
         }, 2000);
       } else {
-        alert("Mã OTP không chính xác.");
+        setOtpError(data.error || "Mã OTP không chính xác.");
+        if (response.status === 429) {
+          setTimeout(() => setShowOtpForm(false), 2000);
+        }
       }
     } catch (err) {
-      alert("Lỗi xác minh. Vui lòng thử lại sau.");
+      setOtpError("Lỗi xác minh. Vui lòng thử lại sau.");
     }
     setIsVerifying(false);
   };

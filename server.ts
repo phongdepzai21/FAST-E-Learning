@@ -227,7 +227,7 @@ async function startServer() {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-      const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_rzb3ipm";
+      const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap";
       const templateId = process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j";
       const publicKey = process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-";
 
