@@ -17,6 +17,7 @@ import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonT
 import { parseNumericPrice } from '../utils/qrService';
 import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 import { useToast } from '../contexts/ToastContext';
+import { markCourseAsSeen } from '../utils/courseNotificationService';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { showToast, success } = useToast();
@@ -59,6 +60,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   useEffect(() => {
     if (!id) return;
+    markCourseAsSeen(id);
 
     const loadFromLocalAndFallback = (firestoreData?: any) => {
       if (firestoreData) {

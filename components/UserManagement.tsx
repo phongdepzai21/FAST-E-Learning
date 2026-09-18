@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save } from 'lucide-react';
+import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save, Bell, CheckCheck, Check } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
+import { addApprovalNotification } from '../utils/courseNotificationService';
 
 interface UserData {
   id: string; // The email
@@ -24,7 +26,7 @@ export const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [editRoles, setEditRoles] = useState({ isAdmin: false, isTeacher: false, isVip: false });
-  const { toast } = useToast();
+  const { success, error } = useToast();
 
   useEffect(() => {
     fetchUsers();
@@ -34,24 +36,82 @@ export const UserManagement: React.FC = () => {
     if (!selectedUser) return;
     setIsUpdating(true);
     try {
-      const userRef = doc(db, 'users', selectedUser.id);
-      await updateDoc(userRef, {
+      const normalizedEmail = selectedUser.id.toLowerCase().trim();
+      const userRef = doc(db, 'users', normalizedEmail);
+
+      const updatedPayload = {
+        email: normalizedEmail,
+        displayName: selectedUser.displayName || 'Học viên',
         isAdmin: editRoles.isAdmin,
         isTeacher: editRoles.isTeacher,
         isVip: editRoles.isVip,
-      });
+        rolePromotedByAdmin: true,
+        status: 'approved',
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Use setDoc with merge so it creates document if it does not exist yet
+      await setDoc(userRef, updatedPayload, { merge: true });
       
+      // Update local storage cache for instant synchronization
+      try {
+        localStorage.setItem(`user_roles_${normalizedEmail}`, JSON.stringify({
+          isAdmin: editRoles.isAdmin,
+          isTeacher: editRoles.isTeacher,
+          isVip: editRoles.isVip,
+        }));
+      } catch (e) {}
+
+      // Dispatch event to sync components across the app
+      window.dispatchEvent(new CustomEvent('user_roles_updated', {
+        detail: {
+          email: normalizedEmail,
+          roles: editRoles
+        }
+      }));
+
+      // Trigger bell notification for approval
+      addApprovalNotification({
+        userEmail: normalizedEmail,
+        userName: selectedUser.displayName,
+        roles: editRoles
+      });
+
+      // Save notification in user's notifications subcollection in Firestore
+      try {
+        const notifDocRef = doc(collection(db, 'users', normalizedEmail, 'notifications'));
+        await setDoc(notifDocRef, {
+          title: 'Phê duyệt phân quyền tài khoản',
+          message: `Tài khoản của bạn đã được Admin phê duyệt vai trò: ${[
+            editRoles.isAdmin ? 'Admin' : null,
+            editRoles.isTeacher ? 'Giảng viên' : null,
+            editRoles.isVip ? 'VIP' : null,
+          ].filter(Boolean).join(', ') || 'Học viên'}`,
+          type: 'approval',
+          createdAt: new Date().toISOString(),
+          isRead: false
+        });
+      } catch (notifErr) {
+        console.warn('Could not persist user subcollection notification:', notifErr);
+      }
+
       setUsers(users.map(u => 
-        u.id === selectedUser.id 
+        u.id.toLowerCase() === normalizedEmail 
           ? { ...u, isAdmin: editRoles.isAdmin, isTeacher: editRoles.isTeacher, isVip: editRoles.isVip } 
           : u
       ));
       
-      toast('Thành công', 'Cập nhật phân quyền tài khoản thành công', 'success');
+      const roleSummaryList: string[] = [];
+      if (editRoles.isAdmin) roleSummaryList.push('Admin');
+      if (editRoles.isTeacher) roleSummaryList.push('Giảng viên');
+      if (editRoles.isVip) roleSummaryList.push('VIP');
+      const roleSummaryText = roleSummaryList.length > 0 ? roleSummaryList.join(', ') : 'Học viên tiêu chuẩn';
+
+      success(`Đã cập nhật & phê duyệt thành công cho tài khoản ${selectedUser.displayName ? `${selectedUser.displayName} (${normalizedEmail})` : normalizedEmail}: [${roleSummaryText}]`, 5000, 'Phê duyệt thành công');
       setSelectedUser(null);
-    } catch (error) {
-      console.error('Error updating user roles:', error);
-      toast('Lỗi', 'Không thể cập nhật quyền. Hãy chắc chắn bạn là Admin.', 'error');
+    } catch (err) {
+      console.error('Error updating user roles:', err);
+      error('Không thể cập nhật quyền. Hãy chắc chắn bạn là Admin.', 5000, 'Lỗi');
     } finally {
       setIsUpdating(false);
     }
@@ -67,6 +127,9 @@ export const UserManagement: React.FC = () => {
       
       for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
+        const normalizedEmail = docSnap.id.toLowerCase().trim();
+        const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+        const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
         
         // Count purchased courses
         let purchasedCoursesCount = 0;
@@ -79,12 +142,12 @@ export const UserManagement: React.FC = () => {
         }
         
         userData.push({
-          id: docSnap.id,
-          email: data.email || docSnap.id,
+          id: normalizedEmail,
+          email: data.email || normalizedEmail,
           displayName: data.displayName || 'Học viên',
           photoURL: data.photoURL,
-          isAdmin: data.isAdmin || false,
-          isTeacher: data.isTeacher || false,
+          isAdmin: data.isAdmin === true || isHardcodedAdmin,
+          isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin,
           isVip: data.isVip || false,
           createdAt: data.createdAt,
           lastLoginAt: data.lastLoginAt,
@@ -110,9 +173,9 @@ export const UserManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Quản lý Tài khoản</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Quản lý & Phê duyệt Tài khoản</h2>
           <p className="text-sm font-semibold text-gray-500 mt-1">
-            Tổng cộng: {users.length} tài khoản trong hệ thống
+            Tổng cộng: {users.length} tài khoản. Cập nhật phân quyền sẽ tự động gửi thông báo phê duyệt đến người dùng.
           </p>
         </div>
         
@@ -212,9 +275,10 @@ export const UserManagement: React.FC = () => {
                           isVip: user.isVip || false
                         });
                       }}
-                      className="px-4 py-2 bg-gray-50 hover:bg-[#007c76]/10 text-gray-600 hover:text-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#007c76]/5 hover:bg-[#007c76] text-[#007c76] hover:text-white border border-[#007c76]/20 hover:border-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
                     >
-                      Phân quyền
+                      <Shield className="w-3.5 h-3.5" />
+                      Phê duyệt & Phân quyền
                     </button>
                   </td>
                 </tr>
@@ -234,7 +298,10 @@ export const UserManagement: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-black text-gray-900 tracking-tight">Phân quyền tài khoản</h3>
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-[#007c76]" />
+                <h3 className="text-lg font-black text-gray-900 tracking-tight">Phê duyệt & Phân quyền tài khoản</h3>
+              </div>
               <button 
                 onClick={() => setSelectedUser(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -243,7 +310,7 @@ export const UserManagement: React.FC = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-5">
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100">
                 <div className="w-12 h-12 rounded-full bg-white shadow-sm overflow-hidden flex items-center justify-center shrink-0">
                   {selectedUser.photoURL ? (
@@ -256,6 +323,14 @@ export const UserManagement: React.FC = () => {
                   <div className="font-extrabold text-gray-900">{selectedUser.displayName}</div>
                   <div className="font-semibold text-gray-500 text-xs mt-0.5">{selectedUser.email}</div>
                 </div>
+              </div>
+
+              {/* Approval notice */}
+              <div className="p-3.5 bg-teal-50/80 border border-teal-100 rounded-2xl flex items-start gap-2.5 text-xs text-teal-900">
+                <Bell className="w-4 h-4 text-[#007c76] shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  Khi xác nhận phê duyệt, thay đổi vai trò sẽ có hiệu lực ngay lập tức và hệ thống tự động kích hoạt thông báo vào chuông thông báo của tài khoản.
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -345,8 +420,8 @@ export const UserManagement: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
-                    Lưu phân quyền
+                    <CheckCheck className="w-4 h-4" />
+                    Xác nhận & Phê duyệt
                   </>
                 )}
               </button>

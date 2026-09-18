@@ -11,8 +11,9 @@ import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
+import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
 
-const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
+const Categories = ['Tất cả', 'Mới cập nhật', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
 const Courses: React.FC = () => {
   const toast = useToast();
@@ -302,8 +303,16 @@ const Courses: React.FC = () => {
 
       const term = searchTerm.toLowerCase();
       const matchesSearch = course.title.toLowerCase().includes(term) || (course.category && course.category.toLowerCase().includes(term));
-      const matchesCategory = activeCategory === 'Tất cả' || 
-                             course.category.toUpperCase().includes(activeCategory.toUpperCase());
+      
+      let matchesCategory = false;
+      if (activeCategory === 'Tất cả') {
+        matchesCategory = true;
+      } else if (activeCategory === 'Mới cập nhật') {
+        matchesCategory = isCourseNewOrUpdated(course.id);
+      } else {
+        matchesCategory = Boolean(course.category && course.category.toUpperCase().includes(activeCategory.toUpperCase()));
+      }
+
       return matchesSearch && matchesCategory;
     });
   }, [searchTerm, activeCategory, allCourses]);
@@ -357,19 +366,27 @@ const Courses: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-20">
         {/* Category Pills */}
         <div className="flex overflow-x-auto no-scrollbar gap-3 mb-12 py-2">
-            {Categories.map((cat) => (
-                <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`whitespace-nowrap px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
-                        activeCategory === cat 
-                        ? 'bg-[#007c76] text-white border-[#007c76] shadow-lg shadow-[#007c76]/30 translate-y-[-2px]' 
-                        : 'bg-white text-gray-400 border-gray-100 hover:border-[#007c76]/30 hover:text-[#007c76]'
-                    }`}
-                >
-                    {cat}
-                </button>
-            ))}
+            {Categories.map((cat) => {
+                const isNewTab = cat === 'Mới cập nhật';
+                const isSelected = activeCategory === cat;
+                return (
+                  <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`whitespace-nowrap px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
+                          isSelected 
+                          ? isNewTab
+                            ? 'bg-yellow-400 text-yellow-950 border-yellow-400 shadow-lg shadow-yellow-400/30 translate-y-[-2px]'
+                            : 'bg-[#007c76] text-white border-[#007c76] shadow-lg shadow-[#007c76]/30 translate-y-[-2px]' 
+                          : isNewTab
+                            ? 'bg-yellow-50/90 text-yellow-600 border-yellow-300/90 hover:bg-yellow-100 hover:text-yellow-700 shadow-xs'
+                            : 'bg-white text-gray-400 border-gray-100 hover:border-[#007c76]/30 hover:text-[#007c76]'
+                      }`}
+                  >
+                      <span className={isNewTab && !isSelected ? 'text-yellow-600 font-black' : ''}>{cat}</span>
+                  </button>
+                );
+            })}
         </div>
 
         {/* Course Grid Results */}

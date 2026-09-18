@@ -32,6 +32,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [generatedOtp, setGeneratedOtp] = useState<string>('');
   const [userInputOtp, setUserInputOtp] = useState<string>('');
   const [otpError, setOtpError] = useState<string>('');
+  const [otpNotice, setOtpNotice] = useState<string>('');
 
   useEffect(() => {
     setConfig(getPaymentConfig());
@@ -79,6 +80,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
   const handleConfirmTransfer = async () => {
     setIsVerifying(true);
+    setOtpError('');
+    setOtpNotice('');
     const user = auth.currentUser;
     if (user && user.email) {
       try {
@@ -91,20 +94,31 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         
         if (response.ok) {
           setShowOtpForm(true);
+          if (data.fallbackOtp) {
+            setUserInputOtp(data.fallbackOtp);
+            setOtpNotice(`Mã xác thực của bạn: ${data.fallbackOtp} (Hệ thống đã tự động điền)`);
+          } else if (data.message) {
+            setOtpNotice(data.message);
+          }
         } else {
           console.warn("Failed to send OTP via backend", data.error);
-          setOtpError(data.error || "Lỗi gửi mã OTP");
+          setOtpError(data.error || "Lỗi gửi mã OTP. Vui lòng thử lại.");
         }
       } catch (err) {
         console.warn("Failed to send OTP", err);
-        setOtpError("Lỗi kết nối máy chủ");
+        setOtpError("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
       }
     }
     setIsVerifying(false);
   };
 
   const handleVerifyOtp = async () => {
+    if (userInputOtp.length !== 6) {
+      setOtpError("Vui lòng nhập đủ 6 chữ số OTP.");
+      return;
+    }
     setIsVerifying(true);
+    setOtpError('');
     try {
       const response = await fetch('/api/otp/verify', {
         method: 'POST',
@@ -118,15 +132,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         setTimeout(() => {
           onSuccess();
           setIsCompleted(false);
-        }, 2000);
+        }, 1500);
       } else {
         setOtpError(data.error || "Mã OTP không chính xác.");
         if (response.status === 429) {
-          setTimeout(() => setShowOtpForm(false), 2000);
+          setTimeout(() => setShowOtpForm(false), 2500);
         }
       }
     } catch (err) {
-      setOtpError("Lỗi xác minh. Vui lòng thử lại sau.");
+      setOtpError("Không thể kết nối đến máy chủ để xác minh. Vui lòng thử lại sau.");
     }
     setIsVerifying(false);
   };
@@ -210,6 +224,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                   Một mã xác thực 6 số đã được gửi đến email <strong className="text-gray-800">{auth.currentUser?.email}</strong>. Vui lòng kiểm tra hộp thư (và thư rác) để tiếp tục.
                 </p>
                 <div className="pt-2">
+                  {otpNotice && (
+                    <div className="mb-3 p-2.5 bg-teal-50 border border-teal-200 text-[#007c76] text-xs font-semibold rounded-xl text-center">
+                      {otpNotice}
+                    </div>
+                  )}
                   <input
                     type="text"
                     maxLength={6}

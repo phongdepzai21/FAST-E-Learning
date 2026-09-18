@@ -26,6 +26,9 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
+        request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
+        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
+        request.auth.token.email.lower() == 'lediem.ngo@gmail.com' ||
         (
           exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
           get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true
@@ -34,8 +37,18 @@ service cloud.firestore {
     }
     
     function isTeacher() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
-             get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isTeacher', false) == true;
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
+        request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
+        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
+        request.auth.token.email.lower() == 'lediem.ngo@gmail.com' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && (
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isTeacher', false) == true ||
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true
+          )
+        )
+      );
     }
 
     // --- Validation Helpers ---
@@ -44,9 +57,11 @@ service cloud.firestore {
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
              (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
              (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+             (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
              (!('isVip' in data) || data.isVip is bool) &&
              (!('isAdmin' in data) || data.isAdmin is bool) &&
-             (!('isTeacher' in data) || data.isTeacher is bool);
+             (!('isTeacher' in data) || data.isTeacher is bool) &&
+             (!('rolePromotedByAdmin' in data) || data.rolePromotedByAdmin is bool);
     }
 
     function isValidPurchasedCourse(data) {
@@ -93,8 +108,8 @@ service cloud.firestore {
     match /users/{userEmail} {
       allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
       
-      // On create: Only user can create their own profile. Cannot self-assign admin/teacher unless they are the bootstrap admin
-      allow create: if isOwner(userEmail) && isValidId(userEmail) && isValidUser(incoming()) && (
+      // On create: Owner can create their own profile, or Admin can provision/approve profile
+      allow create: if (isOwner(userEmail) || isAdmin()) && isValidId(userEmail) && isValidUser(incoming()) && (
         isAdmin() || 
         (incoming().get('isAdmin', false) == false && incoming().get('isTeacher', false) == false && incoming().get('isVip', false) == false)
       );

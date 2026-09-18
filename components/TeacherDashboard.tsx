@@ -77,6 +77,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     category?: string;
     price?: string;
     description?: string;
+    position?: { top: number; right: number };
     isProcessing?: boolean;
     onConfirm: () => void;
   }>({

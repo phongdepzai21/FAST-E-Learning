@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Course } from '../types';
 import { Link } from "react-router-dom";
 import { getCachedLastLessonIdx } from '../utils/lessonTracking';
+import { isCourseNewOrUpdated, markCourseAsSeen } from '../utils/courseNotificationService';
 
 interface CourseCardProps {
   course: Course;
@@ -47,6 +48,20 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
   const [lastLessonIdx, setLastLessonIdx] = useState<number>(() => {
     return isOwned ? getCachedLastLessonIdx(course.id) : 0;
   });
+  const [isNewOrUpdated, setIsNewOrUpdated] = useState<boolean>(() => isCourseNewOrUpdated(course.id));
+
+  useEffect(() => {
+    const checkStatus = () => {
+      setIsNewOrUpdated(isCourseNewOrUpdated(course.id));
+    };
+    checkStatus();
+    window.addEventListener('course_notifications_updated', checkStatus);
+    window.addEventListener('storage', checkStatus);
+    return () => {
+      window.removeEventListener('course_notifications_updated', checkStatus);
+      window.removeEventListener('storage', checkStatus);
+    };
+  }, [course.id]);
 
   useEffect(() => {
     if (isOwned) {
@@ -72,6 +87,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
   }), [course.id]);
 
   const handleClick = (e: React.MouseEvent) => {
+    markCourseAsSeen(course.id);
     if (onSelect) {
       e.preventDefault();
       onSelect(course);
@@ -107,9 +123,19 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`}
                 />
                 
-                {/* Floating Category Badge */}
-                <div className={`absolute top-4 left-4 ${style.bg} ${style.text} backdrop-blur-md px-3 py-1.5 rounded-full z-10 shadow-sm text-[10px] font-black uppercase tracking-widest border border-white/50`}>
-                    {course.category}
+                {/* Floating Category & New Badge */}
+                <div className="absolute top-4 left-4 flex items-center gap-1.5 z-10">
+                    <div className={`${style.bg} ${style.text} backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm text-[10px] font-black uppercase tracking-widest border border-white/50`}>
+                        {course.category}
+                    </div>
+                    {isNewOrUpdated && (
+                        <div 
+                          id={`course-new-badge-${course.id}`}
+                          className="bg-yellow-400 text-yellow-950 px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 border border-yellow-300 shadow-yellow-500/20"
+                        >
+                            <span className="font-black text-yellow-950">Mới cập nhật</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Owned Badge */}
