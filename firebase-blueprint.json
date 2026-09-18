@@ -11,6 +11,9 @@
         "isVip": { "type": "boolean", "description": "Flag indicating if user is a VIP subscriber" },
         "isAdmin": { "type": "boolean", "description": "Flag indicating if user is an Administrator" },
         "isTeacher": { "type": "boolean", "description": "Flag indicating if user is a Teacher" },
+        "isLocked": { "type": "boolean", "description": "Flag indicating if the user account is locked/banned" },
+        "lockedAt": { "type": "string", "description": "ISO 8601 timestamp when account was locked" },
+        "lockReason": { "type": "string", "description": "Reason for locking the account" },
         "updatedAt": { "type": "string", "description": "ISO 8601 update timestamp string" }
       },
       "required": ["email"]
