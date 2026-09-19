@@ -38,6 +38,9 @@ interface UserProfile {
   isVip: boolean;
   isAdmin: boolean;
   isTeacher: boolean;
+  isLocked?: boolean;
+  lockedAt?: string;
+  lockReason?: string;
 }
 
 interface PurchasedCourseData {
@@ -574,17 +577,24 @@ const Account: React.FC = () => {
                     let curVip = isVipStatus;
                     let curAdmin = isAdminStatus;
                     let curTeacher = isTeacherStatus;
+                    let curLocked = false;
+                    let curLockedAt: string | undefined = undefined;
+                    let curLockReason: string | undefined = undefined;
 
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
                         curVip = userData.isVip === true;
                         curAdmin = userData.isAdmin === true || isHardcodedAdmin;
                         curTeacher = userData.isTeacher === true || curAdmin || isHardcodedTeacher;
+                        curLocked = userData.isLocked === true;
+                        curLockedAt = userData.lockedAt;
+                        curLockReason = userData.lockReason;
                         
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
                             isVip: curVip,
                             isAdmin: curAdmin,
-                            isTeacher: curTeacher
+                            isTeacher: curTeacher,
+                            isLocked: curLocked
                         }));
                     } else {
                         // Create default user document
@@ -596,11 +606,13 @@ const Account: React.FC = () => {
                                 isAdmin: false,
                                 isTeacher: false,
                                 isVip: false,
+                                isLocked: false,
                                 createdAt: new Date().toISOString()
                             });
                             curVip = false;
                             curAdmin = false;
                             curTeacher = false;
+                            curLocked = false;
                         } catch (err) {
                             console.error('Error creating user profile:', err);
                         }
@@ -608,7 +620,8 @@ const Account: React.FC = () => {
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
                             isVip: false,
                             isAdmin: false,
-                            isTeacher: false
+                            isTeacher: false,
+                            isLocked: false
                         }));
                     }
 
@@ -616,7 +629,10 @@ const Account: React.FC = () => {
                       ...prev,
                       isVip: curVip,
                       isAdmin: curAdmin,
-                      isTeacher: curTeacher
+                      isTeacher: curTeacher,
+                      isLocked: curLocked,
+                      lockedAt: curLockedAt,
+                      lockReason: curLockReason
                     } : null);
                     window.dispatchEvent(new CustomEvent('user_roles_updated'));
                 }, (err) => {
@@ -1423,6 +1439,55 @@ const Account: React.FC = () => {
 
   // --- DASHBOARD VIEW (LOGGED IN) ---
   if (user) {
+    // If account is locked by administrator
+    if (user.isLocked) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-red-100 shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 rounded-3xl bg-red-50 text-red-600 flex items-center justify-center mx-auto border-2 border-red-100">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tài khoản tạm thời bị khóa</h2>
+              <p className="text-sm font-medium text-gray-500 leading-relaxed">
+                Tài khoản <span className="font-bold text-gray-800">{user.email}</span> đã bị quản trị viên khóa quyền truy cập.
+              </p>
+            </div>
+
+            {user.lockReason && (
+              <div className="p-4 bg-red-50/70 border border-red-200/60 rounded-2xl text-left">
+                <p className="text-[10px] font-black uppercase tracking-wider text-red-600 mb-1">Lý do khóa</p>
+                <p className="text-xs font-semibold text-red-900">{user.lockReason}</p>
+                {user.lockedAt && (
+                  <p className="text-[10px] text-red-500 mt-2">
+                    Thời điểm: {new Date(user.lockedAt).toLocaleString('vi-VN')}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2 flex flex-col gap-3">
+              <button
+                onClick={handleLogout}
+                className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-md cursor-pointer"
+              >
+                Đăng xuất tài khoản
+              </button>
+              <Link
+                to="/"
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all"
+              >
+                Quay về trang chủ
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#f8fafc] flex animate-fade-in overflow-hidden">
         
@@ -1944,12 +2009,6 @@ const Account: React.FC = () => {
   // --- LOGIN SCREEN (MODERNIZED) ---
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 font-sans relative overflow-hidden animate-fade-in">
-      
-      {/* Account Page Notification Bell */}
-      <div className="absolute top-6 right-6 z-30">
-        <NotificationDropdown />
-      </div>
-
       {/* Dynamic Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-teal-100/50 rounded-full blur-[120px] animate-[pulse_8s_infinite]"></div>

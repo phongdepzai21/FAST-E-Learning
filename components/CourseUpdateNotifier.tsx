@@ -4,8 +4,34 @@ import { db } from '../firebase';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { useNavigate } from 'react-router-dom';
-import { addCourseNotification, markCourseAsSeen } from '../utils/courseNotificationService';
-import { Sparkles, ArrowRight, BookOpen } from 'lucide-react';
+import { 
+  addCourseNotification, 
+  markCourseAsSeen, 
+  isCourseDismissed, 
+  dismissCourseNotification 
+} from '../utils/courseNotificationService';
+import { Sparkles, ArrowRight, BookOpen, EyeOff } from 'lucide-react';
+
+const KNOWN_COURSES_KEY = 'fast_known_course_ids_cache';
+
+function getStoredKnownCourseIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(KNOWN_COURSES_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveKnownCourseId(id: string) {
+  if (typeof window === 'undefined' || !id) return;
+  try {
+    const ids = getStoredKnownCourseIds();
+    ids.add(id);
+    localStorage.setItem(KNOWN_COURSES_KEY, JSON.stringify(Array.from(ids)));
+  } catch {}
+}
 
 export const CourseUpdateNotifier: React.FC = () => {
   const toast = useToast();
@@ -15,9 +41,27 @@ export const CourseUpdateNotifier: React.FC = () => {
   const isInitialLoadRef = useRef(true);
   const knownCoursesRef = useRef<Map<string, { updatedAt?: string; title: string }>>(new Map());
 
+  // Initialize known courses from localStorage
+  useEffect(() => {
+    const cachedIds = getStoredKnownCourseIds();
+    cachedIds.forEach(id => {
+      if (!knownCoursesRef.current.has(id)) {
+        knownCoursesRef.current.set(id, { title: '' });
+      }
+    });
+  }, []);
+
   // Handle showing the toast for a course update/addition
   const notifyCourse = (course: Partial<Course>, type: 'new' | 'updated') => {
     if (!course || !course.id) return;
+
+    // Strict check: if user has already dismissed/skipped this course, NEVER show it again
+    if (isCourseDismissed(course.id)) {
+      return;
+    }
+
+    // Save as known
+    saveKnownCourseId(course.id);
 
     // Add to notification store
     addCourseNotification(course, type);
@@ -66,10 +110,22 @@ export const CourseUpdateNotifier: React.FC = () => {
         </div>
 
         <div className="flex items-center justify-between pt-1 mt-1 border-t border-gray-100">
-          <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-            <BookOpen className="w-3 h-3 text-[#007c76]" />
-            Hệ thống đào tạo FAST
-          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (course.id) {
+                dismissCourseNotification(course.id);
+                // Also close any toast
+                window.dispatchEvent(new CustomEvent('course_notifications_updated'));
+              }
+            }}
+            title="Bỏ qua và không bao giờ hiện lại thông báo này"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-400 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+          >
+            <EyeOff className="w-3 h-3" />
+            <span>Bỏ qua</span>
+          </button>
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -86,7 +142,7 @@ export const CourseUpdateNotifier: React.FC = () => {
         </div>
       </div>,
       isNew ? 'success' : 'info',
-      8500,
+      7000,
       titleText
     );
   };

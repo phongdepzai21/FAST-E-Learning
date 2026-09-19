@@ -8,7 +8,6 @@ import {
   ExternalLink, 
   Clock, 
   X,
-  PlusCircle,
   Shield,
   UserCheck
 } from 'lucide-react';
@@ -19,7 +18,9 @@ import {
   markAllNotificationsAsRead, 
   formatTimeAgo,
   CourseNotification,
-  markCourseAsSeen
+  markCourseAsSeen,
+  dismissCourseNotification,
+  deleteNotification
 } from '../utils/courseNotificationService';
 
 interface NotificationDropdownProps {
@@ -90,25 +91,6 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     e.stopPropagation();
     markAllNotificationsAsRead();
     refresh();
-  };
-
-  const handleTriggerDemoNotification = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const demoId = `demo-course-${Date.now()}`;
-    window.dispatchEvent(new CustomEvent('courses_updated', {
-      detail: {
-        action: 'upsert',
-        course: {
-          id: demoId,
-          title: 'Khóa học Chuyên sâu: Kiểm soát Vi sinh vật trong Chế biến Thực phẩm',
-          price: '699.000đ',
-          category: 'QA/QC',
-          image: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&q=80&w=800',
-          description: 'Cập nhật kỹ thuật kiểm nghiệm nhanh và tiêu chuẩn phòng ngừa ô nhiễm chéo vi sinh vật.',
-          updatedAt: new Date().toISOString()
-        }
-      }
-    }));
   };
 
   return (
@@ -243,6 +225,21 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         <Clock className="w-2.5 h-2.5" />
                         {formatTimeAgo(notif.timestamp)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (notif.courseId) {
+                            dismissCourseNotification(notif.courseId);
+                          }
+                          deleteNotification(notif.id);
+                          refresh();
+                        }}
+                        title="Bỏ qua & không hiện lại thông báo này"
+                        className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
 
                     <h5 className="text-xs font-bold text-gray-900 dark:text-white leading-snug group-hover:text-[#007c76] transition-colors line-clamp-2">
@@ -270,22 +267,13 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           </div>
 
           {/* Footer with Actions */}
-          <div className="p-3 bg-gray-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
-            <button
-              onClick={handleTriggerDemoNotification}
-              title="Kích hoạt thông báo đẩy mẫu để kiểm thử tính năng Toast và Huy hiệu"
-              className="text-[11px] font-bold text-gray-500 hover:text-[#007c76] flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-200/60 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Thử thông báo</span>
-            </button>
-
+          <div className="p-3 bg-gray-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 flex items-center justify-end">
             <button
               onClick={() => {
                 setIsOpen(false);
                 navigate('/khoa-hoc');
               }}
-              className="text-[11px] font-extrabold text-[#007c76] hover:text-[#005a56] flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              className="text-[11px] font-extrabold text-[#007c76] hover:text-[#005a56] flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               <span>Xem tất cả khóa học →</span>
             </button>

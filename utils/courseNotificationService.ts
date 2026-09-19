@@ -19,30 +19,17 @@ export interface CourseNotification {
 
 const STORAGE_KEY = 'fast_course_notifications';
 const SEEN_COURSES_KEY = 'fast_seen_course_ids';
+const DISMISSED_COURSES_KEY = 'fast_dismissed_course_ids';
 
-// Initial sample notification if empty so users can experience the badge and bell in action
-const SEED_NOTIFICATIONS: CourseNotification[] = [
-  {
-    id: 'seed-iso-22000-update',
-    courseId: 'iso-22000',
-    courseTitle: 'ISO 22000 - Quản lý An toàn thực phẩm',
-    courseCategory: 'ISO',
-    courseImage: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&q=80&w=800',
-    type: 'updated',
-    message: 'Khóa học vừa được cập nhật bài giảng mới về Phân tích mối nguy chuỗi cung ứng thực phẩm.',
-    timestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(), // 35 mins ago
-    isRead: false,
-    price: '599.000đ',
-  }
-];
+// Do not seed dummy notifications so old courses do not appear unexpectedly
+const SEED_NOTIFICATIONS: CourseNotification[] = [];
 
 export function getStoredNotifications(): CourseNotification[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_NOTIFICATIONS));
-      return SEED_NOTIFICATIONS;
+      return [];
     }
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -59,6 +46,51 @@ export function saveNotifications(list: CourseNotification[]) {
   } catch (e) {
     console.warn('Could not save notifications to localStorage:', e);
   }
+}
+
+export function getDismissedCourseIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DISMISSED_COURSES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function isCourseDismissed(courseId: string): boolean {
+  if (!courseId) return false;
+  return getDismissedCourseIds().includes(courseId);
+}
+
+export function dismissCourseNotification(courseId: string) {
+  if (typeof window === 'undefined' || !courseId) return;
+  try {
+    const dismissed = new Set(getDismissedCourseIds());
+    dismissed.add(courseId);
+    localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(Array.from(dismissed)));
+
+    // Also remove any existing notifications for this course
+    const current = getStoredNotifications();
+    const updated = current.filter(n => n.courseId !== courseId);
+    saveNotifications(updated);
+  } catch (e) {}
+}
+
+export function deleteNotification(notificationId: string) {
+  if (typeof window === 'undefined' || !notificationId) return;
+  try {
+    const current = getStoredNotifications();
+    const target = current.find(n => n.id === notificationId);
+    if (target?.courseId) {
+      // If user dismisses/deletes a course notification, also dismiss that course permanently
+      const dismissed = new Set(getDismissedCourseIds());
+      dismissed.add(target.courseId);
+      localStorage.setItem(DISMISSED_COURSES_KEY, JSON.stringify(Array.from(dismissed)));
+    }
+    const updated = current.filter(n => n.id !== notificationId);
+    saveNotifications(updated);
+  } catch (e) {}
 }
 
 export function getUnreadNotifications(): CourseNotification[] {
