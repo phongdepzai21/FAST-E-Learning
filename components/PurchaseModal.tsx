@@ -58,68 +58,27 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsSending(true);
     setError("");
     setInfoMessage("");
+    setOtpCode("");
 
     try {
-      let data: any = null;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: effectiveEmail, name: userName || 'Học viên' })
+      });
 
-        const response = await fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: effectiveEmail, name: userName || 'Học viên' }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
+      const data = await response.json().catch(() => null);
 
-        if (response.ok) {
-          data = await response.json();
-        } else {
-          try {
-            data = await response.json();
-          } catch {
-            data = null;
-          }
-        }
-      } catch (netErr) {
-        console.warn("Server connection issue, switching to instant offline fallback:", netErr);
-        data = null;
-      }
-
-      if (data && data.success) {
+      if (response.ok && data?.success) {
         setOtpSent(true);
-        setCooldownTimer(20);
-        
-        if (data.fallbackOtp) {
-          setOtpCode(data.fallbackOtp);
-          setInfoMessage(`Mã xác minh của bạn: ${data.fallbackOtp} (Hệ thống đã tự động điền sẵn).`);
-        } else if (data.message) {
-          setInfoMessage(data.message);
-        }
+        setCooldownTimer(30);
+        setInfoMessage(data.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
       } else {
-        // High resilience fallback: If server is unavailable, generate OTP client-side immediately
-        const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        try {
-          sessionStorage.setItem(`client_otp_${effectiveEmail.toLowerCase()}`, fallbackOtp);
-        } catch {}
-        
-        setOtpSent(true);
-        setOtpCode(fallbackOtp);
-        setCooldownTimer(20);
-        setInfoMessage(`Mã xác minh của bạn: ${fallbackOtp} (Hệ thống đã tự động tạo & điền sẵn).`);
-        setError("");
+        setError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
       console.error("OTP send error:", err);
-      // Emergency recovery
-      const emergencyOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      try {
-        sessionStorage.setItem(`client_otp_${effectiveEmail.toLowerCase()}`, emergencyOtp);
-      } catch {}
-      setOtpSent(true);
-      setOtpCode(emergencyOtp);
-      setInfoMessage(`Mã xác minh của bạn: ${emergencyOtp} (Hệ thống đã tự động điền sẵn).`);
-      setError("");
+      setError("Lỗi kết nối khi gửi mã xác thực. Vui lòng thử lại.");
     }
 
     setIsSending(false);
@@ -127,7 +86,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   const handleVerify = async () => {
     if (otpCode.length !== 6) {
-      setError("Vui lòng nhập đủ 6 số OTP.");
+      setError("Vui lòng nhập đầy đủ mã OTP 6 số từ email của bạn.");
       return;
     }
     
@@ -135,53 +94,22 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsVerifying(true);
 
     try {
-      let verified = false;
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: effectiveEmail, otp: otpCode })
+      });
 
-      // 1. Try server verification first with 4s timeout
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+      const data = await response.json().catch(() => null);
 
-        const response = await fetch('/api/otp/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: effectiveEmail, otp: otpCode }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
-
-        if (response.ok) {
-          verified = true;
-        } else {
-          const data = await response.json().catch(() => null);
-          if (data?.error && !data.error.includes("kết nối")) {
-            // If server explicitly rejected mismatched OTP
-            console.warn("Server rejected OTP:", data.error);
-          }
-        }
-      } catch (netErr) {
-        console.warn("Server verify unreachable, evaluating client validation:", netErr);
-      }
-
-      // 2. Client verification check
-      const localCode = sessionStorage.getItem(`client_otp_${effectiveEmail.toLowerCase()}`);
-      if (localCode && localCode === otpCode) {
-        verified = true;
-        try {
-          sessionStorage.removeItem(`client_otp_${effectiveEmail.toLowerCase()}`);
-        } catch {}
-      }
-
-      // If valid 6 digits are entered, grant access smoothly
-      if (verified || otpCode.length === 6) {
+      if (response.ok && data?.success) {
         onSuccess();
-        setIsVerifying(false);
-        return;
       } else {
-        setError("Mã xác minh không chính xác. Vui lòng kiểm tra lại.");
+        setError(data?.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
       }
     } catch (err) {
-      // In case of any error, don't trap the user
-      onSuccess();
+      console.error("Verify OTP error:", err);
+      setError("Lỗi kết nối máy chủ xác minh OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
   };
@@ -272,20 +200,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 "Gửi mã OTP"
               )}
             </button>
-
-            {/* Direct Skip Option */}
-            <div className="pt-2 text-center border-t border-gray-100">
-              <button
-                type="button"
-                onClick={onSuccess}
-                className="text-xs font-semibold text-gray-500 hover:text-[#007c76] py-1 transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto"
-              >
-                <span>Bỏ qua xác minh & Tiếp tục thanh toán</span>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
           </div>
         ) : (
           <div className="space-y-5">
@@ -323,7 +237,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 "Xác nhận & Tiếp tục"
               )}
             </button>
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-center pt-1">
               <button
                 type="button"
                 onClick={handleSendOtp}
@@ -331,16 +245,8 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 className="text-xs font-bold text-[#007c76] hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {cooldownTimer > 0 
-                  ? (cooldownTimer > 60 ? `Thử lại sau ${Math.ceil(cooldownTimer / 60)} phút` : `Gửi lại (${cooldownTimer}s)`) 
-                  : "Gửi lại mã OTP"}
-              </button>
-
-              <button
-                type="button"
-                onClick={onSuccess}
-                className="text-xs font-semibold text-gray-500 hover:text-[#007c76] transition-colors cursor-pointer"
-              >
-                Bỏ qua bước này →
+                  ? (cooldownTimer > 60 ? `Thử lại sau ${Math.ceil(cooldownTimer / 60)} phút` : `Gửi lại mã OTP (${cooldownTimer}s)`) 
+                  : "Chưa nhận được? Gửi lại mã OTP"}
               </button>
             </div>
           </div>

@@ -101,26 +101,26 @@ export const PurchaseHistory: React.FC = () => {
       <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
         <h2 className="text-xl font-bold text-gray-800">Lịch sử giao dịch</h2>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-x-auto custom-scrollbar pb-1">
+        <table className="w-full text-left border-collapse min-w-[650px] whitespace-nowrap">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider">
-              <th className="p-4 font-bold">Khóa học</th>
-              <th className="p-4 font-bold">Ngày mua</th>
-              <th className="p-4 font-bold">Giá</th>
-              <th className="p-4 font-bold">Trạng thái</th>
+            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">
+              <th className="p-4 font-bold whitespace-nowrap">Khóa học</th>
+              <th className="p-4 font-bold whitespace-nowrap">Ngày mua</th>
+              <th className="p-4 font-bold whitespace-nowrap">Giá</th>
+              <th className="p-4 font-bold whitespace-nowrap">Trạng thái</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {purchases.map((purchase) => (
-              <tr key={purchase.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="p-4">
-                  <Link to={`/course/${purchase.courseId}`} className="font-bold text-gray-800 hover:text-[#007c76] transition-colors">
+              <tr key={purchase.id} className="hover:bg-gray-50/50 transition-colors whitespace-nowrap">
+                <td className="p-4 whitespace-nowrap">
+                  <Link to={`/course/${purchase.courseId}`} className="font-bold text-gray-800 hover:text-[#007c76] transition-colors whitespace-nowrap">
                     {purchase.courseTitle}
                   </Link>
-                  <div className="text-xs text-gray-500 mt-1">ID: {purchase.courseId}</div>
+                  <div className="text-xs text-gray-500 mt-1 whitespace-nowrap">ID: {purchase.courseId}</div>
                 </td>
-                <td className="p-4 text-sm text-gray-600">
+                <td className="p-4 text-sm text-gray-600 whitespace-nowrap">
                   {new Date(purchase.purchasedAt).toLocaleDateString('vi-VN', {
                     day: '2-digit',
                     month: '2-digit',
@@ -129,11 +129,11 @@ export const PurchaseHistory: React.FC = () => {
                     minute: '2-digit'
                   })}
                 </td>
-                <td className="p-4">
-                  <span className="font-bold text-gray-800">{purchase.price}</span>
+                <td className="p-4 whitespace-nowrap">
+                  <span className="font-bold text-gray-800 whitespace-nowrap">{purchase.price}</span>
                 </td>
-                <td className="p-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                <td className="p-4 whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                     Thành công
                   </span>

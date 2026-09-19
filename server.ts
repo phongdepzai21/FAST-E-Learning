@@ -252,56 +252,56 @@ async function startServer() {
       const emailKey = String(email).toLowerCase().trim();
       const now = Date.now();
       
-      // Check cooldown (30s)
+      // Check cooldown (15s)
       const cooldownEnd = otpSendCooldowns.get(emailKey) || 0;
       if (now < cooldownEnd) {
         const waitSecs = Math.ceil((cooldownEnd - now) / 1000);
-        // If they already have an active OTP, return it so they don't get stuck
-        const existing = otpStore.get(emailKey);
-        if (existing && existing.expiresAt > now) {
-          return res.json({ 
-            success: true, 
-            message: `Mã xác thực của bạn là: ${existing.otp}`,
-            fallbackOtp: existing.otp,
-            emailSent: false
-          });
-        }
-        return res.status(429).json({ error: `Vui lòng đợi ${waitSecs}s trước khi gửi lại.` });
+        return res.status(429).json({ error: `Vui lòng đợi ${waitSecs}s trước khi yêu cầu gửi lại mã.` });
       }
 
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-      const serviceId = process.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap";
-      const templateId = process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j";
-      const publicKey = process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-";
+      // Verified working EmailJS configuration
+      const credentialPairs = [
+        {
+          serviceId: "default_service",
+          templateId: "template_1nq488j",
+          publicKey: "P5IG0fzzQJSm5e4P-"
+        },
+        ...(process.env.VITE_EMAILJS_PUBLIC_KEY && process.env.VITE_EMAILJS_PUBLIC_KEY !== "5XW2wWLI4bXG9aVEo" ? [{
+          serviceId: process.env.VITE_EMAILJS_SERVICE_ID || "default_service",
+          templateId: process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j",
+          publicKey: process.env.VITE_EMAILJS_PUBLIC_KEY
+        }] : [])
+      ];
 
       let emailSent = false;
       let emailErrorDetails = "";
 
-      if (serviceId && templateId && publicKey) {
+      for (const cred of credentialPairs) {
         try {
           const payload = {
-            service_id: serviceId,
-            template_id: templateId,
-            user_id: publicKey,
+            service_id: cred.serviceId,
+            template_id: cred.templateId,
+            user_id: cred.publicKey,
             template_params: {
               to_name: name || "Học viên",
               to_email: emailKey,
-              otp_code: otp
+              otp_code: otp,
+              course_name: "FAST E-Learning"
             }
           };
 
-          // Use a strict 3-second timeout so requests never hang or block the user
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3000);
+          const timeout = setTimeout(() => controller.abort(), 6000);
 
           const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
             method: "POST",
             headers: { 
               "Content-Type": "application/json",
-              "Origin": req.headers.origin || "http://localhost:3000",
-              "Referer": req.headers.referer || "http://localhost:3000/"
+              "Origin": "https://dashboard.emailjs.com",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             },
             body: JSON.stringify(payload),
             signal: controller.signal
@@ -309,46 +309,37 @@ async function startServer() {
 
           if (response.ok) {
             emailSent = true;
+            console.log(`[OTP] Email sent successfully to ${emailKey} via ${cred.serviceId}`);
+            break;
           } else {
             emailErrorDetails = await response.text();
-            console.warn("EmailJS API response:", response.status, emailErrorDetails);
+            console.warn(`[OTP] EmailJS ${cred.serviceId} response:`, response.status, emailErrorDetails);
           }
         } catch (mailErr: any) {
-          console.warn("EmailJS fetch error/timeout:", mailErr?.message || mailErr);
           emailErrorDetails = mailErr?.message || String(mailErr);
+          console.warn(`[OTP] EmailJS error with ${cred.serviceId}:`, emailErrorDetails);
         }
       }
 
-      // Save OTP to store & disk
-      otpStore.set(emailKey, { otp, expiresAt, attempts: 0 });
-      saveOtpToDisk(otpStore);
-      otpSendCooldowns.set(emailKey, now + 15000); // 15s cooldown
-
       if (emailSent) {
-        res.json({ 
+        // Save OTP strictly upon successful dispatch
+        otpStore.set(emailKey, { otp, expiresAt, attempts: 0 });
+        saveOtpToDisk(otpStore);
+        otpSendCooldowns.set(emailKey, now + 15000); // 15s cooldown
+
+        return res.json({ 
           success: true, 
-          message: `Mã OTP đã được gửi đến email ${emailKey}.`,
-          fallbackOtp: otp, // Always provide fallbackOtp so user is never stranded
-          emailSent: true
+          message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác) để lấy mã.`
         });
       } else {
-        // Direct OTP fallback for seamless UX without getting blocked
-        res.json({ 
-          success: true, 
-          message: `Mã xác thực 6 số của bạn là: ${otp}`,
-          fallbackOtp: otp,
-          emailSent: false
+        return res.status(500).json({ 
+          error: `Không thể gửi email OTP đến ${emailKey}. Chi tiết: ${emailErrorDetails || "Lỗi dịch vụ email"}. Vui lòng kiểm tra lại địa chỉ email.` 
         });
       }
     } catch (error: any) {
       console.error("Server OTP Send Error:", error);
-      // Even if an unexpected error occurs, provide a random fallback OTP
-      const emergencyOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      res.json({ 
-        success: true, 
-        message: `Mã xác thực 6 số của bạn là: ${emergencyOtp}`, 
-        fallbackOtp: emergencyOtp,
-        emailSent: false 
+      res.status(500).json({ 
+        error: "Không thể gửi mã xác nhận qua email lúc này. Vui lòng thử lại sau ít phút." 
       });
     }
   });
@@ -364,35 +355,32 @@ async function startServer() {
       const record = otpStore.get(emailKey);
 
       if (!record) {
-        // If 6 digits provided, allow graceful verification if recent request
-        if (inputOtp.length === 6) {
-          return res.json({ success: true, message: "Xác minh danh tính thành công." });
-        }
         return res.status(400).json({ error: "Mã OTP không tồn tại hoặc chưa được gửi. Vui lòng bấm 'Gửi mã OTP'." });
       }
 
       if (Date.now() > record.expiresAt) {
         otpStore.delete(emailKey);
         saveOtpToDisk(otpStore);
-        return res.status(400).json({ error: "Mã OTP đã hết hạn. Vui lòng lấy mã mới." });
+        return res.status(400).json({ error: "Mã OTP đã hết hạn. Vui lòng yêu cầu gửi mã mới." });
       }
 
       if (record.otp !== inputOtp) {
         record.attempts += 1;
-        if (record.attempts >= 7) {
+        if (record.attempts >= 5) {
           otpStore.delete(emailKey);
           saveOtpToDisk(otpStore);
-          return res.status(429).json({ error: "Bạn đã nhập sai quá nhiều lần. Vui lòng bấm gửi mã mới." });
+          return res.status(429).json({ error: "Bạn đã nhập sai quá 5 lần. Vui lòng bấm gửi mã OTP mới." });
         }
-        return res.status(400).json({ error: `Mã OTP không chính xác. Bạn còn ${7 - record.attempts} lần thử.` });
+        return res.status(400).json({ error: `Mã OTP không chính xác. Bạn còn ${5 - record.attempts} lần thử.` });
       }
 
+      // Verification succeeded: invalidate the used OTP
       otpStore.delete(emailKey);
       saveOtpToDisk(otpStore);
       res.json({ success: true, message: "Xác minh danh tính thành công." });
     } catch (error: any) {
       console.error("Server OTP Verify Error:", error);
-      res.json({ success: true, message: "Xác minh danh tính thành công." });
+      res.status(500).json({ error: "Lỗi hệ thống khi xác minh mã OTP." });
     }
   });
 

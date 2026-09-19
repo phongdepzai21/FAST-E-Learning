@@ -89,57 +89,30 @@ export const UserManagement: React.FC = () => {
     setLockOtpSending(true);
     setLockOtpError('');
     setLockOtpNotice('');
+    setLockOtpCode('');
 
     try {
-      let data: any = null;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: adminEmail, 
+          name: auth.currentUser?.displayName || 'Quản trị viên' 
+        })
+      });
 
-        const res = await fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            email: adminEmail, 
-            name: auth.currentUser?.displayName || 'Quản trị viên' 
-          }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
+      const data = await res.json().catch(() => null);
 
-        if (res.ok) {
-          data = await res.json();
-        } else {
-          data = await res.json().catch(() => null);
-        }
-      } catch (netErr) {
-        console.warn("OTP send network error, generating local fallback:", netErr);
-        data = null;
-      }
-
-      setLockOtpSent(true);
-      setLockOtpCooldown(30);
-
-      if (data && data.success) {
-        if (data.fallbackOtp) {
-          setLockOtpCode(data.fallbackOtp);
-          setLockOtpNotice(`Mã OTP xác thực: ${data.fallbackOtp} (Hệ thống đã tự động điền)`);
-        } else if (data.message) {
-          setLockOtpNotice(data.message);
-        }
+      if (res.ok && data?.success) {
+        setLockOtpSent(true);
+        setLockOtpCooldown(30);
+        setLockOtpNotice(data.message || `Mã OTP đã được gửi đến email ${adminEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam).`);
       } else {
-        const fallback = Math.floor(100000 + Math.random() * 900000).toString();
-        try {
-          sessionStorage.setItem(`admin_lock_otp_${adminEmail.toLowerCase()}`, fallback);
-        } catch {}
-        setLockOtpCode(fallback);
-        setLockOtpNotice(`Mã OTP xác thực: ${fallback} (Hệ thống đã tự động điền)`);
+        setLockOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err) {
-      const fallback = Math.floor(100000 + Math.random() * 900000).toString();
-      setLockOtpSent(true);
-      setLockOtpCooldown(30);
-      setLockOtpCode(fallback);
-      setLockOtpNotice(`Mã OTP xác thực: ${fallback} (Hệ thống đã tự động điền)`);
+      console.error("Lock OTP send error:", err);
+      setLockOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     } finally {
       setLockOtpSending(false);
     }
@@ -233,49 +206,28 @@ export const UserManagement: React.FC = () => {
   const handleToggleLockUser = async (targetUser: UserData, shouldLock: boolean, reason?: string) => {
     if (shouldLock) {
       if (lockOtpCode.trim().length !== 6) {
-        setLockOtpError('Vui lòng nhập đầy đủ mã OTP 6 số để xác nhận khóa tài khoản.');
+        setLockOtpError('Vui lòng nhập đầy đủ mã OTP 6 số nhận từ email để xác nhận khóa tài khoản.');
         return;
       }
 
       setLockOtpError('');
-      let verified = false;
 
-      // 1. Try server verification
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-
         const res = await fetch('/api/otp/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: adminEmail, otp: lockOtpCode.trim() }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
+          body: JSON.stringify({ email: adminEmail, otp: lockOtpCode.trim() })
+        });
 
-        if (res.ok) {
-          verified = true;
-        } else {
-          const resJson = await res.json().catch(() => null);
-          if (resJson?.error && !resJson.error.includes("kết nối")) {
-            console.warn("Server verify rejected:", resJson.error);
-          }
+        const resJson = await res.json().catch(() => null);
+
+        if (!res.ok || !resJson?.success) {
+          setLockOtpError(resJson?.error || 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.');
+          return;
         }
       } catch (err) {
-        console.warn("Server OTP verify check error:", err);
-      }
-
-      // 2. Client verification check
-      const localCode = sessionStorage.getItem(`admin_lock_otp_${adminEmail.toLowerCase()}`);
-      if (localCode && localCode === lockOtpCode.trim()) {
-        verified = true;
-        try {
-          sessionStorage.removeItem(`admin_lock_otp_${adminEmail.toLowerCase()}`);
-        } catch {}
-      }
-
-      // If valid 6 digits are provided
-      if (!verified && lockOtpCode.trim().length !== 6) {
-        setLockOtpError('Mã OTP xác thực không hợp lệ. Vui lòng bấm gửi lại mã.');
+        console.error("Server OTP verify check error:", err);
+        setLockOtpError('Không thể kết nối đến máy chủ xác minh OTP. Vui lòng thử lại.');
         return;
       }
     }
@@ -448,25 +400,25 @@ export const UserManagement: React.FC = () => {
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider animate-pulse">Đang tải danh sách tài khoản...</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm">
-          <table className="w-full text-left border-collapse min-w-[850px]">
+        <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1">
+          <table className="w-full text-left border-collapse min-w-[1050px] whitespace-nowrap">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-                <th className="py-4 px-6">Tài khoản</th>
-                <th className="py-4 px-6">Trạng thái</th>
-                <th className="py-4 px-6">Vai trò</th>
-                <th className="py-4 px-6 text-center">Khóa học</th>
+              <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-nowrap">
+                <th className="py-4 px-6 whitespace-nowrap">Tài khoản</th>
+                <th className="py-4 px-6 whitespace-nowrap">Trạng thái</th>
+                <th className="py-4 px-6 whitespace-nowrap">Vai trò</th>
+                <th className="py-4 px-6 text-center whitespace-nowrap">Khóa học</th>
                 <th className="py-4 px-6 whitespace-nowrap">Thời gian mua gần nhất</th>
-                <th className="py-4 px-6 text-right">Hành động</th>
+                <th className="py-4 px-6 text-right whitespace-nowrap">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredUsers.length > 0 ? filteredUsers.map((user) => {
                 const latestPurchase = user.purchasedCourses && user.purchasedCourses[0];
                 return (
-                  <tr key={user.id} className={`hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 group ${user.isLocked ? 'bg-red-50/30' : ''}`}>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
+                  <tr key={user.id} className={`hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 group whitespace-nowrap ${user.isLocked ? 'bg-red-50/30' : ''}`}>
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      <div className="flex items-center gap-3 whitespace-nowrap">
                         <div className={`w-10 h-10 rounded-full border-2 shadow-sm overflow-hidden flex items-center justify-center shrink-0 ${user.isLocked ? 'border-red-300 bg-red-50' : 'border-white bg-gray-100'}`}>
                           {user.photoURL ? (
                             <img src={user.photoURL} alt={user.email} className="w-full h-full object-cover" />
@@ -474,62 +426,62 @@ export const UserManagement: React.FC = () => {
                             <UserIcon className={`w-5 h-5 ${user.isLocked ? 'text-red-400' : 'text-gray-400'}`} />
                           )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-gray-900 group-hover:text-[#007c76] transition-colors">{user.displayName}</span>
+                        <div className="whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="font-extrabold text-gray-900 group-hover:text-[#007c76] transition-colors whitespace-nowrap">{user.displayName || user.email.split('@')[0]}</span>
                             {user.isLocked && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-black uppercase">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-black uppercase whitespace-nowrap">
                                 <Lock className="w-2.5 h-2.5" /> Đã khóa
                               </span>
                             )}
                           </div>
-                          <div className="font-semibold text-gray-400 text-xs mt-0.5 flex items-center gap-1">
-                            <Mail className="w-3 h-3" />
+                          <div className="font-semibold text-gray-400 text-xs mt-0.5 flex items-center gap-1 whitespace-nowrap">
+                            <Mail className="w-3 h-3 shrink-0" />
                             {user.email}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-6 whitespace-nowrap">
                       {user.isLocked ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[10px] font-black uppercase tracking-wider" title={user.lockReason || 'Tài khoản bị khóa'}>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap" title={user.lockReason || 'Tài khoản bị khóa'}>
                           <Lock className="w-3 h-3" /> Bị khóa
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Hoạt động
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
                         {user.isAdmin && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                             <Shield className="w-3 h-3" /> Admin
                           </span>
                         )}
                         {user.isTeacher && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 border border-teal-100 text-teal-700 text-[10px] font-black uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 border border-teal-100 text-teal-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                             <GraduationCap className="w-3 h-3" /> Giảng viên
                           </span>
                         )}
                         {user.isVip && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-100 text-amber-600 text-[10px] font-black uppercase tracking-wider shadow-sm shadow-amber-500/10">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-100 text-amber-600 text-[10px] font-black uppercase tracking-wider shadow-sm shadow-amber-500/10 whitespace-nowrap">
                             <Crown className="w-3 h-3" /> VIP
                           </span>
                         )}
                         {!user.isAdmin && !user.isTeacher && !user.isVip && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
                             Học viên
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-center">
+                    <td className="py-4 px-6 text-center whitespace-nowrap">
                       <button
                         onClick={() => setViewingUserCourses(user)}
                         title="Xem chi tiết thời gian mua khóa học của học viên này"
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs cursor-pointer transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs cursor-pointer transition-all whitespace-nowrap"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                         <span>{user.purchasedCoursesCount}</span>
@@ -538,16 +490,16 @@ export const UserManagement: React.FC = () => {
                     </td>
                     <td className="py-4 px-6 font-semibold text-gray-600 whitespace-nowrap">
                       {latestPurchase && latestPurchase.purchasedAt ? (
-                        <div className="flex flex-col">
-                          <span className="font-extrabold text-gray-800 text-xs flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-[#007c76]" />
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-extrabold text-gray-800 text-xs flex items-center gap-1 whitespace-nowrap">
+                            <Clock className="w-3.5 h-3.5 text-[#007c76] shrink-0" />
                             {new Date(latestPurchase.purchasedAt).toLocaleTimeString('vi-VN', {
                               hour: '2-digit',
                               minute: '2-digit',
                               second: '2-digit'
                             })}
                           </span>
-                          <span className="text-[11px] text-gray-400">
+                          <span className="text-[11px] text-gray-400 whitespace-nowrap">
                             {new Date(latestPurchase.purchasedAt).toLocaleDateString('vi-VN', {
                               day: '2-digit',
                               month: '2-digit',
@@ -556,17 +508,17 @@ export const UserManagement: React.FC = () => {
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-xs italic">Chưa mua</span>
+                        <span className="text-gray-400 text-xs italic whitespace-nowrap">Chưa mua</span>
                       )}
                     </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="inline-flex items-center gap-2 justify-end">
+                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2 justify-end whitespace-nowrap">
                         {/* Lock / Unlock button */}
                         {user.isLocked ? (
                           <button
                             onClick={() => handleToggleLockUser(user, false)}
                             disabled={isLocking}
-                            className="inline-flex items-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                            className="inline-flex items-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs whitespace-nowrap"
                             title="Mở khóa tài khoản này"
                           >
                             <Unlock className="w-3.5 h-3.5" />
@@ -578,7 +530,7 @@ export const UserManagement: React.FC = () => {
                               setLockModalUser(user);
                               setLockReasonInput('');
                             }}
-                            className="inline-flex items-center gap-1 px-3 py-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                            className="inline-flex items-center gap-1 px-3 py-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs whitespace-nowrap"
                             title="Khóa tài khoản này"
                           >
                             <Lock className="w-3.5 h-3.5" />
@@ -595,7 +547,7 @@ export const UserManagement: React.FC = () => {
                               isVip: user.isVip || false
                             });
                           }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#007c76]/5 hover:bg-[#007c76] text-[#007c76] hover:text-white border border-[#007c76]/20 hover:border-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#007c76]/5 hover:bg-[#007c76] text-[#007c76] hover:text-white border border-[#007c76]/20 hover:border-[#007c76] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs whitespace-nowrap"
                         >
                           <Shield className="w-3.5 h-3.5" />
                           Phân quyền

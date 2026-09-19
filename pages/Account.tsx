@@ -508,7 +508,6 @@ const Account: React.FC = () => {
 
   // OTP Verification States
   const [isOtpPending, setIsOtpPending] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [otpStatusMessage, setOtpStatusMessage] = useState<string | null>(null);
@@ -830,35 +829,6 @@ const Account: React.FC = () => {
     }
   };
 
-  const sendOtpViaEmailJS = async (toEmail: string, toName: string, otpCode: string): Promise<{ success: boolean; reason?: 'MISSING_KEYS' | 'FAILED'; error?: string }> => {
-    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap";
-    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j";
-    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-";
-
-    if (!serviceId || !templateId || !publicKey) {
-      console.warn("EmailJS keys are missing. Falling back...");
-      return { success: false, reason: 'MISSING_KEYS' };
-    }
-
-    try {
-      const templateParams = {
-        to_name: toName,
-        otp_code: otpCode,
-        to_email: toEmail,
-      };
-
-      await emailjs.send(serviceId, templateId, templateParams, publicKey);
-      return { success: true };
-    } catch (err: any) {
-      console.error("EmailJS dispatch failed:", err);
-      return { 
-        success: false, 
-        reason: 'FAILED', 
-        error: err?.text || err?.message || String(err) 
-      };
-    }
-  };
-
   const startOtpFlow = async () => {
     setIsAuthenticating(true);
     setError(null);
@@ -880,30 +850,27 @@ const Account: React.FC = () => {
       setEmail(normalizedEmail);
       setFullName(trimmedName);
       
-      // Generate randomized 6-digit numeric OTP code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(code);
       setOtpDigits(['', '', '', '', '', '']);
       setOtpAttemptsLeft(5);
       setOtpCountdown(60);
-      setIsOtpPending(true);
 
-      // Attempt to dispatch via EmailJS
-      const emailResult = await sendOtpViaEmailJS(normalizedEmail, trimmedName, code);
-      if (emailResult.success) {
-        setOtpStatusMessage(`Mã xác thực 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}] của bạn qua Gmail.`);
-        toast.success('Gửi mã OTP thành công! Vui lòng kiểm tra email của bạn.');
-      } else if (emailResult.reason === 'MISSING_KEYS') {
-        setOtpStatusMessage(`Hệ thống đang được cấu hình (Chưa có API Key Email). Mã OTP của bạn là: ${code}`);
-        toast.warning(`Chưa cấu hình Email. Mã OTP của bạn là: ${code} (Hệ thống đã tự động điền)`);
-        setOtpDigits(code.split('') as string[]);
+      const res = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, name: trimmedName })
+      });
+
+      const resData = await res.json().catch(() => null);
+
+      if (res.ok && resData?.success) {
+        setIsOtpPending(true);
+        setOtpStatusMessage(`Mã xác thực OTP 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác).`);
+        toast.success('Mã OTP đã được gửi đến email của bạn!');
       } else {
-        setOtpStatusMessage(`Hệ thống đang bảo trì máy chủ email. Mã OTP của bạn là: ${code}`);
-        toast.info(`Mã OTP xác thực của bạn là: ${code} (Hệ thống đã tự động điền)`);
-        setOtpDigits(code.split('') as string[]);
+        throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
-      console.error("OTP Flow initial generation error:", err);
+      console.error("OTP Flow error:", err);
       const errMsg = err?.message || "Có lỗi xảy ra khi bắt đầu quá trình xác thực OTP.";
       setError(errMsg);
       toast.error(errMsg);
@@ -915,34 +882,43 @@ const Account: React.FC = () => {
   const handleVerifiedRegister = async () => {
     const enteredCode = otpDigits.join('');
     if (enteredCode.length !== 6) {
-      setOtpFormError("Vui lòng nhập đầy đủ 6 chữ số OTP.");
+      setOtpFormError("Vui lòng nhập đầy đủ 6 chữ số OTP từ email của bạn.");
       toast.error("Vui lòng nhập đầy đủ 6 chữ số OTP.");
       return;
     }
     
-    if (enteredCode !== generatedOtp) {
-      const left = otpAttemptsLeft - 1;
-      setOtpAttemptsLeft(left);
-      
-      if (left <= 0) {
-        const errorMsg = "Bạn đã nhập sai mã OTP quá 5 lần. Tiến trình xác thực đã bị hủy vì lý do bảo mật.";
-        setOtpFormError(errorMsg);
-        setIsOtpPending(false);
-        setGeneratedOtp('');
-        setError("Yêu cầu đăng ký tài khoản bị từ chối do nhập sai OTP quá số lần quy định. Vui lòng đăng ký lại.");
-        toast.error(errorMsg);
-      } else {
-        const errorMsg = `Mã xác thực không chính xác. Bạn còn ${left} lần nhập lại.`;
-        setOtpFormError(errorMsg);
-        toast.error(errorMsg);
-      }
-      return;
-    }
-
-    // OTP matches perfectly! Proceed to register in Firebase Auth & Firestore
     setIsAuthenticating(true);
     setOtpFormError(null);
+
     try {
+      const verifyRes = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.toLowerCase().trim(), otp: enteredCode })
+      });
+
+      const verifyData = await verifyRes.json().catch(() => null);
+
+      if (!verifyRes.ok || !verifyData?.success) {
+        const left = otpAttemptsLeft - 1;
+        setOtpAttemptsLeft(left);
+        
+        if (left <= 0) {
+          const errorMsg = "Bạn đã nhập sai mã OTP quá 5 lần. Tiến trình xác thực đã bị hủy vì lý do bảo mật.";
+          setOtpFormError(errorMsg);
+          setIsOtpPending(false);
+          setError("Yêu cầu đăng ký tài khoản bị từ chối do nhập sai OTP quá số lần quy định. Vui lòng đăng ký lại.");
+          toast.error(errorMsg);
+        } else {
+          const errorMsg = verifyData?.error || `Mã xác thực không chính xác. Bạn còn ${left} lần nhập lại.`;
+          setOtpFormError(errorMsg);
+          toast.error(errorMsg);
+        }
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // OTP matches on server! Proceed to register in Firebase Auth & Firestore
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
       await updateProfile(newUser, { displayName: fullName });
@@ -1023,26 +999,31 @@ const Account: React.FC = () => {
   const handleResendOtp = async () => {
     if (otpCountdown > 0) return;
     setIsAuthenticating(true);
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(code);
     setOtpDigits(['', '', '', '', '', '']);
-    setOtpAttemptsLeft(5);
     setOtpCountdown(60);
     setOtpFormError(null);
 
     const normalizedEmail = email.toLowerCase().trim();
-    const emailResult = await sendOtpViaEmailJS(normalizedEmail, fullName.trim(), code);
-    if (emailResult.success) {
-      setOtpStatusMessage("Mã xác thực OTP mới đã được gửi lại thành công tới hòm thư của bạn!");
-      toast.success("Đã gửi lại mã OTP thành công!");
-    } else if (emailResult.reason === 'MISSING_KEYS') {
-      setOtpStatusMessage("Cảnh báo: Hệ thống chưa cấu hình EmailJS, không thể gửi lại OTP.");
-      toast.warning("Chưa cấu hình cổng gửi email. Hãy dùng OTP giả lập.");
-    } else {
-      setOtpStatusMessage(`Không thể gửi lại mã xác định: "${emailResult.error}". Vui lòng kiểm tra lại.`);
+    try {
+      const res = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, name: fullName.trim() })
+      });
+      const resData = await res.json().catch(() => null);
+      if (res.ok && resData?.success) {
+        setOtpStatusMessage("Mã xác thực OTP mới đã được gửi thành công đến email của bạn!");
+        toast.success("Đã gửi lại mã OTP thành công!");
+      } else {
+        setOtpFormError(resData?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
+        toast.error("Gửi lại mã OTP thất bại!");
+      }
+    } catch (err: any) {
+      setOtpFormError("Lỗi kết nối tới máy chủ gửi OTP.");
       toast.error("Gửi lại mã OTP thất bại!");
+    } finally {
+      setIsAuthenticating(false);
     }
-    setIsAuthenticating(false);
   };
 
   const handleAuthAction = async (e: React.FormEvent) => {

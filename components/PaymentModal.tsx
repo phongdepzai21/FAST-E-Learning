@@ -82,63 +82,36 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     setIsVerifying(true);
     setOtpError('');
     setOtpNotice('');
+    setUserInputOtp('');
     const user = auth.currentUser;
     const email = user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com';
 
     try {
-      let data: any = null;
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), name: user?.displayName || 'Học viên' })
+      });
 
-        const response = await fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), name: user?.displayName || 'Học viên' }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
-
-        if (response.ok) {
-          data = await response.json();
-        } else {
-          data = await response.json().catch(() => null);
-        }
-      } catch (netErr) {
-        console.warn("Payment OTP server unreachable, using instant fallback:", netErr);
-        data = null;
-      }
-      
+      const data = await response.json().catch(() => null);
       setShowOtpForm(true);
 
-      if (data && data.success) {
-        if (data.fallbackOtp) {
-          setUserInputOtp(data.fallbackOtp);
-          setOtpNotice(`Mã xác thực của bạn: ${data.fallbackOtp} (Hệ thống đã tự động điền)`);
-        } else if (data.message) {
-          setOtpNotice(data.message);
-        }
+      if (response.ok && data?.success) {
+        setOtpNotice(data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
       } else {
-        // Fallback OTP for seamless confirmation
-        const clientOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        try {
-          sessionStorage.setItem(`payment_otp_${email.toLowerCase().trim()}`, clientOtp);
-        } catch {}
-        setUserInputOtp(clientOtp);
-        setOtpNotice(`Mã xác thực của bạn: ${clientOtp} (Hệ thống đã tự động điền)`);
+        setOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err) {
       console.warn("Failed to send OTP", err);
-      const clientOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setShowOtpForm(true);
-      setUserInputOtp(clientOtp);
-      setOtpNotice(`Mã xác thực của bạn: ${clientOtp} (Hệ thống đã tự động điền)`);
+      setOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
   };
 
   const handleVerifyOtp = async () => {
     if (userInputOtp.length !== 6) {
-      setOtpError("Vui lòng nhập đủ 6 chữ số OTP.");
+      setOtpError("Vui lòng nhập đầy đủ mã OTP 6 chữ số từ email của bạn.");
       return;
     }
     setIsVerifying(true);
@@ -148,33 +121,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     const email = user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com';
 
     try {
-      let verified = false;
+      const response = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), otp: userInputOtp })
+      });
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+      const data = await response.json().catch(() => null);
 
-        const response = await fetch('/api/otp/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), otp: userInputOtp }),
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeout));
-
-        if (response.ok) {
-          verified = true;
-        }
-      } catch (err) {
-        console.warn("Server verify error, checking local fallback:", err);
-      }
-
-      // Check client fallback or valid 6-digit OTP
-      const localCode = sessionStorage.getItem(`payment_otp_${email.toLowerCase().trim()}`);
-      if (localCode === userInputOtp || userInputOtp.length === 6) {
-        verified = true;
-      }
-
-      if (verified) {
+      if (response.ok && data?.success) {
         // Save course unlock to Firestore & localStorage
         if (user && user.email && course.id) {
           try {
@@ -206,16 +161,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
           setIsCompleted(false);
         }, 1500);
       } else {
-        setOtpError("Mã OTP không chính xác. Vui lòng kiểm tra lại.");
+        setOtpError(data?.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
       }
     } catch (err) {
-      // In case of error, still complete unlock
-      localStorage.setItem(`course_unlocked_${course.id}`, 'true');
-      setIsCompleted(true);
-      setTimeout(() => {
-        onSuccess();
-        setIsCompleted(false);
-      }, 1500);
+      console.error("OTP verification error:", err);
+      setOtpError("Lỗi kết nối khi xác thực mã OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
   };
