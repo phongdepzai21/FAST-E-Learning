@@ -108,7 +108,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
 
   return (
     <Link to={targetUrl} onClick={handleClick} className="block h-full group relative">
-        <div className="bg-white rounded-[24px] overflow-hidden shadow-sm hover-lift border border-gray-100 flex flex-col h-full">
+        <div className="bg-white rounded-[24px] overflow-hidden shadow-sm hover-lift border border-gray-100 flex flex-col h-full transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_20px_35px_-12px_rgba(0,124,118,0.18)] hover:border-[#007c76]/30">
             {/* Image Container */}
             <div className="relative aspect-[16/10] overflow-hidden bg-gray-100 group/image">
                 <div className={`absolute inset-0 bg-gray-200 animate-pulse transition-opacity duration-500 ${isLoaded ? 'opacity-0' : 'opacity-100'}`} />
@@ -120,7 +120,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     decoding="async"
                     onLoad={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
-                    className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`}
+                    className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-106 ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`}
                 />
                 
                 {/* Floating Category & New Badge */}
@@ -153,16 +153,16 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                    </div>
                 )}
 
-                {/* ADVANCED HOVER OVERLAY */}
-                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center p-6 text-center backdrop-blur-[2px]">
+                {/* ADVANCED REFINED HOVER OVERLAY */}
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-950/90 via-gray-900/40 to-transparent backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out z-20 flex flex-col items-center justify-end p-5 text-center pointer-events-none">
                     {course.description && (
-                        <p className="text-white/90 text-sm line-clamp-3 mb-5 opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-100 font-medium">
+                        <p className="text-white/95 text-xs line-clamp-3 mb-3.5 font-medium translate-y-3 group-hover:translate-y-0 transition-transform duration-300 ease-out leading-relaxed">
                             {course.description}
                         </p>
                     )}
-                    <div className="inline-flex items-center gap-2 bg-[#007c76] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-xl transform translate-y-4 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-150 hover:bg-[#005f5a] hover:scale-105">
-                        Xem chi tiết
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    <div className="inline-flex items-center gap-2 bg-[#007c76] text-white px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest shadow-lg shadow-[#007c76]/40 transform translate-y-3 group-hover:translate-y-0 transition-all duration-300 ease-out">
+                        <span>Xem chi tiết</span>
+                        <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </div>
                 </div>
             </div>
@@ -176,7 +176,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     </div>
                 </div>
 
-                <h3 className="font-black text-lg text-gray-800 mb-4 line-clamp-2 leading-[1.3] group-hover:text-[#007c76] transition-colors">
+                <h3 className="font-black text-lg text-gray-800 mb-4 line-clamp-2 leading-[1.3] group-hover:text-[#007c76] transition-colors duration-200">
                     {course.title}
                 </h3>
                 

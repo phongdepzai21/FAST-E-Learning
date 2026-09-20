@@ -10,6 +10,7 @@ import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagno
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 import { broadcastCourseUpdate } from '../utils/courseSyncService';
 import LivePriceQrPreview from './LivePriceQrPreview';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -876,8 +877,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       )}
 
       {/* VIEW 1: COURSES LIST SCHEDULER */}
-      {activeTab === 'list' && (
-        <div className="space-y-6">
+      <AnimatePresence mode="wait">
+        {activeTab === 'list' && (
+          <motion.div 
+            key="teacher-list-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
           {isLoadingCourses ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <div className="w-10 h-10 border-4 border-[#007c76] border-t-transparent rounded-full animate-spin"></div>
@@ -1034,20 +1043,28 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             {filteredCourses.map((course) => {
                               const isSystem = HARDCODED_COURSES.some(c => c.id === course.id);
                               const isHiddenOrInactive = course.status === 'draft' || course.status === 'inactive';
+                              const isVipCombo = course.id === 'khoa-vip';
                               return (
-                                <tr key={course.id} className="hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 whitespace-nowrap">
+                                <tr key={course.id} className="hover:bg-[#007c76]/[0.035] transition-all duration-200 ease-out text-xs sm:text-sm text-gray-700 whitespace-nowrap group/row">
                                   <td className="py-4 px-6 whitespace-nowrap">
                                     <img 
                                       src={course.image} 
                                       alt={course.title} 
-                                      className="w-16 h-10 object-cover rounded-lg border border-gray-150 shadow-sm shrink-0"
+                                      className="w-16 h-10 object-cover rounded-lg border border-gray-150 shadow-sm shrink-0 transition-transform duration-300 ease-out group-hover/row:scale-105"
                                       onError={(e) => {
                                         (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
                                       }}
                                     />
                                   </td>
                                   <td className="py-4 px-6 min-w-[260px] whitespace-nowrap">
-                                    <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block">{course.title}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block group-hover/row:text-[#007c76] transition-colors duration-200">{course.title}</span>
+                                      {isVipCombo && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-300">
+                                          ⭐ Combo VIP
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
                                       ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
                                     </span>
@@ -1158,12 +1175,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               })()}
             </div>
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* VIEW 2 & 3: FORM WITH EMBEDDED CURRICULUM DESIGNER */}
-      {(activeTab === 'add' || activeTab === 'edit') && (
-        <form onSubmit={activeTab === 'add' ? handleCreateCourse : handleSaveCourseEdit} className="space-y-10">
+        {/* VIEW 2 & 3: FORM WITH EMBEDDED CURRICULUM DESIGNER */}
+        {(activeTab === 'add' || activeTab === 'edit') && (
+          <motion.div
+            key="teacher-form-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <form onSubmit={activeTab === 'add' ? handleCreateCourse : handleSaveCourseEdit} className="space-y-10">
           
           {activeTab === 'edit' && (
             <div className="bg-teal-50 border border-teal-150 p-4 rounded-2xl flex items-center gap-3 text-xs sm:text-sm text-teal-800 font-bold mb-4">
@@ -1424,7 +1448,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             </button>
           </div>
         </form>
-      )}
+      </motion.div>
+    )}
+  </AnimatePresence>
 
       {/* MODAL: NHẬP HÀNG LOẠT BÀI GIẢNG / VIDEO (TIẾT KIỆM THỜI GIAN KHI CÓ 10, 50, 153 VIDEO) */}
       {showBulkImportModal && (

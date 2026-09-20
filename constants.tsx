@@ -65,11 +65,11 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
 export const COURSES: Course[] = [
   {
     id: 'khoa-vip',
-    title: 'Khóa VIP',
+    title: 'Gói Combo VIP (Toàn Bộ Khóa Học)',
     price: '2.500.000đ',
     image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
     category: 'Gói VIP',
-    description: 'Gói đặc quyền Khóa VIP trọn đời: Sở hữu không giới hạn toàn bộ hệ thống khóa học ISO, HACCP, an toàn thực phẩm chuyên sâu, bộ tài liệu SOP biểu mẫu chuẩn hóa và hỗ trợ cố vấn 1-1 từ chuyên gia.'
+    description: 'Gói Combo VIP trọn đời: Combo trọn gói toàn bộ hệ thống các khóa học ISO, HACCP, QA/QC, Lean, bộ tài liệu biểu mẫu SOP chuẩn hóa và cập nhật tất cả khóa học mới trong tương lai mà không phải khóa học đơn lẻ.'
   },
   {
     id: 'test-course-2k',
