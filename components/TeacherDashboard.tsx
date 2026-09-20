@@ -8,7 +8,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
-import { broadcastCourseUpdate } from '../utils/courseSyncService';
+import { broadcastCourseUpdate, broadcastComboUpdate } from '../utils/courseSyncService';
 import LivePriceQrPreview from './LivePriceQrPreview';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -38,6 +38,36 @@ const cleanForFirestore = (obj: any): any => {
   }
   return obj;
 };
+
+const DEFAULT_COMBOS = [
+  {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'khoa-vip',
+    title: 'Gói Combo VIP (Toàn Bộ Khóa Học)',
+    price: '2.500.000đ',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo VIP trọn đời: Combo trọn gói toàn bộ hệ thống các khóa học ISO, HACCP, QA/QC, Lean, bộ tài liệu biểu mẫu SOP chuẩn hóa và cập nhật tất cả khóa học mới trong tương lai.',
+    courseIds: [],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành', 'Đặc quyền Hỗ trợ 1-1 từ chuyên gia']
+  }
+];
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const navigate = useNavigate();
@@ -210,13 +240,25 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Sync combos from Firestore in real-time
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
-      const list: any[] = [];
+      const dbCombos: any[] = [];
       snapshot.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
+        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
       });
-      setCombos(list);
+
+      // Merge with defaults
+      const merged = DEFAULT_COMBOS.map(def => {
+        const found = dbCombos.find(dbc => dbc.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+
+      // Include new custom combos that are not in defaults
+      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+      const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
+
+      setCombos([...merged, ...customCombos]);
     }, (err) => {
       console.warn("Lỗi đồng bộ danh sách combo ở TeacherDashboard:", err);
+      setCombos(DEFAULT_COMBOS);
     });
     return () => unsub();
   }, []);
@@ -232,6 +274,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
     try {
       await deleteDoc(doc(db, 'combos', comboId));
+      
+      // Real-time broadcast combo deletion to ALL tabs & ALL accounts
+      broadcastComboUpdate('delete', { comboId });
+
       toast.success(`Đã xóa thành công gói combo "${comboTitle}" khỏi hệ thống!`, 4000, 'Đã xóa');
     } catch (err: any) {
       console.error("Lỗi khi xóa combo:", err);

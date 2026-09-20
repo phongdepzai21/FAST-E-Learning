@@ -69,6 +69,8 @@ export function initCourseSyncService() {
           updateStoredCourses(data.courses);
         }
         window.dispatchEvent(new CustomEvent('courses_updated', { detail: data }));
+      } else if (data && data.type === 'combos_updated') {
+        window.dispatchEvent(new CustomEvent('combos_updated', { detail: data }));
       }
     };
   }
@@ -258,5 +260,33 @@ export async function broadcastCourseUpdate(
     }
   } catch (err) {
     console.warn('Network error pushing course sync to server:', err);
+  }
+}
+
+/**
+ * Broadcast an edit/delete action for Combos across all tabs
+ */
+export function broadcastComboUpdate(
+  action: 'save' | 'delete',
+  payload: {
+    comboId: string;
+    combo?: any;
+  }
+) {
+  // 1. Dispatch locally in the current tab
+  window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action, ...payload } }));
+
+  // 2. Broadcast to sibling tabs
+  if (broadcastChannel) {
+    try {
+      broadcastChannel.postMessage({
+        type: 'combos_updated',
+        action,
+        ...payload,
+        timestamp: Date.now()
+      });
+    } catch (e) {
+      console.warn('BroadcastChannel postMessage error for combo sync:', e);
+    }
   }
 }

@@ -288,7 +288,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
                 }
                 onConfirm();
               }}
-              disabled={isProcessing || (isDelete && (!otpSent || otpInput !== otpCode))}
+              disabled={isProcessing}
               className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer ${theme.btnConfirm} disabled:opacity-50`}
             >
               {isProcessing ? (

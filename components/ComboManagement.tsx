@@ -4,6 +4,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firesto
 import { Course } from '../types';
 import { getMergedCourses } from '../constants';
 import { useToast } from '../contexts/ToastContext';
+import { broadcastComboUpdate } from '../utils/courseSyncService';
 import { Crown, Shield, Layers, Save, CheckSquare, Square, RefreshCw, Award, Plus, Trash2, X, Check } from 'lucide-react';
 
 interface Combo {
@@ -191,6 +192,9 @@ const ComboManagement: React.FC = () => {
       // If it was a custom unsaved combo, we just remove it from states
       setCombos(prev => prev.filter(c => c.id !== selectedComboId));
       
+      // Real-time broadcast combo deletion to ALL tabs & ALL accounts
+      broadcastComboUpdate('delete', { comboId: selectedComboId });
+
       toast.success(`🗑️ Đã xóa gói combo thành công!`);
       setSelectedComboId('combo-basic');
     } catch (err: any) {
@@ -230,6 +234,9 @@ const ComboManagement: React.FC = () => {
       const cachedKey = `combo_cache_${selectedComboId}`;
       localStorage.setItem(cachedKey, JSON.stringify({ id: selectedComboId, ...updatedData }));
       
+      // Real-time broadcast combo update to ALL tabs & ALL accounts
+      broadcastComboUpdate('save', { comboId: selectedComboId, combo: updatedData });
+
       toast.success(`💾 Đã lưu thay đổi cho "${editTitle}" thành công!`);
     } catch (error: any) {
       console.error("Lỗi khi lưu combo:", error);

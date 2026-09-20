@@ -607,35 +607,7 @@ const Courses: React.FC = () => {
             </div>
         </div>
 
-        {/* VIP PROMOTION BANNER (Only shown if NOT VIP/Admin) */}
-        {!isVipOrAdmin && (
-            <div className="mt-20 mb-12 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 rounded-[32px] p-8 md:p-10 shadow-2xl shadow-yellow-500/30 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/20 rounded-full blur-3xl group-hover:bg-white/30 transition-all"></div>
-                
-                <div className="relative z-10 text-center md:text-left">
-                    <div className="inline-block bg-black/20 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-black/10">
-                        ★ Best Value
-                    </div>
-                    <h3 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter leading-none mb-2">
-                        Sở hữu trọn bộ 20+ Khóa học
-                    </h3>
-                    <p className="text-black/70 font-bold text-sm md:text-base max-w-xl">
-                        Tiết kiệm đến 60% học phí khi đăng ký gói Thành viên VIP trọn đời ngay hôm nay.
-                    </p>
-                </div>
-                
-                <div className="relative z-10 shrink-0">
-                    <Link 
-                        to="/account/vip-upgrade" 
-                        className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl hover:bg-gray-900"
-                    >
-                        <span>Xem chi tiết gói VIP</span>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                    </Link>
-                </div>
-            </div>
-        )}
+
 
         {/* Support Section */}
         <section className="mt-12 bg-gray-900 rounded-[48px] p-8 md:p-16 text-white flex flex-col md:flex-row items-center justify-between gap-10">
