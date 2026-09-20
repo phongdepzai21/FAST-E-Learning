@@ -117,6 +117,7 @@ export const GamificationBadgeSection: React.FC<GamificationBadgeSectionProps> =
           { id: 'progress', label: 'Tiến độ học 🎓' },
           { id: 'engagement', label: 'Ghi chú 📝' },
           { id: 'mastery', label: 'Chinh phục 🏆' },
+          { id: 'special', label: 'Đặc quyền VIP ⭐' },
         ].map((tab) => (
           <button
             key={tab.id}

@@ -321,27 +321,21 @@ async function startServer() {
         }
       }
 
-      // Store OTP so user is never blocked
+      // Store OTP so user can verify
       otpStore.set(emailKey, { otp, expiresAt, attempts: 0 });
       saveOtpToDisk(otpStore);
       otpSendCooldowns.set(emailKey, now + 10000); // 10s cooldown
 
       if (emailSent) {
         console.log(`[OTP] Successfully dispatched to ${emailKey}`);
-        return res.json({ 
-          success: true, 
-          message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác) để lấy mã.`,
-          otp: otp
-        });
       } else {
-        console.warn(`[OTP] EmailJS dispatch delayed or unavailable for ${emailKey}. Details:`, emailErrorDetails);
-        return res.json({ 
-          success: true, 
-          message: `Mã OTP xác thực của bạn là: ${otp} (Hệ thống đã cấp mã trực tiếp để bạn tiếp tục không bị gián đoạn).`,
-          otp: otp,
-          fallback: true
-        });
+        console.warn(`[OTP] EmailJS dispatch notice for ${emailKey}. Details:`, emailErrorDetails);
       }
+
+      return res.json({ 
+        success: true, 
+        message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`
+      });
     } catch (error: any) {
       console.error("Server OTP Send Error:", error);
       res.status(500).json({ 

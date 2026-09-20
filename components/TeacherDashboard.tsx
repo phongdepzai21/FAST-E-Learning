@@ -47,6 +47,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   // Course management states
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Form input states
   const [editingCourseId, setEditingCourseId] = useState('');
@@ -893,108 +895,267 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1">
-              <table className="w-full text-left border-collapse min-w-[1050px] whitespace-nowrap">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-nowrap">
-                    <th className="py-4 px-6 whitespace-nowrap">Ảnh bìa</th>
-                    <th className="py-4 px-6 min-w-[260px] whitespace-nowrap">Tiêu đề khóa học</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Danh mục</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Học phí</th>
-                    <th className="py-4 px-6 whitespace-nowrap">Trạng thái</th>
-                    <th className="py-4 px-6 text-right whitespace-nowrap">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {courses.map((course) => {
-                    const isSystem = HARDCODED_COURSES.some(c => c.id === course.id);
-                    const isHiddenOrInactive = course.status === 'draft' || course.status === 'inactive';
-                    return (
-                      <tr key={course.id} className="hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 whitespace-nowrap">
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <img 
-                            src={course.image} 
-                            alt={course.title} 
-                            className="w-16 h-10 object-cover rounded-lg border border-gray-150 shadow-sm shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
-                            }}
+              {/* Toolbar: Search, Filters & Bulk Toggle */}
+              {(() => {
+                const activeCount = courses.filter(c => c.status !== 'inactive' && c.status !== 'draft').length;
+                const inactiveCount = courses.filter(c => c.status === 'inactive' || c.status === 'draft').length;
+                const filteredCourses = courses.filter(c => {
+                  const query = searchQuery.trim().toLowerCase();
+                  const matchesSearch = !query || 
+                    c.title.toLowerCase().includes(query) || 
+                    c.category.toLowerCase().includes(query) || 
+                    c.id.toLowerCase().includes(query);
+                  if (!matchesSearch) return false;
+                  if (statusFilter === 'active') return c.status !== 'inactive' && c.status !== 'draft';
+                  if (statusFilter === 'inactive') return c.status === 'inactive' || c.status === 'draft';
+                  return true;
+                });
+
+                return (
+                  <>
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-gray-50/90 p-3.5 rounded-2xl border border-gray-200/80 shadow-xs">
+                      {/* Left: Filter Buttons & Search */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Tìm khóa học..."
+                            className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-[#007c76] focus:ring-1 focus:ring-[#007c76] w-36 sm:w-48 transition-all"
                           />
-                        </td>
-                        <td className="py-4 px-6 min-w-[260px] whitespace-nowrap">
-                          <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block">{course.title}</span>
-                          <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
-                            ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#007c76]/10 text-[#007c76] whitespace-nowrap">
-                            {course.category}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <div className="flex items-center gap-2 whitespace-nowrap">
-                            <span className="font-extrabold text-[#007c76] whitespace-nowrap">{course.price}</span>
+                          <svg className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          {searchQuery && (
                             <button
                               type="button"
-                              onClick={() => setPreviewQrCourse(course)}
-                              title="Xem và tải mã QR thanh toán động cho khóa học này"
-                              className="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200/80 transition-all text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
+                              onClick={() => setSearchQuery('')}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                              </svg>
-                              <span>QR</span>
+                              ✕
                             </button>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
-                            course.status === 'draft' 
-                              ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                              : course.status === 'inactive'
-                              ? 'bg-rose-50 text-rose-600 border border-rose-200'
-                              : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              course.status === 'draft'
-                                ? 'bg-amber-500'
-                                : course.status === 'inactive'
-                                ? 'bg-rose-500'
-                                : 'bg-emerald-500'
-                            }`}></span>
-                            <span>
-                              {course.status === 'draft' ? 'Nháp' : course.status === 'inactive' ? 'Không hoạt động' : 'Hoạt động'}
-                            </span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2 text-xs font-black whitespace-nowrap">
-                            {/* Nút Sửa */}
-                            <button
-                              onClick={() => startEditCourse(course)}
-                              className="px-3.5 py-2 bg-gray-50 border border-gray-100 hover:border-[#007c76]/20 text-[#007c76] hover:bg-[#007c76]/5 rounded-xl uppercase tracking-wider cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                              Sửa
-                            </button>
+                          )}
+                        </div>
 
-                            {/* Nút Xóa */}
-                            {!isSystem && (
-                              <button
-                                onClick={(e) => promptDeleteCourse(course.id, course.title, e)}
-                                className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors whitespace-nowrap"
-                              >
-                                Xóa
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        <div className="h-5 w-px bg-gray-200 mx-1 hidden sm:block"></div>
+
+                        {/* Status Filter Buttons */}
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter('all')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            statusFilter === 'all'
+                              ? 'bg-[#007c76] text-white shadow-xs'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Tất cả ({courses.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter('active')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            statusFilter === 'active'
+                              ? 'bg-emerald-600 text-white shadow-xs'
+                              : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                          <span>Đang hiện ({activeCount})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter('inactive')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            statusFilter === 'inactive'
+                              ? 'bg-amber-600 text-white shadow-xs'
+                              : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                          <span>Đã ẩn ({inactiveCount})</span>
+                        </button>
+                      </div>
+
+                      {/* Right: Bulk Status Actions */}
+                      <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => promptBulkToggleCourseStatus('active', e)}
+                          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          title="Kích hoạt hiển thị công khai cho tất cả khóa học"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span>Hiện tất cả</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => promptBulkToggleCourseStatus('inactive', e)}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                          title="Ẩn tất cả khóa học khỏi danh sách hiển thị học viên"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                          </svg>
+                          <span>Ẩn tất cả</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {filteredCourses.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50/50 rounded-2xl border border-gray-100">
+                        <p className="text-gray-400 font-bold text-sm">Không tìm thấy khóa học nào phù hợp với bộ lọc.</p>
+                        <button
+                          type="button"
+                          onClick={() => { setStatusFilter('all'); setSearchQuery(''); }}
+                          className="mt-2 text-xs font-bold text-[#007c76] hover:underline cursor-pointer"
+                        >
+                          Đặt lại bộ lọc
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1">
+                        <table className="w-full text-left border-collapse min-w-[1050px] whitespace-nowrap">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-nowrap">
+                              <th className="py-4 px-6 whitespace-nowrap">Ảnh bìa</th>
+                              <th className="py-4 px-6 min-w-[260px] whitespace-nowrap">Tiêu đề khóa học</th>
+                              <th className="py-4 px-6 whitespace-nowrap">Danh mục</th>
+                              <th className="py-4 px-6 whitespace-nowrap">Học phí</th>
+                              <th className="py-4 px-6 whitespace-nowrap">Trạng thái</th>
+                              <th className="py-4 px-6 text-right whitespace-nowrap">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {filteredCourses.map((course) => {
+                              const isSystem = HARDCODED_COURSES.some(c => c.id === course.id);
+                              const isHiddenOrInactive = course.status === 'draft' || course.status === 'inactive';
+                              return (
+                                <tr key={course.id} className="hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 whitespace-nowrap">
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <img 
+                                      src={course.image} 
+                                      alt={course.title} 
+                                      className="w-16 h-10 object-cover rounded-lg border border-gray-150 shadow-sm shrink-0"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-4 px-6 min-w-[260px] whitespace-nowrap">
+                                    <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block">{course.title}</span>
+                                    <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
+                                      ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#007c76]/10 text-[#007c76] whitespace-nowrap">
+                                      {course.category}
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                      <span className="font-extrabold text-[#007c76] whitespace-nowrap">{course.price}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewQrCourse(course)}
+                                        title="Xem và tải mã QR thanh toán động cho khóa học này"
+                                        className="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200/80 transition-all text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                        </svg>
+                                        <span>QR</span>
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 px-6 whitespace-nowrap">
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
+                                      course.status === 'draft' 
+                                        ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                                        : course.status === 'inactive'
+                                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                        : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                    }`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                        course.status === 'draft'
+                                          ? 'bg-amber-500'
+                                          : course.status === 'inactive'
+                                          ? 'bg-rose-500'
+                                          : 'bg-emerald-500'
+                                      }`}></span>
+                                      <span>
+                                        {course.status === 'draft' ? 'Nháp' : course.status === 'inactive' ? 'Không hoạt động' : 'Hoạt động'}
+                                      </span>
+                                    </span>
+                                  </td>
+                                  <td className="py-4 px-6 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-2 text-xs font-black whitespace-nowrap">
+                                      {/* Nút Ẩn / Hiện Khóa học */}
+                                      <button
+                                        type="button"
+                                        id={`toggle-course-status-${course.id}`}
+                                        onClick={(e) => promptToggleCourseStatus(course, e)}
+                                        className={`px-3 py-2 border rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shadow-xs font-bold ${
+                                          course.status === 'inactive'
+                                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                            : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                                        }`}
+                                        title={course.status === 'inactive' ? 'Hiện lại khóa học trên hệ thống' : 'Tạm ẩn khóa học khỏi học viên'}
+                                      >
+                                        {course.status === 'inactive' ? (
+                                          <>
+                                            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <span>Hiện</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg className="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                                            </svg>
+                                            <span>Ẩn</span>
+                                          </>
+                                        )}
+                                      </button>
+
+                                      {/* Nút Sửa */}
+                                      <button
+                                        id={`edit-course-${course.id}`}
+                                        onClick={() => startEditCourse(course)}
+                                        className="px-3.5 py-2 bg-gray-50 border border-gray-100 hover:border-[#007c76]/20 text-[#007c76] hover:bg-[#007c76]/5 rounded-xl uppercase tracking-wider cursor-pointer transition-colors whitespace-nowrap"
+                                      >
+                                        Sửa
+                                      </button>
+
+                                      {/* Nút Xóa */}
+                                      {!isSystem && (
+                                        <button
+                                          id={`delete-course-${course.id}`}
+                                          onClick={(e) => promptDeleteCourse(course.id, course.title, e)}
+                                          className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors whitespace-nowrap"
+                                        >
+                                          Xóa
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

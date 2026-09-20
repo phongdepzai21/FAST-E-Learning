@@ -44,8 +44,11 @@ interface UserProfile {
 }
 
 interface PurchasedCourseData {
-    courseId: string;
-    progress: number;
+  courseId: string;
+  progress: number;
+  id?: string;
+  completedLessons?: string[];
+  [key: string]: any;
 }
 
 const MyOwnedCoursesView: React.FC<{
@@ -509,7 +512,6 @@ const Account: React.FC = () => {
   // OTP Verification States
   const [isOtpPending, setIsOtpPending] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [availableOtp, setAvailableOtp] = useState<string | null>(null);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [otpStatusMessage, setOtpStatusMessage] = useState<string | null>(null);
   const [otpFormError, setOtpFormError] = useState<string | null>(null);
@@ -768,7 +770,10 @@ const Account: React.FC = () => {
   useEffect(() => {
     if (!user?.email) return;
     const normalizedEmail = user.email.toLowerCase();
-    const isVipUser = user.isVip === true;
+    const isVipUser = user.isVip === true || 
+      Boolean(localStorage.getItem('user_is_vip')) || 
+      Boolean(localStorage.getItem('course_unlocked_khoa-vip')) || 
+      purchasedCourses.some(c => c.id === 'khoa-vip' || c.id === 'vip-lifetime-access');
 
     // Load initial local data
     try {
@@ -779,12 +784,16 @@ const Account: React.FC = () => {
       }
     } catch (e) {}
 
+    // Total completed lessons and courses
+    const totalLessons = purchasedCourses.reduce((acc, c) => acc + (Array.isArray(c.completedLessons) ? c.completedLessons.length : (c.progress >= 100 ? 10 : (c.progress > 0 ? 1 : 0))), 0);
+    const completedCourses = purchasedCourses.filter(c => c.progress >= 100).length;
+
     // Record activity and load streak
     recordDailyLearningActivity(normalizedEmail).then(fresh => {
       if (fresh) {
-        const completedCourses = purchasedCourses.filter(c => c.progress >= 100).length;
         const evaluated = evaluateBadges({
           ...fresh,
+          totalLessonsCompleted: Math.max(fresh.totalLessonsCompleted || 0, totalLessons),
           completedCoursesCount: Math.max(fresh.completedCoursesCount || 0, completedCourses),
         }, isVipUser);
         setGamificationData(evaluated);
@@ -796,7 +805,11 @@ const Account: React.FC = () => {
     const unsubscribeGamification = onSnapshot(gamificationDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data() as UserGamificationData;
-        const evaluated = evaluateBadges(data, isVipUser);
+        const evaluated = evaluateBadges({
+          ...data,
+          totalLessonsCompleted: Math.max(data.totalLessonsCompleted || 0, totalLessons),
+          completedCoursesCount: Math.max(data.completedCoursesCount || 0, completedCourses),
+        }, isVipUser);
         setGamificationData(evaluated);
         try {
           localStorage.setItem(`gamification_${normalizedEmail}`, JSON.stringify(evaluated));
@@ -865,16 +878,8 @@ const Account: React.FC = () => {
 
       if (res.ok && resData?.success) {
         setIsOtpPending(true);
-        if (resData.otp) {
-          setAvailableOtp(resData.otp);
-        }
-        if (resData.fallback && resData.otp) {
-          setOtpStatusMessage(`Mã xác thực OTP của bạn là: [${resData.otp}]. Hệ thống đã tự động cấp mã trực tiếp để quá trình đăng ký không bị gián đoạn.`);
-          toast.success(`Mã OTP của bạn: ${resData.otp}`);
-        } else {
-          setOtpStatusMessage(resData.message || `Mã xác thực OTP 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác).`);
-          toast.success('Mã OTP đã được gửi đến email của bạn!');
-        }
+        setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng mở email (kiểm tra cả mục Thư rác/Spam), sao chép mã và dán vào ô bên dưới.`);
+        toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
       } else {
         throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
@@ -1021,16 +1026,8 @@ const Account: React.FC = () => {
       });
       const resData = await res.json().catch(() => null);
       if (res.ok && resData?.success) {
-        if (resData.otp) {
-          setAvailableOtp(resData.otp);
-        }
-        if (resData.fallback && resData.otp) {
-          setOtpStatusMessage(`Mã xác thực OTP mới của bạn là: [${resData.otp}].`);
-          toast.success(`Mã OTP mới: ${resData.otp}`);
-        } else {
-          setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn!");
-          toast.success("Đã gửi lại mã OTP thành công!");
-        }
+        setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
+        toast.success("Đã gửi lại mã OTP vào email thành công!");
       } else {
         setOtpFormError(resData?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
         toast.error("Gửi lại mã OTP thất bại!");
@@ -1897,23 +1894,13 @@ const Account: React.FC = () => {
               </div>
             )}
 
-            {/* OTP Keypad Input Boxes */}
-            {availableOtp && (
-              <div className="mb-5 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpDigits(availableOtp.split('').slice(0, 6));
-                    setOtpFormError(null);
-                    toast.success("Đã tự động điền mã OTP!");
-                  }}
-                  className="px-3.5 py-1.5 bg-[#007c76]/10 hover:bg-[#007c76]/20 border border-[#007c76]/30 text-[#007c76] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  <span>Điền nhanh mã OTP: <strong className="tracking-widest">{availableOtp}</strong></span>
-                </button>
-              </div>
-            )}
+            {/* Hướng dẫn bảo mật */}
+            <div className="mb-6 p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs font-bold text-amber-800 text-center flex items-center justify-center gap-2">
+              <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>Vui lòng vào hộp thư email để lấy mã 6 chữ số và dán vào ô bên dưới</span>
+            </div>
 
             <div className="flex justify-center gap-2 md:gap-3 mb-8">
               {otpDigits.map((digit, index) => (
@@ -1948,12 +1935,16 @@ const Account: React.FC = () => {
                   onPaste={(e) => {
                     e.preventDefault();
                     const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-                    if (pastedData.length === 6) {
-                      const newDigits = pastedData.split('');
+                    if (pastedData.length > 0) {
+                      const newDigits = [...otpDigits];
+                      for (let i = 0; i < 6; i++) {
+                        newDigits[i] = pastedData[i] || '';
+                      }
                       setOtpDigits(newDigits);
                       setOtpFormError(null);
-                      const lastInput = document.getElementById('otp-input-5');
-                      if (lastInput) (lastInput as HTMLInputElement).focus();
+                      const targetIdx = Math.min(5, pastedData.length - 1);
+                      const targetInput = document.getElementById(`otp-input-${targetIdx}`);
+                      if (targetInput) (targetInput as HTMLInputElement).focus();
                     }
                   }}
                   className="w-11 h-14 md:w-12 md:h-16 text-center text-2xl font-black text-[#007c76] bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all shadow-inner"

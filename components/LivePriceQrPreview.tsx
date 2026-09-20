@@ -60,14 +60,14 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const [isCustomPriceOpen, setIsCustomPriceOpen] = useState(false);
+  const [customPriceInput, setCustomPriceInput] = useState('');
+
   const pricePresets = [
-    { label: 'Miễn phí', val: 'Miễn phí' },
     { label: '199.000đ', val: '199.000đ' },
-    { label: '299.000đ', val: '299.000đ' },
+    { label: '399.000đ', val: '399.000đ' },
     { label: '499.000đ', val: '499.000đ' },
-    { label: '799.000đ', val: '799.000đ' },
-    { label: '1.200.000đ', val: '1.200.000đ' },
-    { label: '1.990.000đ', val: '1.990.000đ' },
+    { label: '599.000đ', val: '599.000đ' },
   ];
 
   return (
@@ -171,20 +171,22 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
 
       {/* Quick Price Preset Chips (If editable) */}
       {!readOnly && onPriceChange && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+        <div className="flex flex-wrap items-center gap-1.5 pb-1 text-xs">
           <span className="text-[11px] font-bold text-slate-500 shrink-0">Chọn nhanh:</span>
           {pricePresets.map((preset) => {
             const isSelected =
               price === preset.val ||
-              (preset.val === 'Miễn phí' && amount === 0) ||
               parseNumericPrice(preset.val) === amount;
             return (
               <button
                 key={preset.val}
                 type="button"
-                onClick={() => onPriceChange(preset.val)}
+                onClick={() => {
+                  setIsCustomPriceOpen(false);
+                  onPriceChange(preset.val);
+                }}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all text-xs shrink-0 cursor-pointer ${
-                  isSelected
+                  isSelected && !isCustomPriceOpen
                     ? 'bg-[#007c76] text-white shadow-sm scale-102'
                     : 'bg-white hover:bg-teal-50 text-slate-700 border border-slate-200'
                 }`}
@@ -193,6 +195,68 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
               </button>
             );
           })}
+
+          {/* Tùy chỉnh giá */}
+          {!isCustomPriceOpen ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsCustomPriceOpen(true);
+                setCustomPriceInput(amount > 0 ? formatVND(amount) : '');
+              }}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all text-xs shrink-0 cursor-pointer flex items-center gap-1 ${
+                !pricePresets.some(p => parseNumericPrice(p.val) === amount) && amount > 0
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+              <span>{(!pricePresets.some(p => parseNumericPrice(p.val) === amount) && amount > 0) ? `Tùy chỉnh: ${formatVND(amount)}` : 'Chỉnh sửa thêm tùy'}</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-[#007c76] shadow-sm animate-in fade-in">
+              <input
+                type="text"
+                autoFocus
+                value={customPriceInput}
+                onChange={(e) => setCustomPriceInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const num = parseNumericPrice(customPriceInput);
+                    if (num > 0) {
+                      onPriceChange(formatVND(num));
+                      setIsCustomPriceOpen(false);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setIsCustomPriceOpen(false);
+                  }
+                }}
+                placeholder="Nhập giá (VD: 699.000)..."
+                className="px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none w-36"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const num = parseNumericPrice(customPriceInput);
+                  if (num > 0) {
+                    onPriceChange(formatVND(num));
+                    setIsCustomPriceOpen(false);
+                  }
+                }}
+                className="px-2 py-0.5 bg-[#007c76] text-white rounded font-bold text-xs hover:bg-[#00625d] cursor-pointer"
+              >
+                Áp dụng
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCustomPriceOpen(false)}
+                className="px-1.5 py-0.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
       )}
 

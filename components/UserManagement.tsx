@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert } from 'lucide-react';
+import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 import { addApprovalNotification } from '../utils/courseNotificationService';
@@ -51,6 +51,19 @@ export const UserManagement: React.FC = () => {
   const [lockOtpNotice, setLockOtpNotice] = useState('');
   const [lockOtpCooldown, setLockOtpCooldown] = useState(0);
 
+  // Pagination states (20 tài khoản mỗi trang)
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Custom mouse-drag horizontal scroll and smooth navigation
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const isMouseDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   const { success, error } = useToast();
 
   const adminEmail = (
@@ -58,6 +71,57 @@ export const UserManagement: React.FC = () => {
     (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') ||
     'admin@fast.edu.vn'
   ).trim();
+
+  const checkScroll = () => {
+    if (tableContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const handleResize = () => checkScroll();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [users, currentPage]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button, input, a, select, textarea')) return;
+    if (!tableContainerRef.current) return;
+    isMouseDownRef.current = true;
+    startXRef.current = e.pageX - tableContainerRef.current.offsetLeft;
+    scrollLeftRef.current = tableContainerRef.current.scrollLeft;
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDownRef.current || !tableContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - tableContainerRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    tableContainerRef.current.scrollLeft = scrollLeftRef.current - walk;
+    checkScroll();
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isMouseDownRef.current = false;
+    setIsDragging(false);
+  };
+
+  const handleSmoothScroll = (direction: 'left' | 'right') => {
+    if (tableContainerRef.current) {
+      const delta = direction === 'left' ? -350 : 350;
+      tableContainerRef.current.scrollBy({ left: delta, behavior: 'smooth' });
+      setTimeout(checkScroll, 350);
+    }
+  };
+
+  // Reset page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchUsers();
@@ -304,67 +368,90 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const fetchUsers = async () => {
-    setIsLoading(true);
+  const fetchUsers = async (forceRefresh = false) => {
+    // 1. Instant cache load on initial mount to eliminate loading wait time
+    if (!forceRefresh && users.length === 0) {
+      try {
+        const cached = sessionStorage.getItem('cached_admin_users');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUsers(parsed);
+            setIsLoading(false);
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (users.length === 0 || forceRefresh) {
+      setIsLoading(true);
+    }
+
     try {
       const usersRef = collection(db, 'users');
       const snapshot = await getDocs(usersRef);
-      
-      const userData: UserData[] = [];
-      
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data();
-        const normalizedEmail = docSnap.id.toLowerCase().trim();
-        const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
-        const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
-        
-        // Fetch purchased courses with details
-        const purchasedCoursesList: UserPurchasedCourse[] = [];
-        try {
-          const purchasedRef = collection(db, 'users', docSnap.id, 'purchased_courses');
-          const purchasedSnap = await getDocs(purchasedRef);
-          purchasedSnap.forEach(pDoc => {
-            const pData = pDoc.data();
-            purchasedCoursesList.push({
-              courseId: pData.courseId || pDoc.id,
-              courseTitle: pData.courseTitle || pData.title || pDoc.id,
-              purchasedAt: pData.purchasedAt || pData.createdAt,
-              price: pData.price || 'Đã kích hoạt',
-              status: pData.status || 'active'
+
+      // Fast parallel fetch for purchased courses instead of sequential blocking loop
+      const userData: UserData[] = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          const normalizedEmail = docSnap.id.toLowerCase().trim();
+          const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+          const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+
+          // Fetch purchased courses in parallel
+          const purchasedCoursesList: UserPurchasedCourse[] = [];
+          try {
+            const purchasedRef = collection(db, 'users', docSnap.id, 'purchased_courses');
+            const purchasedSnap = await getDocs(purchasedRef);
+            purchasedSnap.forEach(pDoc => {
+              const pData = pDoc.data();
+              purchasedCoursesList.push({
+                courseId: pData.courseId || pDoc.id,
+                courseTitle: pData.courseTitle || pData.title || pDoc.id,
+                purchasedAt: pData.purchasedAt || pData.createdAt,
+                price: pData.price || 'Đã kích hoạt',
+                status: pData.status || 'active'
+              });
             });
-          });
-          // Sort newest purchase first
-          purchasedCoursesList.sort((a, b) => {
-            const timeA = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
-            const timeB = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
-            return timeB - timeA;
-          });
-        } catch (e) {
-          console.error(`Could not fetch courses for ${docSnap.id}`);
-        }
-        
-        userData.push({
-          id: normalizedEmail,
-          email: data.email || normalizedEmail,
-          displayName: data.displayName || 'Học viên',
-          photoURL: data.photoURL,
-          isAdmin: data.isAdmin === true || isHardcodedAdmin,
-          isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin,
-          isVip: data.isVip || false,
-          isLocked: data.isLocked === true,
-          lockedAt: data.lockedAt,
-          lockReason: data.lockReason,
-          createdAt: data.createdAt,
-          lastLoginAt: data.lastLoginAt,
-          purchasedCoursesCount: purchasedCoursesList.length,
-          purchasedCourses: purchasedCoursesList
-        });
-      }
-      
+            purchasedCoursesList.sort((a, b) => {
+              const timeA = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
+              const timeB = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
+              return timeB - timeA;
+            });
+          } catch (e) {
+            // ignore
+          }
+
+          return {
+            id: normalizedEmail,
+            email: data.email || normalizedEmail,
+            displayName: data.displayName || 'Học viên',
+            photoURL: data.photoURL,
+            isAdmin: data.isAdmin === true || isHardcodedAdmin,
+            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin,
+            isVip: data.isVip || false,
+            isLocked: data.isLocked === true,
+            lockedAt: data.lockedAt,
+            lockReason: data.lockReason,
+            createdAt: data.createdAt,
+            lastLoginAt: data.lastLoginAt,
+            purchasedCoursesCount: purchasedCoursesList.length,
+            purchasedCourses: purchasedCoursesList
+          };
+        })
+      );
+
       setUsers(userData);
+      try {
+        sessionStorage.setItem('cached_admin_users', JSON.stringify(userData));
+      } catch (e) {}
+
+      if (forceRefresh) {
+        success('Đã tải lại danh sách tài khoản thành công!');
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
-      // Fallback data if permissions fail
     } finally {
       setIsLoading(false);
     }
@@ -374,6 +461,11 @@ export const UserManagement: React.FC = () => {
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (user.displayName && user.displayName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Pagination calculation (20 accounts per page)
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const displayedUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -385,25 +477,74 @@ export const UserManagement: React.FC = () => {
           </p>
         </div>
         
-        <div className="relative w-full sm:w-auto">
-          <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm theo email, tên..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-80 pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all shadow-sm"
-          />
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-80">
+            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm theo email, tên..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all shadow-sm"
+            />
+          </div>
+
+          {/* Nút tải lại mỗi trang tài khoản */}
+          <button
+            onClick={() => fetchUsers(true)}
+            disabled={isLoading}
+            title="Tải lại danh sách tài khoản ngay lập tức"
+            className="px-4 py-2.5 sm:py-3 bg-white hover:bg-teal-50/60 border border-gray-200 hover:border-[#007c76] text-gray-700 hover:text-[#007c76] rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#007c76]' : ''}`} />
+            <span className="hidden sm:inline">Tải lại</span>
+          </button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4">
+      {/* Horizontal Scroll Bar Navigation & Mouse-Drag Tip on Desktop */}
+      <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+        <div className="flex items-center gap-2 font-medium">
+          <MoveHorizontal className="w-4 h-4 text-[#007c76]" />
+          <span>Kéo chuột sang ngang hoặc dùng nút cuộn để xem đầy đủ thông tin</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => handleSmoothScroll('left')}
+            disabled={!canScrollLeft}
+            title="Cuộn sang trái"
+            className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleSmoothScroll('right')}
+            disabled={!canScrollRight}
+            title="Cuộn sang phải"
+            className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+          >
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {isLoading && users.length === 0 ? (
+        <div className="py-16 flex flex-col items-center justify-center gap-4 bg-white rounded-3xl border border-gray-100">
           <div className="w-10 h-10 border-4 border-[#007c76] border-t-transparent rounded-full animate-spin"></div>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider animate-pulse">Đang tải danh sách tài khoản...</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1">
+        <div
+          ref={tableContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          onScroll={checkScroll}
+          className={`overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1 select-none transition-colors ${
+            isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+          }`}
+        >
           <table className="w-full text-left border-collapse min-w-[1050px] whitespace-nowrap">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-nowrap">
@@ -416,10 +557,15 @@ export const UserManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredUsers.length > 0 ? filteredUsers.map((user) => {
+              {displayedUsers.length > 0 ? displayedUsers.map((user) => {
                 const latestPurchase = user.purchasedCourses && user.purchasedCourses[0];
                 return (
-                  <tr key={user.id} className={`hover:bg-gray-50/40 transition-colors text-xs sm:text-sm text-gray-700 group whitespace-nowrap ${user.isLocked ? 'bg-red-50/30' : ''}`}>
+                  <tr
+                    key={user.id}
+                    className={`transition-all duration-150 text-xs sm:text-sm text-gray-700 group whitespace-nowrap cursor-pointer hover:bg-teal-50/20 hover:outline hover:outline-2 hover:outline-[#007c76] hover:outline-offset-[-2px] hover:shadow-xs ${
+                      user.isLocked ? 'bg-red-50/30' : ''
+                    }`}
+                  >
                     <td className="py-4 px-6 whitespace-nowrap">
                       <div className="flex items-center gap-3 whitespace-nowrap">
                         <div className={`w-10 h-10 rounded-full border-2 shadow-sm overflow-hidden flex items-center justify-center shrink-0 ${user.isLocked ? 'border-red-300 bg-red-50' : 'border-white bg-gray-100'}`}>
@@ -537,7 +683,7 @@ export const UserManagement: React.FC = () => {
                             title="Khóa tài khoản này"
                           >
                             <Lock className="w-3.5 h-3.5" />
-                            Khóa TK
+                            Khóa tài khoản
                           </button>
                         )}
 
@@ -568,6 +714,75 @@ export const UserManagement: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* --- PHÂN TRANG (20 TÀI KHOẢN MỖI TRANG) --- */}
+      {filteredUsers.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-xs">
+          <div className="text-xs font-semibold text-gray-500">
+            Hiển thị <span className="font-extrabold text-gray-900">{(safePage - 1) * PAGE_SIZE + 1} - {Math.min(safePage * PAGE_SIZE, filteredUsers.length)}</span> trong tổng số <span className="font-extrabold text-[#007c76]">{filteredUsers.length}</span> tài khoản
+            <span className="ml-2 text-gray-400">(Trang {safePage} / {totalPages})</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={safePage === 1}
+              title="Trang đầu"
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={safePage === 1}
+              title="Trang trước"
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Page Number Buttons */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .map((pageNum, idx, arr) => {
+                const prev = arr[idx - 1];
+                const isEllipsis = prev && pageNum - prev > 1;
+                return (
+                  <React.Fragment key={pageNum}>
+                    {isEllipsis && <span className="px-1 text-gray-400 text-xs font-bold">...</span>}
+                    <button
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                        safePage === pageNum
+                          ? 'bg-[#007c76] text-white shadow-md shadow-[#007c76]/20'
+                          : 'border border-gray-200 bg-white hover:bg-teal-50 text-gray-700 hover:text-[#007c76]'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={safePage === totalPages}
+              title="Trang sau"
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={safePage === totalPages}
+              title="Trang cuối"
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-gray-200 bg-white hover:bg-teal-50 text-gray-600 hover:text-[#007c76] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
