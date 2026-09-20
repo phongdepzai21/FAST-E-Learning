@@ -50,9 +50,23 @@ const DEFAULT_COMBOS: Combo[] = [
 const ComboManagement: React.FC = () => {
   const toast = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [combos, setCombos] = useState<Combo[]>(DEFAULT_COMBOS);
+  const [combos, setCombos] = useState<Combo[]>(() => {
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {}
+    return DEFAULT_COMBOS;
+  });
   const [selectedComboId, setSelectedComboId] = useState<string>('combo-basic');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) return false;
+    } catch (e) {}
+    return true;
+  });
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Edit fields for selected combo
@@ -66,8 +80,6 @@ const ComboManagement: React.FC = () => {
 
   // Fetch courses and sync combos from Firestore
   useEffect(() => {
-    setIsLoading(true);
-    
     // Sync regular courses
     const allCoursesList = getMergedCourses([]);
     // Remove the combos themselves from the list of selectable individual courses
@@ -95,6 +107,9 @@ const ComboManagement: React.FC = () => {
 
       const finalCombos = [...mergedCombos, ...customCombos];
       setCombos(finalCombos);
+      try {
+        localStorage.setItem('combo_cache_all', JSON.stringify(finalCombos));
+      } catch (e) {}
       setIsLoading(false);
     }, (error) => {
       console.error("Lỗi đồng bộ combos từ Firestore:", error);
@@ -187,13 +202,23 @@ const ComboManagement: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await deleteDoc(doc(db, 'combos', selectedComboId));
-      
-      // If it was a custom unsaved combo, we just remove it from states
+      // Optmistic local state update first
       setCombos(prev => prev.filter(c => c.id !== selectedComboId));
-      
-      // Real-time broadcast combo deletion to ALL tabs & ALL accounts
       broadcastComboUpdate('delete', { comboId: selectedComboId });
+
+      // Run Firestore delete with a timeout so it doesn't hang
+      const deletePromise = deleteDoc(doc(db, 'combos', selectedComboId));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
+
+      try {
+        await Promise.race([deletePromise, timeoutPromise]);
+      } catch (fErr: any) {
+        if (fErr.message === 'timeout') {
+          console.warn(`[Combo Delete] Firestore delete timed out for ${selectedComboId}, deleted locally.`);
+        } else {
+          console.warn(`[Combo Delete] Firestore delete error:`, fErr);
+        }
+      }
 
       toast.success(`🗑️ Đã xóa gói combo thành công!`);
       setSelectedComboId('combo-basic');
@@ -228,14 +253,29 @@ const ComboManagement: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(comboRef, updatedData, { merge: true });
-
-      // Save to local cache as fallback
+      // Save to local cache as fallback first so it is instantaneous
       const cachedKey = `combo_cache_${selectedComboId}`;
       localStorage.setItem(cachedKey, JSON.stringify({ id: selectedComboId, ...updatedData }));
       
-      // Real-time broadcast combo update to ALL tabs & ALL accounts
+      // Update local state instantly so user doesn't wait
+      setCombos(prev => prev.map(c => c.id === selectedComboId ? { ...c, ...updatedData } : c));
+
+      // Real-time broadcast combo update to ALL tabs & ALL accounts instantly
       broadcastComboUpdate('save', { comboId: selectedComboId, combo: updatedData });
+
+      // Run Firestore write with a timeout so it doesn't block the UI forever
+      const firestorePromise = setDoc(comboRef, updatedData, { merge: true });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
+
+      try {
+        await Promise.race([firestorePromise, timeoutPromise]);
+      } catch (fErr: any) {
+        if (fErr.message === 'timeout') {
+          console.warn(`[Combo Save] Firestore write timed out for ${selectedComboId}, saved locally.`);
+        } else {
+          console.warn(`[Combo Save] Firestore write error:`, fErr);
+        }
+      }
 
       toast.success(`💾 Đã lưu thay đổi cho "${editTitle}" thành công!`);
     } catch (error: any) {
@@ -474,7 +514,7 @@ const ComboManagement: React.FC = () => {
               ) : (
                 <Save className="w-5 h-5" />
               )}
-              <span>Lưu cấu hình combo</span>
+              <span>Lưu thay đổi combo</span>
             </button>
 
             <button

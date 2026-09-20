@@ -271,10 +271,31 @@ async function startServer() {
   // OTP Send Endpoint
   app.post("/api/otp/send", async (req, res) => {
     try {
-      const { email, name } = req.body || {};
+      const { email, name, flow = 'register' } = req.body || {};
       if (!email) return res.status(400).json({ error: "Email là bắt buộc." });
 
       const emailKey = String(email).toLowerCase().trim();
+
+      // Check if user account already exists in Firebase Auth
+      let userExists = false;
+      try {
+        await getAuth().getUserByEmail(emailKey);
+        userExists = true;
+      } catch (authErr: any) {
+        if (authErr.code !== 'auth/user-not-found') {
+          console.warn(`[OTP Send] getUserByEmail error for ${emailKey}:`, authErr);
+        }
+      }
+
+      // Distinguish flows: Register vs Login/Reset
+      if (flow === 'register' && userExists) {
+        return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
+      }
+
+      if ((flow === 'reset' || flow === 'login') && !userExists) {
+        return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
+      }
+
       const now = Date.now();
       
       // Check cooldown (15s)
@@ -375,13 +396,34 @@ async function startServer() {
   });
 
   // OTP Verify Endpoint
-  app.post("/api/otp/verify", (req, res) => {
+  app.post("/api/otp/verify", async (req, res) => {
     try {
-      const { email, otp } = req.body || {};
+      const { email, otp, flow = 'register' } = req.body || {};
       if (!email || !otp) return res.status(400).json({ error: "Email và mã OTP là bắt buộc." });
 
       const emailKey = String(email).toLowerCase().trim();
       const inputOtp = String(otp).trim();
+
+      // Check if user account already exists in Firebase Auth
+      let userExists = false;
+      try {
+        await getAuth().getUserByEmail(emailKey);
+        userExists = true;
+      } catch (authErr: any) {
+        if (authErr.code !== 'auth/user-not-found') {
+          console.warn(`[OTP Verify] getUserByEmail error for ${emailKey}:`, authErr);
+        }
+      }
+
+      // Distinguish flows: Register vs Login/Reset
+      if (flow === 'register' && userExists) {
+        return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
+      }
+
+      if ((flow === 'reset' || flow === 'login') && !userExists) {
+        return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
+      }
+
       const record = otpStore.get(emailKey);
 
       if (!record) {
