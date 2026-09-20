@@ -301,6 +301,11 @@ const Courses: React.FC = () => {
       const isDraft = course.status === 'draft' || course.status === 'inactive';
       if (isDraft) return false; // Hide drafts & inactive courses for general view
 
+      // Hide VIP package / Combos from regular single courses list
+      if (course.id === 'khoa-vip' || course.category === 'Gói VIP' || course.id.startsWith('combo-')) {
+        return false;
+      }
+
       const term = searchTerm.toLowerCase();
       const matchesSearch = course.title.toLowerCase().includes(term) || (course.category && course.category.toLowerCase().includes(term));
       

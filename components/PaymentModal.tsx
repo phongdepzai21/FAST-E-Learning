@@ -33,6 +33,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [userInputOtp, setUserInputOtp] = useState<string>('');
   const [otpError, setOtpError] = useState<string>('');
   const [otpNotice, setOtpNotice] = useState<string>('');
+  const [otpCountdown, setOtpCountdown] = useState<number>(0);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (otpCountdown > 0) {
+      timer = setTimeout(() => setOtpCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCountdown]);
 
   useEffect(() => {
     setConfig(getPaymentConfig());
@@ -98,6 +107,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
       if (response.ok && data?.success) {
         setOtpNotice(data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
+        setOtpCountdown(60);
         if (data.fallback && data.otp) {
           setUserInputOtp(data.otp);
         }
@@ -108,6 +118,37 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       console.warn("Failed to send OTP", err);
       setShowOtpForm(true);
       setOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
+    }
+    setIsVerifying(false);
+  };
+
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0) return;
+    setOtpError('');
+    setOtpNotice('');
+    setIsVerifying(true);
+    const user = auth.currentUser;
+    const email = user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com';
+
+    try {
+      const response = await fetch('/api/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), name: user?.displayName || 'Học viên' })
+      });
+
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.success) {
+        setOtpNotice(`Mã OTP mới đã được gửi lại thành công đến email ${email}.`);
+        setOtpCountdown(60);
+        if (data.fallback && data.otp) {
+          setUserInputOtp(data.otp);
+        }
+      } else {
+        setOtpError(data?.error || "Không thể gửi lại mã OTP lúc này.");
+      }
+    } catch (err) {
+      setOtpError("Lỗi kết nối khi gửi lại OTP.");
     }
     setIsVerifying(false);
   };
@@ -253,7 +294,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 </p>
                 <div className="pt-2">
                   {otpNotice && (
-                    <div className="mb-3 p-2.5 bg-teal-50 border border-teal-200 text-[#007c76] text-xs font-semibold rounded-xl text-center">
+                    <div className="mb-3 p-2.5 bg-teal-50 border border-teal-200 text-[#007c76] text-xs font-semibold rounded-xl text-center animate-in fade-in">
                       {otpNotice}
                     </div>
                   )}
@@ -261,30 +302,75 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                     type="text"
                     maxLength={6}
                     value={userInputOtp}
+                    disabled={isVerifying}
                     onChange={(e) => {
                       setUserInputOtp(e.target.value.replace(/[^0-9]/g, ''));
                       setOtpError('');
                     }}
                     placeholder="Nhập 6 số OTP"
-                    className="w-full text-center text-2xl tracking-[0.5em] font-black font-mono text-[#007c76] bg-gray-50 border-2 border-gray-200 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 rounded-xl py-3 outline-none transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-medium placeholder:text-gray-300"
+                    className="w-full text-center text-2xl tracking-[0.5em] font-black font-mono text-[#007c76] bg-gray-50 border-2 border-gray-200 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 rounded-xl py-3 outline-none transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-medium placeholder:text-gray-300 disabled:opacity-75"
                   />
                   {otpError && (
                     <p className="text-red-500 text-xs font-bold mt-2 animate-in slide-in-from-top-1">{otpError}</p>
                   )}
+
+                  {/* Visual status indicator / loading spinner / progress bar inside the OTP input component */}
+                  <div className="mt-4 w-full">
+                    {isVerifying ? (
+                      <div className="space-y-2">
+                        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden relative">
+                          <div className="h-full bg-gradient-to-r from-teal-500 to-[#007c76] rounded-full animate-pulse w-full"></div>
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-xs font-bold text-[#007c76] animate-pulse">
+                          <svg className="animate-spin h-3.5 w-3.5 text-[#007c76]" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Đang thực hiện xác thực bảo mật OTP...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-1.5 w-full bg-gray-100/50 rounded-full"></div>
+                    )}
+                  </div>
                 </div>
+
+                <div className="flex items-center justify-between text-xs px-2 pt-1 pb-1">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider">Chưa nhận được mã?</span>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={otpCountdown > 0 || isVerifying}
+                    className={`font-black uppercase tracking-wider cursor-pointer transition-colors ${otpCountdown > 0 || isVerifying ? 'text-gray-300 cursor-not-allowed' : 'text-[#007c76] hover:underline'}`}
+                  >
+                    Gửi lại {otpCountdown > 0 ? `(${otpCountdown}s)` : ''}
+                  </button>
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowOtpForm(false)}
-                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
+                    disabled={isVerifying}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50"
                   >
                     Quay lại
                   </button>
                   <button
                     onClick={handleVerifyOtp}
-                    disabled={userInputOtp.length !== 6}
-                    className="flex-1 py-3 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all shadow-md active:scale-98 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={userInputOtp.length !== 6 || isVerifying}
+                    className="flex-1 py-3 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all shadow-md active:scale-98 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Xác nhận
+                    {isVerifying ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Đang xử lý...</span>
+                      </>
+                    ) : (
+                      'Xác nhận'
+                    )}
                   </button>
                 </div>
               </div>

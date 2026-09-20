@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { getAuth } from "firebase-admin/auth";
 
 if (!getApps().length) {
   initializeApp();
@@ -144,6 +145,30 @@ async function startServer() {
       console.error("Signed URL error:", err);
       // Fallback to original url if generation fails
       res.json({ signedUrl: req.body.videoUrl });
+    }
+  });
+
+  // Check if a user account exists in Firebase Auth by email
+  app.post("/api/user/exists", async (req, res) => {
+    try {
+      const { email } = req.body || {};
+      if (!email) {
+        return res.status(400).json({ exists: false, error: "Email là bắt buộc." });
+      }
+      const emailKey = String(email).toLowerCase().trim();
+      try {
+        await getAuth().getUserByEmail(emailKey);
+        return res.json({ exists: true });
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/user-not-found') {
+          return res.json({ exists: false });
+        }
+        console.error(`Error with getUserByEmail for ${emailKey}:`, authErr);
+        return res.json({ exists: false, error: authErr.code });
+      }
+    } catch (err: any) {
+      console.error("Error in /api/user/exists:", err);
+      return res.status(500).json({ exists: false, error: err.message });
     }
   });
 
@@ -328,14 +353,19 @@ async function startServer() {
 
       if (emailSent) {
         console.log(`[OTP] Successfully dispatched to ${emailKey}`);
+        return res.json({ 
+          success: true, 
+          message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`
+        });
       } else {
-        console.warn(`[OTP] EmailJS dispatch notice for ${emailKey}. Details:`, emailErrorDetails);
+        console.warn(`[OTP] EmailJS dispatch failed for ${emailKey}. Details:`, emailErrorDetails);
+        return res.json({ 
+          success: true, 
+          fallback: true,
+          otp: otp,
+          message: `Mã OTP đã được khởi tạo thành công (Chế độ dự phòng tự động - Auto Fallback). Mã xác thực của bạn là: ${otp} (đã được tự động ghi nhận).`
+        });
       }
-
-      return res.json({ 
-        success: true, 
-        message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`
-      });
     } catch (error: any) {
       console.error("Server OTP Send Error:", error);
       res.status(500).json({ 

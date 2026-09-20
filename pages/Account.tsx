@@ -7,6 +7,7 @@ import TeacherDashboard from '../components/TeacherDashboard';
 import AccountSettings from './AccountSettings';
 import CourseDetail from './CourseDetail';
 import { UserManagement } from '../components/UserManagement';
+import ComboManagement from '../components/ComboManagement';
 import { PurchaseHistory } from '../components/PurchaseHistory';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
@@ -16,6 +17,7 @@ import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagno
 import { GamificationBadgeSection } from '../components/GamificationBadgeSection';
 import { UserGamificationData } from '../utils/gamification';
 import { recordDailyLearningActivity, evaluateBadges } from '../utils/gamificationService';
+import { motion, AnimatePresence } from 'motion/react';
 
 import {
   onAuthStateChanged,
@@ -215,7 +217,15 @@ const BuyCoursesView: React.FC<{
   const isPrivileged = isVip || isAdmin;
 
   const activeCourses = useMemo(() => {
-    return allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive');
+    return allCourses.filter(c => {
+      const isDraft = c.status === 'draft' || c.status === 'inactive';
+      if (isDraft) return false;
+      // Filter out VIP and other combo packages from individual course views
+      if (c.id === 'khoa-vip' || c.category === 'Gói VIP' || c.id.startsWith('combo-')) {
+        return false;
+      }
+      return true;
+    });
   }, [allCourses]);
 
   const ownedActiveCount = useMemo(() => {
@@ -227,7 +237,7 @@ const BuyCoursesView: React.FC<{
   const categories = useMemo(() => {
     const set = new Set<string>();
     allCourses.forEach(c => {
-      if (c.category) set.add(c.category);
+      if (c.category && c.id !== 'khoa-vip' && !c.id.startsWith('combo-')) set.add(c.category);
     });
     return ['all', ...Array.from(set)];
   }, [allCourses]);
@@ -235,6 +245,9 @@ const BuyCoursesView: React.FC<{
   const filteredCourses = useMemo(() => {
     return allCourses.filter(course => {
       if (course.status === 'draft' || course.status === 'inactive') return false;
+      if (course.id === 'khoa-vip' || course.category === 'Gói VIP' || course.id.startsWith('combo-')) {
+        return false;
+      }
       const matchCat = selectedCategory === 'all' || course.category?.toLowerCase() === selectedCategory.toLowerCase();
       const matchSearch = !searchQuery || 
         course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -429,7 +442,7 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'settings' | 'course-learning'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'settings' | 'course-learning'>('dashboard');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -878,8 +891,14 @@ const Account: React.FC = () => {
 
       if (res.ok && resData?.success) {
         setIsOtpPending(true);
-        setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng mở email (kiểm tra cả mục Thư rác/Spam), sao chép mã và dán vào ô bên dưới.`);
-        toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
+        if (resData.fallback && resData.otp) {
+          setOtpDigits(resData.otp.split(''));
+          setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
+          toast.success('Hệ thống tự động điền mã OTP dự phòng!');
+        } else {
+          setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng mở email (kiểm tra cả mục Thư rác/Spam), sao chép mã và dán vào ô bên dưới.`);
+          toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
+        }
       } else {
         throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
@@ -1094,27 +1113,53 @@ const Account: React.FC = () => {
         errMsg = "Mật khẩu không chính xác.";
         msg = "Mật khẩu không chính xác. Vui lòng kiểm tra kỹ lại.";
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        errMsg = "Tài khoản không tồn tại hoặc sai thông tin.";
-        msg = (
-          <div className="space-y-2">
-            <p className="font-extrabold uppercase text-amber-600">tài khoản chưa khả dụng / chưa tồn tại</p>
-            <p className="font-medium text-gray-700 leading-snug text-xs">
-              Hệ thống không tìm thấy tài khoản học viên này. Nếu bạn chưa có tài khoản trên FAST E-Learning, hãy tạo tài khoản mới để bắt đầu học tập ngay nhé!
-            </p>
-            <div className="pt-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(true);
-                  setError(null);
-                }}
-                className="inline-flex items-center gap-1.5 bg-[#007c76]/10 text-[#007c76] hover:bg-[#007c76]/20 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all animate-flicker"
-              >
-                👉 Đăng ký tài khoản mới ngay
-              </button>
+        // Modern Firebase Auth throws 'auth/invalid-credential' for both wrong password and non-existent users.
+        // We call our server endpoint /api/user/exists which uses Admin SDK to check if user really exists!
+        let userExists = false;
+        try {
+          const res = await fetch("/api/user/exists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: cleanEmail })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            userExists = !!data.exists;
+          }
+        } catch (fErr) {
+          console.warn("Could not check if user exists via API:", fErr);
+          // Fallback to checking local storage roles
+          if (localStorage.getItem(`user_roles_${cleanEmail}`)) {
+            userExists = true;
+          }
+        }
+
+        if (userExists) {
+          errMsg = "Mật khẩu không chính xác.";
+          msg = "Mật khẩu không chính xác. Vui lòng kiểm tra kỹ lại mật khẩu của bạn.";
+        } else {
+          errMsg = "Tài khoản không tồn tại.";
+          msg = (
+            <div className="space-y-2">
+              <p className="font-extrabold uppercase text-amber-600">tài khoản chưa khả dụng / chưa tồn tại</p>
+              <p className="font-medium text-gray-700 leading-snug text-xs">
+                Hệ thống không tìm thấy tài khoản học viên này. Nếu bạn chưa có tài khoản trên FAST E-Learning, hãy tạo tài khoản mới để bắt đầu học tập ngay nhé!
+              </p>
+              <div className="pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(true);
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-[#007c76]/10 text-[#007c76] hover:bg-[#007c76]/20 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all animate-flicker"
+                >
+                  👉 Đăng ký tài khoản mới ngay
+                </button>
+              </div>
             </div>
-          </div>
-        );
+          );
+        }
       } else if (err.code === 'auth/email-already-in-use') {
         errMsg = "Email đã được sử dụng.";
         msg = "Email này đã được đăng ký cho một tài khoản khác.";
@@ -1503,6 +1548,7 @@ const Account: React.FC = () => {
                 { id: 'settings', label: 'Cài đặt tài khoản', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
                 ...(isTeacher || isAdmin ? [
                   { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
+                  { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
                   { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
                 ] : [])
               ].map((item, idx) => (
@@ -1553,6 +1599,7 @@ const Account: React.FC = () => {
                   <option value="purchase-history">Lịch sử mua hàng</option>
                   <option value="settings">Cài đặt tài khoản</option>
                   {isTeacher && <option value="teacher-dashboard">Quản lý bài giảng</option>}
+                  {isTeacher && <option value="combo-management">Quản lý combo</option>}
                   {isTeacher && <option value="user-management">Quản lý tài khoản</option>}
                 </select>
              </div>
@@ -1605,77 +1652,88 @@ const Account: React.FC = () => {
           </header>
 
           <div className="p-6 md:p-10 space-y-10">
-            {activeTab === 'teacher-dashboard' && isTeacher ? (
-              <TeacherDashboard userEmail={user.email} />
-            ) : activeTab === 'user-management' && isTeacher ? (
-              <UserManagement />
-            ) : activeTab === 'settings' ? (
-              <AccountSettings embed={true} />
-            ) : activeTab === 'course-learning' && courseId ? (
-              <CourseDetail embeddedCourseId={courseId} />
-            ) : activeTab === 'badges' ? (
-              <GamificationBadgeSection 
-                gamificationData={gamificationData} 
-                userEmail={user.email} 
-                isVip={isVip} 
-              />
-            ) : activeTab === 'purchase-history' ? (
-                <PurchaseHistory />
-            ) : activeTab === 'buy-courses' ? (
-              <BuyCoursesView 
-                allCourses={allCourses}
-                ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
-                isVip={isVip}
-                isAdmin={isAdmin}
-                onClaimSingleCourse={handleClaimSingleCourse}
-                onClaimAllCourses={handleClaimAllCourses}
-                claimingId={claimingId}
-                isClaimingAll={isClaimingAll}
-                onGoToMyCourses={() => setActiveTab('my-courses')}
-              />
-            ) : activeTab === 'my-courses' ? (
-              <MyOwnedCoursesView 
-                myCourses={myCourses} 
-                progressMap={progressMap} 
-                onGoToBuyCourses={() => setActiveTab('buy-courses')}
-                isVip={isVip}
-                isAdmin={isAdmin}
-                unownedCount={unownedCoursesCount}
-                onClaimAllCourses={handleClaimAllCourses}
-                isClaimingAll={isClaimingAll}
-              />
-            ) : (
-              <>
-                <section className="relative overflow-hidden bg-white rounded-[40px] p-8 md:p-12 border border-gray-100 shadow-sm animate-in slide-in-from-bottom-5 duration-700">
-                  <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="text-center md:text-left">
-                      <h2 className="text-3xl md:text-5xl font-black text-gray-800 tracking-tight leading-none">Chào {(user.name || 'Học viên').split(' ').pop()}! 👋</h2>
-                      <p className="text-gray-500 font-bold max-w-lg leading-relaxed mt-4">
-                        {isVip ? "Bạn đang có quyền truy cập không giới hạn. Tận hưởng việc học!" : "Tiếp tục hành trình chuẩn hóa kiến thức cùng FAST."}
-                      </p>
-                      <button onClick={() => navigate('/khoa-hoc')} className="mt-8 px-10 py-4 bg-[#007c76] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">TIẾP TỤC HỌC TẬP</button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
-                       <div className="bg-gray-50 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-gray-100 min-w-[90px]">
-                          <span className="text-2xl sm:text-3xl font-black text-[#007c76]">{isVip ? "ALL" : purchasedCourses.length}</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 mt-1">Khóa học</span>
-                       </div>
-                       <div className="bg-amber-50/80 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-amber-200/60 min-w-[90px]">
-                          <span className="text-2xl sm:text-3xl font-black text-amber-600 flex items-center gap-1">
-                            <span>🔥</span>
-                            <span>{gamificationData.streakDays || 1}</span>
-                          </span>
-                          <span className="text-[9px] font-black uppercase tracking-wider text-amber-700/70 mt-1">Streak</span>
-                       </div>
-                       <div className="bg-purple-50/80 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-purple-200/60 min-w-[90px]">
-                          <span className="text-2xl sm:text-3xl font-black text-purple-600 flex items-center justify-center">
-                            <span>{(gamificationData.unlockedBadgeIds || []).length}</span>
-                          </span>
-                          <span className="text-[9px] font-black uppercase tracking-wider text-purple-700/70 mt-1">Huy hiệu</span>
-                       </div>
-                    </div>
-                  </div>
-                </section>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full"
+              >
+                {activeTab === 'teacher-dashboard' && isTeacher ? (
+                  <TeacherDashboard userEmail={user.email} />
+                ) : activeTab === 'combo-management' && isTeacher ? (
+                  <ComboManagement />
+                ) : activeTab === 'user-management' && isTeacher ? (
+                  <UserManagement />
+                ) : activeTab === 'settings' ? (
+                  <AccountSettings embed={true} />
+                ) : activeTab === 'course-learning' && courseId ? (
+                  <CourseDetail embeddedCourseId={courseId} />
+                ) : activeTab === 'badges' ? (
+                  <GamificationBadgeSection 
+                    gamificationData={gamificationData} 
+                    userEmail={user.email} 
+                    isVip={isVip} 
+                  />
+                ) : activeTab === 'purchase-history' ? (
+                  <PurchaseHistory />
+                ) : activeTab === 'buy-courses' ? (
+                  <BuyCoursesView 
+                    allCourses={allCourses}
+                    ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
+                    isVip={isVip}
+                    isAdmin={isAdmin}
+                    onClaimSingleCourse={handleClaimSingleCourse}
+                    onClaimAllCourses={handleClaimAllCourses}
+                    claimingId={claimingId}
+                    isClaimingAll={isClaimingAll}
+                    onGoToMyCourses={() => setActiveTab('my-courses')}
+                  />
+                ) : activeTab === 'my-courses' ? (
+                  <MyOwnedCoursesView 
+                    myCourses={myCourses} 
+                    progressMap={progressMap} 
+                    onGoToBuyCourses={() => setActiveTab('buy-courses')}
+                    isVip={isVip}
+                    isAdmin={isAdmin}
+                    unownedCount={unownedCoursesCount}
+                    onClaimAllCourses={handleClaimAllCourses}
+                    isClaimingAll={isClaimingAll}
+                  />
+                ) : (
+                  <div className="space-y-10">
+                    <section className="relative overflow-hidden bg-white rounded-[40px] p-8 md:p-12 border border-gray-100 shadow-sm animate-in slide-in-from-bottom-5 duration-700">
+                      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div className="text-center md:text-left">
+                          <h2 className="text-3xl md:text-5xl font-black text-gray-800 tracking-tight leading-none">Chào {(user.name || 'Học viên').split(' ').pop()}! 👋</h2>
+                          <p className="text-gray-500 font-bold max-w-lg leading-relaxed mt-4">
+                            {isVip ? "Bạn đang có quyền truy cập không giới hạn. Tận hưởng việc học!" : "Tiếp tục hành trình chuẩn hóa kiến thức cùng FAST."}
+                          </p>
+                          <button onClick={() => navigate('/khoa-hoc')} className="mt-8 px-10 py-4 bg-[#007c76] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">TIẾP TỤC HỌC TẬP</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+                           <div className="bg-gray-50 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-gray-100 min-w-[90px]">
+                              <span className="text-2xl sm:text-3xl font-black text-[#007c76]">{isVip ? "ALL" : purchasedCourses.length}</span>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 mt-1">Khóa học</span>
+                           </div>
+                           <div className="bg-amber-50/80 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-amber-200/60 min-w-[90px]">
+                              <span className="text-2xl sm:text-3xl font-black text-amber-600 flex items-center gap-1">
+                                <span>🔥</span>
+                                <span>{gamificationData.streakDays || 1}</span>
+                              </span>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-amber-700/70 mt-1">Streak</span>
+                           </div>
+                           <div className="bg-purple-50/80 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-purple-200/60 min-w-[90px]">
+                              <span className="text-2xl sm:text-3xl font-black text-purple-600 flex items-center justify-center">
+                                <span>{(gamificationData.unlockedBadgeIds || []).length}</span>
+                              </span>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-purple-700/70 mt-1">Huy hiệu</span>
+                           </div>
+                        </div>
+                      </div>
+                    </section>
 
                 {/* Admin Status Activation Panel */}
                 {ADMIN_EMAILS.includes(user?.email || '') && !(user?.isVip === true && user?.isAdmin === true && user?.isTeacher === true) && (
@@ -1843,9 +1901,11 @@ const Account: React.FC = () => {
                   userEmail={user.email} 
                   isVip={isVip} 
                 />
-              </>
+              </div>
             )}
-          </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
         </main>
       </div>
     );
@@ -1950,6 +2010,26 @@ const Account: React.FC = () => {
                   className="w-11 h-14 md:w-12 md:h-16 text-center text-2xl font-black text-[#007c76] bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all shadow-inner"
                 />
               ))}
+            </div>
+
+            {/* Visual status indicator / loading spinner / progress bar inside the OTP input component */}
+            <div className="mb-6 w-full max-w-xs mx-auto">
+              {isAuthenticating ? (
+                <div className="space-y-2">
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden relative">
+                    <div className="h-full bg-[#007c76] rounded-full animate-pulse w-full"></div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-xs font-bold text-[#007c76] animate-pulse">
+                    <svg className="animate-spin h-3.5 w-3.5 text-[#007c76]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Đang kết nối FAST Security Gateway & xác minh OTP...</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-1.5 w-full bg-gray-100/50 rounded-full"></div>
+              )}
             </div>
 
             {/* Validation and Action buttons */}

@@ -4,6 +4,7 @@ import { Course } from '../types';
 import { Link } from "react-router-dom";
 import { getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { isCourseNewOrUpdated, markCourseAsSeen } from '../utils/courseNotificationService';
+import { motion } from 'motion/react';
 
 interface CourseCardProps {
   course: Course;
@@ -108,7 +109,15 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
 
   return (
     <Link to={targetUrl} onClick={handleClick} className="block h-full group relative">
-        <div className="bg-white rounded-[24px] overflow-hidden shadow-sm hover-lift border border-gray-100 flex flex-col h-full transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_20px_35px_-12px_rgba(0,124,118,0.18)] hover:border-[#007c76]/30">
+        <motion.div 
+          whileHover={{ 
+            y: -8,
+            scale: 1.025,
+            boxShadow: "0 25px 45px -12px rgba(0, 124, 118, 0.22)"
+          }}
+          transition={{ type: "spring", stiffness: 350, damping: 25 }}
+          className="bg-white rounded-[24px] overflow-hidden border border-gray-100 flex flex-col h-full transition-colors duration-300 ease-out hover:border-[#007c76]/30"
+        >
             {/* Image Container */}
             <div className="relative aspect-[16/10] overflow-hidden bg-gray-100 group/image">
                 <div className={`absolute inset-0 bg-gray-200 animate-pulse transition-opacity duration-500 ${isLoaded ? 'opacity-0' : 'opacity-100'}`} />
@@ -234,7 +243,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     </div>
                 )}
             </div>
-        </div>
+        </motion.div>
     </Link>
   );
 });
