@@ -9,14 +9,14 @@ import PaymentModal from '../components/PaymentModal';
 import PurchaseModal from '../components/PurchaseModal';
 import { useToast } from '../contexts/ToastContext';
 
-// Mock Course Object for reference
+// VIP Package Definition - Khóa VIP
 const VIP_PACKAGE: Course = {
-  id: 'vip-lifetime-access',
-  title: 'Gói Thành Viên VIP (Trọn Đời)',
+  id: 'khoa-vip',
+  title: 'Khóa VIP (Trọn Đời)',
   price: '2.500.000đ',
-  image: 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?q=80&w=1000&auto=format&fit=crop',
-  category: 'PREMIUM',
-  description: 'Đặc quyền truy cập không giới hạn toàn bộ kho học liệu, cập nhật trọn đời và hỗ trợ ưu tiên 1-1.'
+  image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
+  category: 'Gói VIP',
+  description: 'Đặc quyền Khóa VIP: Truy cập không giới hạn toàn bộ kho học liệu, cập nhật trọn đời và hỗ trợ ưu tiên 1-1.'
 };
 
 const VipUpgrade: React.FC = () => {
@@ -83,13 +83,15 @@ const VipUpgrade: React.FC = () => {
       }, { merge: true });
 
       // 2. Record Transaction
-      await setDoc(doc(db, "users", userEmail, "purchased_courses", "vip-lifetime-access"), {
-        courseId: "vip-lifetime-access",
-        courseTitle: "VIP MEMBERSHIP LIFETIME",
+      await setDoc(doc(db, "users", userEmail, "purchased_courses", "khoa-vip"), {
+        courseId: "khoa-vip",
+        courseTitle: "Khóa VIP (Trọn Đời)",
         purchasedAt: new Date().toISOString(),
         price: VIP_PACKAGE.price,
         status: 'active'
       });
+      localStorage.setItem('course_unlocked_khoa-vip', 'true');
+      localStorage.setItem('course_unlocked_vip-lifetime-access', 'true');
 
       // Save to local roles backup
       const localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);

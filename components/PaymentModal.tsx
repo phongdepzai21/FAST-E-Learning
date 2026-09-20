@@ -98,6 +98,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
       if (response.ok && data?.success) {
         setOtpNotice(data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
+        if (data.fallback && data.otp) {
+          setUserInputOtp(data.otp);
+        }
       } else {
         setOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }

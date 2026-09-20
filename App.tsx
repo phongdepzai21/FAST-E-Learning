@@ -1,7 +1,7 @@
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
-// Fix: Clean named exports for HashRouter, Routes, Route, and useLocation
-import { HashRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+// Migration: Switch from HashRouter to BrowserRouter for clean production URLs (e.g. /home) without #
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './firebase';
 import Header from './components/Header';
@@ -46,11 +46,20 @@ const PageLoader = () => (
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAccountPath = location.pathname.startsWith('/account');
   const isClassroomPath = location.pathname.startsWith('/hoc');
   const [isDelayedLoaded, setIsDelayedLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+
+  // Auto clean legacy #/ hash URLs to clean pathname (e.g. /home)
+  useEffect(() => {
+    if (window.location.hash && window.location.hash.startsWith('#/')) {
+      const targetPath = window.location.hash.slice(1); // e.g. "/home"
+      navigate(targetPath, { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     initCourseSyncService();
@@ -88,6 +97,7 @@ const AppLayout: React.FC = () => {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/khoa-hoc" element={<Courses />} />
             <Route path="/khoa-hoc/:id" element={<CourseDetail />} />
             <Route path="/hoc/:courseId" element={<Classroom />} />

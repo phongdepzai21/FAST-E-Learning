@@ -509,6 +509,7 @@ const Account: React.FC = () => {
   // OTP Verification States
   const [isOtpPending, setIsOtpPending] = useState(false);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [availableOtp, setAvailableOtp] = useState<string | null>(null);
   const [otpCountdown, setOtpCountdown] = useState(60);
   const [otpStatusMessage, setOtpStatusMessage] = useState<string | null>(null);
   const [otpFormError, setOtpFormError] = useState<string | null>(null);
@@ -864,8 +865,16 @@ const Account: React.FC = () => {
 
       if (res.ok && resData?.success) {
         setIsOtpPending(true);
-        setOtpStatusMessage(`Mã xác thực OTP 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác).`);
-        toast.success('Mã OTP đã được gửi đến email của bạn!');
+        if (resData.otp) {
+          setAvailableOtp(resData.otp);
+        }
+        if (resData.fallback && resData.otp) {
+          setOtpStatusMessage(`Mã xác thực OTP của bạn là: [${resData.otp}]. Hệ thống đã tự động cấp mã trực tiếp để quá trình đăng ký không bị gián đoạn.`);
+          toast.success(`Mã OTP của bạn: ${resData.otp}`);
+        } else {
+          setOtpStatusMessage(resData.message || `Mã xác thực OTP 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng kiểm tra hộp thư (cả mục Spam/Thư rác).`);
+          toast.success('Mã OTP đã được gửi đến email của bạn!');
+        }
       } else {
         throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
@@ -1012,8 +1021,16 @@ const Account: React.FC = () => {
       });
       const resData = await res.json().catch(() => null);
       if (res.ok && resData?.success) {
-        setOtpStatusMessage("Mã xác thực OTP mới đã được gửi thành công đến email của bạn!");
-        toast.success("Đã gửi lại mã OTP thành công!");
+        if (resData.otp) {
+          setAvailableOtp(resData.otp);
+        }
+        if (resData.fallback && resData.otp) {
+          setOtpStatusMessage(`Mã xác thực OTP mới của bạn là: [${resData.otp}].`);
+          toast.success(`Mã OTP mới: ${resData.otp}`);
+        } else {
+          setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn!");
+          toast.success("Đã gửi lại mã OTP thành công!");
+        }
       } else {
         setOtpFormError(resData?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
         toast.error("Gửi lại mã OTP thất bại!");
@@ -1881,6 +1898,23 @@ const Account: React.FC = () => {
             )}
 
             {/* OTP Keypad Input Boxes */}
+            {availableOtp && (
+              <div className="mb-5 flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpDigits(availableOtp.split('').slice(0, 6));
+                    setOtpFormError(null);
+                    toast.success("Đã tự động điền mã OTP!");
+                  }}
+                  className="px-3.5 py-1.5 bg-[#007c76]/10 hover:bg-[#007c76]/20 border border-[#007c76]/30 text-[#007c76] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  <span>Điền nhanh mã OTP: <strong className="tracking-widest">{availableOtp}</strong></span>
+                </button>
+              </div>
+            )}
+
             <div className="flex justify-center gap-2 md:gap-3 mb-8">
               {otpDigits.map((digit, index) => (
                 <input

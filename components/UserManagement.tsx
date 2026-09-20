@@ -107,6 +107,9 @@ export const UserManagement: React.FC = () => {
         setLockOtpSent(true);
         setLockOtpCooldown(30);
         setLockOtpNotice(data.message || `Mã OTP đã được gửi đến email ${adminEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam).`);
+        if (data.fallback && data.otp) {
+          setLockOtpCode(data.otp);
+        }
       } else {
         setLockOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }

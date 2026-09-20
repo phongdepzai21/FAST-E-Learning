@@ -3,8 +3,8 @@ import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import emailjs from '@emailjs/browser';
 
-// --- CẤU HÌNH EMAILJS (Sử dụng chung key với PaymentModal) ---
-const EMAILJS_SERVICE_ID = "service_q86r4ap"; 
+// --- CẤU HÌNH EMAILJS (Sử dụng service hoạt động chuẩn xác) ---
+const EMAILJS_SERVICE_ID = "default_service"; 
 const EMAILJS_TEMPLATE_ID = "template_1nq488j"; 
 const EMAILJS_PUBLIC_KEY = "P5IG0fzzQJSm5e4P-"; 
 const TARGET_EMAIL = "hkc.qms@gmail.com";
