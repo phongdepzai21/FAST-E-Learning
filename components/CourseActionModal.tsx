@@ -61,6 +61,21 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const [otpCode, setOtpCode] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpError, setOtpError] = useState('');
+
+  // Reset OTP states when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setOtpCode('');
+      setOtpInput('');
+      setOtpSent(false);
+      setOtpError('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isDelete = type === 'delete';
@@ -179,6 +194,74 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
             </p>
           )}
 
+          {/* OTP Section for Delete Action */}
+          {isDelete && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/30 space-y-3">
+              <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300 font-extrabold text-xs uppercase tracking-wider">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                </span>
+                Xác thực OTP Bảo Mật để Xóa Khóa Học
+              </div>
+              
+              {!otpSent ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-semibold leading-relaxed">
+                    Xóa khóa học là hành động không thể khôi phục. Vui lòng bấm nút nhận mã OTP để xác nhận danh tính Quản trị viên/Giáo viên của bạn.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = Math.floor(100000 + Math.random() * 900000).toString();
+                      setOtpCode(code);
+                      setOtpSent(true);
+                      setOtpError('');
+                    }}
+                    className="w-full py-2.5 bg-rose-100 hover:bg-rose-200 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Gửi Mã OTP Xác Thực</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-amber-500/10 border border-amber-300/30 p-3 rounded-xl space-y-1">
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300 font-bold leading-normal">
+                      🔒 Mã OTP xác thực xóa khóa học đã được gửi!
+                    </p>
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold leading-normal">
+                      Vì lý do demo, vui lòng nhập mã OTP sau: <strong className="text-sm bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900 select-all font-mono font-black text-rose-600 dark:text-rose-400">{otpCode}</strong>
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Nhập mã OTP 6 số
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setOtpInput(val);
+                        if (otpError) setOtpError('');
+                      }}
+                      placeholder="Nhập 6 chữ số..."
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-center font-mono font-black text-base tracking-[0.5em] focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  {otpError && (
+                    <p className="text-[11px] text-red-600 font-bold">
+                      ⚠️ {otpError}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
@@ -192,8 +275,20 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
             <button
               type="button"
-              onClick={onConfirm}
-              disabled={isProcessing}
+              onClick={() => {
+                if (isDelete) {
+                  if (!otpSent) {
+                    setOtpError('Vui lòng click nút "Gửi Mã OTP" trước!');
+                    return;
+                  }
+                  if (otpInput !== otpCode) {
+                    setOtpError('Mã OTP nhập không chính xác. Vui lòng nhập lại.');
+                    return;
+                  }
+                }
+                onConfirm();
+              }}
+              disabled={isProcessing || (isDelete && (!otpSent || otpInput !== otpCode))}
               className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer ${theme.btnConfirm} disabled:opacity-50`}
             >
               {isProcessing ? (

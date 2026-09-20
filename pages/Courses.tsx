@@ -15,6 +15,36 @@ import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificatio
 
 const Categories = ['Tất cả', 'Mới cập nhật', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
+const DEFAULT_COMBOS = [
+  {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'khoa-vip',
+    title: 'Gói Combo VIP (Toàn Bộ Khóa Học)',
+    price: '2.500.000đ',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo VIP trọn đời: Combo trọn gói toàn bộ hệ thống các khóa học ISO, HACCP, QA/QC, Lean, bộ tài liệu biểu mẫu SOP chuẩn hóa và cập nhật tất cả khóa học mới trong tương lai.',
+    courseIds: [],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành', 'Đặc quyền Hỗ trợ 1-1 từ chuyên gia']
+  }
+];
+
 const Courses: React.FC = () => {
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +57,33 @@ const Courses: React.FC = () => {
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [combos, setCombos] = useState<any[]>(DEFAULT_COMBOS);
+
+  // --- FETCH ALL COMBOS FROM FIRESTORE ---
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
+      const dbCombos: any[] = [];
+      snapshot.forEach(docSnap => {
+        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      // Merge with defaults
+      const merged = DEFAULT_COMBOS.map(def => {
+        const found = dbCombos.find(dbc => dbc.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+
+      // Include new custom combos that are not in defaults
+      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+      const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
+
+      setCombos([...merged, ...customCombos]);
+    }, (err) => {
+      console.warn("Lỗi đồng bộ danh sách combo:", err);
+      setCombos(DEFAULT_COMBOS);
+    });
+    return () => unsub();
+  }, []);
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
@@ -474,6 +531,81 @@ const Courses: React.FC = () => {
                 </button>
             </div>
         )}
+
+        {/* COMBO PACKAGES SECTION */}
+        <div className="mt-20 space-y-8">
+            <div className="border-l-4 border-[#007c76] pl-4">
+                <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight">
+                    🎁 Gói Combo Tiết Kiệm (Đăng ký học nhiều hơn, ưu đãi nhiều hơn)
+                </h2>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mt-1">
+                    Lộ trình đào tạo trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {combos.map((combo) => {
+                    const isVip = combo.id === 'khoa-vip' || combo.id.includes('vip');
+                    const isPro = combo.id === 'combo-pro' || combo.id.includes('pro');
+                    return (
+                        <div key={combo.id} className={`bg-white rounded-[32px] border-2 transition-all duration-300 overflow-hidden flex flex-col hover:shadow-xl hover:scale-[1.01] ${
+                            isVip 
+                                ? 'border-amber-500 shadow-md shadow-amber-500/5' 
+                                : isPro 
+                                    ? 'border-blue-500/50 shadow-md shadow-blue-500/5' 
+                                    : 'border-gray-100 hover:border-[#007c76]/30'
+                        }`}>
+                            <div className="relative h-44 overflow-hidden shrink-0">
+                                <img 
+                                    src={combo.image} 
+                                    alt={combo.title} 
+                                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800';
+                                    }}
+                                />
+                                {isVip && (
+                                    <div className="absolute top-4 left-4 bg-amber-500 text-amber-950 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-1">
+                                        ⭐ Đặc Quyền VIP
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-6 flex-1 flex flex-col space-y-4">
+                                <div className="space-y-1.5">
+                                    <h3 className="text-base sm:text-lg font-black text-gray-800 leading-snug line-clamp-1">
+                                        {combo.title}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2">
+                                        {combo.description}
+                                    </p>
+                                </div>
+
+                                <div className="pt-2 border-t border-gray-150 flex justify-between items-center mt-auto">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Học phí trọn gói</span>
+                                        <span className="text-lg font-extrabold text-[#007c76]">{combo.price}</span>
+                                    </div>
+
+                                    <Link 
+                                        to="/account/vip-upgrade"
+                                        className={`px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all ${
+                                            isVip 
+                                                ? 'bg-amber-500 text-amber-950 hover:bg-amber-600' 
+                                                : isPro 
+                                                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                                    : 'bg-[#007c76] text-white hover:bg-[#005f5b]'
+                                        }`}
+                                    >
+                                        Đăng ký ngay
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
 
         {/* VIP PROMOTION BANNER (Only shown if NOT VIP/Admin) */}
         {!isVipOrAdmin && (
