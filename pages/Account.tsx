@@ -887,17 +887,7 @@ const Account: React.FC = () => {
         body: JSON.stringify({ email: normalizedEmail, name: trimmedName, flow: 'register' })
       });
 
-      const responseText = await res.text().catch(() => '');
-      console.log("[OTP Send] Response Status:", res.status, "Response Text:", responseText);
-
-      let resData: any = null;
-      try {
-        if (responseText) {
-          resData = JSON.parse(responseText);
-        }
-      } catch (parseErr) {
-        console.error("[OTP Send] Failed to parse JSON response:", parseErr);
-      }
+      const resData = await res.json().catch(() => null);
 
       if (res.ok && resData?.success) {
         setIsOtpPending(true);
@@ -910,8 +900,7 @@ const Account: React.FC = () => {
           toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
         }
       } else {
-        const errorMsg = resData?.error || (res.status === 404 ? "Không tìm thấy dịch vụ xác thực OTP (Lỗi 404)." : `Không thể gửi mã OTP lúc này (Lỗi ${res.status}). Vui lòng kiểm tra lại địa chỉ email hoặc kết nối mạng.`);
-        throw new Error(errorMsg);
+        throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
       console.error("OTP Flow error:", err);
@@ -1054,24 +1043,12 @@ const Account: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail, name: fullName.trim(), flow: 'register' })
       });
-      const responseText = await res.text().catch(() => '');
-      console.log("[OTP Resend] Response Status:", res.status, "Response Text:", responseText);
-
-      let resData: any = null;
-      try {
-        if (responseText) {
-          resData = JSON.parse(responseText);
-        }
-      } catch (parseErr) {
-        console.error("[OTP Resend] Failed to parse JSON response:", parseErr);
-      }
-
+      const resData = await res.json().catch(() => null);
       if (res.ok && resData?.success) {
         setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
         toast.success("Đã gửi lại mã OTP vào email thành công!");
       } else {
-        const errorMsg = resData?.error || (res.status === 404 ? "Không tìm thấy dịch vụ gửi lại OTP (Lỗi 404)." : `Không thể gửi lại mã OTP lúc này (Lỗi ${res.status}). Vui lòng thử lại sau.`);
-        setOtpFormError(errorMsg);
+        setOtpFormError(resData?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
         toast.error("Gửi lại mã OTP thất bại!");
       }
     } catch (err: any) {
