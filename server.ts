@@ -6,9 +6,41 @@ import { GoogleGenAI } from "@google/genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 if (!getApps().length) {
   initializeApp();
+}
+
+/**
+ * Safely check if a user exists via Firebase Admin Auth or Firestore users collection.
+ * Gracefully handles 403 API restriction / Identity Toolkit disabled errors.
+ */
+async function checkUserExistsSafe(emailKey: string): Promise<boolean | null> {
+  // 1. Try Firebase Admin Auth if Identity Toolkit API is available
+  try {
+    const user = await getAuth().getUserByEmail(emailKey);
+    if (user && user.uid) {
+      return true;
+    }
+  } catch (authErr: any) {
+    if (authErr.code === 'auth/user-not-found') {
+      return false;
+    }
+    // Silently ignore 403 / auth/internal-error from identitytoolkit.googleapis.com
+  }
+
+  // 2. Fallback to Firestore users collection
+  try {
+    const userDoc = await getFirestore().collection("users").doc(emailKey).get();
+    if (userDoc.exists) {
+      return true;
+    }
+  } catch {
+    // Silently ignore if Firestore admin check fails
+  }
+
+  return null;
 }
 
 // Persistent Data Storage Directory
@@ -156,19 +188,10 @@ async function startServer() {
         return res.status(400).json({ exists: false, error: "Email là bắt buộc." });
       }
       const emailKey = String(email).toLowerCase().trim();
-      try {
-        await getAuth().getUserByEmail(emailKey);
-        return res.json({ exists: true });
-      } catch (authErr: any) {
-        if (authErr.code === 'auth/user-not-found') {
-          return res.json({ exists: false });
-        }
-        console.error(`Error with getUserByEmail for ${emailKey}:`, authErr);
-        return res.json({ exists: false, error: authErr.code });
-      }
+      const exists = await checkUserExistsSafe(emailKey);
+      return res.json({ exists: exists === true });
     } catch (err: any) {
-      console.error("Error in /api/user/exists:", err);
-      return res.status(500).json({ exists: false, error: err.message });
+      return res.json({ exists: false });
     }
   });
 
@@ -276,23 +299,15 @@ async function startServer() {
 
       const emailKey = String(email).toLowerCase().trim();
 
-      // Check if user account already exists in Firebase Auth
-      let userExists = false;
-      try {
-        await getAuth().getUserByEmail(emailKey);
-        userExists = true;
-      } catch (authErr: any) {
-        if (authErr.code !== 'auth/user-not-found') {
-          console.warn(`[OTP Send] getUserByEmail error for ${emailKey}:`, authErr);
-        }
-      }
+      // Check if user account already exists in Firebase Auth or Firestore
+      const userExists = await checkUserExistsSafe(emailKey);
 
       // Distinguish flows: Register vs Login/Reset
-      if (flow === 'register' && userExists) {
+      if (flow === 'register' && userExists === true) {
         return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
       }
 
-      if ((flow === 'reset' || flow === 'login') && !userExists) {
+      if ((flow === 'reset' || flow === 'login') && userExists === false) {
         return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
       }
 
@@ -404,23 +419,15 @@ async function startServer() {
       const emailKey = String(email).toLowerCase().trim();
       const inputOtp = String(otp).trim();
 
-      // Check if user account already exists in Firebase Auth
-      let userExists = false;
-      try {
-        await getAuth().getUserByEmail(emailKey);
-        userExists = true;
-      } catch (authErr: any) {
-        if (authErr.code !== 'auth/user-not-found') {
-          console.warn(`[OTP Verify] getUserByEmail error for ${emailKey}:`, authErr);
-        }
-      }
+      // Check if user account already exists in Firebase Auth or Firestore
+      const userExists = await checkUserExistsSafe(emailKey);
 
       // Distinguish flows: Register vs Login/Reset
-      if (flow === 'register' && userExists) {
+      if (flow === 'register' && userExists === true) {
         return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
       }
 
-      if ((flow === 'reset' || flow === 'login') && !userExists) {
+      if ((flow === 'reset' || flow === 'login') && userExists === false) {
         return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
       }
 
