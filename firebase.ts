@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-ifqmttPrxRY36zKc_dbEYq3NOXqElPo",
@@ -22,11 +22,7 @@ const app = isAlreadyInitialized ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 // Lấy instance storage
 const storage = getStorage(app);
-// Lấy instance firestore (database) có hỗ trợ offline persistence
-const db = isAlreadyInitialized 
-  ? getFirestore(app) 
-  : initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
+// Lấy instance firestore (database)
+const db = getFirestore(app);
 
 export { auth, storage, db };
