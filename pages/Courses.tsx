@@ -33,15 +33,6 @@ const DEFAULT_COMBOS = [
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
     benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'khoa-vip',
-    title: 'Gói Combo VIP (Toàn Bộ Khóa Học)',
-    price: '2.500.000đ',
-    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP trọn đời: Combo trọn gói toàn bộ hệ thống các khóa học ISO, HACCP, QA/QC, Lean, bộ tài liệu biểu mẫu SOP chuẩn hóa và cập nhật tất cả khóa học mới trong tương lai.',
-    courseIds: [],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành', 'Đặc quyền Hỗ trợ 1-1 từ chuyên gia']
   }
 ];
 

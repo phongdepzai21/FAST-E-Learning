@@ -72,7 +72,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       if (response.ok && data?.success) {
         setOtpSent(true);
         setCooldownTimer(30);
-        setInfoMessage(data.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
+        if (data.fallback && data.otp) {
+          setOtpCode(data.otp);
+          setInfoMessage(data.message || `Mã OTP đã được khởi tạo tự động (Chế độ dự phòng). Mã xác nhận của bạn là: ${data.otp}`);
+        } else {
+          setInfoMessage(data.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
+        }
       } else {
         setError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }

@@ -62,6 +62,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     } else {
       setIsVipOrAdmin(false);
     }
+
+    // Reset OTP states when modal toggles open/closed to ensure clean state
+    setShowOtpForm(false);
+    setUserInputOtp('');
+    setOtpError('');
+    setOtpNotice('');
+    setOtpCountdown(0);
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -103,9 +110,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       });
 
       const data = await response.json().catch(() => null);
-      setShowOtpForm(true);
 
       if (response.ok && data?.success) {
+        setShowOtpForm(true);
         setOtpNotice(data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
         setOtpCountdown(60);
         if (data.fallback && data.otp) {
@@ -116,7 +123,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       }
     } catch (err) {
       console.warn("Failed to send OTP", err);
-      setShowOtpForm(true);
       setOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
