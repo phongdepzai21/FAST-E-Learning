@@ -13,6 +13,7 @@ import { initCourseSyncService } from './utils/courseSyncService';
 import { LessonUpdateNotifier } from './components/LessonUpdateNotifier';
 import { CourseUpdateNotifier } from './components/CourseUpdateNotifier';
 import { NetworkStatusNotifier } from './components/NetworkStatusNotifier';
+import { authDebugger } from './utils/authDebugger';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -86,6 +87,11 @@ const AppLayout: React.FC = () => {
       unsubscribe();
     };
   }, []);
+
+  // DIAGNOSTIC HOOK: Logs Firebase Auth user states using the debugging utility
+  useEffect(() => {
+    authDebugger.debugAuthAndOtpSync(user, authResolved, false);
+  }, [user, authResolved]);
 
   // OPTIMIZATION: Defer loading of heavy non-critical components (Chatbot)
   // until after the main content has likely finished loading (3 seconds delay).
