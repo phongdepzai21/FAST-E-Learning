@@ -46,6 +46,63 @@ async function checkUserExistsSafe(emailKey: string): Promise<boolean | null> {
 // Persistent Data Storage Directory
 const DATA_DIR = path.join(process.cwd(), "data");
 const COURSES_FILE = path.join(DATA_DIR, "courses.json");
+const COMBOS_FILE = path.join(DATA_DIR, "combos.json");
+
+const DEFAULT_SERVER_COMBOS: Record<string, any> = {
+  'combo-basic': {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
+    status: 'active',
+    updatedAt: new Date().toISOString()
+  },
+  'combo-pro': {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
+    status: 'active',
+    updatedAt: new Date().toISOString()
+  }
+};
+
+function loadCombosFromDisk(): Record<string, any> {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(COMBOS_FILE)) {
+      const content = fs.readFileSync(COMBOS_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      return { ...DEFAULT_SERVER_COMBOS, ...(parsed.combos || {}) };
+    }
+  } catch (err) {
+    console.warn("Failed to read combos from disk:", err);
+  }
+  return { ...DEFAULT_SERVER_COMBOS };
+}
+
+function saveCombosToDisk(combos: Record<string, any>) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(
+      COMBOS_FILE,
+      JSON.stringify({ combos, updatedAt: new Date().toISOString() }, null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("Failed to save combos to disk:", err);
+  }
+}
 
 function loadCoursesFromDisk(): Record<string, any> {
   try {
@@ -78,12 +135,24 @@ function saveCoursesToDisk(courses: Record<string, any>) {
   }
 }
 
-// In-memory courses state synchronized across all users & tabs
+// In-memory courses & combos state synchronized across all users & tabs
 const serverCourses: Record<string, any> = loadCoursesFromDisk();
+const serverCombos: Record<string, any> = loadCombosFromDisk();
 // Set of active SSE subscribers
 const sseClients = new Set<express.Response>();
 
 function broadcastCoursesUpdate(event: string, payload: any) {
+  const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+function broadcastCombosUpdate(event: string, payload: any) {
   const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const client of sseClients) {
     try {
@@ -101,9 +170,13 @@ async function startServer() {
   app.use(express.json({ limit: "10mb" }));
 
   // API routes
-  // 1. Get current synchronized courses
+  // 1. Get current synchronized courses & combos
   app.get("/api/courses", (req, res) => {
     res.json({ courses: Object.values(serverCourses) });
+  });
+
+  app.get("/api/combos", (req, res) => {
+    res.json({ combos: Object.values(serverCombos) });
   });
 
   // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
@@ -117,6 +190,7 @@ async function startServer() {
     res.write(
       `event: init\ndata: ${JSON.stringify({
         courses: Object.values(serverCourses),
+        combos: Object.values(serverCombos),
         timestamp: Date.now()
       })}\n\n`
     );
@@ -248,6 +322,63 @@ async function startServer() {
       res.json({ success: true, courses: allList });
     } catch (err: any) {
       console.error("Course sync error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. Post Combo Sync (add, edit, status toggle, delete)
+  app.post("/api/combos/sync", (req, res) => {
+    try {
+      const { action, combo, comboId, status, combos } = req.body;
+      const now = new Date().toISOString();
+
+      if (action === "upsert" && combo && combo.id) {
+        serverCombos[combo.id] = {
+          ...serverCombos[combo.id],
+          ...combo,
+          updatedAt: combo.updatedAt || now
+        };
+      } else if (action === "status" && comboId && status) {
+        if (serverCombos[comboId]) {
+          serverCombos[comboId] = {
+            ...serverCombos[comboId],
+            status,
+            updatedAt: now
+          };
+        } else {
+          serverCombos[comboId] = {
+            id: comboId,
+            status,
+            updatedAt: now
+          };
+        }
+      } else if (action === "delete" && comboId) {
+        delete serverCombos[comboId];
+      } else if (action === "sync_all" && Array.isArray(combos)) {
+        combos.forEach((c: any) => {
+          if (c && c.id) {
+            serverCombos[c.id] = { ...serverCombos[c.id], ...c, updatedAt: c.updatedAt || now };
+          }
+        });
+      }
+
+      saveCombosToDisk(serverCombos);
+
+      const allList = Object.values(serverCombos);
+
+      // Broadcast immediately to ALL other tabs, accounts, and devices
+      broadcastCombosUpdate("combos_updated", {
+        action,
+        combo: combo || (comboId ? serverCombos[comboId] : null),
+        comboId,
+        status,
+        combos: allList,
+        timestamp: Date.now()
+      });
+
+      res.json({ success: true, combos: allList });
+    } catch (err: any) {
+      console.error("Combo sync error:", err);
       res.status(500).json({ error: err.message });
     }
   });

@@ -39,36 +39,15 @@ const cleanForFirestore = (obj: any): any => {
   return obj;
 };
 
-const DEFAULT_COMBOS = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
-  }
-];
-
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const navigate = useNavigate();
   const toast = useToast();
-  // Navigation internal tab
+
+  // Mode: list courses vs add new course vs edit course
   const [activeTab, setActiveTab] = useState<'list' | 'add' | 'edit'>('list');
 
   // Course management states
   const [courses, setCourses] = useState<Course[]>([]);
-  const [combos, setCombos] = useState<any[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -227,54 +206,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       window.removeEventListener('storage', handleCustomUpdate);
     };
   }, [userEmail]);
-
-  // Sync combos from Firestore in real-time
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
-      const dbCombos: any[] = [];
-      snapshot.forEach(docSnap => {
-        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
-      });
-
-      // Merge with defaults
-      const merged = DEFAULT_COMBOS.map(def => {
-        const found = dbCombos.find(dbc => dbc.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      // Include new custom combos that are not in defaults
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
-
-      setCombos([...merged, ...customCombos]);
-    }, (err) => {
-      console.warn("Lỗi đồng bộ danh sách combo ở TeacherDashboard:", err);
-      setCombos(DEFAULT_COMBOS);
-    });
-    return () => unsub();
-  }, []);
-
-  const handleDeleteCombo = async (comboId: string, comboTitle: string) => {
-    const isSystemCombo = ['combo-basic', 'combo-pro', 'khoa-vip'].includes(comboId);
-    let confirmMsg = `Bạn có chắc chắn muốn xóa gói combo "${comboTitle}" khỏi hệ thống?`;
-    if (isSystemCombo) {
-      confirmMsg = `CẢNH BÁO: Đây là gói Combo mặc định hệ thống! Xóa combo này có thể ảnh hưởng đến giao diện mua hàng của học viên. Bạn có chắc chắn vẫn muốn xóa?`;
-    }
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
-    try {
-      await deleteDoc(doc(db, 'combos', comboId));
-      
-      // Real-time broadcast combo deletion to ALL tabs & ALL accounts
-      broadcastComboUpdate('delete', { comboId });
-
-      toast.success(`Đã xóa thành công gói combo "${comboTitle}" khỏi hệ thống!`, 4000, 'Đã xóa');
-    } catch (err: any) {
-      console.error("Lỗi khi xóa combo:", err);
-      toast.error(`Không thể xóa combo: ${err.message}`);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -1240,88 +1171,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                         </table>
                       </div>
                     )}
-
-                    {/* QUẢN LÝ GÓI COMBO TRONG QUẢN LÝ BÀI GIẢNG */}
-                    <div className="mt-12 pt-8 border-t border-gray-150 space-y-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                          <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2.5">
-                            <span className="w-1.5 h-6 bg-[#007c76] rounded-full"></span>
-                            Danh Sách Gói Combo Học Tập ({combos.length})
-                          </h3>
-                          <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mt-1">
-                            Quản lý các gói combo hiện có trên hệ thống
-                          </p>
-                        </div>
-                      </div>
-
-                      {combos.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50/50 rounded-2xl border border-gray-100 p-8">
-                          <p className="text-gray-400 font-bold text-sm uppercase tracking-wider">Chưa cấu hình bất kỳ gói Combo nào.</p>
-                          <p className="text-gray-400 text-xs mt-1 font-semibold">Các gói mặc định sẽ tự động được sử dụng trừ khi bạn cấu hình mới trong mục Quản Lý Combo.</p>
-                        </div>
-                      ) : (
-                        <div className="overflow-x-auto rounded-[24px] border border-gray-100 bg-white shadow-sm custom-scrollbar pb-1">
-                          <table className="w-full text-left border-collapse min-w-[950px] whitespace-nowrap">
-                            <thead>
-                              <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest whitespace-nowrap">
-                                <th className="py-4 px-6 whitespace-nowrap">Ảnh bìa</th>
-                                <th className="py-4 px-6 min-w-[260px] whitespace-nowrap">Tiêu đề Gói Combo</th>
-                                <th className="py-4 px-6 whitespace-nowrap">Học phí</th>
-                                <th className="py-4 px-6 whitespace-nowrap">Khóa liên kết</th>
-                                <th className="py-4 px-6 text-right whitespace-nowrap">Thao tác</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                              {combos.map((combo) => {
-                                const isSystemCombo = ['combo-basic', 'combo-pro', 'khoa-vip'].includes(combo.id);
-                                return (
-                                  <tr key={combo.id} className="hover:bg-[#007c76]/[0.035] transition-all duration-200 text-xs sm:text-sm text-gray-700 whitespace-nowrap group/row">
-                                    <td className="py-4 px-6">
-                                      <img 
-                                        src={combo.image} 
-                                        alt={combo.title} 
-                                        className="w-16 h-10 object-cover rounded-lg border border-gray-150 shadow-sm shrink-0 transition-transform duration-300 ease-out group-hover/row:scale-105"
-                                        onError={(e) => {
-                                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800';
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="py-4 px-6 min-w-[260px]">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block group-hover/row:text-[#007c76] transition-colors duration-200">
-                                          {combo.title}
-                                        </span>
-                                      </div>
-                                      <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
-                                        ID: {combo.id} {isSystemCombo && <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Mặc định</span>}
-                                      </span>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      <span className="font-extrabold text-[#007c76]">{combo.price}</span>
-                                    </td>
-                                    <td className="py-4 px-6">
-                                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                                        {combo.id === 'khoa-vip' ? 'Tất cả các khóa' : `${combo.courseIds?.length || 0} khóa học`}
-                                      </span>
-                                    </td>
-                                    <td className="py-4 px-6 text-right">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteCombo(combo.id, combo.title)}
-                                        className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-transparent hover:border-red-200 text-red-600 rounded-xl uppercase tracking-wider cursor-pointer transition-colors whitespace-nowrap text-xs font-bold"
-                                      >
-                                        Xóa Combo
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
                   </>
                 );
               })()}

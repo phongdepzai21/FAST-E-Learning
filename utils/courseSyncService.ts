@@ -54,6 +54,18 @@ function updateStoredCourses(courses: Course[]) {
 }
 
 /**
+ * Apply updated combos into localStorage safely
+ */
+function updateStoredCombos(combos: any[]) {
+  if (!Array.isArray(combos)) return;
+  try {
+    localStorage.setItem('combo_cache_all', JSON.stringify(combos));
+  } catch (err) {
+    console.warn('Error saving combos to local storage:', err);
+  }
+}
+
+/**
  * Initialize cross-tab, cross-account, and cross-device real-time sync
  */
 export function initCourseSyncService() {
@@ -70,12 +82,15 @@ export function initCourseSyncService() {
         }
         window.dispatchEvent(new CustomEvent('courses_updated', { detail: data }));
       } else if (data && data.type === 'combos_updated') {
+        if (data.combos && Array.isArray(data.combos)) {
+          updateStoredCombos(data.combos);
+        }
         window.dispatchEvent(new CustomEvent('combos_updated', { detail: data }));
       }
     };
   }
 
-  // 2. Fetch initial courses snapshot from backend API
+  // 2. Fetch initial courses & combos snapshot from backend API
   fetch('/api/courses')
     .then((res) => res.json())
     .then((data) => {
@@ -86,6 +101,18 @@ export function initCourseSyncService() {
     })
     .catch((err) => {
       console.warn('Could not fetch initial /api/courses snapshot:', err);
+    });
+
+  fetch('/api/combos')
+    .then((res) => res.json())
+    .then((data) => {
+      if (data && Array.isArray(data.combos) && data.combos.length > 0) {
+        updateStoredCombos(data.combos);
+        window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'init', combos: data.combos } }));
+      }
+    })
+    .catch((err) => {
+      console.warn('Could not fetch initial /api/combos snapshot:', err);
     });
 
   // 3. Connect to Server-Sent Events stream for real-time push from server
@@ -105,6 +132,10 @@ export function initCourseSyncService() {
             updateStoredCourses(payload.courses);
             window.dispatchEvent(new CustomEvent('courses_updated', { detail: payload }));
           }
+          if (payload && Array.isArray(payload.combos) && payload.combos.length > 0) {
+            updateStoredCombos(payload.combos);
+            window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));
+          }
         } catch (err) {
           console.warn('Failed to parse init SSE event:', err);
         }
@@ -116,7 +147,6 @@ export function initCourseSyncService() {
           if (payload && Array.isArray(payload.courses)) {
             updateStoredCourses(payload.courses);
           } else if (payload && payload.action === 'status' && payload.courseId) {
-            // Apply single status update
             const localStr = localStorage.getItem('local_custom_courses');
             if (localStr) {
               const list: Course[] = JSON.parse(localStr);
@@ -136,6 +166,27 @@ export function initCourseSyncService() {
           }
         } catch (err) {
           console.warn('Failed to parse courses_updated SSE event:', err);
+        }
+      });
+
+      eventSource.addEventListener('combos_updated', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload && Array.isArray(payload.combos)) {
+            updateStoredCombos(payload.combos);
+          }
+          // Notify current tab's components
+          window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));
+
+          // Also notify any sibling tabs via BroadcastChannel
+          if (broadcastChannel) {
+            broadcastChannel.postMessage({
+              type: 'combos_updated',
+              ...payload,
+            });
+          }
+        } catch (err) {
+          console.warn('Failed to parse combos_updated SSE event:', err);
         }
       });
 
@@ -163,6 +214,9 @@ export function initCourseSyncService() {
   window.addEventListener('storage', (e) => {
     if (e.key === 'local_custom_courses' || e.key === 'server_custom_courses') {
       window.dispatchEvent(new CustomEvent('courses_updated'));
+    }
+    if (e.key === 'combo_cache_all') {
+      window.dispatchEvent(new CustomEvent('combos_updated'));
     }
   });
 }
@@ -264,19 +318,64 @@ export async function broadcastCourseUpdate(
 }
 
 /**
- * Broadcast an edit/delete action for Combos across all tabs
+ * Broadcast an edit/delete action for Combos across all tabs and devices
  */
-export function broadcastComboUpdate(
-  action: 'save' | 'delete',
+export async function broadcastComboUpdate(
+  action: 'save' | 'upsert' | 'status' | 'delete' | 'sync_all',
   payload: {
-    comboId: string;
+    comboId?: string;
     combo?: any;
+    status?: 'active' | 'inactive';
+    combos?: any[];
   }
 ) {
-  // 1. Dispatch locally in the current tab
+  const now = new Date().toISOString();
+
+  // 1. Immediately apply to local storage
+  try {
+    const cached = localStorage.getItem('combo_cache_all');
+    let localList: any[] = cached ? JSON.parse(cached) : [];
+    if (!Array.isArray(localList)) localList = [];
+
+    if ((action === 'save' || action === 'upsert') && (payload.combo || payload.comboId)) {
+      const cId = payload.combo?.id || payload.comboId;
+      const idx = localList.findIndex((c) => c.id === cId);
+      const updatedItem = { ...(idx >= 0 ? localList[idx] : {}), ...(payload.combo || {}), id: cId, updatedAt: now };
+      if (idx >= 0) {
+        localList[idx] = updatedItem;
+      } else {
+        localList.push(updatedItem);
+      }
+    } else if (action === 'status' && payload.comboId && payload.status) {
+      const idx = localList.findIndex((c) => c.id === payload.comboId);
+      if (idx >= 0) {
+        localList[idx] = { ...localList[idx], status: payload.status, updatedAt: now };
+      }
+    } else if (action === 'delete' && payload.comboId) {
+      localList = localList.filter((c) => c.id !== payload.comboId);
+
+      // Track deleted combo ID
+      try {
+        const delStr = localStorage.getItem('deleted_combo_ids');
+        const delList: string[] = delStr ? JSON.parse(delStr) : [];
+        if (!delList.includes(payload.comboId)) {
+          delList.push(payload.comboId);
+          localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+        }
+      } catch (e) {}
+    } else if (action === 'sync_all' && Array.isArray(payload.combos)) {
+      localList = payload.combos;
+    }
+
+    localStorage.setItem('combo_cache_all', JSON.stringify(localList));
+  } catch (err) {
+    console.warn('Local storage update error in broadcastComboUpdate:', err);
+  }
+
+  // 2. Dispatch locally in the current tab
   window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action, ...payload } }));
 
-  // 2. Broadcast to sibling tabs
+  // 3. Broadcast to sibling tabs
   if (broadcastChannel) {
     try {
       broadcastChannel.postMessage({
@@ -288,5 +387,21 @@ export function broadcastComboUpdate(
     } catch (e) {
       console.warn('BroadcastChannel postMessage error for combo sync:', e);
     }
+  }
+
+  // 4. Send to server backend to propagate via SSE to all other accounts/devices
+  try {
+    await fetch('/api/combos/sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action,
+        ...payload,
+      }),
+    });
+  } catch (err) {
+    console.warn('Network error pushing combo sync to server:', err);
   }
 }

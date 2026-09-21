@@ -60,28 +60,57 @@ const VipUpgrade: React.FC = () => {
     setAllCourses(list);
 
     // Sync combos
+    const syncCombosList = (fsCombos?: Combo[]) => {
+      let deletedIds: string[] = [];
+      try {
+        const delStr = localStorage.getItem('deleted_combo_ids');
+        if (delStr) deletedIds = JSON.parse(delStr);
+      } catch (e) {}
+
+      let currentDbList = fsCombos;
+      if (!currentDbList) {
+        try {
+          const cached = localStorage.getItem('combo_cache_all');
+          if (cached) currentDbList = JSON.parse(cached);
+        } catch (e) {}
+      }
+
+      // Merge defaults with Firestore edits
+      const merged = DEFAULT_COMBOS.map(def => {
+        const found = (currentDbList || []).find(dbc => dbc.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+
+      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+      const customCombos = (currentDbList || []).filter(dbc => !defaultIds.includes(dbc.id));
+
+      const all = [...merged, ...customCombos]
+        .filter(c => !deletedIds.includes(c.id))
+        .filter(c => (c as any).status !== 'inactive');
+
+      setCombos(all);
+    };
+
     const unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
       const dbCombos: Combo[] = [];
       snapshot.forEach((doc) => {
         dbCombos.push({ id: doc.id, ...doc.data() } as Combo);
       });
-
-      // Merge defaults with Firestore edits
-      const merged = DEFAULT_COMBOS.map(def => {
-        const found = dbCombos.find(dbc => dbc.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      // Include new custom combos that are not in defaults
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
-
-      setCombos([...merged, ...customCombos]);
+      syncCombosList(dbCombos);
     }, (error) => {
       console.warn("Lỗi đồng bộ danh sách combo ở VipUpgrade:", error);
+      syncCombosList();
     });
 
-    return () => unsubCombos();
+    const handleCustomComboUpdate = () => syncCombosList();
+    window.addEventListener('combos_updated', handleCustomComboUpdate);
+    window.addEventListener('storage', handleCustomComboUpdate);
+
+    return () => {
+      unsubCombos();
+      window.removeEventListener('combos_updated', handleCustomComboUpdate);
+      window.removeEventListener('storage', handleCustomComboUpdate);
+    };
   }, []);
 
   // Sync authentication and purchased status
