@@ -5,6 +5,7 @@ import { auth, db } from '../firebase';
 import { ADMIN_EMAILS } from '../constants';
 import { doc, setDoc } from 'firebase/firestore';
 import { authDebugger } from '../utils/authDebugger';
+import { otpLogger } from '../auth/otp-logger';
 import {
   parseNumericPrice,
   formatVND,
@@ -130,69 +131,36 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
     try {
       console.log("[PaymentModal:ConfirmTransfer] Dispatching POST request to /api/otp/send...");
-      authDebugger.logEmailJsFlow({
-        step: 'fetching',
-        email
-      });
-      const response = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: user?.displayName || 'Học viên' })
-      });
+      const result = await otpLogger.wrapOtpSend(
+        email,
+        user?.displayName || 'Học viên',
+        () => fetch('/api/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name: user?.displayName || 'Học viên' })
+        })
+      );
 
-      console.log("[PaymentModal:ConfirmTransfer] HTTP response status received:", response.status);
-      const data = await response.json().catch((err) => {
-        console.error("[PaymentModal:ConfirmTransfer] Failed to parse response JSON:", err);
-        authDebugger.logEmailJsFlow({
-          step: 'rejected',
-          email,
-          error: "JSON Parsing Error: " + err.message
-        });
-        return null;
-      });
-      console.log("[PaymentModal:ConfirmTransfer] Parse response JSON data:", data);
-
-      if (response.ok && data?.success) {
+      if (result.success) {
         console.log("[PaymentModal:ConfirmTransfer] SUCCESS: OTP sent successfully. Toggling showOtpForm to TRUE.");
-        authDebugger.logEmailJsFlow({
-          step: 'resolved',
-          email,
-          status: response.status,
-          success: true,
-          fallbackOtp: data.fallback ? data.otp : undefined
-        });
-
+        otpLogger.logModalToggle("PaymentModal_OTPForm", true, "ConfirmTransfer_Success_Event");
         setShowOtpForm(true);
+        const data = result.data;
         const noticeMsg = data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`;
         setOtpNotice(noticeMsg);
         setOtpCountdown(60);
         console.log("[PaymentModal:ConfirmTransfer] States updated: showOtpForm=true, otpNotice set, countdown=60.");
 
         if (data.fallback && data.otp) {
-          authDebugger.logEmailJsFlow({
-            step: 'fallback_triggered',
-            email,
-            fallbackOtp: data.otp
-          });
           console.log("[PaymentModal:ConfirmTransfer] FALLBACK mode triggered by server. Autofilling userInputOtp with:", data.otp);
           setUserInputOtp(data.otp);
         }
       } else {
-        console.warn("[PaymentModal:ConfirmTransfer] FAILED: Server returned negative status or failure boolean:", data);
-        authDebugger.logEmailJsFlow({
-          step: 'rejected',
-          email,
-          error: data?.error || `Server responded with status ${response.status}`
-        });
-        setOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
+        console.warn("[PaymentModal:ConfirmTransfer] FAILED: Server returned negative status or failure boolean:", result.error);
+        setOtpError(result.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
       console.error("[PaymentModal:ConfirmTransfer] EXCEPTION thrown during fetch execution:", err);
-      authDebugger.logEmailJsFlow({
-        step: 'rejected',
-        email,
-        error: err.message || String(err)
-      });
       setOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);

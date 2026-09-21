@@ -14,6 +14,7 @@ import { LessonUpdateNotifier } from './components/LessonUpdateNotifier';
 import { CourseUpdateNotifier } from './components/CourseUpdateNotifier';
 import { NetworkStatusNotifier } from './components/NetworkStatusNotifier';
 import { authDebugger } from './utils/authDebugger';
+import { otpLogger } from './auth/otp-logger';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -69,6 +70,7 @@ const AppLayout: React.FC = () => {
     console.log("[AuthListener] Initializing Firebase Auth listener...");
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
+        otpLogger.logAuthListenerEvent(currentUser, true, "User authenticated state changed: LOGGED_IN");
         console.log("[AuthListener] User authenticated state changed: LOGGED_IN", {
           uid: currentUser.uid,
           email: currentUser.email,
@@ -76,6 +78,7 @@ const AppLayout: React.FC = () => {
           emailVerified: currentUser.emailVerified
         });
       } else {
+        otpLogger.logAuthListenerEvent(null, true, "User authenticated state changed: LOGGED_OUT");
         console.log("[AuthListener] User authenticated state changed: LOGGED_OUT");
       }
       setUser(currentUser);
