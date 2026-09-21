@@ -127,7 +127,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     window.scrollTo(0, 0);
     setTimeout(() => setIsLoaded(true), 100);
 
+    let unsubPurchased: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (unsubPurchased) {
+            unsubPurchased();
+            unsubPurchased = null;
+        }
         if (user && user.email) {
             setCurrentUser({
                 name: user.displayName || '',
@@ -167,13 +173,15 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             // DB Real-time Check
             if (id) {
                 const docRef = doc(db, "users", normalizedEmail, "purchased_courses", id);
-                const unsubPurchased = onSnapshot(docRef, (docSnap) => {
+                unsubPurchased = onSnapshot(docRef, (docSnap) => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         setIsOwned(true);
                         setCourseProgress(data.progress || 0);
                         setCompletedLessons(data.completedLessons || []);
-                        localStorage.setItem(`course_unlocked_${id}`, 'true');
+                        try {
+                            localStorage.setItem(`course_unlocked_${id}`, 'true');
+                        } catch (e) {}
 
                         if (typeof data.lastLessonIdx === 'number' && data.lastLessonIdx >= 0) {
                             setLastSavedLessonIdx(data.lastLessonIdx);
@@ -188,7 +196,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             setIsOwned(false);
         }
     });
-    return () => unsubscribe();
+    return () => {
+        unsubscribe();
+        if (unsubPurchased) {
+            unsubPurchased();
+        }
+    };
   }, [id]);
 
   const handlePaymentSuccess = async () => {

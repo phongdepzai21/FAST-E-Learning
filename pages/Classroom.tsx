@@ -194,7 +194,13 @@ const Classroom: React.FC = () => {
 
   // Auth & Ownership Listener
   useEffect(() => {
+    let unsubUserCourse: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (unsubUserCourse) {
+        unsubUserCourse();
+        unsubUserCourse = null;
+      }
       if (user && user.email) {
         setCurrentUser({
           name: user.displayName || user.email.split('@')[0],
@@ -210,12 +216,15 @@ const Classroom: React.FC = () => {
         recordDailyLearningActivity(normalizedEmail);
 
         // Local storage unlock check
-        if (courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true') {
+        let isLocalUnlocked = false;
+        try {
+          isLocalUnlocked = courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true';
+        } catch (e) {}
+        if (isLocalUnlocked) {
           setIsOwned(true);
         }
 
         // Realtime Firestore Check
-        let unsubUserCourse: (() => void) | null = null;
         if (courseId) {
           const userDocRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
           unsubUserCourse = onSnapshot(userDocRef, (docSnap) => {
@@ -230,9 +239,13 @@ const Classroom: React.FC = () => {
               setCompletedLessons(data.completedLessons || []);
               if (Array.isArray(data.notes)) {
                 setSavedNotes(data.notes);
-                localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
+                try {
+                  localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
+                } catch (e) {}
               }
-              localStorage.setItem(`course_unlocked_${courseId}`, 'true');
+              try {
+                localStorage.setItem(`course_unlocked_${courseId}`, 'true');
+              } catch (e) {}
 
               // Tự động khôi phục vị trí bài học cuối cùng từ Firestore
               const params = new URLSearchParams(location.search);
@@ -254,7 +267,11 @@ const Classroom: React.FC = () => {
         }
       } else {
         setCurrentUser(null);
-        if (courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true') {
+        let isLocalUnlocked = false;
+        try {
+          isLocalUnlocked = courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true';
+        } catch (e) {}
+        if (isLocalUnlocked) {
           setIsOwned(true);
         } else {
           setIsOwned(false);
@@ -262,7 +279,12 @@ const Classroom: React.FC = () => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubUserCourse) {
+        unsubUserCourse();
+      }
+    };
   }, [courseId, location.search]);
 
   // Tự động lưu vị trí bài học hiện tại mỗi khi chuyển bài
