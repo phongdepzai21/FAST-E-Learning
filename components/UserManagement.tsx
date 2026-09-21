@@ -283,7 +283,7 @@ export const UserManagement: React.FC = () => {
         const res = await fetch('/api/otp/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: adminEmail, otp: lockOtpCode.trim() })
+          body: JSON.stringify({ email: adminEmail, otp: lockOtpCode.trim(), flow: 'lock' })
         });
 
         const resJson = await res.json().catch(() => null);

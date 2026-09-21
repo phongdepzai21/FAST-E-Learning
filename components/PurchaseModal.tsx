@@ -120,7 +120,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       const response = await fetch('/api/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: effectiveEmail, otp: otpCode })
+        body: JSON.stringify({ email: effectiveEmail, otp: otpCode, flow: 'purchase' })
       });
 
       console.log("[PurchaseModal:Verify] HTTP response status received:", response.status);

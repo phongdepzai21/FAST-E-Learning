@@ -231,7 +231,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       const response = await fetch('/api/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: userInputOtp })
+        body: JSON.stringify({ email, otp: userInputOtp, flow: 'purchase' })
       });
 
       console.log("[PaymentModal:VerifyOtp] HTTP response status received:", response.status);
