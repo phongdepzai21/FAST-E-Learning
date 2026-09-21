@@ -98,7 +98,9 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
           const data = docSnap.data();
           if (Array.isArray(data.notes)) {
             setNotes(data.notes);
-            localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
+            try {
+              localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
+            } catch (e) {}
             setSyncStatus('synced');
           }
         }
@@ -115,7 +117,9 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
   // Helper to persist notes to both local storage and Firestore
   const persistNotes = async (updatedNotes: LessonNote[]) => {
     setNotes(updatedNotes);
-    localStorage.setItem(`notes_${courseId}`, JSON.stringify(updatedNotes));
+    try {
+      localStorage.setItem(`notes_${courseId}`, JSON.stringify(updatedNotes));
+    } catch (e) {}
 
     if (userEmail && courseId) {
       setSyncStatus('saving');

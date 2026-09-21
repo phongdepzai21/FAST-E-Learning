@@ -46,9 +46,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             Tải lại trang
           </button>
           
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left overflow-auto max-w-2xl w-full">
-              <p className="font-mono text-sm text-red-600 font-bold">{this.state.error.toString()}</p>
+          {this.state.error && (
+            <div className="mt-8 max-w-2xl w-full text-left">
+              <details className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+                <summary className="px-4 py-3 font-medium text-sm text-gray-700 cursor-pointer hover:bg-gray-100 select-none transition-colors">
+                  Xem chi tiết thông tin lỗi kỹ thuật
+                </summary>
+                <div className="p-4 border-t border-gray-200 bg-white font-mono text-xs text-red-600 overflow-auto max-h-60 leading-relaxed whitespace-pre-wrap">
+                  <div className="font-bold mb-1">{this.state.error.name}: {this.state.error.message}</div>
+                  {this.state.error.stack}
+                </div>
+              </details>
             </div>
           )}
         </div>

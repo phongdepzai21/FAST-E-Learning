@@ -249,7 +249,9 @@ const Courses: React.FC = () => {
         claimedVia: 'INSTANT_CLAIM'
       }, { merge: true });
 
-      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      try {
+        localStorage.setItem('course_unlocked_' + course.id, 'true');
+      } catch (e) {}
       setOwnedCourseIds(prev => {
         const next = prev.includes(course.id) ? prev : [...prev, course.id];
         try {
@@ -265,7 +267,9 @@ const Courses: React.FC = () => {
       const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${auth.currentUser?.email}/purchased_courses/${course.id}`, err);
       
       // Fallback mở khóa cục bộ
-      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      try {
+        localStorage.setItem('course_unlocked_' + course.id, 'true');
+      } catch (e) {}
       setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
       window.dispatchEvent(new CustomEvent('courses_updated'));
       window.dispatchEvent(new Event('storage'));
@@ -317,7 +321,9 @@ const Courses: React.FC = () => {
           hasFirestoreError = true;
           if (!firstError) firstError = e;
         }
-        localStorage.setItem('course_unlocked_' + course.id, 'true');
+        try {
+          localStorage.setItem('course_unlocked_' + course.id, 'true');
+        } catch (e) {}
       }
 
       const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);

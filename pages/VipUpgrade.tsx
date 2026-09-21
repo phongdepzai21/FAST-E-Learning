@@ -174,7 +174,9 @@ const VipUpgrade: React.FC = () => {
         status: 'active'
       }, { merge: true });
 
-      localStorage.setItem(`course_unlocked_${combo.id}`, 'true');
+      try {
+        localStorage.setItem(`course_unlocked_${combo.id}`, 'true');
+      } catch (e) {}
 
       // 2. If VIP was purchased, unlock VIP profile status globally
       if (combo.id === 'khoa-vip') {
@@ -187,10 +189,12 @@ const VipUpgrade: React.FC = () => {
 
         const localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
         const existingRoles = localRolesStr ? JSON.parse(localRolesStr) : {};
-        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-          ...existingRoles,
-          isVip: true
-        }));
+        try {
+          localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
+            ...existingRoles,
+            isVip: true
+          }));
+        } catch (e) {}
       } else {
         // 3. For Basic or Pro, automatically unlock each linked course individually for immediate classroom access!
         const linkedCourseIds = combo.courseIds || [];
@@ -204,7 +208,9 @@ const VipUpgrade: React.FC = () => {
             status: 'active'
           }, { merge: true });
 
-          localStorage.setItem(`course_unlocked_${courseId}`, 'true');
+          try {
+            localStorage.setItem(`course_unlocked_${courseId}`, 'true');
+          } catch (e) {}
         }
       }
 
@@ -215,12 +221,16 @@ const VipUpgrade: React.FC = () => {
     } catch (err: any) {
       console.error("Lỗi khi lưu giao dịch combo:", err);
       // Local fallback activation to ensure robust UX
-      localStorage.setItem(`course_unlocked_${combo.id}`, 'true');
+      try {
+        localStorage.setItem(`course_unlocked_${combo.id}`, 'true');
+      } catch (e) {}
       if (combo.id === 'khoa-vip') {
         setIsVip(true);
       } else {
         (combo.courseIds || []).forEach(id => {
-          localStorage.setItem(`course_unlocked_${id}`, 'true');
+          try {
+            localStorage.setItem(`course_unlocked_${id}`, 'true');
+          } catch (e) {}
         });
       }
       setPurchasedComboIds(prev => [...prev, combo.id]);
