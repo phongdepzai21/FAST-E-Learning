@@ -55,42 +55,59 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   }, [cooldownTimer]);
 
   const handleSendOtp = async () => {
+    console.log("[PurchaseModal:SendOtp] Initiating OTP send process...");
     setIsSending(true);
     setError("");
     setInfoMessage("");
     setOtpCode("");
+    console.log("[PurchaseModal:SendOtp] Configuration:", {
+      effectiveEmail,
+      userName
+    });
 
     try {
+      console.log("[PurchaseModal:SendOtp] Dispatching POST request to /api/otp/send...");
       const response = await fetch('/api/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: effectiveEmail, name: userName || 'Học viên' })
       });
 
-      const data = await response.json().catch(() => null);
+      console.log("[PurchaseModal:SendOtp] HTTP response status received:", response.status);
+      const data = await response.json().catch((err) => {
+        console.error("[PurchaseModal:SendOtp] Failed to parse response JSON:", err);
+        return null;
+      });
+      console.log("[PurchaseModal:SendOtp] Parse response JSON data:", data);
 
       if (response.ok && data?.success) {
+        console.log("[PurchaseModal:SendOtp] SUCCESS: OTP sent. Setting otpSent to TRUE.");
         setOtpSent(true);
         setCooldownTimer(30);
         if (data.fallback && data.otp) {
+          console.log("[PurchaseModal:SendOtp] FALLBACK mode triggered by server. Autofilling otpCode with:", data.otp);
           setOtpCode(data.otp);
           setInfoMessage(data.message || `Mã OTP đã được khởi tạo tự động (Chế độ dự phòng). Mã xác nhận của bạn là: ${data.otp}`);
         } else {
           setInfoMessage(data.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
         }
       } else {
+        console.warn("[PurchaseModal:SendOtp] FAILED: Server returned unsuccessful or not-ok response:", data);
         setError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
-      console.error("OTP send error:", err);
+      console.error("[PurchaseModal:SendOtp] EXCEPTION thrown during fetch execution:", err);
       setError("Lỗi kết nối khi gửi mã xác thực. Vui lòng thử lại.");
     }
 
     setIsSending(false);
+    console.log("[PurchaseModal:SendOtp] Completed OTP send process. isSending set to false.");
   };
 
   const handleVerify = async () => {
+    console.log("[PurchaseModal:Verify] Initiating OTP verification process for digits:", otpCode);
     if (otpCode.length !== 6) {
+      console.warn("[PurchaseModal:Verify] Aborted: Invalid otpCode length:", otpCode.length);
       setError("Vui lòng nhập đầy đủ mã OTP 6 số từ email của bạn.");
       return;
     }
@@ -99,24 +116,30 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsVerifying(true);
 
     try {
+      console.log("[PurchaseModal:Verify] Dispatching POST request to /api/otp/verify...");
       const response = await fetch('/api/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: effectiveEmail, otp: otpCode })
       });
 
+      console.log("[PurchaseModal:Verify] HTTP response status received:", response.status);
       const data = await response.json().catch(() => null);
+      console.log("[PurchaseModal:Verify] Parse response JSON data:", data);
 
       if (response.ok && data?.success) {
+        console.log("[PurchaseModal:Verify] SUCCESS: OTP verified successfully. Triggering onSuccess callback.");
         onSuccess();
       } else {
+        console.warn("[PurchaseModal:Verify] FAILED: Server returned verification failure:", data);
         setError(data?.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
       }
     } catch (err) {
-      console.error("Verify OTP error:", err);
+      console.error("[PurchaseModal:Verify] EXCEPTION thrown during fetch verification:", err);
       setError("Lỗi kết nối máy chủ xác minh OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
+    console.log("[PurchaseModal:Verify] Completed OTP verification flow. isVerifying set to false.");
   };
 
   if (!isOpen) return null;

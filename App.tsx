@@ -65,11 +65,26 @@ const AppLayout: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    console.log("[AuthListener] Initializing Firebase Auth listener...");
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        console.log("[AuthListener] User authenticated state changed: LOGGED_IN", {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName,
+          emailVerified: currentUser.emailVerified
+        });
+      } else {
+        console.log("[AuthListener] User authenticated state changed: LOGGED_OUT");
+      }
       setUser(currentUser);
       setAuthResolved(true);
+      console.log("[AuthListener] authResolved set to true.");
     });
-    return () => unsubscribe();
+    return () => {
+      console.log("[AuthListener] Cleaning up Firebase Auth listener...");
+      unsubscribe();
+    };
   }, []);
 
   // OPTIMIZATION: Defer loading of heavy non-critical components (Chatbot)
