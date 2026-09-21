@@ -85,6 +85,8 @@ const VipUpgrade: React.FC = () => {
       const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
 
       setCombos([...merged, ...customCombos]);
+    }, (error) => {
+      console.warn("Lỗi đồng bộ danh sách combo ở VipUpgrade:", error);
     });
 
     return () => unsubCombos();

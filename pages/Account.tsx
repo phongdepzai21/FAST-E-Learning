@@ -576,7 +576,10 @@ const Account: React.FC = () => {
 
             if (userEmail) {
                 // Fetch from localStorage backup first
-                const localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
+                let localRolesStr = null;
+                try {
+                    localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
+                } catch (e) {}
                 if (localRolesStr) {
                     try {
                         const localRoles = JSON.parse(localRolesStr);
@@ -735,7 +738,10 @@ const Account: React.FC = () => {
                 }
             });
             
-            const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+            let hasClaimedAll = false;
+            try {
+              hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+            } catch (e) {}
             let finalCourses = courses;
             if (hasClaimedAll && allCoursesRef.current.length > 0) {
               const existingIds = new Set(courses.map(c => c.courseId));
@@ -783,9 +789,16 @@ const Account: React.FC = () => {
   useEffect(() => {
     if (!user?.email) return;
     const normalizedEmail = user.email.toLowerCase();
+    let localIsVip = false;
+    let localUnlockedVip = false;
+    try {
+      localIsVip = Boolean(localStorage.getItem('user_is_vip'));
+      localUnlockedVip = Boolean(localStorage.getItem('course_unlocked_khoa-vip'));
+    } catch (e) {}
+
     const isVipUser = user.isVip === true || 
-      Boolean(localStorage.getItem('user_is_vip')) || 
-      Boolean(localStorage.getItem('course_unlocked_khoa-vip')) || 
+      localIsVip || 
+      localUnlockedVip || 
       purchasedCourses.some(c => c.id === 'khoa-vip' || c.id === 'vip-lifetime-access');
 
     // Load initial local data
@@ -828,6 +841,8 @@ const Account: React.FC = () => {
           localStorage.setItem(`gamification_${normalizedEmail}`, JSON.stringify(evaluated));
         } catch (e) {}
       }
+    }, (error) => {
+      console.warn("Lỗi đồng bộ Gamification Stats realtime:", error);
     });
 
     const handleGamificationEvent = (e: any) => {
@@ -1129,9 +1144,11 @@ const Account: React.FC = () => {
         } catch (fErr) {
           console.warn("Could not check if user exists via API:", fErr);
           // Fallback to checking local storage roles
-          if (localStorage.getItem(`user_roles_${cleanEmail}`)) {
-            userExists = true;
-          }
+          try {
+            if (localStorage.getItem(`user_roles_${cleanEmail}`)) {
+              userExists = true;
+            }
+          } catch (e) {}
         }
 
         if (userExists) {
@@ -1344,7 +1361,9 @@ const Account: React.FC = () => {
         claimedVia: isVip ? 'VIP_INSTANT' : (isAdmin ? 'ADMIN_INSTANT' : 'FREE_CLAIM')
       }, { merge: true });
 
-      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      try {
+        localStorage.setItem('course_unlocked_' + course.id, 'true');
+      } catch (e) {}
       setPurchasedCourses(prev => {
         if (prev.some(p => p.courseId === course.id)) return prev;
         const next = [...prev, { courseId: course.id, progress: 0 }];
@@ -1361,7 +1380,9 @@ const Account: React.FC = () => {
       const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${user.email}/purchased_courses/${course.id}`, err);
       
       // Fallback lưu cục bộ để người dùng vẫn có thể học ngay trên máy
-      localStorage.setItem('course_unlocked_' + course.id, 'true');
+      try {
+        localStorage.setItem('course_unlocked_' + course.id, 'true');
+      } catch (e) {}
       setPurchasedCourses(prev => {
         if (prev.some(p => p.courseId === course.id)) return prev;
         const next = [...prev, { courseId: course.id, progress: 0 }];
@@ -1401,7 +1422,9 @@ const Account: React.FC = () => {
     try {
       await Promise.all(unowned.map(async (c) => {
         const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", c.id);
-        localStorage.setItem('course_unlocked_' + c.id, 'true');
+        try {
+          localStorage.setItem('course_unlocked_' + c.id, 'true');
+        } catch (e) {}
         return setDoc(courseRef, {
           courseId: c.id,
           courseTitle: c.title || '',
@@ -1432,7 +1455,9 @@ const Account: React.FC = () => {
       
       // Fallback mở khóa cục bộ trên thiết bị
       unowned.forEach(c => {
-        localStorage.setItem('course_unlocked_' + c.id, 'true');
+        try {
+          localStorage.setItem('course_unlocked_' + c.id, 'true');
+        } catch (e) {}
       });
       const allActiveIds = activeCourses.map(c => c.id);
       const allPurchased = allActiveIds.map(id => ({ courseId: id, progress: 0 }));
@@ -1783,12 +1808,14 @@ const Account: React.FC = () => {
                               }, { merge: true });
 
                               // Save to local backup
-                              localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
-                                isVip: true,
-                                isAdmin: true,
-                                isTeacher: true,
-                                rolePromotedByAdmin: true
-                              }));
+                              try {
+                                localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
+                                  isVip: true,
+                                  isAdmin: true,
+                                  isTeacher: true,
+                                  rolePromotedByAdmin: true
+                                }));
+                              } catch (e) {}
                               
                               // Immediately update local state
                               setUser(prev => prev ? {
@@ -1806,11 +1833,13 @@ const Account: React.FC = () => {
                               const errorMsg = err instanceof Error ? err.message : String(err);
 
                               // Save to local backup anyway so user is NEVER blocked
-                              localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
-                                isVip: true,
-                                isAdmin: true,
-                                isTeacher: true
-                              }));
+                              try {
+                                localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
+                                  isVip: true,
+                                  isAdmin: true,
+                                  isTeacher: true
+                                }));
+                              } catch (e) {}
 
                               // Immediately update local state
                               setUser(prev => prev ? {
