@@ -105,11 +105,13 @@
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: 260mm !important;
+    height: 265mm !important;
+    min-height: 265mm !important;
+    box-sizing: border-box !important;
     position: relative !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 5mm !important;
     background: #ffffff !important;
     page-break-before: avoid !important;
     break-before: avoid !important;

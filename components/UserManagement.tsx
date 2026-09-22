@@ -279,60 +279,36 @@ export const UserManagement: React.FC = () => {
 
   const handleToggleLockUser = async (targetUser: UserData, shouldLock: boolean, reason?: string) => {
     setIsLocking(true);
-    if (shouldLock) {
-      if (lockOtpCode.trim().length !== 6) {
-        setLockOtpError('Vui lòng nhập đầy đủ mã OTP 6 số nhận từ email để xác nhận khóa tài khoản.');
-        setIsLocking(false);
-        return;
-      }
-
-      setLockOtpError('');
-
-      try {
-        const verifyRes = await verifyOtp({
-          email: adminEmail,
-          otp: lockOtpCode.trim(),
-          flow: 'lock'
-        });
-
-        if (!verifyRes.success) {
-          setLockOtpError(verifyRes.error || 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.');
-          setIsLocking(false);
-          return;
-        }
-      } catch (err: any) {
-        console.error("OTP verify check error:", err);
-        setLockOtpError(err?.message || 'Không thể xác minh OTP. Vui lòng thử lại.');
-        setIsLocking(false);
-        return;
-      }
-    }
+    setLockOtpError('');
+    const normalizedEmail = targetUser.id.toLowerCase().trim();
 
     try {
-      const normalizedEmail = targetUser.id.toLowerCase().trim();
-      const userRef = doc(db, 'users', normalizedEmail);
+      const res = await fetch('/api/admin/toggle-lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetEmail: normalizedEmail,
+          shouldLock,
+          reason,
+          adminEmail,
+          otp: shouldLock ? lockOtpCode.trim() : undefined
+        })
+      });
 
-      const updateData: Record<string, any> = {
-        isLocked: shouldLock,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (shouldLock) {
-        updateData.lockedAt = new Date().toISOString();
-        updateData.lockReason = reason || 'Vi phạm điều khoản hoặc chính sách hệ thống.';
-      } else {
-        updateData.lockedAt = null;
-        updateData.lockReason = null;
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Có lỗi xảy ra khi thực hiện thao tác.');
       }
 
-      await setDoc(userRef, updateData, { merge: true });
+      const lockedAtValue = shouldLock ? new Date().toISOString() : null;
+      const lockReasonValue = shouldLock ? (reason || 'Vi phạm điều khoản hoặc chính sách hệ thống.') : null;
 
       // Update local storage cache
       try {
         localStorage.setItem(`user_locked_${normalizedEmail}`, JSON.stringify({
           isLocked: shouldLock,
-          lockedAt: updateData.lockedAt,
-          lockReason: updateData.lockReason
+          lockedAt: lockedAtValue,
+          lockReason: lockReasonValue
         }));
       } catch (e) {}
 
@@ -341,7 +317,7 @@ export const UserManagement: React.FC = () => {
         detail: {
           email: normalizedEmail,
           isLocked: shouldLock,
-          reason: updateData.lockReason
+          reason: lockReasonValue
         }
       }));
 
@@ -351,8 +327,8 @@ export const UserManagement: React.FC = () => {
           return {
             ...u,
             isLocked: shouldLock,
-            lockedAt: updateData.lockedAt,
-            lockReason: updateData.lockReason
+            lockedAt: lockedAtValue || undefined,
+            lockReason: lockReasonValue || undefined
           };
         }
         return u;
@@ -368,9 +344,13 @@ export const UserManagement: React.FC = () => {
       setLockReasonInput('');
       setLockOtpCode('');
       setLockOtpSent(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi khóa/mở khóa tài khoản:', err);
-      error('Không thể cập nhật trạng thái khóa tài khoản. Vui lòng kiểm tra quyền Admin.', 5000, 'Lỗi');
+      if (shouldLock) {
+        setLockOtpError(err.message || 'Không thể cập nhật trạng thái khóa tài khoản. Vui lòng kiểm tra lại mã OTP.');
+      } else {
+        error(err.message || 'Không thể cập nhật trạng thái mở khóa tài khoản. Vui lòng thử lại.', 5000, 'Lỗi');
+      }
     } finally {
       setIsLocking(false);
     }

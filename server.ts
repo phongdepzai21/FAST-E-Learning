@@ -717,6 +717,86 @@ async function startServer() {
     }
   });
 
+  // Admin Toggle Lock Endpoint
+  app.post("/api/admin/toggle-lock", async (req, res) => {
+    try {
+      const { targetEmail, shouldLock, reason, adminEmail, otp } = req.body || {};
+      if (!targetEmail || !adminEmail) {
+        return res.status(400).json({ error: "Thông tin tài khoản là bắt buộc." });
+      }
+
+      const admins = ['h1h4phong@gmail.com', 'hkc.qms@gmail.com', 'trdung153@gmail.com', 'lediem.ngo@gmail.com'];
+      const adminEmailKey = String(adminEmail).toLowerCase().trim();
+      let isAuthorized = admins.includes(adminEmailKey);
+      
+      if (!isAuthorized) {
+        const adminDoc = await getFirestore().collection("users").doc(adminEmailKey).get();
+        if (adminDoc.exists && adminDoc.data()?.isAdmin === true) {
+          isAuthorized = true;
+        }
+      }
+      
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Bạn không có quyền quản trị viên." });
+      }
+
+      if (shouldLock) {
+        if (!otp) {
+          return res.status(400).json({ error: "Mã OTP là bắt buộc để thực hiện khóa tài khoản." });
+        }
+        const flowKey = `${adminEmailKey}_lock`;
+        const record = otpStore.get(flowKey) || otpStore.get(adminEmailKey);
+
+        if (!record) {
+          return res.status(400).json({ error: "Mã OTP không tồn tại hoặc đã hết hạn. Vui lòng bấm gửi lại mã." });
+        }
+
+        if (Date.now() > record.expiresAt) {
+          otpStore.delete(flowKey);
+          otpStore.delete(adminEmailKey);
+          saveOtpToDisk(otpStore);
+          return res.status(400).json({ error: "Mã OTP đã hết hạn. Vui lòng gửi lại mã mới." });
+        }
+
+        if (record.otp !== String(otp).trim()) {
+          record.attempts = (record.attempts || 0) + 1;
+          if (record.attempts >= 5) {
+            otpStore.delete(flowKey);
+            otpStore.delete(adminEmailKey);
+            saveOtpToDisk(otpStore);
+            return res.status(429).json({ error: "Bạn đã nhập sai mã quá 5 lần. Vui lòng gửi lại mã mới." });
+          }
+          saveOtpToDisk(otpStore);
+          return res.status(400).json({ error: `Mã OTP không chính xác. Bạn còn ${5 - record.attempts} lần thử.` });
+        }
+
+        otpStore.delete(flowKey);
+        otpStore.delete(adminEmailKey);
+        saveOtpToDisk(otpStore);
+      }
+
+      const targetEmailKey = String(targetEmail).toLowerCase().trim();
+      const updateData: Record<string, any> = {
+        isLocked: !!shouldLock,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (shouldLock) {
+        updateData.lockedAt = new Date().toISOString();
+        updateData.lockReason = reason || 'Vi phạm điều khoản hoặc chính sách hệ thống.';
+      } else {
+        updateData.lockedAt = null;
+        updateData.lockReason = null;
+      }
+
+      await getFirestore().collection("users").doc(targetEmailKey).set(updateData, { merge: true });
+      res.json({ success: true, message: shouldLock ? "Khóa tài khoản thành công." : "Mở khóa tài khoản thành công." });
+    } catch (error: any) {
+      console.error("Server Toggle Lock Error:", error);
+      res.status(500).json({ error: "Lỗi hệ thống khi thực hiện thao tác khóa tài khoản." });
+    }
+  });
+
   // Gemini Chat
   app.post("/api/gemini/chat", async (req, res) => {
     try {
