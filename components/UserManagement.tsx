@@ -278,9 +278,11 @@ export const UserManagement: React.FC = () => {
   };
 
   const handleToggleLockUser = async (targetUser: UserData, shouldLock: boolean, reason?: string) => {
+    setIsLocking(true);
     if (shouldLock) {
       if (lockOtpCode.trim().length !== 6) {
         setLockOtpError('Vui lòng nhập đầy đủ mã OTP 6 số nhận từ email để xác nhận khóa tài khoản.');
+        setIsLocking(false);
         return;
       }
 
@@ -295,16 +297,17 @@ export const UserManagement: React.FC = () => {
 
         if (!verifyRes.success) {
           setLockOtpError(verifyRes.error || 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.');
+          setIsLocking(false);
           return;
         }
       } catch (err: any) {
         console.error("OTP verify check error:", err);
         setLockOtpError(err?.message || 'Không thể xác minh OTP. Vui lòng thử lại.');
+        setIsLocking(false);
         return;
       }
     }
 
-    setIsLocking(true);
     try {
       const normalizedEmail = targetUser.id.toLowerCase().trim();
       const userRef = doc(db, 'users', normalizedEmail);
