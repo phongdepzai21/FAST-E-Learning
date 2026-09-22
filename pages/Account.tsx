@@ -32,6 +32,8 @@ import {
 import { doc, setDoc, collection, onSnapshot, getDoc, deleteDoc, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Helmet } from 'react-helmet-async';
+import { authDebugger } from '../utils/authDebugger';
+import { otpLogger } from '../auth/otp-logger';
 
 interface UserProfile {
   name: string;
@@ -541,6 +543,20 @@ const Account: React.FC = () => {
     return () => clearInterval(timer);
   }, [isOtpPending, otpCountdown]);
 
+  // Real-time Diagnostic hook for Account registration OTP
+  useEffect(() => {
+    authDebugger.logOtpModalState({
+      componentName: 'AccountRegister_OTP',
+      isOpen: isOtpPending,
+      otpFormVisible: isOtpPending,
+      userInputLength: otpDigits.join('').length,
+      hasNotice: !!otpStatusMessage,
+      hasError: !!otpFormError,
+      countdown: otpCountdown,
+      extra: { triggerSource: 'Account_Registration_Flow' }
+    });
+  }, [isOtpPending, otpDigits, otpStatusMessage, otpFormError, otpCountdown]);
+
   // --- EFFECT 1: AUTHENTICATION LISTENER ---
   useEffect(() => {
     if (location.state && location.state.message) {
@@ -896,16 +912,20 @@ const Account: React.FC = () => {
       setOtpAttemptsLeft(5);
       setOtpCountdown(60);
 
-      const res = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, name: trimmedName, flow: 'register' })
-      });
+      const sendResult = await otpLogger.wrapOtpSend(
+        normalizedEmail,
+        trimmedName,
+        () => fetch('/api/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, name: trimmedName, flow: 'register' })
+        })
+      );
 
-      const resData = await res.json().catch(() => null);
-
-      if (res.ok && resData?.success) {
+      if (sendResult.success) {
         setIsOtpPending(true);
+        otpLogger.logModalToggle("Account_Registration_OTP", true, "Register_Button_Submit");
+        const resData = sendResult.data;
         if (resData.fallback && resData.otp) {
           setOtpDigits(resData.otp.split(''));
           setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
@@ -915,7 +935,7 @@ const Account: React.FC = () => {
           toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
         }
       } else {
-        throw new Error(resData?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
+        throw new Error(sendResult?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
       console.error("OTP Flow error:", err);
@@ -1053,17 +1073,22 @@ const Account: React.FC = () => {
 
     const normalizedEmail = email.toLowerCase().trim();
     try {
-      const res = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, name: fullName.trim(), flow: 'register' })
-      });
-      const resData = await res.json().catch(() => null);
-      if (res.ok && resData?.success) {
+      const sendResult = await otpLogger.wrapOtpSend(
+        normalizedEmail,
+        fullName.trim(),
+        () => fetch('/api/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, name: fullName.trim(), flow: 'register' })
+        })
+      );
+
+      if (sendResult.success) {
+        const resData = sendResult.data;
         setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
         toast.success("Đã gửi lại mã OTP vào email thành công!");
       } else {
-        setOtpFormError(resData?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
+        setOtpFormError(sendResult?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
         toast.error("Gửi lại mã OTP thất bại!");
       }
     } catch (err: any) {

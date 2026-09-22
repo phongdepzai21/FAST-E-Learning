@@ -1,4 +1,4 @@
-import { authDebugger, EmailJsFlowInfo } from '../utils/authDebugger';
+import { authDebugger } from '../utils/authDebugger';
 
 export interface OtpVerificationLog {
   action: 'send_request' | 'verify_request' | 'modal_toggle' | 'timer_event';
@@ -28,6 +28,7 @@ export const otpLogger = {
       recipientName: name
     });
 
+    const startTime = Date.now();
     try {
       authDebugger.logEmailJsFlow({
         step: 'fetching',
@@ -35,6 +36,7 @@ export const otpLogger = {
       });
 
       const response = await sendFetchPromise();
+      const durationMs = Date.now() - startTime;
       const status = response.status;
       const data = await response.json().catch(() => null);
 
@@ -46,14 +48,18 @@ export const otpLogger = {
           email,
           status,
           success: true,
-          fallbackOtp: data.fallback ? data.otp : undefined
+          fallbackOtp: data.fallback ? data.otp : undefined,
+          durationMs,
+          payload: data
         });
 
         if (data.fallback && data.otp) {
           authDebugger.logEmailJsFlow({
             step: 'fallback_triggered',
             email,
-            fallbackOtp: data.otp
+            fallbackOtp: data.otp,
+            durationMs,
+            payload: data
           });
         }
         return { success: true, data };
@@ -62,17 +68,22 @@ export const otpLogger = {
         authDebugger.logEmailJsFlow({
           step: 'rejected',
           email,
-          error: errorMsg
+          status,
+          error: errorMsg,
+          durationMs,
+          payload: data
         });
         return { success: false, error: errorMsg };
       }
     } catch (err: any) {
+      const durationMs = Date.now() - startTime;
       const errorMsg = err?.message || String(err);
       console.error(`[OTPLogger:EmailJS_Send] Promise execution failed:`, err);
       authDebugger.logEmailJsFlow({
         step: 'rejected',
         email,
-        error: errorMsg
+        error: errorMsg,
+        durationMs
       });
       return { success: false, error: errorMsg };
     }
@@ -81,12 +92,13 @@ export const otpLogger = {
   /**
    * Logs modal visibility state toggling explicitly.
    */
-  logModalToggle: (modalName: string, isVisible: boolean, triggerSource: string) => {
+  logModalToggle: (modalName: string, isVisible: boolean, triggerSource: string, extra?: any) => {
     const timestamp = new Date().toISOString();
     console.log(
       `%c[OTPLogger:ModalToggle] [${timestamp}] ${modalName} visibility changed to: ${String(isVisible).toUpperCase()} (Triggered via ${triggerSource})`,
       `color: ${isVisible ? '#0d9488' : '#e11d48'}; font-weight: bold; font-size: 11px;`
     );
+    authDebugger.logModalToggle(modalName, isVisible, triggerSource, extra);
   },
 
   /**
@@ -103,5 +115,6 @@ export const otpLogger = {
         authResolved
       }
     );
+    authDebugger.logAuthListenerEvent(user, authResolved, message);
   }
 };
