@@ -102,7 +102,10 @@
   }
 
   body.printing-ad-checklist #ad-checklist-print-area {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: 260mm !important;
     position: relative !important;
     width: 100% !important;
     margin: 0 !important;

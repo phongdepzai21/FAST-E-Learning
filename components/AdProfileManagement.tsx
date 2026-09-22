@@ -49,7 +49,6 @@ interface CustomerRecord {
   totalDocs: number;
   rate: number;
   checklist: Record<string, boolean>;
-  images?: string[];
   updatedAt: string;
 }
 
@@ -156,9 +155,6 @@ export const AdProfileManagement: React.FC = () => {
   // 7 checklist docs state
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
 
-  // Attached images state (Base64)
-  const [images, setImages] = useState<string[]>([]);
-
   // UI state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterPendingOnly, setFilterPendingOnly] = useState<boolean>(false);
@@ -264,7 +260,6 @@ export const AdProfileManagement: React.FC = () => {
         setCustStatus(d.status || 'Đang chuẩn bị hồ sơ');
         setCustReceipt(d.receipt || '');
         setChecklist(d.checklist || {});
-        setImages(d.images || []);
       }
     } catch (e) {}
   }, []);
@@ -283,8 +278,7 @@ export const AdProfileManagement: React.FC = () => {
       actualDate,
       status: custStatus,
       receipt: custReceipt,
-      checklist,
-      images
+      checklist
     };
     try {
       localStorage.setItem(CUST_ACTIVE_KEY, JSON.stringify(active));
@@ -399,7 +393,6 @@ export const AdProfileManagement: React.FC = () => {
       totalDocs: 7,
       rate: Math.round((checkedCount / 7) * 100),
       checklist,
-      images,
       updatedAt: new Date().toLocaleString('vi-VN')
     };
 
@@ -435,7 +428,6 @@ export const AdProfileManagement: React.FC = () => {
       setCustStatus('Đang chuẩn bị hồ sơ');
       setCustReceipt('');
       setChecklist({});
-      setImages([]);
       saveActiveDraft();
     }
   };
@@ -454,47 +446,8 @@ export const AdProfileManagement: React.FC = () => {
     setCustStatus(c.status || 'Đang chuẩn bị hồ sơ');
     setCustReceipt(c.receipt || '');
     setChecklist(c.checklist || {});
-    setImages(c.images || []);
     saveActiveDraft();
     window.scrollTo({ top: 300, behavior: 'smooth' });
-  };
-
-  // Image Upload and Remove Handlers
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      if (!file.type.startsWith('image/')) {
-        alert('Vui lòng chỉ tải lên các tệp tin hình ảnh.');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Kích thước ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setImages(prev => {
-            const updated = [...prev, reader.result as string];
-            // Save active draft
-            setTimeout(() => saveActiveDraft(), 50);
-            return updated;
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImages(prev => {
-      const updated = prev.filter((_, idx) => idx !== index);
-      setTimeout(() => saveActiveDraft(), 50);
-      return updated;
-    });
   };
 
   // Delete customer
@@ -1071,72 +1024,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
         </div>
       </div>
 
-      {/* Khối đính kèm hình ảnh minh họa (Phối cảnh & Ma-két) */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-          <Layers className="w-5 h-5 text-[#005c56]" />
-          <h3 className="font-bold text-sm text-gray-800 uppercase tracking-wide">
-            Đính Kèm Ảnh Thực Tế / Ma-két / Phối Cảnh (Đính kèm cuối bản in)
-          </h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Uploader Box */}
-          <div className="border-2 border-dashed border-gray-200 hover:border-[#005c56] rounded-2xl p-6 transition-all bg-gray-50/50 flex flex-col items-center justify-center text-center group cursor-pointer relative min-h-[160px]">
-            <input 
-              type="file" 
-              multiple 
-              accept="image/*" 
-              onChange={handleImageUpload}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-            />
-            <div className="space-y-2 pointer-events-none">
-              <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mx-auto text-[#005c56] group-hover:scale-110 transition-transform">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-gray-700">Chọn hoặc Kéo thả ảnh vào đây</p>
-                <p className="text-[11px] text-gray-500 mt-1">Hỗ trợ các file ảnh JPEG, PNG, WEBP. Tối đa 5MB/ảnh.</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Preview Grid */}
-          <div className="flex flex-col justify-center">
-            {images.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-xs italic bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                Chưa có hình ảnh đính kèm. Hãy tải lên ảnh phối cảnh hoặc bản vẽ maquette để tự động đính kèm vào cuối bản in.
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {images.map((imgBase64, index) => (
-                  <div key={index} className="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all">
-                    <img 
-                      src={imgBase64} 
-                      alt={`Ảnh đính kèm ${index + 1}`} 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(index)}
-                      className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-20 cursor-pointer"
-                      title="Xóa ảnh này"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
-                      Ảnh {index + 1}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Sticky Progress Bar */}
       <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm sticky top-0 z-20">
@@ -1504,9 +1392,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
-      <div id="ad-checklist-print-area" className="hidden print:block bg-white text-gray-900 p-6">
-        {/* Header */}
-        <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
+      <div id="ad-checklist-print-area" className="hidden print:flex print:flex-col print:justify-between print:min-h-[260mm] bg-white text-gray-900 p-6">
+        <div className="flex-1 flex flex-col justify-start">
+          {/* Header */}
+          <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
           <div>
             <div className="text-[11px] font-black uppercase text-[#005c56] tracking-wider">
               FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
@@ -1626,40 +1515,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           </div>
         </div>
 
-        {/* Khối Bảng Ảnh Đính Kèm Cuối Bản In */}
-        {images.length > 0 && (
-          <div className="mt-8 pt-5 border-t border-gray-300 page-break-before-always">
-            <div className="text-center mb-4">
-              <h3 className="text-sm font-black uppercase text-gray-900 tracking-wide">
-                DANH MỤC HÌNH ẢNH ĐÍNH KÈM HỒ SƠ QUẢNG CÁO
-              </h3>
-              <p className="text-[10px] text-gray-500 italic mt-0.5">
-                (Hình ảnh phối cảnh vị trí đặt bảng và ma-két sản phẩm quảng cáo in màu)
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {images.map((imgBase64, index) => (
-                <div key={index} className="border border-gray-300 rounded-lg p-2 bg-white flex flex-col items-center">
-                  <div className="w-full h-64 bg-gray-50 rounded overflow-hidden flex items-center justify-center">
-                    <img 
-                      src={imgBase64} 
-                      alt={`Ảnh đính kèm ${index + 1}`} 
-                      className="max-w-full max-h-full object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="text-[10px] font-bold text-gray-700 mt-2 text-center">
-                    HÌNH KHẢO SÁT / MA-KÉT SỐ {index + 1}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Ảnh đính kèm cuối bản in) */}
-        <div className="mt-8 pt-5 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
+        <div className="mt-6 pt-3 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
           <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
             FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
           </div>

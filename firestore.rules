@@ -62,8 +62,8 @@ service cloud.firestore {
              (!('isAdmin' in data) || data.isAdmin is bool) &&
              (!('isTeacher' in data) || data.isTeacher is bool) &&
              (!('isLocked' in data) || data.isLocked is bool) &&
-             (!('lockedAt' in data) || (data.lockedAt is string && data.lockedAt.size() <= 64)) &&
-             (!('lockReason' in data) || (data.lockReason is string && data.lockReason.size() <= 256)) &&
+             (!('lockedAt' in data) || data.lockedAt == null || (data.lockedAt is string && data.lockedAt.size() <= 64)) &&
+             (!('lockReason' in data) || data.lockReason == null || (data.lockReason is string && data.lockReason.size() <= 256)) &&
              (!('rolePromotedByAdmin' in data) || data.rolePromotedByAdmin is bool);
     }
 
