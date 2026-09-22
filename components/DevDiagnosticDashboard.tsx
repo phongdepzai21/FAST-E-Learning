@@ -34,22 +34,9 @@ import { authDebugger, DiagnosticState, DiagnosticLogEntry, PromiseRecord } from
 import { auth } from '../firebase';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Only allow execution in development mode
-const isDevMode = 
-  import.meta.env.DEV || 
-  (typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname.includes('127.0.0.1') ||
-    window.location.search.includes('dev=true') ||
-    window.location.search.includes('debug=true')
-  ));
-
 const REQUIRED_DEV_PASSWORD = 'Family2515@';
 
 export const DevDiagnosticDashboard: React.FC = () => {
-  // If in production, strictly render nothing
-  if (!isDevMode) return null;
-
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'raw'>('stream');
@@ -129,35 +116,50 @@ export const DevDiagnosticDashboard: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Keyboard shortcut listener: Ctrl + Shift + X + Y + Z (also supports D-E-V and O-T-P)
+  // Keyboard shortcut listener: Ctrl + Shift + X, Ctrl + Shift + D, Ctrl + Shift + X Y Z, Ctrl + Shift + D E V, phong, etc.
   useEffect(() => {
+    // Expose global console helper for convenience
+    (window as any).openDevDiagnostic = () => setIsOpen(true);
+    (window as any).closeDevDiagnostic = () => setIsOpen(false);
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for modifier (Ctrl/Meta + Shift)
       const hasModifier = (e.ctrlKey || e.metaKey) && e.shiftKey;
       const key = e.key.toLowerCase();
 
-      // Reset buffer if idle for more than 3 seconds
+      // Direct single-chord shortcut: Ctrl + Shift + X or Ctrl + Shift + D or Ctrl + Alt + D
+      if ((hasModifier && (key === 'x' || key === 'd')) || (e.ctrlKey && e.altKey && key === 'd')) {
+        // Prevent default browser shortcuts where applicable
+        if (key === 'x' || key === 'd') {
+          e.preventDefault();
+        }
+        setIsOpen((prev) => !prev);
+        return;
+      }
+
+      // Reset buffer if idle for more than 4 seconds
       const now = Date.now();
-      if (now - lastKeyTimeRef.current > 3000) {
+      if (now - lastKeyTimeRef.current > 4000) {
         keySequenceRef.current = [];
       }
       lastKeyTimeRef.current = now;
 
-      // Single-chord fallback: Ctrl + Shift + X or Ctrl + Alt + D
-      if ((hasModifier && key === 'x') || (e.ctrlKey && e.altKey && key === 'd')) {
-        // Continue tracking sequence, but also allow direct chord toggle if needed
-      }
-
       if (hasModifier && /^[a-z0-9]$/.test(key)) {
         keySequenceRef.current.push(key);
 
-        if (keySequenceRef.current.length > 10) {
-          keySequenceRef.current = keySequenceRef.current.slice(-10);
+        if (keySequenceRef.current.length > 15) {
+          keySequenceRef.current = keySequenceRef.current.slice(-15);
         }
 
-        const recent3 = keySequenceRef.current.slice(-3).join('');
-        // Supported 3-letter sequences: xyz (primary), dev, otp, fst
-        if (recent3 === 'xyz' || recent3 === 'dev' || recent3 === 'otp' || recent3 === 'fst') {
+        const str = keySequenceRef.current.join('');
+        // Supported sequences: xyz (primary), dev, otp, fst, phong
+        if (
+          str.endsWith('xyz') ||
+          str.endsWith('dev') ||
+          str.endsWith('otp') ||
+          str.endsWith('fst') ||
+          str.endsWith('phong')
+        ) {
           e.preventDefault();
           keySequenceRef.current = [];
           setIsOpen((prev) => !prev);
@@ -166,7 +168,11 @@ export const DevDiagnosticDashboard: React.FC = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      delete (window as any).openDevDiagnostic;
+      delete (window as any).closeDevDiagnostic;
+    };
   }, []);
 
   // Auto scroll logs

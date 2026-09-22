@@ -6,6 +6,7 @@ import { ADMIN_EMAILS } from '../constants';
 import { doc, setDoc } from 'firebase/firestore';
 import { authDebugger } from '../utils/authDebugger';
 import { otpLogger } from '../auth/otp-logger';
+import { sendOtp, verifyOtp } from '../utils/otpService';
 import {
   parseNumericPrice,
   formatVND,
@@ -130,38 +131,33 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     });
 
     try {
-      console.log("[PaymentModal:ConfirmTransfer] Dispatching POST request to /api/otp/send...");
-      const result = await otpLogger.wrapOtpSend(
+      console.log("[PaymentModal:ConfirmTransfer] Dispatching OTP send via otpService...");
+      const result = await sendOtp({
         email,
-        user?.displayName || 'Học viên',
-        () => fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name: user?.displayName || 'Học viên' })
-        })
-      );
+        name: user?.displayName || 'Học viên',
+        flow: 'purchase'
+      });
 
       if (result.success) {
         console.log("[PaymentModal:ConfirmTransfer] SUCCESS: OTP sent successfully. Toggling showOtpForm to TRUE.");
         otpLogger.logModalToggle("PaymentModal_OTPForm", true, "ConfirmTransfer_Success_Event");
         setShowOtpForm(true);
-        const data = result.data;
-        const noticeMsg = data.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`;
+        const noticeMsg = result.message || `Mã xác thực OTP đã được gửi đến email ${email}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`;
         setOtpNotice(noticeMsg);
         setOtpCountdown(60);
         console.log("[PaymentModal:ConfirmTransfer] States updated: showOtpForm=true, otpNotice set, countdown=60.");
 
-        if (data.fallback && data.otp) {
-          console.log("[PaymentModal:ConfirmTransfer] FALLBACK mode triggered by server. Autofilling userInputOtp with:", data.otp);
-          setUserInputOtp(data.otp);
+        if (result.fallback && result.otp) {
+          console.log("[PaymentModal:ConfirmTransfer] FALLBACK mode triggered. Autofilling userInputOtp with:", result.otp);
+          setUserInputOtp(result.otp);
         }
       } else {
-        console.warn("[PaymentModal:ConfirmTransfer] FAILED: Server returned negative status or failure boolean:", result.error);
+        console.warn("[PaymentModal:ConfirmTransfer] FAILED: Negative status:", result.error);
         setOtpError(result.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
-      console.error("[PaymentModal:ConfirmTransfer] EXCEPTION thrown during fetch execution:", err);
-      setOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
+      console.error("[PaymentModal:ConfirmTransfer] EXCEPTION thrown:", err);
+      setOtpError(err?.message || "Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     }
     setIsVerifying(false);
     console.log("[PaymentModal:ConfirmTransfer] Completed confirm transfer process. isVerifying set to false.");
@@ -181,32 +177,28 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     console.log("[PaymentModal:ResendOtp] User details:", { email });
 
     try {
-      console.log("[PaymentModal:ResendOtp] Dispatching POST request to /api/otp/send (resend)...");
-      const response = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: user?.displayName || 'Học viên' })
+      console.log("[PaymentModal:ResendOtp] Dispatching resend via otpService...");
+      const result = await sendOtp({
+        email,
+        name: user?.displayName || 'Học viên',
+        flow: 'purchase'
       });
 
-      console.log("[PaymentModal:ResendOtp] HTTP response status received:", response.status);
-      const data = await response.json().catch(() => null);
-      console.log("[PaymentModal:ResendOtp] Parse response JSON data:", data);
-
-      if (response.ok && data?.success) {
+      if (result.success) {
         console.log("[PaymentModal:ResendOtp] SUCCESS: Resend successful.");
-        setOtpNotice(`Mã OTP mới đã được gửi lại thành công đến email ${email}.`);
+        setOtpNotice(result.message || `Mã OTP mới đã được gửi lại thành công đến email ${email}.`);
         setOtpCountdown(60);
-        if (data.fallback && data.otp) {
-          console.log("[PaymentModal:ResendOtp] FALLBACK mode triggered during resend. Autofilling userInputOtp with:", data.otp);
-          setUserInputOtp(data.otp);
+        if (result.fallback && result.otp) {
+          console.log("[PaymentModal:ResendOtp] FALLBACK mode triggered during resend. Autofilling userInputOtp with:", result.otp);
+          setUserInputOtp(result.otp);
         }
       } else {
-        console.warn("[PaymentModal:ResendOtp] FAILED: Server returned failure status:", data);
-        setOtpError(data?.error || "Không thể gửi lại mã OTP lúc này.");
+        console.warn("[PaymentModal:ResendOtp] FAILED:", result.error);
+        setOtpError(result.error || "Không thể gửi lại mã OTP lúc này.");
       }
-    } catch (err) {
-      console.error("[PaymentModal:ResendOtp] EXCEPTION thrown during fetch execution:", err);
-      setOtpError("Lỗi kết nối khi gửi lại OTP.");
+    } catch (err: any) {
+      console.error("[PaymentModal:ResendOtp] EXCEPTION thrown:", err);
+      setOtpError(err?.message || "Lỗi kết nối khi gửi lại OTP.");
     }
     setIsVerifying(false);
     console.log("[PaymentModal:ResendOtp] Completed OTP resend process. isVerifying set to false.");
@@ -227,18 +219,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     console.log("[PaymentModal:VerifyOtp] Verification details:", { email, otp: userInputOtp });
 
     try {
-      console.log("[PaymentModal:VerifyOtp] Dispatching POST request to /api/otp/verify...");
-      const response = await fetch('/api/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: userInputOtp, flow: 'purchase' })
+      console.log("[PaymentModal:VerifyOtp] Dispatching verify via otpService...");
+      const verifyRes = await verifyOtp({
+        email,
+        otp: userInputOtp,
+        flow: 'purchase'
       });
 
-      console.log("[PaymentModal:VerifyOtp] HTTP response status received:", response.status);
-      const data = await response.json().catch(() => null);
-      console.log("[PaymentModal:VerifyOtp] Parse response JSON data:", data);
-
-      if (response.ok && data?.success) {
+      if (verifyRes.success) {
         console.log("[PaymentModal:VerifyOtp] SUCCESS: OTP verified successfully. Provisioning course:", course.id);
         // Save course unlock to Firestore & localStorage
         if (user && user.email && course.id) {
@@ -276,8 +264,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
           setIsCompleted(false);
         }, 1500);
       } else {
-        console.warn("[PaymentModal:VerifyOtp] FAILED: OTP verification failed. Server data:", data);
-        setOtpError(data?.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
+        console.warn("[PaymentModal:VerifyOtp] FAILED: OTP verification failed. Result:", verifyRes);
+        setOtpError(verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
       }
     } catch (err) {
       console.error("[PaymentModal:VerifyOtp] EXCEPTION thrown during fetch verification:", err);

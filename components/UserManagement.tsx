@@ -5,6 +5,7 @@ import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen,
 import { useToast } from '../contexts/ToastContext';
 import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 import { addApprovalNotification } from '../utils/courseNotificationService';
+import { sendOtp, verifyOtp } from '../utils/otpService';
 
 interface UserPurchasedCourse {
   courseId: string;
@@ -156,30 +157,25 @@ export const UserManagement: React.FC = () => {
     setLockOtpCode('');
 
     try {
-      const res = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: adminEmail, 
-          name: auth.currentUser?.displayName || 'Quản trị viên' 
-        })
+      const result = await sendOtp({
+        email: adminEmail,
+        name: auth.currentUser?.displayName || 'Quản trị viên',
+        flow: 'lock'
       });
 
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data?.success) {
+      if (result.success) {
         setLockOtpSent(true);
         setLockOtpCooldown(30);
-        setLockOtpNotice(data.message || `Mã OTP đã được gửi đến email ${adminEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam).`);
-        if (data.fallback && data.otp) {
-          setLockOtpCode(data.otp);
+        setLockOtpNotice(result.message || `Mã OTP đã được gửi đến email ${adminEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam).`);
+        if (result.fallback && result.otp) {
+          setLockOtpCode(result.otp);
         }
       } else {
-        setLockOtpError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
+        setLockOtpError(result.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Lock OTP send error:", err);
-      setLockOtpError("Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
+      setLockOtpError(err?.message || "Lỗi kết nối tới máy chủ gửi mã OTP. Vui lòng thử lại.");
     } finally {
       setLockOtpSending(false);
     }
@@ -280,21 +276,19 @@ export const UserManagement: React.FC = () => {
       setLockOtpError('');
 
       try {
-        const res = await fetch('/api/otp/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: adminEmail, otp: lockOtpCode.trim(), flow: 'lock' })
+        const verifyRes = await verifyOtp({
+          email: adminEmail,
+          otp: lockOtpCode.trim(),
+          flow: 'lock'
         });
 
-        const resJson = await res.json().catch(() => null);
-
-        if (!res.ok || !resJson?.success) {
-          setLockOtpError(resJson?.error || 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.');
+        if (!verifyRes.success) {
+          setLockOtpError(verifyRes.error || 'Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.');
           return;
         }
-      } catch (err) {
-        console.error("Server OTP verify check error:", err);
-        setLockOtpError('Không thể kết nối đến máy chủ xác minh OTP. Vui lòng thử lại.');
+      } catch (err: any) {
+        console.error("OTP verify check error:", err);
+        setLockOtpError(err?.message || 'Không thể xác minh OTP. Vui lòng thử lại.');
         return;
       }
     }

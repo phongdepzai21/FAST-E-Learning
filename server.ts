@@ -431,9 +431,12 @@ async function startServer() {
       const emailKey = String(email).toLowerCase().trim();
 
       // Check if user account already exists in Firebase Auth or Firestore
-      const userExists = await checkUserExistsSafe(emailKey);
+      let userExists: boolean | null = null;
+      if (flow === 'register' || flow === 'reset' || flow === 'login') {
+        userExists = await checkUserExistsSafe(emailKey);
+      }
 
-      // Distinguish flows: Register vs Login/Reset
+      // Distinguish flows: Register vs Login/Reset vs Lock/Purchase
       if (flow === 'register' && userExists === true) {
         return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
       }
@@ -551,7 +554,10 @@ async function startServer() {
       const inputOtp = String(otp).trim();
 
       // Check if user account already exists in Firebase Auth or Firestore
-      const userExists = await checkUserExistsSafe(emailKey);
+      let userExists: boolean | null = null;
+      if (flow === 'register' || flow === 'reset' || flow === 'login') {
+        userExists = await checkUserExistsSafe(emailKey);
+      }
 
       // Distinguish flows: Register vs Login/Reset
       if (flow === 'register' && userExists === true) {

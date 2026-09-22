@@ -34,6 +34,7 @@ import { auth, db } from '../firebase';
 import { Helmet } from 'react-helmet-async';
 import { authDebugger } from '../utils/authDebugger';
 import { otpLogger } from '../auth/otp-logger';
+import { sendOtp, verifyOtp } from '../utils/otpService';
 
 interface UserProfile {
   name: string;
@@ -912,26 +913,21 @@ const Account: React.FC = () => {
       setOtpAttemptsLeft(5);
       setOtpCountdown(60);
 
-      const sendResult = await otpLogger.wrapOtpSend(
-        normalizedEmail,
-        trimmedName,
-        () => fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail, name: trimmedName, flow: 'register' })
-        })
-      );
+      const sendResult = await sendOtp({
+        email: normalizedEmail,
+        name: trimmedName,
+        flow: 'register'
+      });
 
       if (sendResult.success) {
         setIsOtpPending(true);
         otpLogger.logModalToggle("Account_Registration_OTP", true, "Register_Button_Submit");
-        const resData = sendResult.data;
-        if (resData.fallback && resData.otp) {
-          setOtpDigits(resData.otp.split(''));
-          setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
+        if (sendResult.fallback && sendResult.otp) {
+          setOtpDigits(sendResult.otp.split(''));
+          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP gồm 6 chữ số đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
           toast.success('Hệ thống tự động điền mã OTP dự phòng!');
         } else {
-          setOtpStatusMessage(resData.message || `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng mở email (kiểm tra cả mục Thư rác/Spam), sao chép mã và dán vào ô bên dưới.`);
+          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP gồm 6 chữ số đã được gửi trực tiếp đến hộp thư email [${normalizedEmail}]. Vui lòng mở email (kiểm tra cả mục Thư rác/Spam), sao chép mã và dán vào ô bên dưới.`);
           toast.success('Mã OTP đã được gửi đến email của bạn! Vui lòng vào hộp thư để lấy mã.');
         }
       } else {
@@ -959,15 +955,13 @@ const Account: React.FC = () => {
     setOtpFormError(null);
 
     try {
-      const verifyRes = await fetch('/api/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim(), otp: enteredCode, flow: 'register' })
+      const verifyRes = await verifyOtp({
+        email: email.toLowerCase().trim(),
+        otp: enteredCode,
+        flow: 'register'
       });
 
-      const verifyData = await verifyRes.json().catch(() => null);
-
-      if (!verifyRes.ok || !verifyData?.success) {
+      if (!verifyRes.success) {
         const left = otpAttemptsLeft - 1;
         setOtpAttemptsLeft(left);
         
@@ -978,7 +972,7 @@ const Account: React.FC = () => {
           setError("Yêu cầu đăng ký tài khoản bị từ chối do nhập sai OTP quá số lần quy định. Vui lòng đăng ký lại.");
           toast.error(errorMsg);
         } else {
-          const errorMsg = verifyData?.error || `Mã xác thực không chính xác. Bạn còn ${left} lần nhập lại.`;
+          const errorMsg = verifyRes.error || `Mã xác thực không chính xác. Bạn còn ${left} lần nhập lại.`;
           setOtpFormError(errorMsg);
           toast.error(errorMsg);
         }
@@ -986,7 +980,7 @@ const Account: React.FC = () => {
         return;
       }
 
-      // OTP matches on server! Proceed to register in Firebase Auth & Firestore
+      // OTP matches! Proceed to register in Firebase Auth & Firestore
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
       await updateProfile(newUser, { displayName: fullName });
@@ -1073,19 +1067,14 @@ const Account: React.FC = () => {
 
     const normalizedEmail = email.toLowerCase().trim();
     try {
-      const sendResult = await otpLogger.wrapOtpSend(
-        normalizedEmail,
-        fullName.trim(),
-        () => fetch('/api/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail, name: fullName.trim(), flow: 'register' })
-        })
-      );
+      const sendResult = await sendOtp({
+        email: normalizedEmail,
+        name: fullName.trim(),
+        flow: 'register'
+      });
 
       if (sendResult.success) {
-        const resData = sendResult.data;
-        setOtpStatusMessage(resData.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
+        setOtpStatusMessage(sendResult.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
         toast.success("Đã gửi lại mã OTP vào email thành công!");
       } else {
         setOtpFormError(sendResult?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
