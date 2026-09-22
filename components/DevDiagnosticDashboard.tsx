@@ -44,6 +44,8 @@ const isDevMode =
     window.location.search.includes('debug=true')
   ));
 
+const REQUIRED_DEV_PASSWORD = 'Family2515@';
+
 export const DevDiagnosticDashboard: React.FC = () => {
   // If in production, strictly render nothing
   if (!isDevMode) return null;
@@ -53,6 +55,18 @@ export const DevDiagnosticDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'raw'>('stream');
   const [state, setState] = useState<DiagnosticState>(authDebugger.getState());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Security password protection state
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('fast_dev_diag_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // Filters
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -70,6 +84,42 @@ export const DevDiagnosticDashboard: React.FC = () => {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const keySequenceRef = useRef<string[]>([]);
   const lastKeyTimeRef = useRef<number>(0);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus password input when unlock modal appears
+  useEffect(() => {
+    if (isOpen && !isUnlocked) {
+      const timer = setTimeout(() => {
+        passwordInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isUnlocked]);
+
+  const handleUnlock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (passwordInput === REQUIRED_DEV_PASSWORD) {
+      setIsUnlocked(true);
+      setPasswordError(null);
+      setPasswordInput('');
+      try {
+        sessionStorage.setItem('fast_dev_diag_unlocked', 'true');
+      } catch (err) {
+        // ignore storage errors
+      }
+    } else {
+      setPasswordError('Mật khẩu không chính xác! Vui lòng thử lại.');
+    }
+  };
+
+  const handleLock = () => {
+    setIsUnlocked(false);
+    try {
+      sessionStorage.removeItem('fast_dev_diag_unlocked');
+    } catch (err) {
+      // ignore
+    }
+  };
 
   // Subscribe to real-time events from authDebugger
   useEffect(() => {
@@ -169,9 +219,110 @@ export const DevDiagnosticDashboard: React.FC = () => {
 
   return (
     <>
-      {/* FULL DIAGNOSTIC DASHBOARD MODAL (Triggered via Ctrl + Shift + X Y Z / D E V) */}
+      {/* SECURITY UNLOCK MODAL (When triggered via shortcut but not yet authenticated) */}
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && !isUnlocked && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-md bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-2xl overflow-hidden p-6 font-sans text-slate-100 relative"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
+                    <Shield className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+                      Xác thực Quyền Developer
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        DEV ACCESS
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Nhập mã bảo mật để mở bảng chẩn đoán hệ thống
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setPasswordError(null);
+                    setPasswordInput('');
+                  }}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUnlock} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 mb-1.5 font-medium">
+                    MẬT KHẨU TRUY CẬP (DEVELOPER PASSCODE):
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <Lock className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <input
+                      ref={passwordInputRef}
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwordInput}
+                      onChange={(e) => {
+                        setPasswordInput(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Nhập mật khẩu nhà phát triển..."
+                      className="w-full pl-9 pr-10 py-2.5 bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl text-sm font-mono text-white placeholder-slate-500 transition-all outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {passwordError && (
+                    <p className="mt-2 text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      {passwordError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setPasswordError(null);
+                      setPasswordInput('');
+                    }}
+                    className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer font-mono"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Mở Khóa Bảng Chẩn Đoán
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* FULL DIAGNOSTIC DASHBOARD MODAL (Triggered via Ctrl + Shift + X Y Z / D E V) */}
+        {isOpen && isUnlocked && (
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -207,6 +358,15 @@ export const DevDiagnosticDashboard: React.FC = () => {
 
               {/* Action buttons */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLock}
+                  className="px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/70 text-rose-300 hover:text-white text-[11px] font-medium transition-all flex items-center gap-1.5 cursor-pointer border border-rose-800/50"
+                  title="Khóa bảng chẩn đoán"
+                >
+                  <Lock className="w-3 h-3 text-rose-400" />
+                  <span className="hidden md:inline">Khóa lại</span>
+                </button>
+
                 <button
                   onClick={() => authDebugger.clearLogs()}
                   className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium transition-all flex items-center gap-1.5 cursor-pointer border border-slate-700"
