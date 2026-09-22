@@ -1590,7 +1590,7 @@ const Account: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex animate-fade-in overflow-hidden">
+      <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
         {/* Sidebar */}
         {(() => {
@@ -1601,7 +1601,7 @@ const Account: React.FC = () => {
             <aside 
               onMouseEnter={() => { if (isCompactSidebar) setIsSidebarHovered(true); }}
               onMouseLeave={() => { if (isCompactSidebar) setIsSidebarHovered(false); }}
-              className={`hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
+              className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
                 isCompactSidebar 
                   ? (isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs') 
                   : 'w-72'
@@ -1688,15 +1688,15 @@ const Account: React.FC = () => {
           );
         })()}
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
-          <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between border-b border-gray-100">
-             <div className="flex items-center gap-4 lg:hidden">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc] print:bg-white print:overflow-visible print:p-0 print:m-0">
+          <header className="print:hidden bg-white/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between border-b border-gray-100">
+             <div className="flex items-center gap-4 lg:hidden print:hidden">
                 <select 
                   value={activeTab} 
                   onChange={(e) => {
                     setActiveTab(e.target.value as any);
                   }}
-                  className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#007c76] focus:border-[#007c76] block w-full p-2.5 outline-none"
+                  className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
                 >
                   <option value="dashboard">Bảng điều khiển</option>
                   <option value="my-courses">Khóa học của tôi</option>

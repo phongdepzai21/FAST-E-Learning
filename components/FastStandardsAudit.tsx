@@ -14,7 +14,7 @@ import {
   ShieldCheck, 
   Building2, 
   UserCheck, 
-  Sparkles, 
+  Droplets, 
   UtensilsCrossed, 
   HeartHandshake, 
   Wrench, 
@@ -554,7 +554,7 @@ export const FastStandardsAudit: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner (Screen Only) */}
-      <div className="fast-audit-screen-only bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+      <div className="fast-audit-screen-only bg-gradient-to-r from-[#005c56] to-[#005c56] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
@@ -575,55 +575,22 @@ export const FastStandardsAudit: React.FC = () => {
               Đánh giá toàn diện 8 trụ cột Vận hành &amp; An toàn thực phẩm (265 tiêu chuẩn chuẩn hóa ISO &amp; HACCP Codex).
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={exportToExcel}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
-              title="Xuất toàn bộ 265 tiêu chuẩn và CAPA ra file Excel"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Xuất Excel
-            </button>
-            <button
-              onClick={handleExportPDF}
-              className="px-4 py-2.5 bg-white text-[#005c56] hover:bg-teal-50 rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
-            >
-              <Download className="w-4 h-4" />
-              Xuất Báo Cáo PDF
-            </button>
-            <button
-              onClick={handleNativePrint}
-              className="px-4 py-2.5 bg-teal-800/80 hover:bg-teal-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center gap-1.5"
-            >
-              <Printer className="w-4 h-4" />
-              In Báo Cáo
-            </button>
-            <button
-              onClick={resetAllAudit}
-              className="px-3 py-2.5 bg-red-600/80 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
-              title="Làm mới lại toàn bộ tiêu chuẩn đánh giá"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Làm mới
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Navigation Sub-Tabs (Screen Only) */}
       <div className="fast-audit-screen-only bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
         {[
-          { id: 'library', label: 'Thư Viện', icon: Building2, count: null, activeGradient: 'from-slate-700 to-slate-900', textColor: 'text-slate-700' },
-          { id: 'accuracy', label: 'Accuracy', icon: CheckCircle2, count: 20, activeGradient: 'from-teal-600 to-emerald-600', textColor: 'text-teal-700' },
-          { id: 'cleanliness', label: 'Cleanliness', icon: Sparkles, count: 55, activeGradient: 'from-sky-600 to-blue-600', textColor: 'text-sky-700' },
-          { id: 'hospitality', label: 'Hospitality', icon: HeartHandshake, count: 21, activeGradient: 'from-purple-600 to-indigo-600', textColor: 'text-purple-700' },
-          { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: 54, activeGradient: 'from-amber-600 to-orange-600', textColor: 'text-amber-700' },
-          { id: 'people', label: 'People', icon: Users, count: 10, activeGradient: 'from-emerald-600 to-teal-700', textColor: 'text-emerald-700' },
-          { id: 'product', label: 'Product', icon: UtensilsCrossed, count: 61, activeGradient: 'from-rose-600 to-red-600', textColor: 'text-rose-700' },
-          { id: 'safety', label: 'Safety', icon: ShieldAlert, count: 19, activeGradient: 'from-red-600 to-orange-700', textColor: 'text-red-700' },
-          { id: 'speed', label: 'Speed', icon: Timer, count: 25, activeGradient: 'from-sky-600 to-blue-700', textColor: 'text-blue-700' },
-          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'from-amber-500 via-orange-500 to-amber-600', textColor: 'text-amber-800' }
+          { id: 'library', label: 'Thư Viện', icon: Building2, count: null, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'accuracy', label: 'Accuracy', icon: CheckCircle2, count: 20, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'cleanliness', label: 'Cleanliness', icon: Droplets, count: 55, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'hospitality', label: 'Hospitality', icon: HeartHandshake, count: 21, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: 54, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'people', label: 'People', icon: Users, count: 10, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'product', label: 'Product', icon: UtensilsCrossed, count: 61, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'safety', label: 'Safety', icon: ShieldAlert, count: 19, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'speed', label: 'Speed', icon: Timer, count: 25, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
+          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'bg-amber-600', textColor: 'text-amber-800' }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -633,10 +600,10 @@ export const FastStandardsAudit: React.FC = () => {
               onClick={() => setActiveSubTab(tab.id)}
               className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 isActive
-                  ? `bg-gradient-to-r ${tab.activeGradient} text-white shadow-md shadow-teal-900/20 ring-1 ring-white/30 scale-[1.02]`
+                  ? `${tab.activeGradient} text-white shadow-md shadow-teal-900/10 ring-1 ring-[#005c56] scale-[1.02]`
                   : tab.highlight
                     ? 'bg-amber-50 text-amber-900 hover:bg-amber-100/80 border border-amber-300 shadow-xs'
-                    : 'bg-gray-50/80 text-gray-700 hover:bg-teal-50/80 hover:text-[#007c76] border border-gray-100'
+                    : 'bg-gray-50/80 text-gray-700 hover:bg-teal-50/80 hover:text-[#005c56] border border-gray-100'
               }`}
             >
               <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-amber-600' : 'text-gray-500'}`} />
@@ -972,10 +939,30 @@ export const FastStandardsAudit: React.FC = () => {
       {/* TAB 10: BÁO CÁO & CAPA */}
       {activeSubTab === 'report' && (
         <div className="space-y-6" id="fastAuditReportSection">
+          {/* Action Toolbar (Screen-Only) */}
+          <div className="fast-audit-screen-only print:hidden flex flex-wrap items-center gap-3 bg-teal-50/50 p-4 rounded-2xl border border-teal-100">
+            <button
+              onClick={handleNativePrint}
+              className="px-5 py-3 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+              title="In báo cáo trực tiếp hoặc xuất ra định dạng file PDF sạch đẹp"
+            >
+              <Printer className="w-4 h-4" />
+              In / Xuất Báo Cáo PDF
+            </button>
+            <button
+              onClick={exportToExcel}
+              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+              title="Xuất toàn bộ tiêu chuẩn và CAPA sang định dạng Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Xuất Excel
+            </button>
+          </div>
+
           {/* Audit Header Section */}
-          <div className="bg-white p-6 rounded-2xl border-2 border-[#007c76] shadow-sm">
-            <div className="border-b-2 border-[#007c76] pb-3 mb-4">
-              <h2 className="text-lg md:text-xl font-black text-[#007c76] uppercase tracking-wide">
+          <div className="bg-white p-6 rounded-2xl border-2 border-[#005c56] shadow-sm">
+            <div className="border-b-2 border-[#005c56] pb-3 mb-4">
+              <h2 className="text-lg md:text-xl font-black text-[#005c56] uppercase tracking-wide">
                 BÁO CÁO KẾT QUẢ ĐÁNH GIÁ HỆ THỐNG AN TOÀN THỰC PHẨM &amp; VẬN HÀNH
               </h2>
               <p className="text-xs text-gray-500 font-medium italic mt-1">
@@ -1110,7 +1097,7 @@ export const FastStandardsAudit: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse min-w-[950px]">
                 <thead>
-                  <tr className="bg-[#007c76] text-white font-bold">
+                  <tr className="bg-[#005c56] text-white font-bold">
                     <th className="p-3 w-12 text-center border-r border-teal-700/50">STT</th>
                     <th className="p-3 w-28 border-r border-teal-700/50">Trụ cột</th>
                     <th className="p-3 w-24 text-center border-r border-teal-700/50">Phân loại</th>
@@ -1144,7 +1131,7 @@ export const FastStandardsAudit: React.FC = () => {
                         <tr key={f.id} className="hover:bg-gray-50/60 transition-colors">
                           <td className="p-3 text-center font-bold text-gray-700 border-r border-gray-100">{idx + 1}</td>
                           <td className="p-3 border-r border-gray-100">
-                            <span className="font-bold text-[#007c76] text-[11px] block">{f.pillar}</span>
+                            <span className="font-bold text-[#005c56] text-[11px] block">{f.pillar}</span>
                             <span className="text-[10px] text-gray-400 font-mono">[{f.id}]</span>
                           </td>
                           <td className="p-3 text-center border-r border-gray-100">
@@ -1232,12 +1219,31 @@ export const FastStandardsAudit: React.FC = () => {
 
             <div className="flex flex-col items-center justify-between min-h-[140px]">
               <div>
-                <p className="font-black text-xs uppercase tracking-wider text-[#007c76]">CHUYÊN GIA ĐÁNH GIÁ TRƯỞNG (LEAD AUDITOR)</p>
+                <p className="font-black text-xs uppercase tracking-wider text-[#005c56]">CHUYÊN GIA ĐÁNH GIÁ TRƯỞNG (LEAD AUDITOR)</p>
                 <p className="text-[11px] text-gray-500 italic mt-0.5">(Ký &amp; ghi rõ họ tên)</p>
               </div>
               <div className="font-bold text-xs text-gray-900 border-t border-gray-300 pt-2 w-48">
                 {auditorName}
               </div>
+            </div>
+          </div>
+
+          {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Mộc Đóng Dấu Đính Kèm) */}
+          <div className="mt-12 p-6 border-2 border-dashed border-[#005c56] rounded-2xl bg-[#005c56]/5 flex flex-col items-center justify-center text-center space-y-2 page-break-inside-avoid">
+            <div className="text-[#005c56] font-black text-xs uppercase tracking-widest flex items-center gap-2">
+              ★ FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING ★
+            </div>
+            <div className="text-gray-700 font-bold text-[11px]">
+              ĐƠN VỊ TƯ VẤN QUẢN LÝ CHẤT LƯỢNG &amp; THỦ TỤC HÀNH CHÍNH DOANH NGHIỆP HÀNG ĐẦU
+            </div>
+            <div className="text-[11px] text-gray-800 font-medium max-w-xl leading-relaxed">
+              Chuyên sâu tư vấn: An toàn thực phẩm (ISO 22000, HACCP), Giấy phép quảng cáo Sở Văn hóa, Giấy phép xây dựng Pano tấm lớn, và các thủ tục pháp lý trọn gói.
+            </div>
+            <div className="text-[11px] text-gray-900 font-bold bg-white px-4 py-1.5 rounded-full shadow-xs border border-gray-100">
+              Hotline Hỗ Trợ Toàn Quốc 24/7: <span className="text-red-600 font-black text-xs">0927 002 668</span>
+            </div>
+            <div className="text-gray-400 text-[10px] pt-1">
+              &copy; {new Date().getFullYear()} FAST CONSULTING. Mọi quyền được bảo lưu.
             </div>
           </div>
         </div>

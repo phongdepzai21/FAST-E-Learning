@@ -49,6 +49,7 @@ interface CustomerRecord {
   totalDocs: number;
   rate: number;
   checklist: Record<string, boolean>;
+  images?: string[];
   updatedAt: string;
 }
 
@@ -155,6 +156,9 @@ export const AdProfileManagement: React.FC = () => {
   // 7 checklist docs state
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
 
+  // Attached images state (Base64)
+  const [images, setImages] = useState<string[]>([]);
+
   // UI state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterPendingOnly, setFilterPendingOnly] = useState<boolean>(false);
@@ -260,6 +264,7 @@ export const AdProfileManagement: React.FC = () => {
         setCustStatus(d.status || 'Đang chuẩn bị hồ sơ');
         setCustReceipt(d.receipt || '');
         setChecklist(d.checklist || {});
+        setImages(d.images || []);
       }
     } catch (e) {}
   }, []);
@@ -278,7 +283,8 @@ export const AdProfileManagement: React.FC = () => {
       actualDate,
       status: custStatus,
       receipt: custReceipt,
-      checklist
+      checklist,
+      images
     };
     try {
       localStorage.setItem(CUST_ACTIVE_KEY, JSON.stringify(active));
@@ -393,6 +399,7 @@ export const AdProfileManagement: React.FC = () => {
       totalDocs: 7,
       rate: Math.round((checkedCount / 7) * 100),
       checklist,
+      images,
       updatedAt: new Date().toLocaleString('vi-VN')
     };
 
@@ -428,6 +435,7 @@ export const AdProfileManagement: React.FC = () => {
       setCustStatus('Đang chuẩn bị hồ sơ');
       setCustReceipt('');
       setChecklist({});
+      setImages([]);
       saveActiveDraft();
     }
   };
@@ -446,8 +454,47 @@ export const AdProfileManagement: React.FC = () => {
     setCustStatus(c.status || 'Đang chuẩn bị hồ sơ');
     setCustReceipt(c.receipt || '');
     setChecklist(c.checklist || {});
+    setImages(c.images || []);
     saveActiveDraft();
     window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  // Image Upload and Remove Handlers
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chỉ tải lên các tệp tin hình ảnh.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Kích thước ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setImages(prev => {
+            const updated = [...prev, reader.result as string];
+            // Save active draft
+            setTimeout(() => saveActiveDraft(), 50);
+            return updated;
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages(prev => {
+      const updated = prev.filter((_, idx) => idx !== index);
+      setTimeout(() => saveActiveDraft(), 50);
+      return updated;
+    });
   };
 
   // Delete customer
@@ -615,7 +662,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       {/* SCREEN VIEW (Hidden when printing checklist) */}
       <div className="ad-profile-screen-only space-y-6">
         {/* Header Banner */}
-        <div className="bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#005c56] to-[#00423e] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
@@ -720,7 +767,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#007c76]" />
+            <Layers className="w-4 h-4 text-[#005c56]" />
             <h2 className="text-xs font-black uppercase text-gray-800 tracking-wider">
               Cơ Sở Dữ Liệu Theo Dõi Toàn Trình (FAST CRM)
             </h2>
@@ -735,7 +782,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             </button>
             <button
               onClick={handleNewCustomer}
-              className="px-3 py-1.5 bg-[#007c76] hover:bg-[#005c56] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
+              className="px-3 py-1.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
               + Tạo Hồ Sơ Khách Mới
@@ -783,7 +830,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                       <td className="p-2.5 font-bold text-gray-900">{c.name}</td>
                       <td className="p-2.5">
                         {c.phone && c.phone !== 'Chưa có' ? (
-                          <a href={`tel:${c.phone}`} className="text-[#007c76] hover:underline font-semibold flex items-center gap-1">
+                           <a href={`tel:${c.phone}`} className="text-[#005c56] hover:underline font-semibold flex items-center gap-1">
                             <Phone className="w-3 h-3" />
                             {c.phone}
                           </a>
@@ -793,7 +840,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                       </td>
                       <td className="p-2.5 text-gray-600">{c.location}</td>
                       <td className="p-2.5 text-gray-600">{c.orderDate || '-'}</td>
-                      <td className="p-2.5 font-semibold text-[#007c76]">{c.submitDate || '-'}</td>
+                      <td className="p-2.5 font-semibold text-[#005c56]">{c.submitDate || '-'}</td>
                       <td className="p-2.5 font-semibold text-amber-700">{c.targetDate || '-'}</td>
                       <td className="p-2.5 font-semibold text-green-700">{c.actualDate || '-'}</td>
                       <td className="p-2.5 text-center font-bold">{c.completedCount || 0}/7</td>
@@ -830,10 +877,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Customer Record Edit Form */}
-      <div className="bg-white p-6 rounded-2xl border-2 border-teal-500/40 shadow-sm space-y-4">
+      <div className="bg-white p-6 rounded-2xl border-2 border-[#005c56]/40 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between border-b border-dashed border-gray-200 pb-3 gap-2">
           <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-[#007c76]" />
+            <User className="w-5 h-5 text-[#005c56]" />
             <h2 className="text-sm font-black uppercase text-gray-800 tracking-wide">
               Quản Lý Toàn Trình Hồ Sơ Khách Hàng
             </h2>
@@ -1016,10 +1063,77 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <button
               type="button"
               onClick={saveCustomerToCRM}
-              className="px-5 py-2 bg-[#007c76] hover:bg-[#005c56] text-white rounded-xl font-black transition-all text-xs shadow-md shadow-teal-700/20"
+              className="px-5 py-2 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-black transition-all text-xs shadow-md shadow-teal-700/20"
             >
               Lưu Vào Thống Kê
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Khối đính kèm hình ảnh minh họa (Phối cảnh & Ma-két) */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+          <Layers className="w-5 h-5 text-[#005c56]" />
+          <h3 className="font-bold text-sm text-gray-800 uppercase tracking-wide">
+            Đính Kèm Ảnh Thực Tế / Ma-két / Phối Cảnh (Đính kèm cuối bản in)
+          </h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Uploader Box */}
+          <div className="border-2 border-dashed border-gray-200 hover:border-[#005c56] rounded-2xl p-6 transition-all bg-gray-50/50 flex flex-col items-center justify-center text-center group cursor-pointer relative min-h-[160px]">
+            <input 
+              type="file" 
+              multiple 
+              accept="image/*" 
+              onChange={handleImageUpload}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+            />
+            <div className="space-y-2 pointer-events-none">
+              <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mx-auto text-[#005c56] group-hover:scale-110 transition-transform">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-700">Chọn hoặc Kéo thả ảnh vào đây</p>
+                <p className="text-[11px] text-gray-500 mt-1">Hỗ trợ các file ảnh JPEG, PNG, WEBP. Tối đa 5MB/ảnh.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Grid */}
+          <div className="flex flex-col justify-center">
+            {images.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-xs italic bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                Chưa có hình ảnh đính kèm. Hãy tải lên ảnh phối cảnh hoặc bản vẽ maquette để tự động đính kèm vào cuối bản in.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {images.map((imgBase64, index) => (
+                  <div key={index} className="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all">
+                    <img 
+                      src={imgBase64} 
+                      alt={`Ảnh đính kèm ${index + 1}`} 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-20 cursor-pointer"
+                      title="Xóa ảnh này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
+                      Ảnh {index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1028,16 +1142,16 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm sticky top-0 z-20">
         <div className="flex items-center justify-between text-xs font-bold mb-2">
           <span className="text-gray-700 flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-[#007c76]" />
+            <CheckCircle2 className="w-4 h-4 text-[#005c56]" />
             Tiến độ chuẩn bị hồ sơ khách hàng ({custName || 'Khách hàng hiện tại'})
           </span>
-          <span className={`font-black ${progressPercent === 100 ? 'text-green-600' : 'text-[#007c76]'}`}>
+          <span className={`font-black ${progressPercent === 100 ? 'text-green-600' : 'text-[#005c56]'}`}>
             Đã chuẩn bị: {checkedDocsCount}/7 mục ({progressPercent}%) {progressPercent === 100 && '✓ Hoàn thành'}
           </span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-[#007c76] to-green-500 rounded-full transition-all duration-300"
+            className="h-full bg-gradient-to-r from-[#005c56] to-green-500 rounded-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -1061,7 +1175,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             onClick={() => setFilterPendingOnly(!filterPendingOnly)}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               filterPendingOnly 
-                ? 'bg-[#007c76] text-white shadow-sm' 
+                ? 'bg-[#005c56] text-white shadow-sm' 
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -1077,13 +1191,6 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           </button>
 
           <button
-            onClick={resetChecklist}
-            className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all border border-red-200"
-          >
-            Xóa chọn lại
-          </button>
-
-          <button
             onClick={copyZaloMessage}
             className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
             title="Sao chép tin nhắn để gửi khách qua Zalo"
@@ -1094,7 +1201,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 
           <button
             onClick={handlePrintChecklistOnly}
-            className="px-3.5 py-2 bg-[#007c76] hover:bg-[#005c56] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
             title="In riêng bảng checklist hồ sơ theo yêu cầu"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -1110,7 +1217,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           className="w-full p-4 bg-teal-50/50 hover:bg-teal-50 flex items-center justify-between text-left transition-all border-b border-gray-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-bold text-xs flex items-center justify-center">1</span>
+            <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">1</span>
             <span className="font-bold text-sm text-gray-800">
               Danh Mục Hồ Sơ Khách Hàng Cần Cung Cấp (07 Hạng Mục)
             </span>
@@ -1135,7 +1242,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 </button>
                 <button
                   onClick={handlePrintChecklistOnly}
-                  className="px-3 py-1.5 bg-[#007c76] hover:bg-[#005c56] text-white rounded-lg font-bold flex items-center gap-1 shadow-sm"
+                  className="px-3 py-1.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-lg font-bold flex items-center gap-1 shadow-sm"
                   title="In trực tiếp bảng checklist hồ sơ"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -1227,7 +1334,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-bold text-xs flex items-center justify-center">2</span>
+            <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">2</span>
             <span className="font-bold text-sm text-gray-800">
               Trình Tự Thực Hiện &amp; Nguyên Tắc Hậu Kiểm 05 Ngày Làm Việc
             </span>
@@ -1238,8 +1345,8 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
         {openSections.secProcess && (
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-4 bg-gray-50 rounded-xl border-t-4 border-t-[#007c76]">
-                <div className="text-[10px] font-black uppercase text-[#007c76] tracking-wider mb-1">Bước 1: Nộp hồ sơ</div>
+              <div className="p-4 bg-gray-50 rounded-xl border-t-4 border-t-[#005c56]">
+                <div className="text-[10px] font-black uppercase text-[#005c56] tracking-wider mb-1">Bước 1: Nộp hồ sơ</div>
                 <div className="font-bold text-sm text-gray-800 mb-1">Gửi trước 15 ngày</div>
                 <p className="text-gray-600 leading-relaxed">
                   Tổ chức, cá nhân gửi 01 bộ hồ sơ thông báo đến Sở VHTTDL / Sở VHTT trước khi thực hiện quảng cáo ít nhất <strong>15 ngày</strong>.
@@ -1277,7 +1384,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-bold text-xs flex items-center justify-center">3</span>
+            <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">3</span>
             <span className="font-bold text-sm text-gray-800">
               3 Cách Thức Tiếp Nhận Hồ Sơ &amp; Mức Lệ Phí
             </span>
@@ -1334,7 +1441,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-bold text-xs flex items-center justify-center">4</span>
+            <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">4</span>
             <span className="font-bold text-sm text-gray-800">
               Quy Định Kỹ Thuật Treo Băng-Rôn &amp; Bảng Quảng Cáo Cần Biết
             </span>
@@ -1363,7 +1470,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-bold text-xs flex items-center justify-center">5</span>
+            <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">5</span>
             <span className="font-bold text-sm text-gray-800">
               Hệ Thống Căn Cứ Pháp Lý Ban Hành
             </span>
@@ -1376,19 +1483,19 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <div className="divide-y divide-gray-100">
               <div className="py-2 flex justify-between items-center">
                 <span className="font-semibold text-gray-800">Luật Quảng cáo năm 2012</span>
-                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#007c76] font-mono font-bold text-[11px]">16/2012/QH13</span>
+                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#005c56] font-mono font-bold text-[11px]">16/2012/QH13</span>
               </div>
               <div className="py-2 flex justify-between items-center">
                 <span className="font-semibold text-gray-800">Nghị định quy định chi tiết thi hành một số điều của Luật Quảng cáo</span>
-                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#007c76] font-mono font-bold text-[11px]">342/2025/NĐ-CP</span>
+                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#005c56] font-mono font-bold text-[11px]">342/2025/NĐ-CP</span>
               </div>
               <div className="py-2 flex justify-between items-center">
                 <span className="font-semibold text-gray-800">Thông tư của Bộ trưởng BVHTTDL sửa đổi, bổ sung quy định liên quan đến giấy tờ công dân</span>
-                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#007c76] font-mono font-bold text-[11px]">13/2023/TT-BVHTTDL</span>
+                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#005c56] font-mono font-bold text-[11px]">13/2023/TT-BVHTTDL</span>
               </div>
               <div className="py-2 flex justify-between items-center">
                 <span className="font-semibold text-gray-800">Quyết định công bố TTHC thuộc phạm vi quản lý của Bộ Văn hóa, Thể thao và Du lịch</span>
-                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#007c76] font-mono font-bold text-[11px]">190/QĐ-BVHTTDL</span>
+                <span className="px-2 py-0.5 rounded bg-teal-50 text-[#005c56] font-mono font-bold text-[11px]">190/QĐ-BVHTTDL</span>
               </div>
             </div>
           </div>
@@ -1399,9 +1506,9 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
       <div id="ad-checklist-print-area" className="hidden print:block bg-white text-gray-900 p-6">
         {/* Header */}
-        <div className="border-b-2 border-[#007c76] pb-3 mb-4 flex justify-between items-center">
+        <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
           <div>
-            <div className="text-[11px] font-black uppercase text-[#007c76] tracking-wider">
+            <div className="text-[11px] font-black uppercase text-[#005c56] tracking-wider">
               FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
             </div>
             <h1 className="text-xl font-black text-gray-900 uppercase mt-0.5 tracking-tight">
@@ -1498,24 +1605,72 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 
         {/* Khối chữ ký bàn giao */}
         <div className="grid grid-cols-2 gap-8 text-center text-xs mt-6 pt-4 border-t border-gray-300">
-          <div className="flex flex-col items-center justify-between min-h-[120px]">
+          <div className="flex flex-col items-center justify-between min-h-[110px]">
             <div>
               <p className="font-bold uppercase tracking-wider text-gray-800">ĐẠI DIỆN KHÁCH HÀNG / DOANH NGHIỆP</p>
-              <p className="text-[10.5px] text-gray-500 italic">(Ký, ghi rõ họ tên &amp; đóng dấu)</p>
+              <p className="text-[10px] text-gray-500 italic">(Ký, ghi rõ họ tên &amp; đóng dấu)</p>
             </div>
             <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
               {custName || 'Khách hàng'}
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-between min-h-[120px]">
+          <div className="flex flex-col items-center justify-between min-h-[110px]">
             <div>
-              <p className="font-bold uppercase tracking-wider text-[#007c76]">CHUYÊN VIÊN FAST TIẾP NHẬN HỒ SƠ</p>
-              <p className="text-[10.5px] text-gray-500 italic">(Ký &amp; ghi rõ họ tên)</p>
+              <p className="font-bold uppercase tracking-wider text-[#005c56]">CHUYÊN VIÊN FAST TIẾP NHẬN HỒ SƠ</p>
+              <p className="text-[10px] text-gray-500 italic">(Ký &amp; ghi rõ họ tên)</p>
             </div>
             <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
               {fastStaff || 'Dung Trần (FAST)'}
             </div>
+          </div>
+        </div>
+
+        {/* Khối Bảng Ảnh Đính Kèm Cuối Bản In */}
+        {images.length > 0 && (
+          <div className="mt-8 pt-5 border-t border-gray-300 page-break-before-always">
+            <div className="text-center mb-4">
+              <h3 className="text-sm font-black uppercase text-gray-900 tracking-wide">
+                DANH MỤC HÌNH ẢNH ĐÍNH KÈM HỒ SƠ QUẢNG CÁO
+              </h3>
+              <p className="text-[10px] text-gray-500 italic mt-0.5">
+                (Hình ảnh phối cảnh vị trí đặt bảng và ma-két sản phẩm quảng cáo in màu)
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {images.map((imgBase64, index) => (
+                <div key={index} className="border border-gray-300 rounded-lg p-2 bg-white flex flex-col items-center">
+                  <div className="w-full h-64 bg-gray-50 rounded overflow-hidden flex items-center justify-center">
+                    <img 
+                      src={imgBase64} 
+                      alt={`Ảnh đính kèm ${index + 1}`} 
+                      className="max-w-full max-h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="text-[10px] font-bold text-gray-700 mt-2 text-center">
+                    HÌNH KHẢO SÁT / MA-KÉT SỐ {index + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Ảnh đính kèm cuối bản in) */}
+        <div className="mt-8 pt-5 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
+          <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
+            FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
+          </div>
+          <div className="text-gray-700 font-medium text-[11px]">
+            Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
+          </div>
+          <div className="text-[11px] text-gray-800 font-semibold">
+            Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
+          </div>
+          <div className="text-gray-400 text-[10px] pt-0.5">
+            &copy; 2026 FAST CONSULTING.
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COURSES, CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
@@ -12,6 +13,7 @@ interface Message {
 }
 
 const FloatingContact: React.FC = () => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -209,9 +211,13 @@ const FloatingContact: React.FC = () => {
     }
   };
 
+  if (location.pathname.startsWith('/account')) {
+    return null;
+  }
+
   return (
     // Z-index adjusted to 90 to sit below PaymentModal (100) but above content
-    <div className="fixed bottom-6 right-4 md:right-8 z-[90] font-sans flex flex-col items-end pointer-events-none">
+    <div className="print:hidden fixed bottom-6 right-4 md:right-8 z-[90] font-sans flex flex-col items-end pointer-events-none">
       
       {/* Chat Window */}
       <div className={`pointer-events-auto w-[92vw] md:w-[380px] bg-white rounded-[24px] shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300 origin-bottom-right mb-4 flex flex-col ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90 h-0 invisible'}`}>
