@@ -662,57 +662,57 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 
       {/* Specifications Grid */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-        <div className="p-3 bg-teal-50/50 border-l-4 border-l-[#007c76] rounded-r-xl">
-          <div className="font-bold text-gray-500 uppercase text-[10px]">Cơ quan thẩm quyền</div>
-          <div className="font-black text-gray-800 text-sm mt-0.5">Sở Văn hóa &amp; Thể thao / Sở VHTTDL</div>
+        <div className="p-3.5 bg-gradient-to-br from-indigo-50/80 to-purple-50/40 border-l-4 border-l-indigo-600 rounded-r-xl shadow-xs">
+          <div className="font-bold text-indigo-950/70 uppercase text-[10px] tracking-wider">Cơ quan thẩm quyền</div>
+          <div className="font-black text-indigo-950 text-sm mt-0.5">Sở Văn hóa &amp; Thể thao / Sở VHTTDL</div>
         </div>
 
-        <div className="p-3 bg-teal-50/50 border-l-4 border-l-teal-600 rounded-r-xl">
-          <div className="font-bold text-gray-500 uppercase text-[10px]">Thời hạn giải quyết</div>
-          <div className="font-black text-[#007c76] text-sm mt-0.5">05 ngày làm việc</div>
+        <div className="p-3.5 bg-gradient-to-br from-amber-50/80 to-orange-50/40 border-l-4 border-l-amber-500 rounded-r-xl shadow-xs">
+          <div className="font-bold text-amber-950/70 uppercase text-[10px] tracking-wider">Thời hạn giải quyết</div>
+          <div className="font-black text-amber-900 text-sm mt-0.5">05 ngày làm việc (SLA FAST)</div>
         </div>
 
-        <div className="p-3 bg-green-50/50 border-l-4 border-l-green-600 rounded-r-xl">
-          <div className="font-bold text-gray-500 uppercase text-[10px]">Lệ phí nhà nước</div>
-          <div className="font-black text-green-700 text-sm mt-0.5">Miễn phí 100% (0 VNĐ)</div>
+        <div className="p-3.5 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border-l-4 border-l-emerald-500 rounded-r-xl shadow-xs">
+          <div className="font-bold text-emerald-950/70 uppercase text-[10px] tracking-wider">Lệ phí nhà nước</div>
+          <div className="font-black text-emerald-800 text-sm mt-0.5">Miễn phí 100% (0 VNĐ)</div>
         </div>
 
-        <div className="p-3 bg-blue-50/50 border-l-4 border-l-blue-600 rounded-r-xl">
-          <div className="font-bold text-gray-500 uppercase text-[10px]">Kết quả &amp; Pháp lý</div>
-          <div className="font-black text-blue-800 text-sm mt-0.5">Mã KQ.G16.000416 (Mặc nhiên hiệu lực)</div>
+        <div className="p-3.5 bg-gradient-to-br from-sky-50/80 to-blue-50/40 border-l-4 border-l-blue-600 rounded-r-xl shadow-xs">
+          <div className="font-bold text-blue-950/70 uppercase text-[10px] tracking-wider">Kết quả &amp; Pháp lý</div>
+          <div className="font-black text-blue-900 text-sm mt-0.5">Mã KQ.G16.000416 (Mặc nhiên hiệu lực)</div>
         </div>
       </div>
 
       {/* CRM Dashboard KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm border-t-4 border-t-[#007c76]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-gray-500">TỔNG KHÁCH HÀNG / ORDER</div>
-          <div className="text-2xl font-black text-gray-800 my-1">{stats.total}</div>
-          <div className="text-[11px] text-gray-400">Hồ sơ trong hệ thống</div>
+        <div className="bg-gradient-to-b from-teal-50/60 to-white p-4 rounded-2xl border-2 border-teal-500/40 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10.5px] font-black uppercase tracking-wider text-teal-800">TỔNG KHÁCH HÀNG / ORDER</div>
+          <div className="text-3xl font-black text-teal-900 my-1">{stats.total}</div>
+          <div className="text-[11px] font-semibold text-teal-700/80">Hồ sơ trong hệ thống</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm border-t-4 border-t-amber-500">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-amber-700">ĐANG CHUẨN BỊ HỒ SƠ</div>
-          <div className="text-2xl font-black text-amber-600 my-1">{stats.draft}</div>
-          <div className="text-[11px] text-gray-400">Chưa nộp Sở</div>
+        <div className="bg-gradient-to-b from-amber-50/60 to-white p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10.5px] font-black uppercase tracking-wider text-amber-800">ĐANG CHUẨN BỊ HỒ SƠ</div>
+          <div className="text-3xl font-black text-amber-700 my-1">{stats.draft}</div>
+          <div className="text-[11px] font-semibold text-amber-700/80">Chưa nộp Sở</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-blue-700">ĐÃ NỘP SỞ (ĐẾM NGƯỢC 5N)</div>
-          <div className="text-2xl font-black text-blue-600 my-1">{stats.submitted}</div>
-          <div className="text-[11px] text-gray-400">Đang trong thời hạn thụ lý</div>
+        <div className="bg-gradient-to-b from-sky-50/60 to-white p-4 rounded-2xl border-2 border-blue-400 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10.5px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (ĐẾM NGƯỢC 5N)</div>
+          <div className="text-3xl font-black text-blue-700 my-1">{stats.submitted}</div>
+          <div className="text-[11px] font-semibold text-blue-700/80">Đang trong thời hạn thụ lý</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm border-t-4 border-t-green-500">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-green-700">HOÀN THÀNH / HIỆU LỰC</div>
-          <div className="text-2xl font-black text-green-600 my-1">{stats.completed}</div>
-          <div className="text-[11px] text-gray-400">Mặc nhiên được phép treo</div>
+        <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border-2 border-emerald-500 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10.5px] font-black uppercase tracking-wider text-emerald-800">HOÀN THÀNH / HIỆU LỰC</div>
+          <div className="text-3xl font-black text-emerald-700 my-1">{stats.completed}</div>
+          <div className="text-[11px] font-semibold text-emerald-700/80">Mặc nhiên được phép treo</div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm border-t-4 border-t-emerald-500">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-emerald-700">TỶ LỆ ĐÚNG HẠN SLA</div>
-          <div className="text-2xl font-black text-emerald-600 my-1">{stats.slaRate}%</div>
-          <div className="text-[11px] text-gray-400">Chỉ số cam kết FAST</div>
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-4 rounded-2xl shadow-md shadow-teal-700/20 transition-transform hover:scale-[1.02]">
+          <div className="text-[10.5px] font-black uppercase tracking-wider text-emerald-100">TỶ LỆ ĐÚNG HẠN SLA</div>
+          <div className="text-3xl font-black text-white my-1 drop-shadow-sm">{stats.slaRate}%</div>
+          <div className="text-[11px] font-medium text-emerald-100">Chỉ số cam kết FAST</div>
         </div>
       </div>
 
@@ -1170,41 +1170,41 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                     const isChecked = !!checklist[doc.id];
 
                     return (
-                      <tr key={doc.id} className={`hover:bg-teal-50/20 transition-colors ${isChecked ? 'bg-green-50/40' : ''}`}>
+                      <tr key={doc.id} className={`transition-all ${isChecked ? 'bg-emerald-50/70 border-l-4 border-l-emerald-500' : 'hover:bg-teal-50/30'}`}>
                         <td className="p-3 text-center">
                           <input
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => handleChecklistToggle(doc.id)}
-                            className="w-4 h-4 rounded text-[#007c76] accent-[#007c76] cursor-pointer"
+                            className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
                           />
                         </td>
-                        <td className="p-3 text-center font-bold text-gray-600">{idx + 1}</td>
+                        <td className="p-3 text-center font-black text-gray-700">{idx + 1}</td>
                         <td className="p-3">
-                          <div className={`font-bold ${isChecked ? 'line-through text-gray-400' : 'text-gray-900'} leading-snug`}>
-                            {doc.name}
+                          <div className={`font-bold text-sm ${isChecked ? 'text-emerald-950 font-black' : 'text-gray-900'} leading-snug`}>
+                            {doc.name} {isChecked && <span className="text-emerald-600 text-xs ml-1 font-bold">✓ Đã đủ hồ sơ</span>}
                           </div>
-                          <div className="text-[11px] text-gray-500 mt-1 leading-relaxed">{doc.guidance}</div>
-                          <span className="inline-block mt-1 text-[10px] font-bold text-[#007c76] bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                          <div className="text-[11.5px] text-gray-600 mt-1 leading-relaxed">{doc.guidance}</div>
+                          <span className="inline-block mt-1.5 text-[10px] font-bold text-[#005c56] bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200">
                             {doc.legalRef}
                           </span>
                         </td>
                         <td className="p-3">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10.5px] font-bold border ${
-                            doc.badge === 'original' ? 'bg-green-50 text-green-800 border-green-200' :
-                            doc.badge === 'copy' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                            'bg-amber-50 text-amber-800 border-amber-200'
+                          <span className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold border shadow-2xs ${
+                            doc.badge === 'original' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
+                            doc.badge === 'copy' ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                            'bg-amber-100 text-amber-900 border-amber-300'
                           }`}>
                             {doc.qty}
                           </span>
                         </td>
                         <td className="p-3">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase mb-1 ${
-                            doc.type === 'Bắt buộc' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-100 text-gray-600'
+                          <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase mb-1 ${
+                            doc.type === 'Bắt buộc' ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-purple-100 text-purple-800 border border-purple-300'
                           }`}>
                             {doc.type}
                           </span>
-                          <div className="text-[11px] text-gray-600">{doc.desc}</div>
+                          <div className="text-[11.5px] text-gray-600 leading-snug">{doc.desc}</div>
                         </td>
                       </tr>
                     );

@@ -30,9 +30,7 @@ import {
   BookOpen,
   CheckSquare,
   Square,
-  HelpCircle,
-  Download,
-  Upload
+  HelpCircle
 } from 'lucide-react';
 
 export interface ComboItem {
@@ -245,55 +243,6 @@ export const ComboManagement: React.FC = () => {
       window.removeEventListener('storage', handleSyncEvent);
     };
   }, []);
-
-  // Export Combos to JSON file
-  const handleExportCombos = () => {
-    try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(combos, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `fast_elearning_combos_backup_${new Date().toISOString().split('T')[0]}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-      toast.success("Đã xuất file sao lưu danh sách gói combo thành công!");
-    } catch (e: any) {
-      toast.error("Không thể xuất dữ liệu: " + e.message);
-    }
-  };
-
-  // Import Combos from JSON file
-  const handleImportCombos = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
-        if (!Array.isArray(parsed)) {
-          throw new Error("File sao lưu không đúng định dạng danh sách (phải là Array)");
-        }
-
-        let importedCount = 0;
-        for (const item of parsed) {
-          if (item && item.id && item.title) {
-            await setDoc(doc(db, 'combos', item.id), item, { merge: true });
-            await broadcastComboUpdate('upsert', { comboId: item.id, combo: item });
-            importedCount++;
-          }
-        }
-
-        toast.success(`Đã khôi phục thành công ${importedCount} gói combo lên hệ thống!`);
-      } catch (err: any) {
-        toast.error("Lỗi khi nhập file JSON: " + err.message);
-      } finally {
-        e.target.value = '';
-      }
-    };
-    reader.readAsText(file);
-  };
 
   // Helper: Open Add Mode
   const handleOpenAdd = () => {
@@ -670,29 +619,6 @@ export const ComboManagement: React.FC = () => {
                   <EyeOff className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Ẩn tất cả</span>
                 </button>
-                <div className="h-5 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-                <button
-                  type="button"
-                  onClick={handleExportCombos}
-                  title="Tải về file sao lưu danh sách gói combo (JSON) để lưu giữ vĩnh viễn"
-                  className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Sao lưu JSON</span>
-                </button>
-                <label
-                  title="Nhập file sao lưu danh sách gói combo (JSON) để phục hồi toàn bộ lên hệ thống Cloud"
-                  className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Phục hồi JSON</span>
-                  <input
-                    type="file"
-                    accept=".json,application/json"
-                    className="hidden"
-                    onChange={handleImportCombos}
-                  />
-                </label>
               </div>
             </div>
           </div>

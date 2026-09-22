@@ -124,7 +124,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       let syncedCount = 0;
 
       for (const localCourse of localList) {
-        if (!localCourse || !localCourse.id) continue;
+        if (!localCourse || !localCourse.id || localCourse.id === 'khoa-vip' || localCourse.id === 'vip-lifetime-access' || localCourse.id === 'vip-course') continue;
         const fsCourse = fsMap.get(localCourse.id);
         const localTime = new Date(localCourse.updatedAt || localCourse.createdAt || 0).getTime();
         const fsTime = fsCourse ? new Date(fsCourse.updatedAt || fsCourse.createdAt || 0).getTime() : 0;
@@ -166,9 +166,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setIsLoadingCourses(true);
     let latestFirestoreCourses: Course[] = [];
 
+    const isVipId = (id?: string) => {
+      if (!id) return false;
+      const lower = id.toLowerCase();
+      return lower === 'khoa-vip' || lower === 'vip-lifetime-access' || lower === 'vip-course' || lower === 'vip_package';
+    };
+
     const syncCourses = (fsList?: Course[]) => {
-      if (fsList) latestFirestoreCourses = fsList;
-      setCourses(getMergedCourses(latestFirestoreCourses));
+      if (fsList) latestFirestoreCourses = fsList.filter(c => !isVipId(c.id));
+      const merged = getMergedCourses(latestFirestoreCourses).filter(c => !isVipId(c.id));
+      setCourses(merged);
       setIsLoadingCourses(false);
     };
 
@@ -1121,7 +1128,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             {filteredCourses.map((course) => {
                               const isSystem = HARDCODED_COURSES.some(c => c.id === course.id);
                               const isHiddenOrInactive = course.status === 'draft' || course.status === 'inactive';
-                              const isVipCombo = course.id === 'khoa-vip';
                               return (
                                 <tr key={course.id} className="hover:bg-[#007c76]/[0.035] transition-all duration-200 ease-out text-xs sm:text-sm text-gray-700 whitespace-nowrap group/row">
                                   <td className="py-4 px-6 whitespace-nowrap">
@@ -1137,11 +1143,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                                   <td className="py-4 px-6 min-w-[260px] whitespace-nowrap">
                                     <div className="flex items-center gap-2">
                                       <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block group-hover/row:text-[#007c76] transition-colors duration-200">{course.title}</span>
-                                      {isVipCombo && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 border border-amber-300">
-                                          ⭐ Combo VIP
-                                        </span>
-                                      )}
                                     </div>
                                     <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
                                       ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}

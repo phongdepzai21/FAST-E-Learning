@@ -426,18 +426,30 @@ export const FastStandardsAudit: React.FC = () => {
       return true;
     });
 
+    const getPillarGradient = (name: string) => {
+      if (name.includes('Accuracy')) return 'from-teal-700 via-teal-800 to-emerald-900';
+      if (name.includes('Cleanliness')) return 'from-sky-700 via-blue-800 to-indigo-900';
+      if (name.includes('Hospitality')) return 'from-purple-700 via-purple-800 to-indigo-900';
+      if (name.includes('Maintenance')) return 'from-amber-700 via-orange-800 to-amber-900';
+      if (name.includes('People')) return 'from-emerald-700 via-teal-800 to-teal-900';
+      if (name.includes('Product')) return 'from-rose-700 via-red-800 to-rose-950';
+      if (name.includes('Safety')) return 'from-red-700 via-rose-800 to-orange-950';
+      if (name.includes('Speed')) return 'from-blue-700 via-sky-800 to-indigo-900';
+      return 'from-teal-800 to-emerald-900';
+    };
+
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-[#007c76] text-white font-bold">
-                <th className="p-3 w-14 text-center border-r border-teal-700/50">Mã</th>
-                <th className="p-3 w-1/3 border-r border-teal-700/50">Tiêu chuẩn Đạt</th>
-                <th className="p-3 w-1/3 border-r border-teal-700/50">Tiêu chuẩn Không Đạt (Defect) &amp; Tham chiếu</th>
-                <th className="p-3 w-16 text-center border-r border-teal-700/50">Trừ</th>
-                <th className="p-3 w-36 text-center border-r border-teal-700/50">Đánh giá</th>
-                <th className="p-3 min-w-[200px]">Ghi chú / Bằng chứng</th>
+              <tr className={`bg-gradient-to-r ${getPillarGradient(pillarName)} text-white font-bold tracking-wide`}>
+                <th className="p-3.5 w-14 text-center border-r border-white/15">Mã</th>
+                <th className="p-3.5 w-1/3 border-r border-white/15">Tiêu chuẩn Đạt</th>
+                <th className="p-3.5 w-1/3 border-r border-white/15">Tiêu chuẩn Không Đạt (Defect) &amp; Tham chiếu</th>
+                <th className="p-3.5 w-16 text-center border-r border-white/15">Trừ</th>
+                <th className="p-3.5 w-40 text-center border-r border-white/15">Đánh giá</th>
+                <th className="p-3.5 min-w-[220px]">Ghi chú / Bằng chứng</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -447,48 +459,48 @@ export const FastStandardsAudit: React.FC = () => {
                 const isNa = st.status === 'na';
 
                 return (
-                  <tr key={item.id} className={`hover:bg-teal-50/30 transition-colors ${isFail ? 'bg-red-50/40' : isNa ? 'bg-gray-50/50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/20'}`}>
+                  <tr key={item.id} className={`hover:bg-teal-50/40 transition-colors ${isFail ? 'bg-red-50/60' : isNa ? 'bg-gray-50/60' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                     <td className="p-3 text-center font-bold text-gray-700 border-r border-gray-100">{item.id}</td>
                     <td className="p-3 border-r border-gray-100">
                       <div className="font-semibold text-gray-800 leading-snug">{item.std}</div>
-                      <div className="text-[11px] text-gray-400 mt-1">Nhóm: {item.group}</div>
+                      <div className="text-[11px] text-teal-700 font-medium mt-1">Nhóm: {item.group}</div>
                     </td>
                     <td className="p-3 border-r border-gray-100">
                       <div className="text-red-700 font-medium italic text-[11.5px] leading-relaxed">{item.defect}</div>
-                      <span className="inline-block mt-1.5 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-[10px] font-bold border border-gray-200">
+                      <span className="inline-block mt-1.5 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-bold border border-amber-200">
                         {item.ref}
                       </span>
                     </td>
                     <td className="p-3 text-center font-black text-red-600 border-r border-gray-100">-{item.pts}</td>
                     <td className="p-3 border-r border-gray-100">
-                      <div className="flex items-center justify-center gap-2">
-                        <label className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs font-bold transition-all ${st.status === 'pass' ? 'bg-green-100 text-green-800 ring-1 ring-green-400' : 'text-gray-500 hover:bg-gray-100'}`}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <label className={`flex items-center gap-1 px-2.5 py-1 rounded-lg cursor-pointer text-xs font-bold transition-all shadow-xs ${st.status === 'pass' ? 'bg-emerald-600 text-white ring-2 ring-emerald-400 font-black' : 'bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-700'}`}>
                           <input 
                             type="radio" 
                             name={`radio_${item.id}`} 
                             checked={st.status === 'pass'} 
                             onChange={() => updateItemStatus(item.id, 'pass')} 
-                            className="w-3.5 h-3.5 text-green-600 accent-green-600"
+                            className="hidden"
                           />
-                          Đạt
+                          ✓ Đạt
                         </label>
-                        <label className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs font-bold transition-all ${st.status === 'fail' ? 'bg-red-100 text-red-800 ring-1 ring-red-400' : 'text-gray-500 hover:bg-gray-100'}`}>
+                        <label className={`flex items-center gap-1 px-2.5 py-1 rounded-lg cursor-pointer text-xs font-bold transition-all shadow-xs ${st.status === 'fail' ? 'bg-rose-600 text-white ring-2 ring-rose-400 font-black' : 'bg-gray-100 text-gray-600 hover:bg-rose-50 hover:text-rose-700'}`}>
                           <input 
                             type="radio" 
                             name={`radio_${item.id}`} 
                             checked={st.status === 'fail'} 
                             onChange={() => updateItemStatus(item.id, 'fail')} 
-                            className="w-3.5 h-3.5 text-red-600 accent-red-600"
+                            className="hidden"
                           />
-                          Lỗi
+                          ⚡ Lỗi
                         </label>
-                        <label className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-xs font-bold transition-all ${st.status === 'na' ? 'bg-gray-200 text-gray-800 ring-1 ring-gray-400' : 'text-gray-500 hover:bg-gray-100'}`}>
+                        <label className={`flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer text-xs font-bold transition-all shadow-xs ${st.status === 'na' ? 'bg-slate-700 text-white ring-2 ring-slate-400' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                           <input 
                             type="radio" 
                             name={`radio_${item.id}`} 
                             checked={st.status === 'na'} 
                             onChange={() => updateItemStatus(item.id, 'na')} 
-                            className="w-3.5 h-3.5 text-gray-600 accent-gray-600"
+                            className="hidden"
                           />
                           K/A
                         </label>
@@ -500,13 +512,13 @@ export const FastStandardsAudit: React.FC = () => {
                         value={st.note} 
                         onChange={(e) => handleNoteChange(item.id, e.target.value, item.type)}
                         placeholder={item.type === 'Observation' ? 'Ghi chú / nhận xét...' : 'Nhập bằng chứng (tự động ghi Lỗi)...'} 
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
                       />
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <button 
                           type="button" 
                           onClick={() => quickSet(item.id, 'pass')} 
-                          className="px-2 py-0.5 text-[10.5px] font-bold rounded bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                          className="px-2 py-0.5 text-[10.5px] font-bold rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer transition-colors"
                           title="Đánh dấu Đạt"
                         >
                           ✓ Đạt
@@ -514,7 +526,7 @@ export const FastStandardsAudit: React.FC = () => {
                         <button 
                           type="button" 
                           onClick={() => quickSet(item.id, 'fail')} 
-                          className="px-2 py-0.5 text-[10.5px] font-bold rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                          className="px-2 py-0.5 text-[10.5px] font-bold rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-colors"
                           title="Điền lỗi & Ghi Lỗi"
                         >
                           ⚡ Ghi Lỗi
@@ -522,7 +534,7 @@ export const FastStandardsAudit: React.FC = () => {
                         <button 
                           type="button" 
                           onClick={() => quickSet(item.id, 'na')} 
-                          className="px-2 py-0.5 text-[10.5px] font-bold rounded bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                          className="px-2 py-0.5 text-[10.5px] font-bold rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 cursor-pointer transition-colors"
                           title="Không áp dụng"
                         >
                           K/A
@@ -602,16 +614,16 @@ export const FastStandardsAudit: React.FC = () => {
       {/* Navigation Sub-Tabs (Screen Only) */}
       <div className="fast-audit-screen-only bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
         {[
-          { id: 'library', label: 'Thư Viện', icon: Building2, count: null },
-          { id: 'accuracy', label: 'Accuracy', icon: CheckCircle2, count: 20 },
-          { id: 'cleanliness', label: 'Cleanliness', icon: Sparkles, count: 55 },
-          { id: 'hospitality', label: 'Hospitality', icon: HeartHandshake, count: 21 },
-          { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: 54 },
-          { id: 'people', label: 'People', icon: Users, count: 10 },
-          { id: 'product', label: 'Product', icon: UtensilsCrossed, count: 61 },
-          { id: 'safety', label: 'Safety', icon: ShieldAlert, count: 19 },
-          { id: 'speed', label: 'Speed', icon: Timer, count: 25 },
-          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true }
+          { id: 'library', label: 'Thư Viện', icon: Building2, count: null, activeGradient: 'from-slate-700 to-slate-900', textColor: 'text-slate-700' },
+          { id: 'accuracy', label: 'Accuracy', icon: CheckCircle2, count: 20, activeGradient: 'from-teal-600 to-emerald-600', textColor: 'text-teal-700' },
+          { id: 'cleanliness', label: 'Cleanliness', icon: Sparkles, count: 55, activeGradient: 'from-sky-600 to-blue-600', textColor: 'text-sky-700' },
+          { id: 'hospitality', label: 'Hospitality', icon: HeartHandshake, count: 21, activeGradient: 'from-purple-600 to-indigo-600', textColor: 'text-purple-700' },
+          { id: 'maintenance', label: 'Maintenance', icon: Wrench, count: 54, activeGradient: 'from-amber-600 to-orange-600', textColor: 'text-amber-700' },
+          { id: 'people', label: 'People', icon: Users, count: 10, activeGradient: 'from-emerald-600 to-teal-700', textColor: 'text-emerald-700' },
+          { id: 'product', label: 'Product', icon: UtensilsCrossed, count: 61, activeGradient: 'from-rose-600 to-red-600', textColor: 'text-rose-700' },
+          { id: 'safety', label: 'Safety', icon: ShieldAlert, count: 19, activeGradient: 'from-red-600 to-orange-700', textColor: 'text-red-700' },
+          { id: 'speed', label: 'Speed', icon: Timer, count: 25, activeGradient: 'from-sky-600 to-blue-700', textColor: 'text-blue-700' },
+          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'from-amber-500 via-orange-500 to-amber-600', textColor: 'text-amber-800' }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -619,20 +631,18 @@ export const FastStandardsAudit: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 isActive
-                  ? tab.highlight 
-                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                    : 'bg-[#007c76] text-white shadow-md shadow-[#007c76]/30'
+                  ? `bg-gradient-to-r ${tab.activeGradient} text-white shadow-md shadow-teal-900/20 ring-1 ring-white/30 scale-[1.02]`
                   : tab.highlight
-                    ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    ? 'bg-amber-50 text-amber-900 hover:bg-amber-100/80 border border-amber-300 shadow-xs'
+                    : 'bg-gray-50/80 text-gray-700 hover:bg-teal-50/80 hover:text-[#007c76] border border-gray-100'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-amber-600' : 'text-gray-500'}`} />
               <span>{tab.label}</span>
               {tab.count !== null && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isActive ? 'bg-white/25 text-white' : 'bg-gray-200/80 text-gray-700'}`}>
                   {tab.count}
                 </span>
               )}
@@ -704,44 +714,45 @@ export const FastStandardsAudit: React.FC = () => {
           {/* 8 Pillar Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { id: 'accuracy', title: 'FAST Accuracy', count: 20, desc: 'Độ chính xác vận hành, khẩu phần & thu ngân', color: 'from-teal-600 to-emerald-600' },
-              { id: 'cleanliness', title: 'FAST Cleanliness', count: 55, desc: 'Vệ sinh cơ sở, thiết bị & SSOP', color: 'from-blue-600 to-cyan-600' },
-              { id: 'hospitality', title: 'FAST Hospitality', count: 21, desc: 'Dịch vụ, văn hóa & trải nghiệm khách hàng', color: 'from-purple-600 to-indigo-600' },
-              { id: 'maintenance', title: 'FAST Maintenance', count: 54, desc: 'Bảo trì thiết bị, cơ sở hạ tầng & kiểm định', color: 'from-amber-600 to-orange-600' },
-              { id: 'people', title: 'FAST People', count: 10, desc: 'Đào tạo, nhân sự & phân công', color: 'from-emerald-600 to-teal-700' },
-              { id: 'product', title: 'FAST Product', count: 61, desc: 'Chất lượng, nhiệt độ, bảo quản & HSD', color: 'from-rose-600 to-red-600' },
-              { id: 'safety', title: 'FAST Safety', count: 19, desc: 'An toàn thực phẩm, CCP, bồn rửa tay & y tế', color: 'from-red-600 to-orange-700' },
-              { id: 'speed', title: 'FAST Speed', count: 25, desc: 'Tốc độ phục vụ, điều phối & quản trị thời gian', color: 'from-sky-600 to-blue-700' },
+              { id: 'accuracy', title: 'FAST Accuracy', count: 20, desc: 'Độ chính xác vận hành, khẩu phần & thu ngân', gradient: 'from-teal-500 to-emerald-600', lightBg: 'bg-emerald-50/70 border-emerald-200', textAccent: 'text-emerald-700', btnHover: 'hover:bg-emerald-600' },
+              { id: 'cleanliness', title: 'FAST Cleanliness', count: 55, desc: 'Vệ sinh cơ sở, thiết bị & SSOP', gradient: 'from-sky-500 to-blue-600', lightBg: 'bg-sky-50/70 border-sky-200', textAccent: 'text-sky-700', btnHover: 'hover:bg-sky-600' },
+              { id: 'hospitality', title: 'FAST Hospitality', count: 21, desc: 'Dịch vụ, văn hóa & trải nghiệm khách hàng', gradient: 'from-purple-500 to-indigo-600', lightBg: 'bg-purple-50/70 border-purple-200', textAccent: 'text-purple-700', btnHover: 'hover:bg-purple-600' },
+              { id: 'maintenance', title: 'FAST Maintenance', count: 54, desc: 'Bảo trì thiết bị, cơ sở hạ tầng & kiểm định', gradient: 'from-amber-500 to-orange-600', lightBg: 'bg-amber-50/70 border-amber-200', textAccent: 'text-amber-700', btnHover: 'hover:bg-amber-600' },
+              { id: 'people', title: 'FAST People', count: 10, desc: 'Đào tạo, nhân sự & phân công', gradient: 'from-emerald-500 to-teal-700', lightBg: 'bg-teal-50/70 border-teal-200', textAccent: 'text-teal-700', btnHover: 'hover:bg-teal-700' },
+              { id: 'product', title: 'FAST Product', count: 61, desc: 'Chất lượng, nhiệt độ, bảo quản & HSD', gradient: 'from-rose-500 to-red-600', lightBg: 'bg-rose-50/70 border-rose-200', textAccent: 'text-rose-700', btnHover: 'hover:bg-rose-600' },
+              { id: 'safety', title: 'FAST Safety', count: 19, desc: 'An toàn thực phẩm, CCP, bồn rửa tay & y tế', gradient: 'from-red-500 to-orange-700', lightBg: 'bg-red-50/70 border-red-200', textAccent: 'text-red-700', btnHover: 'hover:bg-red-600' },
+              { id: 'speed', title: 'FAST Speed', count: 25, desc: 'Tốc độ phục vụ, điều phối & quản trị thời gian', gradient: 'from-sky-500 to-blue-700', lightBg: 'bg-blue-50/70 border-blue-200', textAccent: 'text-blue-700', btnHover: 'hover:bg-blue-600' },
             ].map(p => {
               // Count NCs for this pillar
               const pillarFullName = p.title;
               const ncCount = ALL_AUDIT_ITEMS.filter(it => it.pillar === pillarFullName && auditState[it.id]?.status === 'fail').length;
 
               return (
-                <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-lg transition-all flex flex-col justify-between group relative overflow-hidden">
+                  <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${p.gradient}`}></div>
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-black uppercase text-[#007c76] tracking-wider">{p.title}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[10px] font-black border border-teal-200">
+                    <div className="flex items-center justify-between gap-2 mb-2 pt-1">
+                      <span className={`text-xs font-black uppercase tracking-wider ${p.textAccent}`}>{p.title}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${p.lightBg} ${p.textAccent}`}>
                         {p.count} mục
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 font-medium italic mb-4 min-h-[36px]">{p.desc}</p>
                     
-                    <div className="flex items-center gap-2 mb-4 p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs">
+                    <div className="flex items-center justify-between mb-4 p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-xs">
                       <span className="font-bold text-gray-700">Lỗi phát hiện:</span>
-                      <span className={`font-black ${ncCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {ncCount} lỗi
+                      <span className={`font-black px-2 py-0.5 rounded-lg text-xs ${ncCount > 0 ? 'bg-red-100 text-red-700 border border-red-200 animate-pulse' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+                        {ncCount > 0 ? `${ncCount} lỗi phát hiện` : '0 lỗi (Chuẩn ISO)'}
                       </span>
                     </div>
                   </div>
 
                   <button
                     onClick={() => setActiveSubTab(p.id)}
-                    className="w-full py-2.5 px-3 bg-gray-100 hover:bg-[#007c76] hover:text-white text-gray-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+                    className={`w-full py-2.5 px-3 bg-gray-100 ${p.btnHover} hover:text-white text-gray-800 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs`}
                   >
                     <span>Vào đánh giá</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 </div>
               );
@@ -1003,42 +1014,42 @@ export const FastStandardsAudit: React.FC = () => {
           {/* Score & Finding KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Score box */}
-            <div className={`p-5 rounded-2xl bg-white border-l-4 shadow-sm text-center ${isPassed ? 'border-l-green-500' : 'border-l-red-500'}`}>
+            <div className={`p-5 rounded-2xl bg-white border-2 shadow-sm text-center relative overflow-hidden transition-transform hover:scale-[1.02] ${isPassed ? 'border-emerald-500 bg-gradient-to-b from-emerald-50/50 to-white' : 'border-rose-500 bg-gradient-to-b from-rose-50/50 to-white'}`}>
               <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">ĐIỂM ĐÁNH GIÁ TỔNG</div>
-              <div className="text-3xl font-black text-[#007c76] my-1">{finalScore}%</div>
-              <div className={`text-xs font-bold ${isPassed ? 'text-green-600' : 'text-red-600'}`}>
-                {isPassed ? 'ĐẠT YÊU CẦU (>= 80%)' : hasMajor ? 'KHÔNG ĐẠT (CÓ MAJOR)' : 'KHÔNG ĐẠT (< 80%)'}
+              <div className={`text-3xl font-black my-1 ${isPassed ? 'text-emerald-700' : 'text-rose-700'}`}>{finalScore}%</div>
+              <div className={`text-xs font-black uppercase px-2 py-0.5 rounded-full inline-block ${isPassed ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'}`}>
+                {isPassed ? '✓ ĐẠT YÊU CẦU (>= 80%)' : hasMajor ? '✗ KHÔNG ĐẠT (CÓ MAJOR)' : '✗ KHÔNG ĐẠT (< 80%)'}
               </div>
             </div>
 
             {/* Total NCs */}
-            <div className="p-5 rounded-2xl bg-white border-l-4 border-l-gray-400 shadow-sm text-center">
-              <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">TỔNG LỖI (NCs)</div>
-              <div className="text-3xl font-black text-gray-800 my-1">
+            <div className="p-5 rounded-2xl bg-gradient-to-b from-slate-50 to-white border-2 border-slate-300 shadow-sm text-center hover:scale-[1.02] transition-transform">
+              <div className="text-[11px] font-black uppercase tracking-wider text-slate-600">TỔNG LỖI (NCs)</div>
+              <div className="text-3xl font-black text-slate-800 my-1">
                 {ALL_AUDIT_ITEMS.filter(it => auditState[it.id]?.status === 'fail').length}
               </div>
-              <div className="text-[11px] text-gray-400">Cần khắc phục (CAPA)</div>
+              <div className="text-[11px] font-semibold text-slate-500">Cần khắc phục (CAPA)</div>
             </div>
 
             {/* Major */}
-            <div className="p-5 rounded-2xl bg-red-600 text-white shadow-sm text-center">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-600 to-red-700 text-white shadow-md shadow-red-500/20 text-center hover:scale-[1.02] transition-transform">
               <div className="text-[11px] font-black uppercase tracking-wider text-red-100">MAJOR (Trọng yếu)</div>
-              <div className="text-3xl font-black my-1">{majorCount}</div>
-              <div className="text-[10px] bg-red-700/60 rounded px-2 py-0.5 inline-block">&ge; 1 lỗi: Auto Failed</div>
+              <div className="text-3xl font-black my-1 text-white drop-shadow-sm">{majorCount}</div>
+              <div className="text-[10.5px] bg-white/20 font-bold rounded-full px-2.5 py-0.5 inline-block text-white">&ge; 1 lỗi: Auto Failed</div>
             </div>
 
             {/* Minor */}
-            <div className="p-5 rounded-2xl bg-amber-500 text-white shadow-sm text-center">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20 text-center hover:scale-[1.02] transition-transform">
               <div className="text-[11px] font-black uppercase tracking-wider text-amber-100">MINOR (Thứ yếu)</div>
-              <div className="text-3xl font-black my-1">{minorCount}</div>
-              <div className="text-[10px] text-amber-100">Khắc phục trong 7 ngày</div>
+              <div className="text-3xl font-black my-1 text-white drop-shadow-sm">{minorCount}</div>
+              <div className="text-[10.5px] bg-white/20 font-bold rounded-full px-2.5 py-0.5 inline-block text-white">Khắc phục trong 7 ngày</div>
             </div>
 
             {/* Obs */}
-            <div className="p-5 rounded-2xl bg-sky-600 text-white shadow-sm text-center">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20 text-center hover:scale-[1.02] transition-transform">
               <div className="text-[11px] font-black uppercase tracking-wider text-sky-100">OBSERVATION (Lưu ý)</div>
-              <div className="text-3xl font-black my-1">{obsCount}</div>
-              <div className="text-[10px] text-sky-100">Khắc phục trong 30 ngày</div>
+              <div className="text-3xl font-black my-1 text-white drop-shadow-sm">{obsCount}</div>
+              <div className="text-[10.5px] bg-white/20 font-bold rounded-full px-2.5 py-0.5 inline-block text-white">Khắc phục trong 30 ngày</div>
             </div>
           </div>
 
