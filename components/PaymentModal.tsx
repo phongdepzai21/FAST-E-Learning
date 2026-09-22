@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Course } from '../types';
 import { auth, db } from '../firebase';
@@ -37,6 +37,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [otpError, setOtpError] = useState<string>('');
   const [otpNotice, setOtpNotice] = useState<string>('');
   const [otpCountdown, setOtpCountdown] = useState<number>(0);
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
+  const targetEmail = (auth.currentUser?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim();
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -45,6 +48,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     }
     return () => clearTimeout(timer);
   }, [otpCountdown]);
+
+  useEffect(() => {
+    if (showOtpForm && isOpen) {
+      const timer = setTimeout(() => {
+        otpInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [showOtpForm, isOpen]);
 
   useEffect(() => {
     setConfig(getPaymentConfig());
@@ -351,7 +363,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 </div>
                 <h4 className="font-black text-gray-800 text-lg uppercase tracking-tight">Nhập mã xác thực OTP</h4>
                 <p className="text-sm text-gray-500 font-medium px-4">
-                  Một mã xác thực 6 số đã được gửi đến email <strong className="text-gray-800">{auth.currentUser?.email}</strong>. Vui lòng kiểm tra hộp thư (và thư rác) để tiếp tục.
+                  Một mã xác thực 6 số đã được gửi đến email <strong className="text-gray-800">{targetEmail}</strong>. Vui lòng kiểm tra hộp thư (và thư rác) để tiếp tục.
                 </p>
                 <div className="pt-2">
                   {otpNotice && (
@@ -360,6 +372,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                     </div>
                   )}
                   <input
+                    ref={otpInputRef}
                     type="text"
                     maxLength={6}
                     value={userInputOtp}
@@ -367,6 +380,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                     onChange={(e) => {
                       setUserInputOtp(e.target.value.replace(/[^0-9]/g, ''));
                       setOtpError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && userInputOtp.length === 6 && !isVerifying) {
+                        e.preventDefault();
+                        handleVerifyOtp();
+                      }
                     }}
                     placeholder="Nhập 6 số OTP"
                     className="w-full text-center text-2xl tracking-[0.5em] font-black font-mono text-[#007c76] bg-gray-50 border-2 border-gray-200 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 rounded-xl py-3 outline-none transition-all placeholder:tracking-normal placeholder:text-base placeholder:font-medium placeholder:text-gray-300 disabled:opacity-75"

@@ -383,10 +383,124 @@ async function startServer() {
     }
   });
 
+  // 5. Ad Profiles CRM Persistence & Sync Endpoints
+  const AD_PROFILES_FILE = path.join(DATA_DIR, "ad_profile_crm.json");
+  function loadAdProfilesFromDisk(): any[] {
+    try {
+      if (fs.existsSync(AD_PROFILES_FILE)) {
+        const raw = fs.readFileSync(AD_PROFILES_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("Failed to load ad profiles from disk:", e);
+    }
+    return [];
+  }
+
+  function saveAdProfilesToDisk(records: any[]) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(AD_PROFILES_FILE, JSON.stringify(records, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Failed to save ad profiles to disk:", e);
+    }
+  }
+
+  let serverAdProfiles: any[] = loadAdProfilesFromDisk();
+
+  app.get("/api/ad-profiles", (req, res) => {
+    try {
+      res.json({ success: true, records: serverAdProfiles });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/ad-profiles/sync", (req, res) => {
+    try {
+      const { action, record, recordId, records } = req.body;
+      const now = new Date().toISOString();
+
+      if (action === "sync_all" && Array.isArray(records)) {
+        serverAdProfiles = records;
+      } else if (action === "upsert" && record && record.id) {
+        const idx = serverAdProfiles.findIndex((c: any) => c.id === record.id);
+        const updated = { ...record, updatedAt: record.updatedAt || new Date().toLocaleString("vi-VN") };
+        if (idx >= 0) {
+          serverAdProfiles[idx] = updated;
+        } else {
+          serverAdProfiles.unshift(updated);
+        }
+      } else if (action === "delete" && recordId) {
+        serverAdProfiles = serverAdProfiles.filter((c: any) => c.id !== recordId);
+      }
+
+      saveAdProfilesToDisk(serverAdProfiles);
+      res.json({ success: true, records: serverAdProfiles });
+    } catch (err: any) {
+      console.error("Ad profiles sync error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 6. Fast Standards Audit Persistence & Sync Endpoints
+  const FAST_AUDITS_FILE = path.join(DATA_DIR, "fast_audits.json");
+  function loadFastAuditsFromDisk(): any {
+    try {
+      if (fs.existsSync(FAST_AUDITS_FILE)) {
+        const raw = fs.readFileSync(FAST_AUDITS_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("Failed to load fast audits from disk:", e);
+    }
+    return null;
+  }
+
+  function saveFastAuditsToDisk(auditData: any) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(FAST_AUDITS_FILE, JSON.stringify(auditData, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Failed to save fast audits to disk:", e);
+    }
+  }
+
+  let serverFastAudit: any = loadFastAuditsFromDisk();
+
+  app.get("/api/fast-audits/latest", (req, res) => {
+    try {
+      res.json({ success: true, audit: serverFastAudit });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/fast-audits/sync", (req, res) => {
+    try {
+      const { audit } = req.body;
+      if (audit) {
+        serverFastAudit = {
+          ...audit,
+          updatedAt: new Date().toISOString()
+        };
+        saveFastAuditsToDisk(serverFastAudit);
+      }
+      res.json({ success: true, audit: serverFastAudit });
+    } catch (err: any) {
+      console.error("Fast audit sync error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Persistent OTP storage file & in-memory cache
   const OTP_FILE = path.join(DATA_DIR, "otp_cache.json");
-  function loadOtpFromDisk(): Map<string, { otp: string, expiresAt: number, attempts: number }> {
-    const map = new Map<string, { otp: string, expiresAt: number, attempts: number }>();
+  function loadOtpFromDisk(): Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }> {
+    const map = new Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }>();
     try {
       if (fs.existsSync(OTP_FILE)) {
         const raw = JSON.parse(fs.readFileSync(OTP_FILE, "utf-8"));
@@ -404,8 +518,11 @@ async function startServer() {
     return map;
   }
 
-  function saveOtpToDisk(map: Map<string, { otp: string, expiresAt: number, attempts: number }>) {
+  function saveOtpToDisk(map: Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }>) {
     try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
       const obj: Record<string, any> = {};
       const now = Date.now();
       for (const [k, v] of map.entries()) {
@@ -429,6 +546,7 @@ async function startServer() {
       if (!email) return res.status(400).json({ error: "Email là bắt buộc." });
 
       const emailKey = String(email).toLowerCase().trim();
+      const flowKey = `${emailKey}_${flow}`;
 
       // Check if user account already exists in Firebase Auth or Firestore
       let userExists: boolean | null = null;
@@ -447,8 +565,8 @@ async function startServer() {
 
       const now = Date.now();
       
-      // Check cooldown (15s)
-      const cooldownEnd = otpSendCooldowns.get(emailKey) || 0;
+      // Check cooldown (10s)
+      const cooldownEnd = otpSendCooldowns.get(flowKey) || otpSendCooldowns.get(emailKey) || 0;
       if (now < cooldownEnd) {
         const waitSecs = Math.ceil((cooldownEnd - now) / 1000);
         return res.status(429).json({ error: `Vui lòng đợi ${waitSecs}s trước khi yêu cầu gửi lại mã.` });
@@ -457,18 +575,23 @@ async function startServer() {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-      // Verified working EmailJS configuration
+      // Verified working EmailJS configuration with primary working service first
       const credentialPairs = [
+        {
+          serviceId: process.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap",
+          templateId: process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j",
+          publicKey: process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-"
+        },
+        {
+          serviceId: "service_q86r4ap",
+          templateId: "template_1nq488j",
+          publicKey: "P5IG0fzzQJSm5e4P-"
+        },
         {
           serviceId: "default_service",
           templateId: "template_1nq488j",
           publicKey: "P5IG0fzzQJSm5e4P-"
-        },
-        ...(process.env.VITE_EMAILJS_PUBLIC_KEY && process.env.VITE_EMAILJS_PUBLIC_KEY !== "5XW2wWLI4bXG9aVEo" ? [{
-          serviceId: process.env.VITE_EMAILJS_SERVICE_ID || "default_service",
-          templateId: process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j",
-          publicKey: process.env.VITE_EMAILJS_PUBLIC_KEY
-        }] : [])
+        }
       ];
 
       let emailSent = false;
@@ -516,19 +639,22 @@ async function startServer() {
         }
       }
 
-      // Store OTP so user can verify
-      otpStore.set(emailKey, { otp, expiresAt, attempts: 0 });
+      // Store OTP both with flowKey and emailKey for flow-isolation and backward-compatibility
+      const record = { otp, expiresAt, attempts: 0, flow };
+      otpStore.set(flowKey, record);
+      otpStore.set(emailKey, record);
       saveOtpToDisk(otpStore);
-      otpSendCooldowns.set(emailKey, now + 10000); // 10s cooldown
+      otpSendCooldowns.set(flowKey, now + 10000); // 10s cooldown
+      otpSendCooldowns.set(emailKey, now + 10000);
 
       if (emailSent) {
-        console.log(`[OTP] Successfully dispatched to ${emailKey}`);
+        console.log(`[OTP] Successfully dispatched to ${emailKey} (flow: ${flow})`);
         return res.json({ 
           success: true, 
           message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`
         });
       } else {
-        console.warn(`[OTP] EmailJS dispatch failed for ${emailKey}. Details:`, emailErrorDetails);
+        console.warn(`[OTP] EmailJS dispatch failed for ${emailKey} (flow: ${flow}). Details:`, emailErrorDetails);
         return res.json({ 
           success: true, 
           fallback: true,
@@ -552,45 +678,36 @@ async function startServer() {
 
       const emailKey = String(email).toLowerCase().trim();
       const inputOtp = String(otp).trim();
+      const flowKey = `${emailKey}_${flow}`;
 
-      // Check if user account already exists in Firebase Auth or Firestore
-      let userExists: boolean | null = null;
-      if (flow === 'register' || flow === 'reset' || flow === 'login') {
-        userExists = await checkUserExistsSafe(emailKey);
-      }
-
-      // Distinguish flows: Register vs Login/Reset
-      if (flow === 'register' && userExists === true) {
-        return res.status(400).json({ error: "Tài khoản email này đã được đăng ký trên hệ thống. Vui lòng sử dụng chức năng Đăng nhập." });
-      }
-
-      if ((flow === 'reset' || flow === 'login') && userExists === false) {
-        return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
-      }
-
-      const record = otpStore.get(emailKey);
+      // Check flow-specific record first, then email-wide record
+      const record = otpStore.get(flowKey) || otpStore.get(emailKey);
 
       if (!record) {
         return res.status(400).json({ error: "Mã OTP không tồn tại hoặc chưa được gửi. Vui lòng bấm 'Gửi mã OTP'." });
       }
 
       if (Date.now() > record.expiresAt) {
+        otpStore.delete(flowKey);
         otpStore.delete(emailKey);
         saveOtpToDisk(otpStore);
         return res.status(400).json({ error: "Mã OTP đã hết hạn. Vui lòng yêu cầu gửi mã mới." });
       }
 
       if (record.otp !== inputOtp) {
-        record.attempts += 1;
+        record.attempts = (record.attempts || 0) + 1;
         if (record.attempts >= 5) {
+          otpStore.delete(flowKey);
           otpStore.delete(emailKey);
           saveOtpToDisk(otpStore);
           return res.status(429).json({ error: "Bạn đã nhập sai quá 5 lần. Vui lòng bấm gửi mã OTP mới." });
         }
+        saveOtpToDisk(otpStore);
         return res.status(400).json({ error: `Mã OTP không chính xác. Bạn còn ${5 - record.attempts} lần thử.` });
       }
 
       // Verification succeeded: invalidate the used OTP
+      otpStore.delete(flowKey);
       otpStore.delete(emailKey);
       saveOtpToDisk(otpStore);
       res.json({ success: true, message: "Xác minh danh tính thành công." });

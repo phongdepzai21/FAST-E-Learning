@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { db } from '../firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { 
   Building2, 
   FileText, 
@@ -26,7 +28,9 @@ import {
   HelpCircle,
   MapPin,
   User,
-  Share2
+  Share2,
+  Cloud,
+  Database
 } from 'lucide-react';
 
 interface CustomerRecord {
@@ -162,13 +166,81 @@ export const AdProfileManagement: React.FC = () => {
     secLegal: false
   });
   const [syncStatus, setSyncStatus] = useState<string>('Đã đồng bộ');
+  const [cloudSynced, setCloudSynced] = useState<boolean>(true);
+  const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
 
-  // Save CRM DB
+  // Synchronize with Cloud Firestore and Server Disk API
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     try {
-      localStorage.setItem(CRM_DB_KEY, JSON.stringify(database));
+      const docRef = doc(db, 'ad_profile_crm', 'database');
+      unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data?.records) && data.records.length > 0) {
+            setDatabase(data.records);
+            setCloudSynced(true);
+            try {
+              localStorage.setItem(CRM_DB_KEY, JSON.stringify(data.records));
+            } catch (e) {}
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore onSnapshot fallback notice:', err);
+      });
+    } catch (e) {
+      console.warn('Firestore initialization notice:', e);
+    }
+
+    // Secondary sync from server disk
+    fetch('/api/ad-profiles')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.records) && data.records.length > 0) {
+          setDatabase(prev => (prev.length === 0 ? data.records : prev));
+          setCloudSynced(true);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Persist to local storage, Cloud Firestore & Server Disk API
+  const persistDatabase = async (newDb: CustomerRecord[]) => {
+    setIsCloudSaving(true);
+    setDatabase(newDb);
+
+    // 1. LocalStorage
+    try {
+      localStorage.setItem(CRM_DB_KEY, JSON.stringify(newDb));
     } catch (e) {}
-  }, [database]);
+
+    // 2. Cloud Firestore
+    try {
+      await setDoc(doc(db, 'ad_profile_crm', 'database'), {
+        records: newDb,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      setCloudSynced(true);
+    } catch (err) {
+      console.warn('Firestore sync notice:', err);
+    }
+
+    // 3. Server Disk API
+    try {
+      await fetch('/api/ad-profiles/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_all', records: newDb })
+      });
+      setCloudSynced(true);
+    } catch (err) {}
+
+    setIsCloudSaving(false);
+  };
 
   // Load last active customer
   useEffect(() => {
@@ -211,7 +283,7 @@ export const AdProfileManagement: React.FC = () => {
     try {
       localStorage.setItem(CUST_ACTIVE_KEY, JSON.stringify(active));
       setSyncStatus('Đã lưu nháp');
-      setTimeout(() => setSyncStatus('Tự động đồng bộ'), 2000);
+      setTimeout(() => setSyncStatus('Tự động đồng bộ CSDL'), 2000);
     } catch (e) {}
   };
 
@@ -281,7 +353,7 @@ export const AdProfileManagement: React.FC = () => {
           rate: Math.round((checkedCount / 7) * 100),
           updatedAt: new Date().toLocaleString('vi-VN')
         };
-        setDatabase(newDb);
+        persistDatabase(newDb);
       }
     }
     saveActiveDraft();
@@ -326,19 +398,18 @@ export const AdProfileManagement: React.FC = () => {
 
     setCurrentId(recId);
 
-    setDatabase(prev => {
-      const idx = prev.findIndex(c => c.id === recId);
-      if (idx >= 0) {
-        const clone = [...prev];
-        clone[idx] = newRecord;
-        return clone;
-      } else {
-        return [newRecord, ...prev];
-      }
-    });
+    const idx = database.findIndex(c => c.id === recId);
+    let newDb: CustomerRecord[];
+    if (idx >= 0) {
+      newDb = [...database];
+      newDb[idx] = newRecord;
+    } else {
+      newDb = [newRecord, ...database];
+    }
 
+    persistDatabase(newDb);
     saveActiveDraft();
-    alert(`Đã lưu thành công hồ sơ khách hàng "${custName.trim()}" vào cơ sở dữ liệu FAST!`);
+    alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${custName.trim()}" vào cơ sở dữ liệu FAST!`);
   };
 
   // New Customer creation
@@ -382,11 +453,26 @@ export const AdProfileManagement: React.FC = () => {
   // Delete customer
   const deleteCustomer = (id: string, name: string) => {
     if (window.confirm(`Bạn có chắc chắn muốn xóa hồ sơ khách hàng "${name}" khỏi cơ sở dữ liệu?`)) {
-      setDatabase(prev => prev.filter(c => c.id !== id));
+      const newDb = database.filter(c => c.id !== id);
+      persistDatabase(newDb);
       if (currentId === id) {
         handleNewCustomer();
       }
     }
+  };
+
+  // Print function: specifically prints ONLY the checklist table
+  const handlePrintChecklistOnly = () => {
+    document.body.classList.add('printing-ad-checklist');
+    const cleanUp = () => {
+      document.body.classList.remove('printing-ad-checklist');
+      window.removeEventListener('afterprint', cleanUp);
+    };
+    window.addEventListener('afterprint', cleanUp);
+    setTimeout(() => {
+      window.print();
+      setTimeout(cleanUp, 2500);
+    }, 150);
   };
 
   // KPI Calculations
@@ -525,48 +611,54 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
-                Mã TTHC: 1.004650 &bull; CẤP TỈNH
-              </span>
-              <span className="px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
-                QĐ: 190/QĐ-BVHTTDL
-              </span>
+    <div>
+      {/* SCREEN VIEW (Hidden when printing checklist) */}
+      <div className="ad-profile-screen-only space-y-6">
+        {/* Header Banner */}
+        <div className="bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
+                  Mã TTHC: 1.004650 &bull; CẤP TỈNH
+                </span>
+                <span className="px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
+                  QĐ: 190/QĐ-BVHTTDL
+                </span>
+                <span className="px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30 text-xs font-bold flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${isCloudSaving ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`}></span>
+                  {isCloudSaving ? 'Đang Lưu Trữ CSDL...' : 'Đã Đồng Bộ CSDL Đám Mây'}
+                </span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
+                Quản Lý Toàn Trình Hồ Sơ Quảng Cáo Bảng &amp; Băng-Rôn
+              </h1>
+              <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
+                Hệ thống quản trị hồ sơ, đếm ngược thời hạn thụ lý 05 ngày làm việc và giám sát cơ sở dữ liệu khách hàng FAST CONSULTING.
+              </p>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-              Quản Lý Toàn Trình Hồ Sơ Quảng Cáo Bảng &amp; Băng-Rôn
-            </h1>
-            <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
-              Hệ thống quản trị hồ sơ, đếm ngược thời hạn thụ lý 05 ngày làm việc và giám sát cơ sở dữ liệu khách hàng FAST CONSULTING.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <a
-              href="https://dichvucong.gov.vn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Cổng DVC Quốc Gia
-            </a>
-            <a
-              href="tel:0927002668"
-              className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
-            >
-              <Phone className="w-4 h-4" />
-              Hotline: 0927 002 668
-            </a>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <a
+                href="https://dichvucong.gov.vn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Cổng DVC Quốc Gia
+              </a>
+              <a
+                href="tel:0927002668"
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
+              >
+                <Phone className="w-4 h-4" />
+                Hotline: 0927 002 668
+              </a>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Specifications Grid */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
@@ -1001,11 +1093,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           </button>
 
           <button
-            onClick={() => window.print()}
+            onClick={handlePrintChecklistOnly}
             className="px-3.5 py-2 bg-[#007c76] hover:bg-[#005c56] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            title="In riêng bảng checklist hồ sơ theo yêu cầu"
           >
             <Printer className="w-3.5 h-3.5" />
-            In Toàn Trình (PDF)
+            In Bảng Checklist (PDF)
           </button>
         </div>
       </div>
@@ -1030,7 +1123,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-amber-900 font-semibold">
                 <FileText className="w-4 h-4 text-amber-600" />
-                <span>Xuất danh mục gửi khách hàng qua Zalo hoặc in PDF gửi đính kèm hợp đồng.</span>
+                <span>Xuất danh mục gửi khách hàng qua Zalo hoặc in bảng checklist gửi đính kèm hợp đồng.</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1041,11 +1134,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                   Sao Chép Gửi Zalo
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintChecklistOnly}
                   className="px-3 py-1.5 bg-[#007c76] hover:bg-[#005c56] text-white rounded-lg font-bold flex items-center gap-1 shadow-sm"
+                  title="In trực tiếp bảng checklist hồ sơ"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  In / Xuất PDF
+                  In Bảng Checklist
                 </button>
               </div>
             </div>
@@ -1299,6 +1393,131 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             </div>
           </div>
         )}
+      </div>
+      </div>
+
+      {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
+      <div id="ad-checklist-print-area" className="hidden print:block bg-white text-gray-900 p-6">
+        {/* Header */}
+        <div className="border-b-2 border-[#007c76] pb-3 mb-4 flex justify-between items-center">
+          <div>
+            <div className="text-[11px] font-black uppercase text-[#007c76] tracking-wider">
+              FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
+            </div>
+            <h1 className="text-xl font-black text-gray-900 uppercase mt-0.5 tracking-tight">
+              BẢNG CHECKLIST HỒ SƠ THÔNG BÁO SẢN PHẨM QUẢNG CÁO
+            </h1>
+            <p className="text-[11px] text-gray-500 italic mt-0.5">
+              Thủ tục tiếp nhận hồ sơ thông báo sản phẩm quảng cáo trên bảng quảng cáo, băng-rôn (Mã TTHC: 1.004650)
+            </p>
+          </div>
+          <div className="text-right text-[10.5px] text-gray-500">
+            <div>Mã TTHC: <strong>1.004650</strong></div>
+            <div>QĐ: <strong>190/QĐ-BVHTTDL</strong></div>
+            <div>Hotline: <strong>0927 002 668</strong></div>
+          </div>
+        </div>
+
+        {/* Thông tin hồ sơ khách hàng */}
+        <div className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50/70 text-xs">
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Tên Khách Hàng / Đơn Vị:</td>
+                <td className="py-1 px-2 font-black text-gray-900 w-1/4">{custName || 'Chưa cung cấp'}</td>
+                <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Chuyên Viên FAST Phụ Trách:</td>
+                <td className="py-1 px-2 font-black text-gray-900 w-1/4">{fastStaff || 'Chưa phân công'}</td>
+              </tr>
+              <tr>
+                <td className="py-1 px-2 font-bold text-[#005c56]">Số Điện Thoại:</td>
+                <td className="py-1 px-2 text-gray-800">{custPhone || 'Chưa có'}</td>
+                <td className="py-1 px-2 font-bold text-[#005c56]">Ngày Tiếp Nhận (Order):</td>
+                <td className="py-1 px-2 text-gray-800">{orderDate || '-'}</td>
+              </tr>
+              <tr>
+                <td className="py-1 px-2 font-bold text-[#005c56]">Địa Điểm Cơ Sở / Vị Trí:</td>
+                <td className="py-1 px-2 text-gray-800">{custLocation || 'Chưa cung cấp'}</td>
+                <td className="py-1 px-2 font-bold text-[#005c56]">Hạn Xử Lý Theo Quy Định (05N):</td>
+                <td className="py-1 px-2 font-black text-amber-700">{targetDate || '-'}</td>
+              </tr>
+              <tr>
+                <td className="py-1 px-2 font-bold text-[#005c56]">Tiến Độ Chuẩn Bị Hồ Sơ:</td>
+                <td className="py-1 px-2 font-black text-green-700" colSpan={3}>
+                  Đã chuẩn bị: {Object.values(checklist).filter(Boolean).length}/7 mục ({Math.round((Object.values(checklist).filter(Boolean).length / 7) * 100)}%) - {custStatus}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bảng checklist 07 tài liệu */}
+        <table className="w-full border-collapse border border-gray-400 text-xs mb-4">
+          <thead>
+            <tr className="bg-gray-100 text-gray-900 font-bold border-b border-gray-400">
+              <th className="border border-gray-400 p-2 text-center w-10">STT</th>
+              <th className="border border-gray-400 p-2 text-center w-24">Tình Trạng</th>
+              <th className="border border-gray-400 p-2 w-2/5">Tên Hồ Sơ / Tài Liệu Cần Cung Cấp</th>
+              <th className="border border-gray-400 p-2 w-1/5">Quy Cách &amp; Số Lượng</th>
+              <th className="border border-gray-400 p-2">Hướng Dẫn &amp; Căn Cứ Pháp Lý</th>
+            </tr>
+          </thead>
+          <tbody>
+            {INITIAL_DOCS.map((doc, idx) => {
+              const isChecked = !!checklist[doc.id];
+              return (
+                <tr key={doc.id} className="border-b border-gray-300">
+                  <td className="border border-gray-300 p-2 text-center font-bold">{idx + 1}</td>
+                  <td className="border border-gray-300 p-2 text-center">
+                    {isChecked ? (
+                      <span className="font-bold text-green-700">[ ✓ ] Đã có</span>
+                    ) : (
+                      <span className="text-gray-400 font-mono">[ &nbsp;&nbsp; ] Chưa có</span>
+                    )}
+                  </td>
+                  <td className="border border-gray-300 p-2">
+                    <div className="font-bold text-gray-900">{doc.name}</div>
+                    <div className="text-[10.5px] text-gray-600 mt-0.5">{doc.legalRef}</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 text-[11px]">
+                    <div className="font-semibold text-gray-800">{doc.qty}</div>
+                    <div className="text-[10px] text-gray-500 uppercase mt-0.5">{doc.type}</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 text-[11px] text-gray-700 leading-relaxed">
+                    {doc.guidance}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Hướng dẫn & Lưu ý */}
+        <div className="p-3 border border-gray-300 rounded bg-gray-50/50 text-[11px] text-gray-700 mb-6 leading-relaxed">
+          <strong>Lưu ý từ Chuyên viên FAST CONSULTING:</strong> Khách hàng chỉ cần chuẩn bị <strong>01 bộ hồ sơ đầy đủ</strong> theo danh mục trên. Các bản chụp hoặc bản scan gửi FAST để nộp trực tuyến cần rõ nét, đủ 4 góc, quét từ bản gốc để không bị cơ quan chức năng yêu cầu giải trình lại.
+        </div>
+
+        {/* Khối chữ ký bàn giao */}
+        <div className="grid grid-cols-2 gap-8 text-center text-xs mt-6 pt-4 border-t border-gray-300">
+          <div className="flex flex-col items-center justify-between min-h-[120px]">
+            <div>
+              <p className="font-bold uppercase tracking-wider text-gray-800">ĐẠI DIỆN KHÁCH HÀNG / DOANH NGHIỆP</p>
+              <p className="text-[10.5px] text-gray-500 italic">(Ký, ghi rõ họ tên &amp; đóng dấu)</p>
+            </div>
+            <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
+              {custName || 'Khách hàng'}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-between min-h-[120px]">
+            <div>
+              <p className="font-bold uppercase tracking-wider text-[#007c76]">CHUYÊN VIÊN FAST TIẾP NHẬN HỒ SƠ</p>
+              <p className="text-[10.5px] text-gray-500 italic">(Ký &amp; ghi rõ họ tên)</p>
+            </div>
+            <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
+              {fastStaff || 'Dung Trần (FAST)'}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

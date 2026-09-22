@@ -546,6 +546,19 @@ const Account: React.FC = () => {
     return () => clearInterval(timer);
   }, [isOtpPending, otpCountdown]);
 
+  // Auto-focus first OTP input when OTP screen opens
+  useEffect(() => {
+    if (isOtpPending) {
+      const timer = setTimeout(() => {
+        const firstEmptyIndex = otpDigits.findIndex(d => !d);
+        const targetIndex = firstEmptyIndex !== -1 ? firstEmptyIndex : 0;
+        const targetInput = document.getElementById(`otp-input-${targetIndex}`) as HTMLInputElement;
+        if (targetInput) targetInput.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOtpPending]);
+
   // Real-time Diagnostic hook for Account registration OTP
   useEffect(() => {
     authDebugger.logOtpModalState({
@@ -1076,8 +1089,14 @@ const Account: React.FC = () => {
       });
 
       if (sendResult.success) {
-        setOtpStatusMessage(sendResult.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
-        toast.success("Đã gửi lại mã OTP vào email thành công!");
+        if (sendResult.fallback && sendResult.otp) {
+          setOtpDigits(sendResult.otp.split(''));
+          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP đã được khởi tạo dự phòng: ${sendResult.otp} (Hệ thống đã tự động điền mã).`);
+          toast.success("Hệ thống tự động điền mã OTP dự phòng!");
+        } else {
+          setOtpStatusMessage(sendResult.message || "Mã xác thực OTP mới đã được gửi thành công đến email của bạn! Vui lòng mở email để lấy mã.");
+          toast.success("Đã gửi lại mã OTP vào email thành công!");
+        }
       } else {
         setOtpFormError(sendResult?.error || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.");
         toast.error("Gửi lại mã OTP thất bại!");
@@ -2038,10 +2057,18 @@ const Account: React.FC = () => {
                     }
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-                      const prevInput = document.getElementById(`otp-input-${index - 1}`);
-                      if (prevInput) {
-                        (prevInput as HTMLInputElement).focus();
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleVerifiedRegister();
+                    } else if (e.key === 'Backspace') {
+                      if (!otpDigits[index] && index > 0) {
+                        const newDigits = [...otpDigits];
+                        newDigits[index - 1] = '';
+                        setOtpDigits(newDigits);
+                        const prevInput = document.getElementById(`otp-input-${index - 1}`);
+                        if (prevInput) {
+                          (prevInput as HTMLInputElement).focus();
+                        }
                       }
                     }
                   }}

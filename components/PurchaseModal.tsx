@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth } from "../firebase";
+import { sendOtp, verifyOtp } from "../utils/otpService";
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [cooldownTimer, setCooldownTimer] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Determine active reliable email
   const effectiveEmail = (
@@ -47,6 +49,15 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    if (otpSent && isOpen) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [otpSent, isOpen]);
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (cooldownTimer > 0) {
       timer = setTimeout(() => setCooldownTimer(c => c - 1), 1000);
@@ -55,59 +66,40 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   }, [cooldownTimer]);
 
   const handleSendOtp = async () => {
-    console.log("[PurchaseModal:SendOtp] Initiating OTP send process...");
     setIsSending(true);
     setError("");
     setInfoMessage("");
     setOtpCode("");
-    console.log("[PurchaseModal:SendOtp] Configuration:", {
-      effectiveEmail,
-      userName
-    });
 
     try {
-      console.log("[PurchaseModal:SendOtp] Dispatching POST request to /api/otp/send...");
-      const response = await fetch('/api/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: effectiveEmail, name: userName || 'Học viên' })
+      const result = await sendOtp({
+        email: effectiveEmail,
+        name: userName || 'Học viên',
+        flow: 'purchase'
       });
 
-      console.log("[PurchaseModal:SendOtp] HTTP response status received:", response.status);
-      const data = await response.json().catch((err) => {
-        console.error("[PurchaseModal:SendOtp] Failed to parse response JSON:", err);
-        return null;
-      });
-      console.log("[PurchaseModal:SendOtp] Parse response JSON data:", data);
-
-      if (response.ok && data?.success) {
-        console.log("[PurchaseModal:SendOtp] SUCCESS: OTP sent. Setting otpSent to TRUE.");
+      if (result.success) {
         setOtpSent(true);
         setCooldownTimer(30);
-        if (data.fallback && data.otp) {
-          console.log("[PurchaseModal:SendOtp] FALLBACK mode triggered by server. Autofilling otpCode with:", data.otp);
-          setOtpCode(data.otp);
-          setInfoMessage(data.message || `Mã OTP đã được khởi tạo tự động (Chế độ dự phòng). Mã xác nhận của bạn là: ${data.otp}`);
+        if (result.fallback && result.otp) {
+          setOtpCode(result.otp);
+          setInfoMessage(result.message || `Mã OTP đã được khởi tạo tự động (Chế độ dự phòng). Mã xác nhận của bạn là: ${result.otp}`);
         } else {
-          setInfoMessage(data.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
+          setInfoMessage(result.message || `Mã OTP đã được gửi đến email ${effectiveEmail}. Vui lòng kiểm tra hộp thư (cả thư rác/Spam) để lấy mã.`);
         }
       } else {
-        console.warn("[PurchaseModal:SendOtp] FAILED: Server returned unsuccessful or not-ok response:", data);
-        setError(data?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
+        setError(result?.error || "Không thể gửi mã OTP qua email lúc này. Vui lòng kiểm tra lại địa chỉ email.");
       }
     } catch (err: any) {
-      console.error("[PurchaseModal:SendOtp] EXCEPTION thrown during fetch execution:", err);
-      setError("Lỗi kết nối khi gửi mã xác thực. Vui lòng thử lại.");
+      console.error("[PurchaseModal:SendOtp] Error:", err);
+      setError(err?.message || "Lỗi kết nối khi gửi mã xác thực. Vui lòng thử lại.");
+    } finally {
+      setIsSending(false);
     }
-
-    setIsSending(false);
-    console.log("[PurchaseModal:SendOtp] Completed OTP send process. isSending set to false.");
   };
 
   const handleVerify = async () => {
-    console.log("[PurchaseModal:Verify] Initiating OTP verification process for digits:", otpCode);
     if (otpCode.length !== 6) {
-      console.warn("[PurchaseModal:Verify] Aborted: Invalid otpCode length:", otpCode.length);
       setError("Vui lòng nhập đầy đủ mã OTP 6 số từ email của bạn.");
       return;
     }
@@ -116,30 +108,23 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setIsVerifying(true);
 
     try {
-      console.log("[PurchaseModal:Verify] Dispatching POST request to /api/otp/verify...");
-      const response = await fetch('/api/otp/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: effectiveEmail, otp: otpCode, flow: 'purchase' })
+      const result = await verifyOtp({
+        email: effectiveEmail,
+        otp: otpCode,
+        flow: 'purchase'
       });
 
-      console.log("[PurchaseModal:Verify] HTTP response status received:", response.status);
-      const data = await response.json().catch(() => null);
-      console.log("[PurchaseModal:Verify] Parse response JSON data:", data);
-
-      if (response.ok && data?.success) {
-        console.log("[PurchaseModal:Verify] SUCCESS: OTP verified successfully. Triggering onSuccess callback.");
+      if (result.success) {
         onSuccess();
       } else {
-        console.warn("[PurchaseModal:Verify] FAILED: Server returned verification failure:", data);
-        setError(data?.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
+        setError(result.error || "Mã OTP không chính xác hoặc đã hết hạn. Vui lòng kiểm tra lại email.");
       }
-    } catch (err) {
-      console.error("[PurchaseModal:Verify] EXCEPTION thrown during fetch verification:", err);
-      setError("Lỗi kết nối máy chủ xác minh OTP. Vui lòng thử lại.");
+    } catch (err: any) {
+      console.error("[PurchaseModal:Verify] Error:", err);
+      setError(err?.message || "Lỗi kết nối máy chủ xác minh OTP. Vui lòng thử lại.");
+    } finally {
+      setIsVerifying(false);
     }
-    setIsVerifying(false);
-    console.log("[PurchaseModal:Verify] Completed OTP verification flow. isVerifying set to false.");
   };
 
   if (!isOpen) return null;
@@ -236,12 +221,19 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 Nhập mã OTP (6 số)
               </label>
               <input
+                ref={inputRef}
                 type="text"
                 maxLength={6}
                 value={otpCode}
                 onChange={(e) => {
                   setOtpCode(e.target.value.replace(/\D/g, ""));
                   setError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && otpCode.length === 6 && !isVerifying) {
+                    e.preventDefault();
+                    handleVerify();
+                  }
                 }}
                 placeholder="000000"
                 disabled={isVerifying}

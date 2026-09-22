@@ -174,5 +174,17 @@ service cloud.firestore {
       allow update: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
       allow delete: if isAdmin() || isTeacher();
     }
+
+    // 4. Fast Standards Audits
+    match /fast_standards_audits/{auditId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin() || isTeacher();
+    }
+
+    // 5. Ad Profile CRM Records
+    match /ad_profile_crm/{recordId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin() || isTeacher();
+    }
   }
 }

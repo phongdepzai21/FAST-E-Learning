@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { db } from '../firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { ALL_AUDIT_ITEMS, AuditItem, AuditItemState, VAL_METHODS_LIST, IMP_METHODS_LIST } from '../data/fastStandardsData';
 import { 
   ClipboardCheck, 
@@ -22,10 +24,14 @@ import {
   ArrowRight,
   Filter,
   Check,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  Cloud,
+  Database
 } from 'lucide-react';
 
 const STORAGE_KEY = 'FAST_AUDIT_STATE_SAVE_V1';
+const META_KEY = 'FAST_AUDIT_META_SAVE_V1';
 
 export const FastStandardsAudit: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<string>('library');
@@ -34,6 +40,9 @@ export const FastStandardsAudit: React.FC = () => {
   const [businessModel, setBusinessModel] = useState<string>('Chuỗi Nhà Hàng (F&B Chain)');
   const [auditorName, setAuditorName] = useState<string>('Dung Trần (FAST CONSULTING)');
   const [auditDate, setAuditDate] = useState<string>(() => new Date().toLocaleDateString('vi-VN'));
+
+  const [cloudSynced, setCloudSynced] = useState<boolean>(true);
+  const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
 
   // Filter states for pillars
   const [filterAccuracy, setFilterAccuracy] = useState<string>('all');
@@ -73,12 +82,129 @@ export const FastStandardsAudit: React.FC = () => {
     return init;
   });
 
-  // Save to localStorage on state changes
+  // Load saved metadata from local storage
+  useEffect(() => {
+    try {
+      const meta = localStorage.getItem(META_KEY);
+      if (meta) {
+        const parsed = JSON.parse(meta);
+        if (parsed.clientName) setClientName(parsed.clientName);
+        if (parsed.managerName) setManagerName(parsed.managerName);
+        if (parsed.businessModel) setBusinessModel(parsed.businessModel);
+        if (parsed.auditorName) setAuditorName(parsed.auditorName);
+        if (parsed.auditDate) setAuditDate(parsed.auditDate);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Save metadata to local storage
+  useEffect(() => {
+    try {
+      localStorage.setItem(META_KEY, JSON.stringify({
+        clientName,
+        managerName,
+        businessModel,
+        auditorName,
+        auditDate
+      }));
+    } catch (e) {}
+  }, [clientName, managerName, businessModel, auditorName, auditDate]);
+
+  // Synchronize with Cloud Firestore and Server Disk
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const docRef = doc(db, 'fast_standards_audits', 'current_session');
+      unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data?.auditState && typeof data.auditState === 'object') {
+            setAuditState(data.auditState);
+            if (data.clientName) setClientName(data.clientName);
+            if (data.managerName) setManagerName(data.managerName);
+            if (data.businessModel) setBusinessModel(data.businessModel);
+            if (data.auditorName) setAuditorName(data.auditorName);
+            if (data.auditDate) setAuditDate(data.auditDate);
+            setCloudSynced(true);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data.auditState));
+            } catch (e) {}
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore onSnapshot fallback notice:', err);
+      });
+    } catch (e) {
+      console.warn('Firestore initialization notice:', e);
+    }
+
+    // Secondary load from server API
+    fetch('/api/fast-audits/latest')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && data?.auditState) {
+          setAuditState(data.auditState);
+          if (data.clientName) setClientName(data.clientName);
+          if (data.managerName) setManagerName(data.managerName);
+          if (data.businessModel) setBusinessModel(data.businessModel);
+          if (data.auditorName) setAuditorName(data.auditorName);
+          if (data.auditDate) setAuditDate(data.auditDate);
+          setCloudSynced(true);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Save to cloud on state changes
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(auditState));
     } catch (e) {}
-  }, [auditState]);
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      setIsCloudSaving(true);
+      const payload = {
+        clientName,
+        managerName,
+        businessModel,
+        auditorName,
+        auditDate,
+        auditState,
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, 'fast_standards_audits', 'current_session'), payload, { merge: true });
+        setCloudSynced(true);
+      } catch (err) {
+        console.warn('Firestore save notice:', err);
+      }
+
+      try {
+        await fetch('/api/fast-audits/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync_current', ...payload })
+        });
+        setCloudSynced(true);
+      } catch (err) {}
+
+      setIsCloudSaving(false);
+    }, 1200);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [auditState, clientName, managerName, businessModel, auditorName, auditDate]);
 
   const updateItemStatus = (id: string, status: 'pass' | 'fail' | 'na') => {
     setAuditState(prev => ({
@@ -217,8 +343,15 @@ export const FastStandardsAudit: React.FC = () => {
 
   const handleNativePrint = () => {
     setActiveSubTab('report');
+    document.body.classList.add('printing-fast-audit');
+    const cleanUp = () => {
+      document.body.classList.remove('printing-fast-audit');
+      window.removeEventListener('afterprint', cleanUp);
+    };
+    window.addEventListener('afterprint', cleanUp);
     setTimeout(() => {
       window.print();
+      setTimeout(cleanUp, 2500);
     }, 200);
   };
 
@@ -226,9 +359,63 @@ export const FastStandardsAudit: React.FC = () => {
     setActiveSubTab('report');
     setFilterReportPillar('all');
     setFilterReportType('all');
+    document.body.classList.add('printing-fast-audit');
+    const cleanUp = () => {
+      document.body.classList.remove('printing-fast-audit');
+      window.removeEventListener('afterprint', cleanUp);
+    };
+    window.addEventListener('afterprint', cleanUp);
     setTimeout(() => {
       window.print();
+      setTimeout(cleanUp, 2500);
     }, 250);
+  };
+
+  // Export full audit report to Excel (.CSV with UTF-8 BOM)
+  const exportToExcel = () => {
+    let csv = '\uFEFF';
+    csv += 'BÁO CÁO KẾT QUẢ ĐÁNH GIÁ TIÊU CHUẨN VẬN HÀNH & AN TOÀN THỰC PHẨM (FAST STANDARDS)\n';
+    csv += `Đơn vị được đánh giá (Auditee):,"${(clientName || '').replace(/"/g, '""')}"\n`;
+    csv += `Quản lý cơ sở (Store Manager):,"${(managerName || '').replace(/"/g, '""')}"\n`;
+    csv += `Chuyên gia đánh giá (Lead Auditor):,"${(auditorName || '').replace(/"/g, '""')}"\n`;
+    csv += `Ngày đánh giá:,"${auditDate || ''}"\n`;
+    csv += `Mô hình kinh doanh:,"${(businessModel || '').replace(/"/g, '""')}"\n`;
+    csv += `Điểm đánh giá tổng:,"${finalScore}%"\n`;
+    csv += `Kết luận:,"${isPassed ? 'ĐẠT YÊU CẦU' : hasMajor ? 'KHÔNG ĐẠT (CÓ LỖI MAJOR)' : 'KHÔNG ĐẠT (<80%)'}"\n`;
+    csv += `Tổng số lỗi (NCs):,"${ALL_AUDIT_ITEMS.filter(it => auditState[it.id]?.status === 'fail').length}",Major:,"${majorCount}",Minor:,"${minorCount}",Observation:,"${obsCount}"\n\n`;
+    
+    csv += 'STT,Mã Tiêu Chuẩn,Trụ Cột (Pillar),Nhóm (Group),Tiêu Chuẩn Đạt,Lỗi Không Đạt (Defect),Tham Chiếu Tiêu Chuẩn,Điểm Trừ,Phân Loại,Trạng Thái Đánh Giá,Ghi Chú / Bằng Chứng,Hành Động Khắc Phục (CAPA),Phương Pháp Thẩm Tra (Validation),Ghi Chú Thẩm Tra,Phương Án Cải Tiến (Improvement),Ghi Chú Cải Tiến\n';
+    
+    ALL_AUDIT_ITEMS.forEach((it, idx) => {
+      const st = auditState[it.id] || { status: 'pass', note: '', capa: '', valMethod: '', valNotes: '', impMethod: '', impNotes: '' };
+      const id = `"${it.id}"`;
+      const pillar = `"${(it.pillar || '').replace(/"/g, '""')}"`;
+      const group = `"${(it.group || '').replace(/"/g, '""')}"`;
+      const std = `"${(it.std || '').replace(/"/g, '""')}"`;
+      const defect = `"${(it.defect || '').replace(/"/g, '""')}"`;
+      const ref = `"${(it.ref || '').replace(/"/g, '""')}"`;
+      const pts = `"-${it.pts}"`;
+      const type = `"${it.type}"`;
+      const status = `"${st.status === 'pass' ? 'Đạt (Pass)' : st.status === 'fail' ? 'Không Đạt (Fail)' : 'Không Áp Dụng (K/A)'}"`;
+      const note = `"${(st.note || '').replace(/"/g, '""')}"`;
+      const capa = `"${(st.capa || '').replace(/"/g, '""')}"`;
+      const valM = `"${(st.valMethod || '').replace(/"/g, '""')}"`;
+      const valN = `"${(st.valNotes || '').replace(/"/g, '""')}"`;
+      const impM = `"${(st.impMethod || '').replace(/"/g, '""')}"`;
+      const impN = `"${(st.impNotes || '').replace(/"/g, '""')}"`;
+      
+      csv += `${idx + 1},${id},${pillar},${group},${std},${defect},${ref},${pts},${type},${status},${note},${capa},${valM},${valN},${impM},${impN}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `FAST_BaoCao_TieuChuan_${(clientName || 'FAST').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Render pillar checklist table
@@ -354,14 +541,20 @@ export const FastStandardsAudit: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+      {/* Top Banner (Screen Only) */}
+      <div className="fast-audit-screen-only bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider mb-2">
-              <ShieldCheck className="w-4 h-4 text-teal-300" />
-              FAST CONSULTING &bull; DÀNH RIÊNG QUẢN TRỊ VIÊN
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-teal-300" />
+                FAST CONSULTING &bull; DÀNH RIÊNG QUẢN TRỊ VIÊN
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30 text-xs font-bold flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isCloudSaving ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`}></span>
+                {isCloudSaving ? 'Đang Lưu Trữ CSDL...' : 'Đã Đồng Bộ CSDL Đám Mây'}
+              </span>
             </div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
               Hệ Thống Thư Viện &amp; Đánh Giá Tiêu Chuẩn FAST
@@ -372,6 +565,14 @@ export const FastStandardsAudit: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={exportToExcel}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
+              title="Xuất toàn bộ 265 tiêu chuẩn và CAPA ra file Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Xuất Excel
+            </button>
             <button
               onClick={handleExportPDF}
               className="px-4 py-2.5 bg-white text-[#005c56] hover:bg-teal-50 rounded-xl font-bold text-xs uppercase tracking-wider shadow transition-all flex items-center gap-1.5"
@@ -398,8 +599,8 @@ export const FastStandardsAudit: React.FC = () => {
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
+      {/* Navigation Sub-Tabs (Screen Only) */}
+      <div className="fast-audit-screen-only bg-white p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
         {[
           { id: 'library', label: 'Thư Viện', icon: Building2, count: null },
           { id: 'accuracy', label: 'Accuracy', icon: CheckCircle2, count: 20 },

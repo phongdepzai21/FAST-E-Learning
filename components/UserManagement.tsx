@@ -51,6 +51,17 @@ export const UserManagement: React.FC = () => {
   const [lockOtpError, setLockOtpError] = useState('');
   const [lockOtpNotice, setLockOtpNotice] = useState('');
   const [lockOtpCooldown, setLockOtpCooldown] = useState(0);
+  const lockOtpInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus lock OTP input when sent
+  useEffect(() => {
+    if (lockOtpSent && lockModalUser) {
+      const timer = setTimeout(() => {
+        lockOtpInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [lockOtpSent, lockModalUser]);
 
   // Pagination states (20 tài khoản mỗi trang)
   const PAGE_SIZE = 20;
@@ -948,12 +959,19 @@ export const UserManagement: React.FC = () => {
                   <div className="space-y-2 pt-1">
                     <div className="relative">
                       <input
+                        ref={lockOtpInputRef}
                         type="text"
                         maxLength={6}
                         value={lockOtpCode}
                         onChange={(e) => {
                           setLockOtpCode(e.target.value.replace(/\D/g, ''));
                           setLockOtpError('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && lockOtpCode.trim().length === 6 && !isLocking && lockModalUser) {
+                            e.preventDefault();
+                            handleToggleLockUser(lockModalUser, true, lockReasonInput);
+                          }
                         }}
                         placeholder="000000"
                         className="w-full text-center text-2xl font-black tracking-[0.4em] py-2.5 bg-white border-2 border-slate-300 rounded-xl focus:border-rose-500 focus:outline-none font-mono"

@@ -29,3 +29,56 @@
   box-shadow: 0 20px 35px -12px rgba(0, 124, 118, 0.16), 0 8px 16px -8px rgba(0, 0, 0, 0.05);
   border-color: rgba(0, 124, 118, 0.25);
 }
+
+/* ==========================================================================
+   PRINT STYLES: In Báo Cáo Tiêu Chuẩn FAST & In Bảng Checklist Hồ Sơ Quảng Cáo
+   ========================================================================== */
+@media print {
+  @page {
+    margin: 8mm 6mm;
+    size: auto;
+  }
+
+  /* Hide default browser chrome & UI controls */
+  header.main-header,
+  nav,
+  aside,
+  footer,
+  .no-print,
+  .screen-only,
+  button,
+  .btn-print-hide {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 1. CHỈ IN BẢNG CHECKLIST TRONG HỒ SƠ QUẢNG CÁO */
+  body.printing-ad-checklist #ad-checklist-print-area {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+  body.printing-ad-checklist .ad-profile-screen-only {
+    display: none !important;
+  }
+
+  /* 2. IN BÁO CÁO & CAPA TIÊU CHUẨN FAST */
+  body.printing-fast-audit #fastAuditReportSection {
+    display: block !important;
+    width: 100% !important;
+  }
+  body.printing-fast-audit .fast-audit-screen-only {
+    display: none !important;
+  }
+}
+
