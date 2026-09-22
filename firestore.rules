@@ -105,6 +105,18 @@ service cloud.firestore {
              (!('curriculum' in data) || data.curriculum is list);
     }
 
+    function isValidCombo(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 256)) &&
+             (!('price' in data) || (data.price is string && data.price.size() <= 64)) &&
+             (!('image' in data) || (data.image is string && data.image.size() <= 1024)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 10000)) &&
+             (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
+             (!('courseIds' in data) || data.courseIds is list) &&
+             (!('benefits' in data) || data.benefits is list);
+    }
+
     // --- Collection Rules ---
 
     // 1. Users
@@ -152,6 +164,14 @@ service cloud.firestore {
       allow read: if true; // Publicly readable for catalog listing
       allow create: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
       allow update: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
+      allow delete: if isAdmin() || isTeacher();
+    }
+
+    // 3. Combos (Global)
+    match /combos/{comboId} {
+      allow read: if true; // Publicly readable for catalog listing
+      allow create: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
+      allow update: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
       allow delete: if isAdmin() || isTeacher();
     }
   }

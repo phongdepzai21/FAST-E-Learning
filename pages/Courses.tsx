@@ -50,30 +50,78 @@ const Courses: React.FC = () => {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [combos, setCombos] = useState<any[]>(DEFAULT_COMBOS);
 
-  // --- FETCH ALL COMBOS FROM FIRESTORE ---
+  // --- FETCH ALL COMBOS FROM FIRESTORE & LOCAL CACHE ---
   useEffect(() => {
+    let localCombos: any[] = [];
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) localCombos = parsed;
+      }
+    } catch (e) {}
+
+    const mergeWithDefaults = (sourceCombos: any[]) => {
+      const merged = DEFAULT_COMBOS.map(def => {
+        const found = sourceCombos.find(dbc => dbc.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+
+      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+      const customCombos = sourceCombos.filter(dbc => !defaultIds.includes(dbc.id));
+      return [...merged, ...customCombos];
+    };
+
+    // Immediate display from cache if available
+    if (localCombos.length > 0) {
+      setCombos(mergeWithDefaults(localCombos));
+    }
+
     const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
       const dbCombos: any[] = [];
       snapshot.forEach(docSnap => {
         dbCombos.push({ id: docSnap.id, ...docSnap.data() });
       });
 
-      // Merge with defaults
-      const merged = DEFAULT_COMBOS.map(def => {
-        const found = dbCombos.find(dbc => dbc.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      // Include new custom combos that are not in defaults
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = dbCombos.filter(dbc => !defaultIds.includes(dbc.id));
-
-      setCombos([...merged, ...customCombos]);
+      if (dbCombos.length > 0) {
+        try {
+          localStorage.setItem('combo_cache_all', JSON.stringify(dbCombos));
+        } catch (e) {}
+        setCombos(mergeWithDefaults(dbCombos));
+      } else if (localCombos.length > 0) {
+        setCombos(mergeWithDefaults(localCombos));
+      } else {
+        setCombos(DEFAULT_COMBOS);
+      }
     }, (err) => {
       console.warn("Lỗi đồng bộ danh sách combo:", err);
-      setCombos(DEFAULT_COMBOS);
+      if (localCombos.length > 0) {
+        setCombos(mergeWithDefaults(localCombos));
+      } else {
+        setCombos(DEFAULT_COMBOS);
+      }
     });
-    return () => unsub();
+
+    const handleSync = () => {
+      try {
+        const cached = localStorage.getItem('combo_cache_all');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setCombos(mergeWithDefaults(parsed));
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('combos_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      unsub();
+      window.removeEventListener('combos_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---

@@ -30,7 +30,9 @@ import {
   BookOpen,
   CheckSquare,
   Square,
-  HelpCircle
+  HelpCircle,
+  Download,
+  Upload
 } from 'lucide-react';
 
 export interface ComboItem {
@@ -170,6 +172,48 @@ export const ComboManagement: React.FC = () => {
       setIsLoading(false);
     };
 
+    // Auto-sync any locally cached combos to Firestore Cloud if not yet in Firestore
+    const syncLocalCombosToFirestore = async (currentFsList: ComboItem[]) => {
+      try {
+        const cached = localStorage.getItem('combo_cache_all');
+        if (!cached) return;
+        const localList: ComboItem[] = JSON.parse(cached);
+        if (!Array.isArray(localList) || localList.length === 0) return;
+
+        const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+        const fsMap = new Map(currentFsList.map(c => [c.id, c]));
+        let syncedCount = 0;
+
+        for (const localCombo of localList) {
+          if (!localCombo || !localCombo.id || defaultIds.includes(localCombo.id) || deletedIds.includes(localCombo.id)) continue;
+          const fsCombo = fsMap.get(localCombo.id);
+          const localTime = new Date(localCombo.updatedAt || 0).getTime();
+          const fsTime = fsCombo ? new Date(fsCombo.updatedAt || 0).getTime() : 0;
+
+          if (!fsCombo || localTime > fsTime) {
+            const payload: any = {
+              id: String(localCombo.id),
+              title: String(localCombo.title || '').trim(),
+              price: String(localCombo.price || '').trim(),
+              image: String(localCombo.image || ''),
+              description: String(localCombo.description || '').trim(),
+              status: localCombo.status || 'active',
+              courseIds: Array.isArray(localCombo.courseIds) ? localCombo.courseIds : [],
+              benefits: Array.isArray(localCombo.benefits) ? localCombo.benefits : [],
+              updatedAt: localCombo.updatedAt || new Date().toISOString()
+            };
+            await setDoc(doc(db, 'combos', localCombo.id), payload, { merge: true });
+            syncedCount++;
+          }
+        }
+        if (syncedCount > 0) {
+          console.log(`Đã tự động đồng bộ ${syncedCount} gói combo từ máy lên cơ sở dữ liệu Cloud Firestore.`);
+        }
+      } catch (e) {
+        console.warn("Lỗi auto-sync local combo sang cloud:", e);
+      }
+    };
+
     // Listen to Firestore
     const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
       const dbCombos: ComboItem[] = [];
@@ -177,6 +221,7 @@ export const ComboManagement: React.FC = () => {
         dbCombos.push({ id: docSnap.id, ...docSnap.data() } as ComboItem);
       });
       syncCombosData(dbCombos);
+      syncLocalCombosToFirestore(dbCombos);
     }, (err) => {
       console.warn("Lỗi snapshot Firestore combos:", err);
       syncCombosData();
@@ -200,6 +245,55 @@ export const ComboManagement: React.FC = () => {
       window.removeEventListener('storage', handleSyncEvent);
     };
   }, []);
+
+  // Export Combos to JSON file
+  const handleExportCombos = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(combos, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `fast_elearning_combos_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      toast.success("Đã xuất file sao lưu danh sách gói combo thành công!");
+    } catch (e: any) {
+      toast.error("Không thể xuất dữ liệu: " + e.message);
+    }
+  };
+
+  // Import Combos from JSON file
+  const handleImportCombos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (!Array.isArray(parsed)) {
+          throw new Error("File sao lưu không đúng định dạng danh sách (phải là Array)");
+        }
+
+        let importedCount = 0;
+        for (const item of parsed) {
+          if (item && item.id && item.title) {
+            await setDoc(doc(db, 'combos', item.id), item, { merge: true });
+            await broadcastComboUpdate('upsert', { comboId: item.id, combo: item });
+            importedCount++;
+          }
+        }
+
+        toast.success(`Đã khôi phục thành công ${importedCount} gói combo lên hệ thống!`);
+      } catch (err: any) {
+        toast.error("Lỗi khi nhập file JSON: " + err.message);
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Helper: Open Add Mode
   const handleOpenAdd = () => {
@@ -576,6 +670,29 @@ export const ComboManagement: React.FC = () => {
                   <EyeOff className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Ẩn tất cả</span>
                 </button>
+                <div className="h-5 w-px bg-gray-200 mx-1 hidden sm:block"></div>
+                <button
+                  type="button"
+                  onClick={handleExportCombos}
+                  title="Tải về file sao lưu danh sách gói combo (JSON) để lưu giữ vĩnh viễn"
+                  className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Sao lưu JSON</span>
+                </button>
+                <label
+                  title="Nhập file sao lưu danh sách gói combo (JSON) để phục hồi toàn bộ lên hệ thống Cloud"
+                  className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Phục hồi JSON</span>
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={handleImportCombos}
+                  />
+                </label>
               </div>
             </div>
           </div>

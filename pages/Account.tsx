@@ -8,6 +8,8 @@ import AccountSettings from './AccountSettings';
 import CourseDetail from './CourseDetail';
 import { UserManagement } from '../components/UserManagement';
 import ComboManagement from '../components/ComboManagement';
+import FastStandardsAudit from '../components/FastStandardsAudit';
+import AdProfileManagement from '../components/AdProfileManagement';
 import { PurchaseHistory } from '../components/PurchaseHistory';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
@@ -445,7 +447,7 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'settings' | 'course-learning'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'settings' | 'course-learning'>('dashboard');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1588,7 +1590,9 @@ const Account: React.FC = () => {
                 ...(isTeacher || isAdmin ? [
                   { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
                   { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-                  { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
+                  { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+                  { id: 'fast-standards-audit', label: 'Tiêu chuẩn FAST', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                  { id: 'ad-profile-management', label: 'Hồ sơ quảng cáo', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }
                 ] : [])
               ].map((item, idx) => (
                 <button 
@@ -1637,9 +1641,11 @@ const Account: React.FC = () => {
                   <option value="buy-courses">Mua khóa học</option>
                   <option value="purchase-history">Lịch sử mua hàng</option>
                   <option value="settings">Cài đặt tài khoản</option>
-                  {isTeacher && <option value="teacher-dashboard">Quản lý bài giảng</option>}
-                  {isTeacher && <option value="combo-management">Quản lý combo</option>}
-                  {isTeacher && <option value="user-management">Quản lý tài khoản</option>}
+                  {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
+                  {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
+                  {(isTeacher || isAdmin) && <option value="user-management">Quản lý tài khoản</option>}
+                  {(isTeacher || isAdmin) && <option value="fast-standards-audit">Tiêu chuẩn FAST</option>}
+                  {(isTeacher || isAdmin) && <option value="ad-profile-management">Hồ sơ quảng cáo</option>}
                 </select>
              </div>
              
@@ -1700,12 +1706,16 @@ const Account: React.FC = () => {
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full"
               >
-                {activeTab === 'teacher-dashboard' && isTeacher ? (
+                {activeTab === 'teacher-dashboard' && (isTeacher || isAdmin) ? (
                   <TeacherDashboard userEmail={user.email} />
-                ) : activeTab === 'combo-management' && isTeacher ? (
+                ) : activeTab === 'combo-management' && (isTeacher || isAdmin) ? (
                   <ComboManagement />
-                ) : activeTab === 'user-management' && isTeacher ? (
+                ) : activeTab === 'user-management' && (isTeacher || isAdmin) ? (
                   <UserManagement />
+                ) : activeTab === 'fast-standards-audit' && (isTeacher || isAdmin) ? (
+                  <FastStandardsAudit />
+                ) : activeTab === 'ad-profile-management' && (isTeacher || isAdmin) ? (
+                  <AdProfileManagement />
                 ) : activeTab === 'settings' ? (
                   <AccountSettings embed={true} />
                 ) : activeTab === 'course-learning' && courseId ? (

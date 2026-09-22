@@ -17,7 +17,7 @@ export const otpLogger = {
   wrapOtpSend: async (
     email: string,
     name: string,
-    sendFetchPromise: () => Promise<Response>
+    sendFetchPromise: () => Promise<any>
   ): Promise<any> => {
     const timestamp = new Date().toISOString();
     console.log(`[OTPLogger:EmailJS_Send] [${timestamp}] Starting OTP send request for:`, { email, name });
@@ -35,25 +35,42 @@ export const otpLogger = {
         email
       });
 
-      const response = await sendFetchPromise();
+      const result = await sendFetchPromise();
       const durationMs = Date.now() - startTime;
-      const status = response.status;
-      const data = await response.json().catch(() => null);
 
-      console.log(`[OTPLogger:EmailJS_Send] [${new Date().toISOString()}] Server responded with status:`, status, data);
+      let isSuccess = false;
+      let data: any = null;
+      let status: number | undefined = undefined;
+      let errorMsg: string | undefined = undefined;
 
-      if (response.ok && data?.success) {
+      // Handle standard fetch Response instance
+      if (result && typeof result.json === 'function') {
+        status = result.status;
+        data = await result.json().catch(() => null);
+        isSuccess = !!(result.ok && data?.success);
+        errorMsg = data?.error || (!result.ok ? `Failed with HTTP status ${status}` : undefined);
+      } else if (result && typeof result === 'object') {
+        // Plain object returned directly
+        data = result;
+        isSuccess = result.success === true;
+        status = isSuccess ? 200 : 400;
+        errorMsg = result.error;
+      }
+
+      console.log(`[OTPLogger:EmailJS_Send] [${new Date().toISOString()}] Resolved:`, { isSuccess, status, data, errorMsg });
+
+      if (isSuccess) {
         authDebugger.logEmailJsFlow({
           step: 'resolved',
           email,
           status,
           success: true,
-          fallbackOtp: data.fallback ? data.otp : undefined,
+          fallbackOtp: data?.fallback ? data?.otp : undefined,
           durationMs,
           payload: data
         });
 
-        if (data.fallback && data.otp) {
+        if (data?.fallback && data?.otp) {
           authDebugger.logEmailJsFlow({
             step: 'fallback_triggered',
             email,
@@ -62,18 +79,18 @@ export const otpLogger = {
             payload: data
           });
         }
-        return { success: true, data };
+        return { success: true, ...(typeof data === 'object' ? data : { data }) };
       } else {
-        const errorMsg = data?.error || `Failed with HTTP status ${status}`;
+        const finalError = errorMsg || 'Không thể gửi mã OTP qua email lúc này.';
         authDebugger.logEmailJsFlow({
           step: 'rejected',
           email,
           status,
-          error: errorMsg,
+          error: finalError,
           durationMs,
           payload: data
         });
-        return { success: false, error: errorMsg };
+        return { success: false, error: finalError };
       }
     } catch (err: any) {
       const durationMs = Date.now() - startTime;

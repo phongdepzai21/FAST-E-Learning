@@ -45,6 +45,20 @@
         "description": { "type": "string", "description": "Detailed description of the course content" }
       },
       "required": ["title"]
+    },
+    "Combo": {
+      "title": "Combo",
+      "description": "Master data record for dynamic combo packages offered on the platform",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Combo package title" },
+        "price": { "type": "string", "description": "Formatted package price" },
+        "image": { "type": "string", "description": "Banner photo URL" },
+        "description": { "type": "string", "description": "Detailed description of the combo" },
+        "status": { "type": "string", "description": "Status (active or inactive)" },
+        "updatedAt": { "type": "string", "description": "ISO update timestamp string" }
+      },
+      "required": ["title"]
     }
   },
   "firestore": {
@@ -59,6 +73,10 @@
     "courses/{courseId}": {
       "schema": "Course",
       "description": "Platform course documents editable by admins and teachers"
+    },
+    "combos/{comboId}": {
+      "schema": "Combo",
+      "description": "Platform combo packages editable by admins and teachers"
     }
   }
 }

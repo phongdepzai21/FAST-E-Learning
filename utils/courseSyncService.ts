@@ -115,6 +115,9 @@ export function initCourseSyncService() {
       console.warn('Could not fetch initial /api/combos snapshot:', err);
     });
 
+  let sseRetryCount = 0;
+  const MAX_SSE_RETRIES = 3;
+
   // 3. Connect to Server-Sent Events stream for real-time push from server
   function connectSSE() {
     if (eventSource) {
@@ -122,8 +125,18 @@ export function initCourseSyncService() {
       eventSource = null;
     }
 
+    if (sseRetryCount >= MAX_SSE_RETRIES) {
+      // Backend SSE endpoint is not available (e.g. static CDN / Netlify hosting).
+      // Fallback silently to BroadcastChannel and localStorage events.
+      return;
+    }
+
     try {
       eventSource = new EventSource('/api/courses/stream');
+
+      eventSource.onopen = () => {
+        sseRetryCount = 0; // Reset counter on successful connection
+      };
 
       eventSource.addEventListener('init', (e: MessageEvent) => {
         try {
@@ -195,12 +208,14 @@ export function initCourseSyncService() {
           eventSource.close();
           eventSource = null;
         }
-        // Auto-reconnect after 3 seconds
-        if (!reconnectTimer) {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            connectSSE();
-          }, 3000);
+        sseRetryCount++;
+        if (sseRetryCount < MAX_SSE_RETRIES) {
+          if (!reconnectTimer) {
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              connectSSE();
+            }, 5000 * sseRetryCount);
+          }
         }
       };
     } catch (err) {
