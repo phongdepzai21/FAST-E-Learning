@@ -1392,11 +1392,9 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
-      <div id="ad-checklist-print-area" className="hidden print:table bg-white text-gray-900">
-        {/* Hàng chứa nội dung chính */}
-        <div id="ad-checklist-print-row-content" className="print:table-row">
-          <div id="ad-checklist-print-content" className="print:table-cell">
-            <div className="flex flex-col justify-start">
+      <div id="ad-checklist-print-area" className="hidden print:block bg-white text-gray-900">
+        <div id="ad-checklist-print-content">
+          <div className="flex flex-col justify-start">
               {/* Header */}
               <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
               <div>
@@ -1518,27 +1516,23 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
               </div>
             </div>
 
+            {/* Đóng thẻ flex-col và ad-checklist-print-content */}
             </div>
           </div>
-        </div>
 
-        {/* Hàng chứa chân trang thương hiệu */}
-        <div id="ad-print-footer-row" className="print:table-row">
-          <div id="ad-print-footer" className="print:table-cell">
-            <div className="flex flex-col items-center justify-center text-center space-y-1 border-t-2 border-gray-200 pt-3">
-              <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
-                FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
-              </div>
-              <div className="text-gray-700 font-medium text-[11px]">
-                Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
-              </div>
-              <div className="text-[11px] text-gray-800 font-semibold">
-                Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
-              </div>
-              <div className="text-gray-400 text-[10px] pt-0.5">
-                &copy; 2026 FAST CONSULTING.
-              </div>
-            </div>
+        {/* Chân trang thương hiệu định vị tuyệt đối bám đáy */}
+        <div id="ad-print-footer" className="flex flex-col items-center justify-center text-center space-y-1">
+          <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
+            FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
+          </div>
+          <div className="text-gray-700 font-medium text-[11px]">
+            Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
+          </div>
+          <div className="text-[11px] text-gray-800 font-semibold">
+            Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
+          </div>
+          <div className="text-gray-400 text-[10px] pt-0.5">
+            &copy; 2026 FAST CONSULTING.
           </div>
         </div>
       </div>
