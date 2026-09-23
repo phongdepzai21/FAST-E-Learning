@@ -102,26 +102,41 @@
   }
 
   body.printing-ad-checklist #ad-checklist-print-area {
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
+    display: block !important;
     height: 280mm !important;
     min-height: 280mm !important;
     box-sizing: border-box !important;
     position: relative !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 5mm 5mm 25mm 5mm !important; /* Chừa 25mm đệm dưới để chân trang tuyệt đối không đè lên chữ ký */
+    padding: 6mm 8mm 28mm 8mm !important; /* Chừa 28mm đệm dưới để chân trang tuyệt đối không đè lên chữ ký */
     background: #ffffff !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
   }
 
+  /* Compact spacing rules specifically for single-page print budget */
+  body.printing-ad-checklist #ad-checklist-print-area .mb-4 {
+    margin-bottom: 2mm !important;
+  }
+  body.printing-ad-checklist #ad-checklist-print-area .mb-6 {
+    margin-bottom: 2.5mm !important;
+  }
+  body.printing-ad-checklist #ad-checklist-print-area .mt-6 {
+    margin-top: 2.5mm !important;
+  }
+  body.printing-ad-checklist #ad-checklist-print-area .p-3 {
+    padding: 2mm !important;
+  }
+  body.printing-ad-checklist #ad-checklist-print-area .p-6 {
+    padding: 0 !important; /* Dùng padding của container chính */
+  }
+
   body.printing-ad-checklist #ad-print-footer {
     position: absolute !important;
-    bottom: 5mm !important;
-    left: 10mm !important;
-    right: 10mm !important;
+    bottom: 6mm !important;
+    left: 8mm !important;
+    right: 8mm !important;
     background: #ffffff !important;
     padding-top: 3mm !important;
     border-top: 2px solid #e5e7eb !important;
