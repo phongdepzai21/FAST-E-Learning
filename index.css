@@ -105,8 +105,7 @@
     display: block !important;
     position: relative !important;
     width: 100% !important;
-    height: auto !important;
-    min-height: 255mm !important; /* Chiều cao tối thiểu an toàn vừa khít khổ A4 đã trừ lề */
+    height: 255mm !important; /* Ép cứng chiều cao in 1 trang vàng để Chrome không co rúm nội dung */
     box-sizing: border-box !important;
     background: #ffffff !important;
     margin: 0 !important;
