@@ -1392,7 +1392,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
-      <div id="ad-checklist-print-area" className="hidden print:flex print:flex-col print:justify-between print:h-[265mm] bg-white text-gray-900 p-6">
+      <div id="ad-checklist-print-area" className="hidden print:flex print:flex-col print:justify-between print:h-[280mm] bg-white text-gray-900 p-6">
         <div className="flex-1 flex flex-col justify-start">
           {/* Header */}
           <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">

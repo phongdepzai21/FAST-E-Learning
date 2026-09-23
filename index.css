@@ -35,8 +35,8 @@
    ========================================================================== */
 @media print {
   @page {
-    margin: 8mm 8mm;
-    size: auto;
+    margin: 8mm 10mm;
+    size: A4;
   }
 
   /* Global print resets */
@@ -105,8 +105,8 @@
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    height: 265mm !important;
-    min-height: 265mm !important;
+    height: 280mm !important;
+    min-height: 280mm !important;
     box-sizing: border-box !important;
     position: relative !important;
     width: 100% !important;

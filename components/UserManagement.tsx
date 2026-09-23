@@ -282,6 +282,15 @@ export const UserManagement: React.FC = () => {
     setLockOtpError('');
     const normalizedEmail = targetUser.id.toLowerCase().trim();
 
+    if (shouldLock && lockOtpCode.trim().length !== 6) {
+      setLockOtpError('Vui lòng nhập đầy đủ mã OTP 6 số nhận từ email để xác nhận khóa tài khoản.');
+      setIsLocking(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
     try {
       const res = await fetch('/api/admin/toggle-lock', {
         method: 'POST',
@@ -292,10 +301,21 @@ export const UserManagement: React.FC = () => {
           reason,
           adminEmail,
           otp: shouldLock ? lockOtpCode.trim() : undefined
-        })
+        }),
+        signal: controller.signal
       });
 
-      const data = await res.json();
+      clearTimeout(timeoutId);
+
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Yêu cầu thất bại với mã trạng thái ${res.status}`);
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Có lỗi xảy ra khi thực hiện thao tác.');
       }
@@ -345,11 +365,18 @@ export const UserManagement: React.FC = () => {
       setLockOtpCode('');
       setLockOtpSent(false);
     } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error('Lỗi khóa/mở khóa tài khoản:', err);
+      
+      let errorMsg = err.message || 'Không thể cập nhật trạng thái khóa tài khoản.';
+      if (err.name === 'AbortError') {
+        errorMsg = 'Yêu cầu kết nối quá hạn (Timeout). Vui lòng gửi lại mã OTP và thử lại.';
+      }
+
       if (shouldLock) {
-        setLockOtpError(err.message || 'Không thể cập nhật trạng thái khóa tài khoản. Vui lòng kiểm tra lại mã OTP.');
+        setLockOtpError(errorMsg);
       } else {
-        error(err.message || 'Không thể cập nhật trạng thái mở khóa tài khoản. Vui lòng thử lại.', 5000, 'Lỗi');
+        error(errorMsg, 5000, 'Lỗi');
       }
     } finally {
       setIsLocking(false);
