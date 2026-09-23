@@ -102,20 +102,41 @@
   }
 
   body.printing-ad-checklist #ad-checklist-print-area {
-    display: block !important;
-    height: 280mm !important;
-    min-height: 280mm !important;
-    box-sizing: border-box !important;
-    position: relative !important;
+    display: table !important;
     width: 100% !important;
-    margin: 0 !important;
-    padding: 6mm 8mm 28mm 8mm !important; /* Chừa 28mm đệm dưới để chân trang tuyệt đối không đè lên chữ ký */
+    height: 100% !important;
+    min-height: 275mm !important; /* Chiều cao tối thiểu của 1 trang A4 sau khi trừ lề */
+    box-sizing: border-box !important;
     background: #ffffff !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
   }
 
-  /* Compact spacing rules specifically for single-page print budget */
+  body.printing-ad-checklist #ad-checklist-print-row-content {
+    display: table-row !important;
+    height: 100% !important;
+  }
+
+  body.printing-ad-checklist #ad-checklist-print-content {
+    display: table-cell !important;
+    vertical-align: top !important;
+    height: 100% !important;
+    padding: 6mm 8mm 10mm 8mm !important;
+  }
+
+  body.printing-ad-checklist #ad-print-footer-row {
+    display: table-row !important;
+    height: 1px !important;
+  }
+
+  body.printing-ad-checklist #ad-print-footer {
+    display: table-cell !important;
+    vertical-align: bottom !important;
+    padding: 4mm 8mm 6mm 8mm !important;
+    background: #ffffff !important;
+  }
+
+  /* Compact spacing rules specifically for print budget */
   body.printing-ad-checklist #ad-checklist-print-area .mb-4 {
     margin-bottom: 2mm !important;
   }
@@ -129,18 +150,7 @@
     padding: 2mm !important;
   }
   body.printing-ad-checklist #ad-checklist-print-area .p-6 {
-    padding: 0 !important; /* Dùng padding của container chính */
-  }
-
-  body.printing-ad-checklist #ad-print-footer {
-    position: absolute !important;
-    bottom: 6mm !important;
-    left: 8mm !important;
-    right: 8mm !important;
-    background: #ffffff !important;
-    padding-top: 3mm !important;
-    border-top: 2px solid #e5e7eb !important;
-    z-index: 50 !important;
+    padding: 0 !important;
   }
 
   /* 2. IN BÁO CÁO & CAPA TIÊU CHUẨN FAST */

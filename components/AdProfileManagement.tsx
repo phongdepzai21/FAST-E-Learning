@@ -1392,144 +1392,153 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
-      <div id="ad-checklist-print-area" className="hidden print:block print:h-[280mm] bg-white text-gray-900">
-        <div className="flex-1 flex flex-col justify-start">
-          {/* Header */}
-          <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
-          <div>
-            <div className="text-[11px] font-black uppercase text-[#005c56] tracking-wider">
-              FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
+      <div id="ad-checklist-print-area" className="hidden print:table bg-white text-gray-900">
+        {/* Hàng chứa nội dung chính */}
+        <div id="ad-checklist-print-row-content" className="print:table-row">
+          <div id="ad-checklist-print-content" className="print:table-cell">
+            <div className="flex flex-col justify-start">
+              {/* Header */}
+              <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
+              <div>
+                <div className="text-[11px] font-black uppercase text-[#005c56] tracking-wider">
+                  FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
+                </div>
+                <h1 className="text-xl font-black text-gray-900 uppercase mt-0.5 tracking-tight">
+                  BẢNG CHECKLIST HỒ SƠ THÔNG BÁO SẢN PHẨM QUẢNG CÁO
+                </h1>
+                <p className="text-[11px] text-gray-500 italic mt-0.5">
+                  Thủ tục tiếp nhận hồ sơ thông báo sản phẩm quảng cáo trên bảng quảng cáo, băng-rôn (Mã TTHC: 1.004650)
+                </p>
+              </div>
+              <div className="text-right text-[10.5px] text-gray-500">
+                <div>Mã TTHC: <strong>1.004650</strong></div>
+                <div>QĐ: <strong>190/QĐ-BVHTTDL</strong></div>
+                <div>Hotline: <strong>0927 002 668</strong></div>
+              </div>
             </div>
-            <h1 className="text-xl font-black text-gray-900 uppercase mt-0.5 tracking-tight">
-              BẢNG CHECKLIST HỒ SƠ THÔNG BÁO SẢN PHẨM QUẢNG CÁO
-            </h1>
-            <p className="text-[11px] text-gray-500 italic mt-0.5">
-              Thủ tục tiếp nhận hồ sơ thông báo sản phẩm quảng cáo trên bảng quảng cáo, băng-rôn (Mã TTHC: 1.004650)
-            </p>
-          </div>
-          <div className="text-right text-[10.5px] text-gray-500">
-            <div>Mã TTHC: <strong>1.004650</strong></div>
-            <div>QĐ: <strong>190/QĐ-BVHTTDL</strong></div>
-            <div>Hotline: <strong>0927 002 668</strong></div>
-          </div>
-        </div>
 
-        {/* Thông tin hồ sơ khách hàng */}
-        <div className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50/70 text-xs">
-          <table className="w-full border-collapse">
-            <tbody>
-              <tr>
-                <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Tên Khách Hàng / Đơn Vị:</td>
-                <td className="py-1 px-2 font-black text-gray-900 w-1/4">{custName || 'Chưa cung cấp'}</td>
-                <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Chuyên Viên FAST Phụ Trách:</td>
-                <td className="py-1 px-2 font-black text-gray-900 w-1/4">{fastStaff || 'Chưa phân công'}</td>
-              </tr>
-              <tr>
-                <td className="py-1 px-2 font-bold text-[#005c56]">Số Điện Thoại:</td>
-                <td className="py-1 px-2 text-gray-800">{custPhone || 'Chưa có'}</td>
-                <td className="py-1 px-2 font-bold text-[#005c56]">Ngày Tiếp Nhận (Order):</td>
-                <td className="py-1 px-2 text-gray-800">{orderDate || '-'}</td>
-              </tr>
-              <tr>
-                <td className="py-1 px-2 font-bold text-[#005c56]">Địa Điểm Cơ Sở / Vị Trí:</td>
-                <td className="py-1 px-2 text-gray-800">{custLocation || 'Chưa cung cấp'}</td>
-                <td className="py-1 px-2 font-bold text-[#005c56]">Hạn Xử Lý Theo Quy Định (05N):</td>
-                <td className="py-1 px-2 font-black text-amber-700">{targetDate || '-'}</td>
-              </tr>
-              <tr>
-                <td className="py-1 px-2 font-bold text-[#005c56]">Tiến Độ Chuẩn Bị Hồ Sơ:</td>
-                <td className="py-1 px-2 font-black text-green-700" colSpan={3}>
-                  Đã chuẩn bị: {Object.values(checklist).filter(Boolean).length}/7 mục ({Math.round((Object.values(checklist).filter(Boolean).length / 7) * 100)}%) - {custStatus}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+            {/* Thông tin hồ sơ khách hàng */}
+            <div className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50/70 text-xs">
+              <table className="w-full border-collapse">
+                <tbody>
+                  <tr>
+                    <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Tên Khách Hàng / Đơn Vị:</td>
+                    <td className="py-1 px-2 font-black text-gray-900 w-1/4">{custName || 'Chưa cung cấp'}</td>
+                    <td className="py-1 px-2 font-bold text-[#005c56] w-1/4">Chuyên Viên FAST Phụ Trách:</td>
+                    <td className="py-1 px-2 font-black text-gray-900 w-1/4">{fastStaff || 'Chưa phân công'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-bold text-[#005c56]">Số Điện Thoại:</td>
+                    <td className="py-1 px-2 text-gray-800">{custPhone || 'Chưa có'}</td>
+                    <td className="py-1 px-2 font-bold text-[#005c56]">Ngày Tiếp Nhận (Order):</td>
+                    <td className="py-1 px-2 text-gray-800">{orderDate || '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-bold text-[#005c56]">Địa Điểm Cơ Sở / Vị Trí:</td>
+                    <td className="py-1 px-2 text-gray-800">{custLocation || 'Chưa cung cấp'}</td>
+                    <td className="py-1 px-2 font-bold text-[#005c56]">Hạn Xử Lý Theo Quy Định (05N):</td>
+                    <td className="py-1 px-2 font-black text-amber-700">{targetDate || '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-bold text-[#005c56]">Tiến Độ Chuẩn Bị Hồ Sơ:</td>
+                    <td className="py-1 px-2 font-black text-green-700" colSpan={3}>
+                      Đã chuẩn bị: {Object.values(checklist).filter(Boolean).length}/7 mục ({Math.round((Object.values(checklist).filter(Boolean).length / 7) * 100)}%) - {custStatus}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-        {/* Bảng checklist 07 tài liệu */}
-        <table className="w-full border-collapse border border-gray-400 text-xs mb-4">
-          <thead>
-            <tr className="bg-gray-100 text-gray-900 font-bold border-b border-gray-400">
-              <th className="border border-gray-400 p-2 text-center w-10">STT</th>
-              <th className="border border-gray-400 p-2 text-center w-24">Tình Trạng</th>
-              <th className="border border-gray-400 p-2 w-2/5">Tên Hồ Sơ / Tài Liệu Cần Cung Cấp</th>
-              <th className="border border-gray-400 p-2 w-1/5">Quy Cách &amp; Số Lượng</th>
-              <th className="border border-gray-400 p-2">Hướng Dẫn &amp; Căn Cứ Pháp Lý</th>
-            </tr>
-          </thead>
-          <tbody>
-            {INITIAL_DOCS.map((doc, idx) => {
-              const isChecked = !!checklist[doc.id];
-              return (
-                <tr key={doc.id} className="border-b border-gray-300">
-                  <td className="border border-gray-300 p-2 text-center font-bold">{idx + 1}</td>
-                  <td className="border border-gray-300 p-2 text-center">
-                    {isChecked ? (
-                      <span className="font-bold text-green-700">[ ✓ ] Đã có</span>
-                    ) : (
-                      <span className="text-gray-400 font-mono">[ &nbsp;&nbsp; ] Chưa có</span>
-                    )}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    <div className="font-bold text-gray-900">{doc.name}</div>
-                    <div className="text-[10.5px] text-gray-600 mt-0.5">{doc.legalRef}</div>
-                  </td>
-                  <td className="border border-gray-300 p-2 text-[11px]">
-                    <div className="font-semibold text-gray-800">{doc.qty}</div>
-                    <div className="text-[10px] text-gray-500 uppercase mt-0.5">{doc.type}</div>
-                  </td>
-                  <td className="border border-gray-300 p-2 text-[11px] text-gray-700 leading-relaxed">
-                    {doc.guidance}
-                  </td>
+            {/* Bảng checklist 07 tài liệu */}
+            <table className="w-full border-collapse border border-gray-400 text-xs mb-4">
+              <thead>
+                <tr className="bg-gray-100 text-gray-900 font-bold border-b border-gray-400">
+                  <th className="border border-gray-400 p-2 text-center w-10">STT</th>
+                  <th className="border border-gray-400 p-2 text-center w-24">Tình Trạng</th>
+                  <th className="border border-gray-400 p-2 w-2/5">Tên Hồ Sơ / Tài Liệu Cần Cung Cấp</th>
+                  <th className="border border-gray-400 p-2 w-1/5">Quy Cách &amp; Số Lượng</th>
+                  <th className="border border-gray-400 p-2">Hướng Dẫn &amp; Căn Cứ Pháp Lý</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {INITIAL_DOCS.map((doc, idx) => {
+                  const isChecked = !!checklist[doc.id];
+                  return (
+                    <tr key={doc.id} className="border-b border-gray-300">
+                      <td className="border border-gray-300 p-2 text-center font-bold">{idx + 1}</td>
+                      <td className="border border-gray-300 p-2 text-center">
+                        {isChecked ? (
+                          <span className="font-bold text-green-700">[ ✓ ] Đã có</span>
+                        ) : (
+                          <span className="text-gray-400 font-mono">[ &nbsp;&nbsp; ] Chưa có</span>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 p-2">
+                        <div className="font-bold text-gray-900">{doc.name}</div>
+                        <div className="text-[10.5px] text-gray-600 mt-0.5">{doc.legalRef}</div>
+                      </td>
+                      <td className="border border-gray-300 p-2 text-[11px]">
+                        <div className="font-semibold text-gray-800">{doc.qty}</div>
+                        <div className="text-[10px] text-gray-500 uppercase mt-0.5">{doc.type}</div>
+                      </td>
+                      <td className="border border-gray-300 p-2 text-[11px] text-gray-700 leading-relaxed">
+                        {doc.guidance}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-        {/* Hướng dẫn & Lưu ý */}
-        <div className="p-3 border border-gray-300 rounded bg-gray-50/50 text-[11px] text-gray-700 mb-6 leading-relaxed">
-          <strong>Lưu ý từ Chuyên viên FAST CONSULTING:</strong> Khách hàng chỉ cần chuẩn bị <strong>01 bộ hồ sơ đầy đủ</strong> theo danh mục trên. Các bản chụp hoặc bản scan gửi FAST để nộp trực tuyến cần rõ nét, đủ 4 góc, quét từ bản gốc để không bị cơ quan chức năng yêu cầu giải trình lại.
+            {/* Hướng dẫn & Lưu ý */}
+            <div className="p-3 border border-gray-300 rounded bg-gray-50/50 text-[11px] text-gray-700 mb-6 leading-relaxed">
+              <strong>Lưu ý từ Chuyên viên FAST CONSULTING:</strong> Khách hàng chỉ cần chuẩn bị <strong>01 bộ hồ sơ đầy đủ</strong> theo danh mục trên. Các bản chụp hoặc bản scan gửi FAST để nộp trực tuyến cần rõ nét, đủ 4 góc, quét từ bản gốc để không bị cơ quan chức năng yêu cầu giải trình lại.
+            </div>
+
+            {/* Khối chữ ký bàn giao */}
+            <div className="grid grid-cols-2 gap-8 text-center text-xs mt-6 pt-4 border-t border-gray-300">
+              <div className="flex flex-col items-center justify-between min-h-[110px]">
+                <div>
+                  <p className="font-bold uppercase tracking-wider text-gray-800">ĐẠI DIỆN KHÁCH HÀNG / DOANH NGHIỆP</p>
+                  <p className="text-[10px] text-gray-500 italic">(Ký, ghi rõ họ tên &amp; đóng dấu)</p>
+                </div>
+                <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
+                  {custName || 'Khách hàng'}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-between min-h-[110px]">
+                <div>
+                  <p className="font-bold uppercase tracking-wider text-[#005c56]">CHUYÊN VIÊN FAST TIẾP NHẬN HỒ SƠ</p>
+                  <p className="text-[10px] text-gray-500 italic">(Ký &amp; ghi rõ họ tên)</p>
+                </div>
+                <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
+                  {fastStaff || 'Dung Trần (FAST)'}
+                </div>
+              </div>
+            </div>
+
+            </div>
+          </div>
         </div>
 
-        {/* Khối chữ ký bàn giao */}
-        <div className="grid grid-cols-2 gap-8 text-center text-xs mt-6 pt-4 border-t border-gray-300">
-          <div className="flex flex-col items-center justify-between min-h-[110px]">
-            <div>
-              <p className="font-bold uppercase tracking-wider text-gray-800">ĐẠI DIỆN KHÁCH HÀNG / DOANH NGHIỆP</p>
-              <p className="text-[10px] text-gray-500 italic">(Ký, ghi rõ họ tên &amp; đóng dấu)</p>
+        {/* Hàng chứa chân trang thương hiệu */}
+        <div id="ad-print-footer-row" className="print:table-row">
+          <div id="ad-print-footer" className="print:table-cell">
+            <div className="flex flex-col items-center justify-center text-center space-y-1 border-t-2 border-gray-200 pt-3">
+              <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
+                FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
+              </div>
+              <div className="text-gray-700 font-medium text-[11px]">
+                Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
+              </div>
+              <div className="text-[11px] text-gray-800 font-semibold">
+                Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
+              </div>
+              <div className="text-gray-400 text-[10px] pt-0.5">
+                &copy; 2026 FAST CONSULTING.
+              </div>
             </div>
-            <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
-              {custName || 'Khách hàng'}
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center justify-between min-h-[110px]">
-            <div>
-              <p className="font-bold uppercase tracking-wider text-[#005c56]">CHUYÊN VIÊN FAST TIẾP NHẬN HỒ SƠ</p>
-              <p className="text-[10px] text-gray-500 italic">(Ký &amp; ghi rõ họ tên)</p>
-            </div>
-            <div className="font-bold text-gray-900 border-t border-gray-400 pt-1 w-44">
-              {fastStaff || 'Dung Trần (FAST)'}
-            </div>
-          </div>
-        </div>
-
-        </div>
-
-        {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Ảnh đính kèm cuối bản in) */}
-        <div id="ad-print-footer" className="mt-6 pt-3 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
-          <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
-            FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
-          </div>
-          <div className="text-gray-700 font-medium text-[11px]">
-            Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
-          </div>
-          <div className="text-[11px] text-gray-800 font-semibold">
-            Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
-          </div>
-          <div className="text-gray-400 text-[10px] pt-0.5">
-            &copy; 2026 FAST CONSULTING.
           </div>
         </div>
       </div>
