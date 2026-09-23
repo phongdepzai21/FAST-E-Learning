@@ -427,15 +427,7 @@ export const FastStandardsAudit: React.FC = () => {
     });
 
     const getPillarGradient = (name: string) => {
-      if (name.includes('Accuracy')) return 'from-teal-700 via-teal-800 to-emerald-900';
-      if (name.includes('Cleanliness')) return 'from-sky-700 via-blue-800 to-indigo-900';
-      if (name.includes('Hospitality')) return 'from-purple-700 via-purple-800 to-indigo-900';
-      if (name.includes('Maintenance')) return 'from-amber-700 via-orange-800 to-amber-900';
-      if (name.includes('People')) return 'from-emerald-700 via-teal-800 to-teal-900';
-      if (name.includes('Product')) return 'from-rose-700 via-red-800 to-rose-950';
-      if (name.includes('Safety')) return 'from-red-700 via-rose-800 to-orange-950';
-      if (name.includes('Speed')) return 'from-blue-700 via-sky-800 to-indigo-900';
-      return 'from-teal-800 to-emerald-900';
+      return 'from-[#005c56] via-teal-800 to-[#00423e]';
     };
 
     return (
@@ -681,14 +673,14 @@ export const FastStandardsAudit: React.FC = () => {
           {/* 8 Pillar Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
-              { id: 'accuracy', title: 'FAST Accuracy', count: 20, desc: 'Độ chính xác vận hành, khẩu phần & thu ngân', gradient: 'from-teal-500 to-emerald-600', lightBg: 'bg-emerald-50/70 border-emerald-200', textAccent: 'text-emerald-700', btnHover: 'hover:bg-emerald-600' },
-              { id: 'cleanliness', title: 'FAST Cleanliness', count: 55, desc: 'Vệ sinh cơ sở, thiết bị & SSOP', gradient: 'from-sky-500 to-blue-600', lightBg: 'bg-sky-50/70 border-sky-200', textAccent: 'text-sky-700', btnHover: 'hover:bg-sky-600' },
-              { id: 'hospitality', title: 'FAST Hospitality', count: 21, desc: 'Dịch vụ, văn hóa & trải nghiệm khách hàng', gradient: 'from-purple-500 to-indigo-600', lightBg: 'bg-purple-50/70 border-purple-200', textAccent: 'text-purple-700', btnHover: 'hover:bg-purple-600' },
-              { id: 'maintenance', title: 'FAST Maintenance', count: 54, desc: 'Bảo trì thiết bị, cơ sở hạ tầng & kiểm định', gradient: 'from-amber-500 to-orange-600', lightBg: 'bg-amber-50/70 border-amber-200', textAccent: 'text-amber-700', btnHover: 'hover:bg-amber-600' },
-              { id: 'people', title: 'FAST People', count: 10, desc: 'Đào tạo, nhân sự & phân công', gradient: 'from-emerald-500 to-teal-700', lightBg: 'bg-teal-50/70 border-teal-200', textAccent: 'text-teal-700', btnHover: 'hover:bg-teal-700' },
-              { id: 'product', title: 'FAST Product', count: 61, desc: 'Chất lượng, nhiệt độ, bảo quản & HSD', gradient: 'from-rose-500 to-red-600', lightBg: 'bg-rose-50/70 border-rose-200', textAccent: 'text-rose-700', btnHover: 'hover:bg-rose-600' },
-              { id: 'safety', title: 'FAST Safety', count: 19, desc: 'An toàn thực phẩm, CCP, bồn rửa tay & y tế', gradient: 'from-red-500 to-orange-700', lightBg: 'bg-red-50/70 border-red-200', textAccent: 'text-red-700', btnHover: 'hover:bg-red-600' },
-              { id: 'speed', title: 'FAST Speed', count: 25, desc: 'Tốc độ phục vụ, điều phối & quản trị thời gian', gradient: 'from-sky-500 to-blue-700', lightBg: 'bg-blue-50/70 border-blue-200', textAccent: 'text-blue-700', btnHover: 'hover:bg-blue-600' },
+              { id: 'accuracy', title: 'FAST Accuracy', count: 20, desc: 'Độ chính xác vận hành, khẩu phần & thu ngân', gradient: 'from-[#005c56] to-teal-600', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'cleanliness', title: 'FAST Cleanliness', count: 55, desc: 'Vệ sinh cơ sở, thiết bị & SSOP', gradient: 'from-teal-600 to-teal-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'hospitality', title: 'FAST Hospitality', count: 21, desc: 'Dịch vụ, văn hóa & trải nghiệm khách hàng', gradient: 'from-[#005c56] to-teal-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'maintenance', title: 'FAST Maintenance', count: 54, desc: 'Bảo trì thiết bị, cơ sở hạ tầng & kiểm định', gradient: 'from-teal-600 to-emerald-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'people', title: 'FAST People', count: 10, desc: 'Đào tạo, nhân sự & phân công', gradient: 'from-emerald-500 to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'product', title: 'FAST Product', count: 61, desc: 'Chất lượng, nhiệt độ, bảo quản & HSD', gradient: 'from-teal-600 to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'safety', title: 'FAST Safety', count: 19, desc: 'An toàn thực phẩm, CCP, bồn rửa tay & y tế', gradient: 'from-[#005c56] to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'speed', title: 'FAST Speed', count: 25, desc: 'Tốc độ phục vụ, điều phối & quản trị thời gian', gradient: 'from-teal-700 to-emerald-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
             ].map(p => {
               // Count NCs for this pillar
               const pillarFullName = p.title;

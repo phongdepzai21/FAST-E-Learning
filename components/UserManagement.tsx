@@ -291,37 +291,83 @@ export const UserManagement: React.FC = () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
 
+    let isFallbackNeeded = false;
+    let res: Response | null = null;
+
     try {
-      const res = await fetch('/api/admin/toggle-lock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetEmail: normalizedEmail,
-          shouldLock,
-          reason,
-          adminEmail,
-          otp: shouldLock ? lockOtpCode.trim() : undefined
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      let data: any = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(text || `Yêu cầu thất bại với mã trạng thái ${res.status}`);
+      try {
+        res = await fetch('/api/admin/toggle-lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetEmail: normalizedEmail,
+            shouldLock,
+            reason,
+            adminEmail,
+            otp: shouldLock ? lockOtpCode.trim() : undefined
+          }),
+          signal: controller.signal
+        });
+      } catch (netErr) {
+        console.warn('API connection failed, trying client-side fallback:', netErr);
+        isFallbackNeeded = true;
       }
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Có lỗi xảy ra khi thực hiện thao tác.');
+      if (!isFallbackNeeded && res) {
+        clearTimeout(timeoutId);
+
+        let data: any = {};
+        const contentType = res.headers.get('content-type') || '';
+        
+        // Detect Netlify 404 static HTML page or other non-JSON response
+        if (res.status === 404 || !contentType.includes('application/json')) {
+          console.warn(`Server returned status ${res.status} (non-JSON). Switching to client-side Firestore fallback...`);
+          isFallbackNeeded = true;
+        } else {
+          data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Có lỗi xảy ra khi thực hiện thao tác.');
+          }
+        }
       }
 
       const lockedAtValue = shouldLock ? new Date().toISOString() : null;
       const lockReasonValue = shouldLock ? (reason || 'Vi phạm điều khoản hoặc chính sách hệ thống.') : null;
+
+      // Execute Direct Client-side Firebase/Firestore write when backend is missing (e.g., Netlify)
+      if (isFallbackNeeded) {
+        console.log('[UserManagement] Executing Client-Side Direct Firebase Fallback...');
+        
+        // 1. Verify OTP client-side if locking
+        if (shouldLock) {
+          const otpVerifyResult = await verifyOtp({
+            email: adminEmail,
+            otp: lockOtpCode.trim(),
+            flow: 'lock'
+          });
+
+          if (!otpVerifyResult.success) {
+            throw new Error(otpVerifyResult.error || 'Xác thực mã OTP không thành công.');
+          }
+        }
+
+        // 2. Perform direct Client-Side Firestore write
+        const userRef = doc(db, 'users', normalizedEmail);
+        const updateData: any = {
+          isLocked: shouldLock,
+          updatedAt: new Date().toISOString()
+        };
+        if (shouldLock) {
+          updateData.lockedAt = lockedAtValue;
+          updateData.lockReason = lockReasonValue;
+        } else {
+          updateData.lockedAt = null;
+          updateData.lockReason = null;
+        }
+
+        await setDoc(userRef, updateData, { merge: true });
+        console.log('[UserManagement] Client-Side Fallback Write Succeeded!');
+      }
 
       // Update local storage cache
       try {

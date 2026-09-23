@@ -1518,7 +1518,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
         </div>
 
         {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Ảnh đính kèm cuối bản in) */}
-        <div className="mt-6 pt-3 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
+        <div id="ad-print-footer" className="mt-6 pt-3 border-t-2 border-gray-200 flex flex-col items-center justify-center text-center space-y-1">
           <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
             FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING
           </div>

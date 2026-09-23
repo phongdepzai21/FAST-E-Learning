@@ -111,10 +111,21 @@
     position: relative !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 5mm !important;
+    padding: 5mm 5mm 25mm 5mm !important; /* Chừa 25mm đệm dưới để chân trang tuyệt đối không đè lên chữ ký */
     background: #ffffff !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
+  }
+
+  body.printing-ad-checklist #ad-print-footer {
+    position: absolute !important;
+    bottom: 5mm !important;
+    left: 10mm !important;
+    right: 10mm !important;
+    background: #ffffff !important;
+    padding-top: 3mm !important;
+    border-top: 2px solid #e5e7eb !important;
+    z-index: 50 !important;
   }
 
   /* 2. IN BÁO CÁO & CAPA TIÊU CHUẨN FAST */
