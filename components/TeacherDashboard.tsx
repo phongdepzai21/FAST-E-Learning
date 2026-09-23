@@ -1074,29 +1074,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                           </svg>
                           <span>Ẩn tất cả</span>
                         </button>
-                        <div className="h-5 w-px bg-gray-200 mx-1 hidden sm:block"></div>
-                        <button
-                          type="button"
-                          onClick={handleExportCourses}
-                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                          title="Tải file sao lưu danh sách khóa học (JSON) để lưu giữ vĩnh viễn"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span className="hidden md:inline">Sao lưu JSON</span>
-                        </button>
-                        <label
-                          className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
-                          title="Nhập file sao lưu khóa học (JSON) để khôi phục toàn bộ lên cơ sở dữ liệu Cloud"
-                        >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span className="hidden md:inline">Phục hồi JSON</span>
-                          <input
-                            type="file"
-                            accept=".json,application/json"
-                            className="hidden"
-                            onChange={handleImportCourses}
-                          />
-                        </label>
+
                       </div>
                     </div>
 
