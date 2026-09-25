@@ -120,39 +120,26 @@
   }
 
   body.printing-ad-checklist #ad-checklist-print-area {
-    display: table !important;
+    display: grid !important;
+    grid-template-rows: 1fr auto !important;
     width: 100% !important;
-    height: 100% !important;
-    min-height: 100% !important;
+    min-height: 100vh !important;
     box-sizing: border-box !important;
     background: #ffffff !important;
-    border-collapse: collapse !important;
     margin: 0 !important;
     padding: 0 !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
   }
 
-  body.printing-ad-checklist #ad-checklist-print-row-content {
-    display: table-row !important;
-    height: 100% !important;
-  }
-
   body.printing-ad-checklist #ad-checklist-print-content {
-    display: table-cell !important;
-    vertical-align: top !important;
-    height: 100% !important;
-    padding: 6mm 8mm 10mm 8mm !important;
-  }
-
-  body.printing-ad-checklist #ad-print-footer-row {
-    display: table-row !important;
-    height: 1px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 6mm 8mm 6mm 8mm !important;
   }
 
   body.printing-ad-checklist #ad-print-footer {
-    display: table-cell !important;
-    vertical-align: bottom !important;
     padding: 4mm 8mm 6mm 8mm !important;
     background: #ffffff !important;
     border-top: 2px solid #e5e7eb !important;
