@@ -16,7 +16,6 @@ const Header: React.FC = () => {
   const [isVip, setIsVip] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isTeacher, setIsTeacher] = useState(false);
-  const [isNavHovered, setIsNavHovered] = useState(false);
 
   useEffect(() => {
     let unsubs: Array<() => void> = [];
@@ -184,43 +183,25 @@ const Header: React.FC = () => {
           
           {/* Right Side Navigation and Profile Menu */}
           <div className="flex items-center gap-4 md:gap-6">
-            {/* Desktop Navigation Links (Icon Hover Dropdown) */}
-            <div 
-              className="hidden xl:relative xl:block"
-              onMouseEnter={() => setIsNavHovered(true)}
-              onMouseLeave={() => setIsNavHovered(false)}
-            >
-              <button 
-                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                  isNavHovered ? 'bg-[#007c76]/10 text-primary' : 'text-gray-500 hover:text-primary'
-                }`}
-                aria-label="Navigation Menu"
-              >
-                <svg className="w-6 h-6 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h12M4 18h16" />
-                </svg>
-              </button>
-
-              {isNavHovered && (
-                <div className="absolute left-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-150/50 py-3 z-[110] animate-in fade-in slide-in-from-top-2 duration-150">
-                  {NAV_LINKS.map((link) => {
-                    const isActive = location.pathname === link.path;
-                    return (
-                      <Link
-                        key={link.path}
-                        to={link.path}
-                        onClick={() => setIsNavHovered(false)}
-                        className={`block px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all hover:bg-gray-50 ${
-                          isActive ? 'text-primary bg-[#007c76]/5 font-black' : 'text-text-muted hover:text-primary'
-                        }`}
-                      >
-                        {link.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Desktop Navigation Links */}
+            <nav className="hidden xl:flex items-center space-x-6">
+              {NAV_LINKS.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`${
+                      isActive 
+                        ? 'text-primary font-black border-b-2 border-primary' 
+                        : 'text-text-muted hover:text-primary font-bold'
+                    } text-xs py-1 transition-all duration-200 uppercase tracking-wider flex items-center gap-2`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
 
             {/* Profile Dropdown & Notifications (System Style) */}
             {currentUser ? (
