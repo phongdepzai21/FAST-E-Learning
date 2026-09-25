@@ -1,6 +1,4 @@
-
 import React, { useState, useEffect } from 'react';
-// Fix: Ensure clean import of react-router-dom members
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
@@ -13,7 +11,11 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [avatarBadgeClass, setAvatarBadgeClass] = useState<string>('bg-white border border-gray-300');
+  const [userProfile, setUserProfile] = useState<{ name: string; avatar: string } | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isVip, setIsVip] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
 
   useEffect(() => {
     let unsubs: Array<() => void> = [];
@@ -41,43 +43,49 @@ const Header: React.FC = () => {
           }
         } catch (e) {}
 
-        const updateBadge = (isVip: boolean, isAdmin: boolean, isTeacher: boolean, purchasedCount: number) => {
-          if (isAdmin || isTeacher) {
-            setAvatarBadgeClass('bg-blue-500 ring-2 ring-blue-300');
-          } else if (isVip) {
-            setAvatarBadgeClass('bg-yellow-400 ring-2 ring-yellow-200');
-          } else if (purchasedCount >= 5) {
-            setAvatarBadgeClass('bg-[#007c76] ring-2 ring-teal-200');
-          } else {
-            setAvatarBadgeClass('bg-white border border-gray-300');
-          }
-        };
+        setIsVip(localIsVip);
+        setIsAdmin(localIsAdmin);
+        setIsTeacher(localIsTeacher);
 
         // Real-time listener for user document roles
         let currentIsVip = localIsVip;
         let currentIsAdmin = localIsAdmin;
         let currentIsTeacher = localIsTeacher;
-        let currentPurchasedCount = 0;
 
         const unsubUserDoc = onSnapshot(doc(db, "users", normalizedEmail), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.isVip !== undefined) currentIsVip = !!data.isVip;
-            if (data.isAdmin !== undefined) currentIsAdmin = !!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
-            if (data.isTeacher !== undefined) currentIsTeacher = !!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
+            if (data.isVip !== undefined) {
+              currentIsVip = !!data.isVip;
+              setIsVip(!!data.isVip);
+            }
+            if (data.isAdmin !== undefined) {
+              currentIsAdmin = !!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
+              setIsAdmin(!!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail));
+            }
+            if (data.isTeacher !== undefined) {
+              currentIsTeacher = !!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
+              setIsTeacher(!!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail));
+            }
+            setUserProfile({
+              name: data.fullName || data.name || user.displayName || 'Học viên',
+              avatar: data.avatar || user.photoURL || ''
+            });
+          } else {
+            setUserProfile({
+              name: user.displayName || 'Học viên',
+              avatar: user.photoURL || ''
+            });
           }
-          updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
         }, () => {});
         unsubs.push(unsubUserDoc);
 
-        // Real-time listener for purchased courses
+        // Real-time listener for purchased courses VIP check
         const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
           const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
-          const count = snap.docs.filter(d => d.id !== 'vip-lifetime-access').length;
-          currentPurchasedCount = count;
-          if (isVipDoc) currentIsVip = true;
-
-          updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
+          if (isVipDoc) {
+            setIsVip(true);
+          }
         }, () => {});
         unsubs.push(unsubPurchased);
 
@@ -87,10 +95,9 @@ const Header: React.FC = () => {
             const str = localStorage.getItem(`user_roles_${normalizedEmail}`);
             if (str) {
               const r = JSON.parse(str);
-              if (r.isVip !== undefined) currentIsVip = !!r.isVip;
-              if (r.isAdmin !== undefined) currentIsAdmin = !!r.isAdmin;
-              if (r.isTeacher !== undefined) currentIsTeacher = !!r.isTeacher;
-              updateBadge(currentIsVip, currentIsAdmin, currentIsTeacher, currentPurchasedCount);
+              if (r.isVip !== undefined) setIsVip(!!r.isVip);
+              if (r.isAdmin !== undefined) setIsAdmin(!!r.isAdmin);
+              if (r.isTeacher !== undefined) setIsTeacher(!!r.isTeacher);
             }
           } catch (e) {}
         };
@@ -100,6 +107,11 @@ const Header: React.FC = () => {
           window.removeEventListener('user_roles_updated', handleLocalRoleUpdate);
           window.removeEventListener('storage', handleLocalRoleUpdate);
         });
+      } else {
+        setUserProfile(null);
+        setIsVip(false);
+        setIsAdmin(false);
+        setIsTeacher(false);
       }
     });
 
@@ -120,100 +132,164 @@ const Header: React.FC = () => {
     }
   };
 
-  // Check if we are on an Account page
-  const isAccountPage = location.pathname.startsWith('/account');
+  const handleLogout = async () => {
+    await auth.signOut();
+    setIsDropdownOpen(false);
+    navigate('/');
+  };
 
-  // OPTIMIZATION: Use the Rectangular Full Logo for the Header
+  const avatarConfig = {
+    borderClass: isAdmin 
+      ? 'border-blue-500/40 ring-2 ring-blue-100' 
+      : isTeacher 
+        ? 'border-indigo-500/40 ring-2 ring-indigo-100' 
+        : isVip 
+          ? 'border-amber-400/50 ring-2 ring-amber-100' 
+          : 'border-teal-500/30',
+    fallbackBg: isAdmin 
+      ? 'bg-blue-500 text-white' 
+      : isTeacher 
+        ? 'bg-indigo-500 text-white' 
+        : isVip 
+          ? 'bg-amber-400 text-white' 
+          : 'bg-[#007c76] text-white',
+  };
+
   const logoUrl = "https://dl.dropboxusercontent.com/scl/fi/vujray2dqinzjgvifv5ic/logo-007c76.jpg?rlkey=82ta74w701800wvx50c08aoyt&st=k7c2htcn";
 
   return (
-    <header 
-      className={`
-        bg-surface border-b border-primary/10 shadow-sm z-[100] transition-all duration-300
-        ${isAccountPage 
-            ? 'sticky top-0 opacity-95 hover:opacity-100 hover:shadow-md' 
-            : 'sticky top-0 opacity-100'
-        }
-      `}
-    >
+    <header className="bg-white/85 backdrop-blur-md sticky top-0 z-[100] border-b border-gray-150/80 shadow-xs transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Adjusted header height to accommodate larger logo */}
-        <div className="flex justify-between items-center h-16 md:h-24">
+        <div className="flex justify-between items-center h-16 md:h-20">
+          {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
             <Link to="/" onClick={handleLogoClick} className="flex items-center group">
               {!logoError ? (
-                  <div>
-                      <img 
-                        src={logoUrl} 
-                        alt="FAST Logo" 
-                        className="h-12 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
-                        onError={() => setLogoError(true)}
-                        loading="eager"
-                        // @ts-ignore
-                        fetchPriority="high"
-                      />
-                  </div>
+                <img 
+                  src={logoUrl} 
+                  alt="FAST Logo" 
+                  className="h-10 md:h-16 w-auto object-contain transition-transform group-hover:scale-105"
+                  onError={() => setLogoError(true)}
+                  loading="eager"
+                />
               ) : (
-                  <div className="flex flex-col">
-                    <span className="text-xl md:text-2xl font-black text-primary tracking-tighter leading-none">FAST</span>
-                    <span className="text-[10px] md:text-[10px] font-bold text-text-muted tracking-widest uppercase">E-Learning</span>
-                  </div>
+                <div className="flex flex-col">
+                  <span className="text-lg md:text-xl font-black text-primary tracking-tighter leading-none">FAST</span>
+                  <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">E-Learning</span>
+                </div>
               )}
             </Link>
           </div>
           
+          {/* Right Side Navigation and Profile Menu */}
           <div className="flex items-center gap-4 md:gap-6">
-              <nav className="hidden md:flex items-center space-x-6">
-                {NAV_LINKS.map((link) => {
-                    const isActive = location.pathname === link.path;
-                    const isAccount = link.path === '/account';
-                    return (
-                        <Link
-                            key={link.path}
-                            to={link.path}
-                            className={`${
-                            isActive 
-                              ? 'text-primary font-bold border-b-2 border-primary' 
-                              : 'text-text-muted hover:text-primary'
-                            } text-xs md:text-sm py-1 transition-all duration-200 uppercase tracking-widest font-bold flex items-center gap-2`}
-                        >
-                            {link.label}
-                            {isAccount && currentUser && (
-                              <span className={`w-2.5 h-2.5 rounded-full inline-block ${avatarBadgeClass}`} />
-                            )}
-                        </Link>
-                    );
-                })}
-              </nav>
+            {/* Desktop Navigation Links */}
+            <nav className="hidden xl:flex items-center space-x-6">
+              {NAV_LINKS.map((link) => {
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`${
+                      isActive 
+                        ? 'text-primary font-black border-b-2 border-primary' 
+                        : 'text-text-muted hover:text-primary font-bold'
+                    } text-xs py-1 transition-all duration-200 uppercase tracking-wider flex items-center gap-2`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
 
-              <div className="md:hidden">
-                <button 
-                  onClick={toggleMenu}
-                  className="p-2 text-text focus:outline-none hover:bg-primary/10 rounded-lg transition-colors"
-                  aria-label="Toggle Menu"
-                >
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        {isMenuOpen ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                        )}
-                    </svg>
-                </button>
+            {/* Profile Dropdown & Notifications (System Style) */}
+            {currentUser ? (
+              <div className="flex items-center gap-3 sm:gap-4 border-l border-gray-150 pl-3 sm:pl-4">
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex items-center gap-2.5 group focus:outline-none focus:ring-0"
+                  >
+                    <div className="text-right hidden md:block">
+                      <p className="text-xs font-black text-gray-800 leading-none">{userProfile?.name || 'Học viên'}</p>
+                      <p className="text-[9px] font-bold text-text-muted uppercase mt-0.5">
+                        ID: #FAST-{(currentUser.email || '').split('@')[0] || 'USER'}
+                      </p>
+                    </div>
+                    
+                    <div className={`w-8 h-8 rounded-full border overflow-hidden p-0.5 transition-all ${avatarConfig.borderClass}`}>
+                      {userProfile?.avatar ? (
+                        <img src={userProfile.avatar} className="w-full h-full rounded-full object-cover" alt="Avatar" />
+                      ) : (
+                        <div className={`w-full h-full rounded-full flex items-center justify-center font-black text-xs ${avatarConfig.fallbackBg}`}>
+                          {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : 'H'}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2.5 z-[110] animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-4 py-2 border-b border-gray-50 md:hidden">
+                        <p className="text-xs font-black text-gray-800 leading-none">{userProfile?.name || 'Học viên'}</p>
+                        <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase">ID: #FAST-{(currentUser.email || '').split('@')[0] || 'USER'}</p>
+                      </div>
+                      <button 
+                        onClick={() => { setIsDropdownOpen(false); navigate('/account'); }} 
+                        className="w-full px-4 py-2 text-left text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-primary transition-all flex items-center gap-2"
+                      >
+                        Bảng điều khiển
+                      </button>
+                      <button 
+                        onClick={handleLogout} 
+                        className="w-full px-4 py-2 text-left text-xs font-bold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+            ) : (
+              <Link 
+                to="/account" 
+                className="px-4 py-2 bg-[#007c76] hover:bg-[#005c56] text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs hover:shadow-md transition-all shrink-0"
+              >
+                Vào học
+              </Link>
+            )}
+
+            {/* Hamburger Button for Mobile */}
+            <div className="xl:hidden flex items-center">
+              <button 
+                onClick={toggleMenu}
+                className="p-1.5 text-text hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
+                aria-label="Toggle Menu"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Mobile Navigation Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-surface border-b absolute w-full shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="px-4 pt-4 pb-8 space-y-2">
+        <div className="xl:hidden bg-white border-b border-gray-150 absolute w-full shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-4 pt-3 pb-6 space-y-1.5">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setIsMenuOpen(false)}
-                className="block px-4 py-3 text-base font-bold text-text hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                className="block px-4 py-2.5 text-sm font-bold text-text hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
               >
                 {link.label}
               </Link>

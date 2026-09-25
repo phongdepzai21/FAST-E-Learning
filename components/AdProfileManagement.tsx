@@ -626,10 +626,6 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 <span className="px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
                   QĐ: 190/QĐ-BVHTTDL
                 </span>
-                <span className="px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-200 border border-emerald-300/30 text-xs font-bold flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${isCloudSaving ? 'bg-amber-400 animate-spin' : 'bg-emerald-400 animate-pulse'}`}></span>
-                  {isCloudSaving ? 'Đang Lưu Trữ CSDL...' : 'Đã Đồng Bộ CSDL Đám Mây'}
-                </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
                 Quản Lý Toàn Trình Hồ Sơ Quảng Cáo Bảng &amp; Băng-Rôn
