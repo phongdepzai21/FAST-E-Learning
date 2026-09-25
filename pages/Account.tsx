@@ -1590,14 +1590,8 @@ const Account: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible relative">
+      <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
-        {/* Hover trigger zone for Sidebar at the left edge of the screen */}
-        <div 
-          onMouseEnter={() => setIsSidebarHovered(true)}
-          className="print:hidden hidden lg:block fixed top-0 left-0 h-full w-4 z-40 cursor-pointer"
-        />
-
         {/* Sidebar */}
         {(() => {
           const isExpanded = isSidebarHovered;
@@ -1607,7 +1601,7 @@ const Account: React.FC = () => {
               onMouseEnter={() => setIsSidebarHovered(true)}
               onMouseLeave={() => setIsSidebarHovered(false)}
               className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
-                isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5 opacity-100' : 'w-0 opacity-0 overflow-hidden border-none pointer-events-none'
+                isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
               }`}
             >
               <div className={`transition-all duration-300 ${!isExpanded ? 'p-3' : 'p-8'}`}>

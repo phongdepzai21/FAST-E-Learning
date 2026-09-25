@@ -121,6 +121,8 @@ const Header: React.FC = () => {
     };
   }, []);
 
+  const isAccountPage = location.pathname.startsWith('/account');
+
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const handleLogoClick = (e: React.MouseEvent) => {
@@ -203,8 +205,8 @@ const Header: React.FC = () => {
               })}
             </nav>
 
-            {/* Profile Dropdown & Notifications (System Style) */}
-            {currentUser ? (
+            {/* Profile Dropdown & Notifications (System Style) - Only shown on Account pages as requested */}
+            {currentUser && isAccountPage ? (
               <div className="flex items-center gap-3 sm:gap-4 border-l border-gray-150 pl-3 sm:pl-4">
                 <div className="relative">
                   <button 
