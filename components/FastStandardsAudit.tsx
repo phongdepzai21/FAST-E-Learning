@@ -1220,22 +1220,19 @@ export const FastStandardsAudit: React.FC = () => {
             </div>
           </div>
 
-          {/* Khung Nhận Diện Thương Hiệu FAST CONSULTING (Mộc Đóng Dấu Đính Kèm) */}
-          <div className="mt-12 p-6 border-2 border-dashed border-[#005c56] rounded-2xl bg-[#005c56]/5 flex flex-col items-center justify-center text-center space-y-2 page-break-inside-avoid">
-            <div className="text-[#005c56] font-black text-xs uppercase tracking-widest flex items-center gap-2">
-              ★ FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING ★
+          {/* Chân trang thương hiệu theo ảnh đính kèm */}
+          <div className="mt-12 pt-6 border-t border-gray-300 page-break-inside-avoid text-center space-y-1">
+            <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
+              FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
             </div>
-            <div className="text-gray-700 font-bold text-[11px]">
-              ĐƠN VỊ TƯ VẤN QUẢN LÝ CHẤT LƯỢNG &amp; THỦ TỤC HÀNH CHÍNH DOANH NGHIỆP HÀNG ĐẦU
+            <div className="text-gray-700 text-[11px]">
+              Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
             </div>
-            <div className="text-[11px] text-gray-800 font-medium max-w-xl leading-relaxed">
-              Chuyên sâu tư vấn: An toàn thực phẩm (ISO 22000, HACCP), Giấy phép quảng cáo Sở Văn hóa, Giấy phép xây dựng Pano tấm lớn, và các thủ tục pháp lý trọn gói.
+            <div className="text-gray-900 font-bold text-[11px]">
+              Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
             </div>
-            <div className="text-[11px] text-gray-900 font-bold bg-white px-4 py-1.5 rounded-full shadow-xs border border-gray-100">
-              Hotline Hỗ Trợ Toàn Quốc 24/7: <span className="text-red-600 font-black text-xs">0927 002 668</span>
-            </div>
-            <div className="text-gray-400 text-[10px] pt-1">
-              &copy; {new Date().getFullYear()} FAST CONSULTING. Mọi quyền được bảo lưu.
+            <div className="text-gray-400 text-[10px] mt-1">
+              © 2026 FAST CONSULTING.
             </div>
           </div>
         </div>
