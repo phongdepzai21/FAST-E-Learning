@@ -122,10 +122,19 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-12 md:mt-24 pt-8 md:pt-10 border-t border-gray-200 text-center">
-            <p className="text-xs md:text-sm text-gray-400 font-medium">
-                © {new Date().getFullYear()} FAST E-Learning. Nâng tầm chuẩn mực An toàn thực phẩm Việt Nam.
-            </p>
+        <div className="mt-12 md:mt-24 pt-8 md:pt-10 border-t border-gray-200 text-center space-y-1.5">
+          <div className="text-[#005c56] font-black text-xs md:text-sm uppercase tracking-wider">
+            FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
+          </div>
+          <div className="text-gray-600 text-xs md:text-sm font-semibold">
+            Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
+          </div>
+          <div className="text-gray-800 font-bold text-xs md:text-sm">
+            Tổng đài Tư vấn &amp; Tiếp nhận hồ sơ: <span className="text-red-600 font-black">0927 002 668</span>
+          </div>
+          <div className="text-gray-400 text-[11px] pt-1">
+            © 2026 FAST CONSULTING.
+          </div>
         </div>
       </div>
     </footer>
