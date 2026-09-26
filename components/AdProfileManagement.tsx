@@ -1388,8 +1388,11 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* PHẦN CHUYÊN DÙNG ĐỂ IN BẢNG CHECKLIST (Chỉ xuất hiện khi in / xuất PDF) */}
-      <div id="ad-checklist-print-area" className="hidden print:grid grid-rows-[1fr_auto] min-h-screen bg-white text-gray-900 w-full">
-        <div id="ad-checklist-print-content" className="flex flex-col justify-start">
+      <table id="ad-checklist-print-area" className="hidden print:table bg-white text-gray-900 w-full border-collapse">
+        <tbody>
+          <tr>
+            <td className="p-0 border-none">
+              <div id="ad-checklist-print-content" className="flex flex-col justify-start">
               {/* Header */}
               <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
               <div>
@@ -1513,7 +1516,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 
               {/* Đóng ad-checklist-print-content */}
               </div>
-
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td className="p-0 border-none">
               <footer id="ad-print-footer" className="pt-3 border-t border-gray-300">
                 <div className="text-center space-y-1">
                   <div className="text-[#005c56] font-black text-[11px] uppercase tracking-wider">
@@ -1530,7 +1538,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                   </div>
                 </div>
               </footer>
-            </div>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 };
