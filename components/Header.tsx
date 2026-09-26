@@ -157,12 +157,12 @@ const Header: React.FC = () => {
           : 'bg-[#007c76] text-white',
   };
 
-  const logoUrl = "https://www.dropbox.com/scl/fi/fnnr149ucl9nymrqhchit/logonoback.png?rlkey=1h1g4j7b7d6csa3833vi1iado&st=5non0qck&dl=0";
+  const logoUrl = "https://dl.dropboxusercontent.com/scl/fi/fnnr149ucl9nymrqhchit/logonoback.png?rlkey=1h1g4j7b7d6csa3833vi1iado&st=5non0qck";
 
   return (
     <header className="bg-white/85 backdrop-blur-md sticky top-0 z-[100] border-b border-gray-150/80 shadow-xs transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 md:h-20">
+        <div className="flex justify-between items-center h-20 md:h-24">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
             <Link to="/" onClick={handleLogoClick} className="flex items-center group">
@@ -170,7 +170,7 @@ const Header: React.FC = () => {
                 <img 
                   src={logoUrl} 
                   alt="FAST Logo" 
-                  className="h-12 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
+                  className="h-16 md:h-24 w-auto object-contain transition-transform group-hover:scale-105"
                   onError={() => setLogoError(true)}
                   loading="eager"
                 />
