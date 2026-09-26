@@ -225,14 +225,14 @@ export const COLORS = {
   dark: '#374151'
 };
 
-export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string }> = [
-  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "" },
-  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "" },
-  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1" },
-  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "" }
+export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string; content?: string }> = [
+  { title: "Phân tích bối cảnh tổ chức và quản lý chất lượng", videoUrl: "", content: "Tài liệu học tập: Nghiên cứu kỹ bối cảnh nội bộ và bên ngoài của tổ chức theo mô hình SWOT." },
+  { title: "Xây dựng chính sách an toàn thực phẩm & tiêu chuẩn ISO", videoUrl: "", content: "Tài liệu học tập: Hướng dẫn viết tuyên bố chính sách ATTP đạt chuẩn ISO 22000." },
+  { title: "Hoạch định hệ thống quản lý và 7 nguyên tắc HACCP", videoUrl: "https://www.dropbox.com/scl/fi/qv5982actdgxnzifug9sw/07-nguyen-tac-haccp.mp4?rlkey=c4gd6hqpoovsepfm04rmlulzi&st=808zm8fm&raw=1", content: "Tài liệu học tập: 7 nguyên tắc cốt lõi của tiêu chuẩn HACCP và cách áp dụng vào quy trình sản xuất thực tế." },
+  { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "", content: "Tài liệu học tập: Phương pháp đánh giá mức độ nghiêm trọng và khả năng xảy ra của mối nguy hại." }
 ];
 
-export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string }> => {
+export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string; content?: string }> => {
   if (!rawCurr) return DEFAULT_LESSONS;
   if (!Array.isArray(rawCurr)) {
     if (typeof rawCurr === 'object' && rawCurr.lessons && Array.isArray(rawCurr.lessons)) {
@@ -241,7 +241,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
     return DEFAULT_LESSONS;
   }
 
-  const result: Array<{ title: string; videoUrl: string }> = [];
+  const result: Array<{ title: string; videoUrl: string; content?: string }> = [];
 
   rawCurr.forEach((item: any, itemIdx: number) => {
     if (!item) return;
@@ -254,7 +254,10 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
         const videoUrl = typeof l === 'object' && l?.videoUrl 
           ? String(l.videoUrl).trim() 
           : "";
-        result.push({ title, videoUrl });
+        const content = typeof l === 'object' && l?.content 
+          ? String(l.content).trim() 
+          : "";
+        result.push({ title, videoUrl, content });
       });
     } 
     // Case 2: item is a direct lesson object { title, videoUrl }
@@ -263,13 +266,17 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
       const videoUrl = item.videoUrl 
         ? String(item.videoUrl).trim() 
         : "";
-      result.push({ title, videoUrl });
+      const content = item.content 
+        ? String(item.content).trim() 
+        : "";
+      result.push({ title, videoUrl, content });
     }
     // Case 3: item is a string
     else if (typeof item === 'string' && item.trim()) {
       result.push({
         title: item.trim(),
-        videoUrl: ""
+        videoUrl: "",
+        content: ""
       });
     }
   });

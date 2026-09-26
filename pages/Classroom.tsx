@@ -4,7 +4,7 @@ import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLess
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
-import { Course, LessonNote } from '../types';
+import { Course, LessonNote, Lesson } from '../types';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { PersonalNotesSidebar } from '../components/PersonalNotesSidebar';
@@ -41,7 +41,7 @@ const Classroom: React.FC = () => {
     const initialList = getMergedCourses([]);
     return initialList.find(c => c.id === courseId);
   });
-  const [curriculum, setCurriculum] = useState<Array<{ title: string; videoUrl: string }>>(() => {
+  const [curriculum, setCurriculum] = useState<Lesson[]>(() => {
     if (!courseId) return [];
     const initialList = getMergedCourses([]);
     const found = initialList.find(c => c.id === courseId);
@@ -1028,17 +1028,31 @@ const Classroom: React.FC = () => {
             {/* TAB CONTENT: OVERVIEW */}
             {activeTab === 'overview' && (
               <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-                <div className="flex items-start gap-3 p-4 bg-white/[0.03] rounded-2xl border border-white/[0.06]">
-                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0 mt-0.5 border border-teal-500/20">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-bold text-sm mb-1">Mục tiêu học tập bài học này:</h4>
-                    <p className="text-slate-400 text-xs sm:text-sm">
-                      Nắm vững các thuật ngữ chuyên môn, hiểu rõ phương pháp triển khai thực tế theo tiêu chuẩn ISO/HACCP và ứng dụng ngay vào doanh nghiệp.
+                {currentLesson?.content ? (
+                  <div className="p-5 bg-white/[0.03] rounded-2xl border border-white/[0.06] space-y-3">
+                    <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2.5">
+                      <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      <span className="text-xs font-black uppercase tracking-wider text-teal-400">Nội dung bài giảng & Tài liệu bổ trợ</span>
+                    </div>
+                    <p className="text-slate-200 text-xs sm:text-sm whitespace-pre-line leading-relaxed">
+                      {currentLesson.content}
                     </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-4 bg-white/[0.03] rounded-2xl border border-white/[0.06]">
+                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0 mt-0.5 border border-teal-500/20">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    </div>
+                    <div>
+                      <h4 className="text-white font-bold text-sm mb-1">Mục tiêu học tập bài học này:</h4>
+                      <p className="text-slate-400 text-xs sm:text-sm">
+                        Nắm vững các thuật ngữ chuyên môn, hiểu rõ phương pháp triển khai thực tế theo tiêu chuẩn ISO/HACCP và ứng dụng ngay vào doanh nghiệp.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/[0.06] flex items-center justify-between gap-4">
                   <div className="space-y-1">

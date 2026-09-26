@@ -65,7 +65,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [previewQrCourse, setPreviewQrCourse] = useState<Course | null>(null);
 
   // Curriculum State (Flat Lessons with videoUrl)
-  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string }[]>(DEFAULT_FLAT_LESSONS);
+  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; content?: string }[]>(DEFAULT_FLAT_LESSONS);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [bulkImportText, setBulkImportText] = useState('');
   const [bulkImportMode, setBulkImportMode] = useState<'append' | 'replace'>('append');
@@ -872,7 +872,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     });
   };
 
-  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl', value: string) => {
+  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl' | 'content', value: string) => {
     setFlatLessons(prev => {
       const result = [...prev];
       result[lIdx] = { ...result[lIdx], [field]: value };
@@ -1418,29 +1418,43 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                      {/* Lesson Title Input */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tên bài giảng</span>
-                        <input
-                          type="text"
-                          value={lesson.title}
-                          onChange={(e) => updateFlatLesson(lIdx, 'title', e.target.value)}
-                          placeholder="Nhập tên bài giảng..."
-                          className="w-full bg-gray-50 text-xs font-bold text-gray-800 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
-                        />
+                    <div className="grid grid-cols-1 gap-3 w-full">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Lesson Title Input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tên bài giảng</span>
+                          <input
+                            type="text"
+                            value={lesson.title}
+                            onChange={(e) => updateFlatLesson(lIdx, 'title', e.target.value)}
+                            placeholder="Nhập tên bài giảng..."
+                            className="w-full bg-gray-50 text-xs font-bold text-gray-800 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Lesson Video URL Input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng</span>
+                          <input
+                            type="text"
+                            value={lesson.videoUrl || ''}
+                            onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
+                            placeholder="Link Youtube (watch, shorts, youtu.be), Google Drive, Dropbox, MP4..."
+                            className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
+                          />
+                        </div>
                       </div>
 
-                      {/* Lesson Video URL Input */}
+                      {/* Lesson Detailed Content / Study Material Input */}
                       <div className="space-y-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Đường dẫn Video bài giảng</span>
-                        <input
-                          type="text"
-                          value={lesson.videoUrl || ''}
-                          onChange={(e) => updateFlatLesson(lIdx, 'videoUrl', e.target.value)}
-                          placeholder="Link Youtube (watch, shorts, youtu.be), Google Drive, Dropbox, MP4..."
-                          className="w-full bg-gray-50 text-xs font-medium text-gray-600 py-2.5 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all"
-                        />
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Tài liệu học tập & Nội dung bài học (Hỗ trợ tài liệu đính kèm)</span>
+                        <textarea
+                          rows={2}
+                          value={lesson.content || ''}
+                          onChange={(e) => updateFlatLesson(lIdx, 'content', e.target.value)}
+                          placeholder="Nhập tài liệu hướng dẫn chi tiết, tóm tắt kiến thức, hoặc link tải PDF đính kèm cho bài giảng này..."
+                          className="w-full bg-gray-50 text-xs font-medium text-gray-700 py-2 px-3 border border-gray-200 rounded-xl focus:border-[#007c76] focus:bg-white outline-none transition-all resize-none"
+                        ></textarea>
                       </div>
                     </div>
 

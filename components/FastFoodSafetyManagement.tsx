@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Search, Clipboard, FileText, Database, Plus, Trash2, Edit } from 'lucide-react';
+import { db as firestoreDb } from '../firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface ChecklistDoc {
   id: string;
@@ -107,7 +109,52 @@ export const FastFoodSafetyManagement: React.FC = () => {
   });
   const [syncStatus, setSyncStatus] = useState<string>('Tự động đồng bộ');
 
-  // Load database and initial profile state
+  // Unified persistence with Cloud Firestore sync
+  const persistDatabase = async (newDb: any[]) => {
+    setDb(newDb);
+    try {
+      localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(newDb));
+    } catch (e) {}
+
+    try {
+      await setDoc(doc(firestoreDb, 'fast_food_safety_crm', 'database'), {
+        records: newDb,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      setSyncStatus('Đã đồng bộ Cloud ✓');
+    } catch (err) {
+      console.warn('Firestore sync notice:', err);
+    }
+  };
+
+  // Realtime Cloud Firestore database synchronization
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const docRef = doc(firestoreDb, 'fast_food_safety_crm', 'database');
+      unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (Array.isArray(data?.records)) {
+            setDb(data.records);
+            try {
+              localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(data.records));
+            } catch (e) {}
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore onSnapshot fallback notice:', err);
+      });
+    } catch (e) {
+      console.warn('Firestore initialization notice:', e);
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Load initial draft state
   useEffect(() => {
     const savedActive = localStorage.getItem('FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2');
     if (savedActive) {
@@ -287,8 +334,7 @@ export const FastFoodSafetyManagement: React.FC = () => {
         }
         return c;
       });
-      setDb(updatedDb);
-      localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(updatedDb));
+      persistDatabase(updatedDb);
     }
   };
 
@@ -329,8 +375,7 @@ export const FastFoodSafetyManagement: React.FC = () => {
       updatedDb.unshift(customerRecord);
     }
 
-    setDb(updatedDb);
-    localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(updatedDb));
+    persistDatabase(updatedDb);
     setSyncStatus('Đã lưu CRM ✓');
     alert(`Đã lưu thành công hồ sơ toàn trình "${custName}" vào Cơ sở dữ liệu FAST CRM.`);
   };
@@ -373,8 +418,7 @@ export const FastFoodSafetyManagement: React.FC = () => {
 
     if (window.confirm(`Bạn có chắc chắn muốn xóa hồ sơ "${name}" khỏi cơ sở dữ liệu CRM?`)) {
       const newDb = db.filter(c => c.id !== id);
-      setDb(newDb);
-      localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(newDb));
+      persistDatabase(newDb);
       if (currentCustomerId === id) {
         resetForm();
       }

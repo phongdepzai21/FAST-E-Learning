@@ -3,6 +3,7 @@ export interface Lesson {
   title: string;
   videoUrl?: string;
   isHidden?: boolean;
+  content?: string;
 }
 
 export interface LessonNote {
