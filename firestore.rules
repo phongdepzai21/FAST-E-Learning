@@ -186,5 +186,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn() || isAdmin() || isTeacher();
     }
+
+    // 6. Food Safety CRM Records
+    match /fast_food_safety_crm/{recordId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin() || isTeacher();
+    }
   }
 }
