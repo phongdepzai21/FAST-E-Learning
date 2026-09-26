@@ -140,6 +140,7 @@
   }
 
   body.printing-ad-checklist #ad-print-footer {
+    display: block !important; /* Đè đè luật ẩn footer chung khi in */
     grid-row: 2 !important;
     align-self: end !important;
     padding: 4mm 8mm 6mm 8mm !important;
