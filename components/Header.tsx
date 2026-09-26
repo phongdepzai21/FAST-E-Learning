@@ -157,7 +157,7 @@ const Header: React.FC = () => {
           : 'bg-[#007c76] text-white',
   };
 
-  const logoUrl = "https://dl.dropboxusercontent.com/scl/fi/vujray2dqinzjgvifv5ic/logo-007c76.jpg?rlkey=82ta74w701800wvx50c08aoyt&st=k7c2htcn";
+  const logoUrl = "https://www.dropbox.com/scl/fi/fnnr149ucl9nymrqhchit/logonoback.png?rlkey=1h1g4j7b7d6csa3833vi1iado&st=5non0qck&dl=0";
 
   return (
     <header className="bg-white/85 backdrop-blur-md sticky top-0 z-[100] border-b border-gray-150/80 shadow-xs transition-all duration-300">
@@ -170,7 +170,7 @@ const Header: React.FC = () => {
                 <img 
                   src={logoUrl} 
                   alt="FAST Logo" 
-                  className="h-10 md:h-16 w-auto object-contain transition-transform group-hover:scale-105"
+                  className="h-12 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
                   onError={() => setLogoError(true)}
                   loading="eager"
                 />

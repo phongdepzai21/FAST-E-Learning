@@ -733,84 +733,86 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
         </div>
 
         {/* Form nhập liệu & Hồ sơ chi tiết */}
-        <div className="customer-profile-card">
-          <div className="customer-profile-title">
-            <div className="customer-title-left">
-              <Clipboard className="w-4 h-4 text-[#005c56]" />
-              <span id="activeFormTitle">Cập Nhật Hồ Sơ Khách Hàng (FAST CRM - ATTP)</span>
+        <div className="bg-white p-6 rounded-2xl border-2 border-[#005c56]/30 shadow-xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between border-b border-dashed border-gray-200 pb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <Clipboard className="w-5 h-5 text-[#005c56]" />
+              <h2 className="text-sm font-black uppercase text-[#005c56] tracking-wide">
+                Cập Nhật Hồ Sơ Khách Hàng (FAST CRM - ATTP)
+              </h2>
             </div>
-            <div className="customer-sync-badge">
+            <span className="text-[11.5px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               {syncStatus}
-            </div>
+            </span>
           </div>
 
-          <div className="customer-fields-grid">
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Nhân Viên Phụ Trách <span className="required">*</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Nhân Viên Phụ Trách: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Search className="w-4 h-4" /></span>
-                <input type="text" value={fastStaff} onChange={(e) => setFastStaff(e.target.value)} className="customer-input" placeholder="Tên nhân viên FAST..." />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
+                <input type="text" value={fastStaff} onChange={(e) => setFastStaff(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Tên nhân viên FAST..." />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Tên Khách Hàng / Cơ Sở <span className="required">*</span>
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Tên Khách Hàng / Cơ Sở: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><FileText className="w-4 h-4" /></span>
-                <input type="text" value={custName} onChange={(e) => setCustName(e.target.value)} className="customer-input" placeholder="Tên công ty / bếp ăn / nhà hàng..." />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><FileText className="w-4 h-4" /></span>
+                <input type="text" value={custName} onChange={(e) => setCustName(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Tên công ty / bếp ăn / nhà hàng..." />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Người Liên Hệ <span className="required">*</span>
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Người Liên Hệ: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Search className="w-4 h-4" /></span>
-                <input type="text" value={custContact} onChange={(e) => setCustContact(e.target.value)} className="customer-input" placeholder="Họ tên người liên hệ..." />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
+                <input type="text" value={custContact} onChange={(e) => setCustContact(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Họ tên người liên hệ..." />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Số Điện Thoại <span className="required">*</span>
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Số Điện Thoại: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Phone className="w-4 h-4" /></span>
-                <input type="text" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} className="customer-input" placeholder="Số điện thoại di động..." />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Phone className="w-4 h-4" /></span>
+                <input type="text" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Số điện thoại di động..." />
               </div>
             </div>
 
-            <div className="customer-field-group lg:col-span-2">
-              <label className="customer-field-label">
-                Địa Điểm Cơ Sở / Địa Chỉ Bếp Ăn <span className="required">*</span>
+            <div className="sm:col-span-2">
+              <label className="block font-bold text-gray-700 mb-1">
+                Địa Điểm Cơ Sở / Địa Chỉ Bếp Ăn: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Search className="w-4 h-4" /></span>
-                <input type="text" value={custLocation} onChange={(e) => setCustLocation(e.target.value)} className="customer-input" placeholder="Số nhà, tên đường, Phường, Quận..." />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
+                <input type="text" value={custLocation} onChange={(e) => setCustLocation(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Số nhà, tên đường, Phường, Quận..." />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Ngày Order / Tiếp Nhận <span className="required">*</span>
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Ngày Order / Tiếp Nhận: <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custOrderDate} onChange={(e) => setCustOrderDate(e.target.value)} className="customer-input" />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custOrderDate} onChange={(e) => setCustOrderDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">Trạng Thái Hồ Sơ</label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="customer-select">
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Trạng Thái Hồ Sơ:</label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium">
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ &amp; Cơ sở</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
                   <option value="Đang thẩm định thực tế">🟣 Đang thẩm định thực tế tại bếp</option>
@@ -821,68 +823,68 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">
-                Ngày Nộp (Sở ATTP) <span className="required">*</span>
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">
+                Ngày Nộp (Sở ATTP): <span className="text-red-500">*</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custSubmitDate} onChange={(e) => handleFastSubmitDateChange(e.target.value, 'business')} className="customer-input" />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custSubmitDate} onChange={(e) => handleFastSubmitDateChange(e.target.value, 'business')} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label flex justify-between">
+            <div>
+              <label className="block font-bold text-gray-700 mb-1 flex justify-between">
                 <span>Hạn Thủ Tục (20N)</span>
-                <span onClick={() => handleFastSubmitDateChange(custSubmitDate, 'business')} className="badge-auto">Tính +20N Làm việc</span>
+                <span onClick={() => handleFastSubmitDateChange(custSubmitDate, 'business')} className="text-[#007c76] hover:underline cursor-pointer font-bold">Tính +20N</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custTargetDate} onChange={(e) => setCustTargetDate(e.target.value)} className="customer-input" />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custTargetDate} onChange={(e) => setCustTargetDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">Ngày Thẩm Định Thực Tế</label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custInspectDate} onChange={(e) => setCustInspectDate(e.target.value)} className="customer-input" />
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Ngày Thẩm Định Thực Tế:</label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custInspectDate} onChange={(e) => setCustInspectDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label flex justify-between">
+            <div>
+              <label className="block font-bold text-gray-700 mb-1 flex justify-between">
                 <span>Ngày Cấp GCN</span>
-                <span onClick={() => handleCertDateChange(custCertDate)} className="badge-auto">Tính +3 Năm</span>
+                <span onClick={() => handleCertDateChange(custCertDate)} className="text-[#007c76] hover:underline cursor-pointer font-bold">Tính +3 Năm</span>
               </label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custCertDate} onChange={(e) => handleCertDateChange(e.target.value)} className="customer-input" />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custCertDate} onChange={(e) => handleCertDateChange(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">Số GCN / Mã Biên Nhận</label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><FileText className="w-4 h-4" /></span>
-                <input type="text" value={custCertNumber} onChange={(e) => setCustCertNumber(e.target.value)} className="customer-input" placeholder="1234/2026/ATTP-CN..." />
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Số GCN / Mã Biên Nhận:</label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><FileText className="w-4 h-4" /></span>
+                <input type="text" value={custCertNumber} onChange={(e) => setCustCertNumber(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="1234/2026/ATTP-CN..." />
               </div>
             </div>
 
-            <div className="customer-field-group">
-              <label className="customer-field-label">Ngày Hết Hạn (+3 năm)</label>
-              <div className="customer-input-wrap">
-                <span className="customer-input-icon"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custExpireDate} onChange={(e) => setCustExpireDate(e.target.value)} className="customer-input" />
+            <div>
+              <label className="block font-bold text-gray-700 mb-1">Ngày Hết Hạn (+3 năm):</label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
+                <input type="date" value={custExpireDate} onChange={(e) => setCustExpireDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
               </div>
             </div>
           </div>
 
-          <div className="customer-actions-row flex justify-between items-center mt-6 pt-4 border-t border-dashed border-gray-200">
+          <div className="flex flex-wrap justify-between items-center mt-6 pt-4 border-t border-dashed border-gray-200 gap-2">
             <span className="text-xs text-gray-500">
               * Nhấn <strong>"Lưu Vào Thống Kê"</strong> để ghi nhớ bản ghi toàn trình hoặc cập nhật vào bảng CRM.
             </span>
-            <button onClick={handleSaveActiveCustomer} className="px-5 py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+            <button onClick={handleSaveActiveCustomer} className="px-5 py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all hover:scale-105">
               Lưu Vào Thống Kê
             </button>
           </div>
@@ -1326,7 +1328,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
         <tfoot>
           <tr>
             <td className="p-0 border-none">
-              <footer id="ad-print-footer" className="pt-3 border-t border-gray-300">
+              <div id="attp-print-footer" className="pt-3 border-t border-gray-300">
                 <div className="text-center space-y-1">
                   <div className="text-[#005c56] font-black text-[11px] uppercase tracking-wider">
                     FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
@@ -1341,7 +1343,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                     © 2026 FAST CONSULTING.
                   </div>
                 </div>
-              </footer>
+              </div>
             </td>
           </tr>
         </tfoot>
