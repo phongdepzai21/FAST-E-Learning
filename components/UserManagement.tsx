@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
@@ -429,38 +429,107 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const fetchUsers = async (forceRefresh = false) => {
-    // 1. Instant cache load on initial mount to eliminate loading wait time
-    if (!forceRefresh && users.length === 0) {
-      try {
-        const cached = sessionStorage.getItem('cached_admin_users');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setUsers(parsed);
-            setIsLoading(false);
-          }
-        }
-      } catch (e) {}
-    }
+  const usersRef = useRef<UserData[]>([]);
+  usersRef.current = users;
 
-    if (users.length === 0 || forceRefresh) {
-      setIsLoading(true);
-    }
-
+  // Real-time synchronization of users collection
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     try {
-      const usersRef = collection(db, 'users');
-      const snapshot = await getDocs(usersRef);
-
-      // Fast parallel fetch for purchased courses instead of sequential blocking loop
-      const userData: UserData[] = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
+      const colRef = collection(db, 'users');
+      unsubscribe = onSnapshot(colRef, async (snapshot) => {
+        const promises = snapshot.docs.map(async (docSnap) => {
           const data = docSnap.data();
           const normalizedEmail = docSnap.id.toLowerCase().trim();
           const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
           const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
 
-          // Fetch purchased courses in parallel
+          // Find if we already have loaded this user to reuse their course list
+          const existingUser = usersRef.current.find(u => u.id === normalizedEmail);
+          let purchasedCoursesList: UserPurchasedCourse[] = existingUser?.purchasedCourses || [];
+
+          // Only fetch subcollection if user is new or we don't have courses list loaded
+          if (!existingUser || (data.purchasedCoursesCount !== undefined && data.purchasedCoursesCount !== existingUser.purchasedCoursesCount)) {
+            try {
+              const purchasedRef = collection(db, 'users', docSnap.id, 'purchased_courses');
+              const purchasedSnap = await getDocs(purchasedRef);
+              const fetchedList: UserPurchasedCourse[] = [];
+              purchasedSnap.forEach(pDoc => {
+                const pData = pDoc.data();
+                fetchedList.push({
+                  courseId: pData.courseId || pDoc.id,
+                  courseTitle: pData.courseTitle || pData.title || pDoc.id,
+                  purchasedAt: pData.purchasedAt || pData.createdAt,
+                  price: pData.price || 'Đã kích hoạt',
+                  status: pData.status || 'active'
+                });
+              });
+              fetchedList.sort((a, b) => {
+                const timeA = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
+                const timeB = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
+                return timeB - timeA;
+              });
+              purchasedCoursesList = fetchedList;
+            } catch (e) {
+              // ignore
+            }
+          }
+
+          return {
+            id: normalizedEmail,
+            email: data.email || normalizedEmail,
+            displayName: data.displayName || 'Học viên',
+            photoURL: data.photoURL,
+            isAdmin: data.isAdmin === true || isHardcodedAdmin,
+            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin,
+            isVip: data.isVip || false,
+            isLocked: data.isLocked === true,
+            lockedAt: data.lockedAt,
+            lockReason: data.lockReason,
+            createdAt: data.createdAt,
+            lastLoginAt: data.lastLoginAt,
+            purchasedCoursesCount: purchasedCoursesList.length,
+            purchasedCourses: purchasedCoursesList
+          };
+        });
+
+        const updatedUsers = await Promise.all(promises);
+        
+        // Sort users by createdAt desc
+        updatedUsers.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        setUsers(updatedUsers);
+        setIsLoading(false);
+        try {
+          sessionStorage.setItem('cached_admin_users', JSON.stringify(updatedUsers));
+        } catch (e) {}
+      });
+    } catch (e) {
+      console.error('Error setting up user real-time listener:', e);
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Backwards compatible fetchUsers for manual forced refreshing
+  const fetchUsers = async (forceRefresh = false) => {
+    if (forceRefresh) {
+      setIsLoading(true);
+      try {
+        const usersRefCol = collection(db, 'users');
+        const snapshot = await getDocs(usersRefCol);
+        const promises = snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          const normalizedEmail = docSnap.id.toLowerCase().trim();
+          const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+          const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === normalizedEmail);
+
           const purchasedCoursesList: UserPurchasedCourse[] = [];
           try {
             const purchasedRef = collection(db, 'users', docSnap.id, 'purchased_courses');
@@ -480,9 +549,7 @@ export const UserManagement: React.FC = () => {
               const timeB = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
               return timeB - timeA;
             });
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) {}
 
           return {
             id: normalizedEmail,
@@ -500,21 +567,22 @@ export const UserManagement: React.FC = () => {
             purchasedCoursesCount: purchasedCoursesList.length,
             purchasedCourses: purchasedCoursesList
           };
-        })
-      );
+        });
 
-      setUsers(userData);
-      try {
-        sessionStorage.setItem('cached_admin_users', JSON.stringify(userData));
-      } catch (e) {}
+        const result = await Promise.all(promises);
+        result.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
 
-      if (forceRefresh) {
-        success('Đã tải lại danh sách tài khoản thành công!');
+        setUsers(result);
+        success('Đã làm mới danh sách tài khoản thành công!');
+      } catch (err) {
+        console.error('Error in forced refresh:', err);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 

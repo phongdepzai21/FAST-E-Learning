@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Search, Clipboard, FileText, Database, Plus, Trash2, Edit } from 'lucide-react';
 import { db as firestoreDb } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { useCloudSync } from '../utils/cloudSyncUtility';
 
 interface ChecklistDoc {
   id: string;
@@ -78,7 +79,6 @@ const getTodayDateString = () => {
 };
 
 export const FastFoodSafetyManagement: React.FC = () => {
-  const [db, setDb] = useState<any[]>([]);
   const [currentCustomerId, setCurrentCustomerId] = useState<string>('');
   
   // Fields for currently active profile
@@ -107,90 +107,115 @@ export const FastFoodSafetyManagement: React.FC = () => {
     'sec-technical': false,
     'sec-legal': false
   });
-  const [syncStatus, setSyncStatus] = useState<string>('Tự động đồng bộ');
 
-  // Unified persistence with Cloud Firestore sync
-  const persistDatabase = async (newDb: any[]) => {
-    setDb(newDb);
-    try {
-      localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(newDb));
-    } catch (e) {}
+  // Use unified synchronization hook for the records list database
+  const [db, setDb, isDbSaving, dbSyncStatus] = useCloudSync<any[]>(
+    'fast_food_safety_crm',
+    'database',
+    'FAST_ATTP_1013855_CRM_DATABASE_V2',
+    []
+  );
 
-    try {
-      await setDoc(doc(firestoreDb, 'fast_food_safety_crm', 'database'), {
-        records: newDb,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      setSyncStatus('Đã đồng bộ Cloud ✓');
-    } catch (err) {
-      console.warn('Firestore sync notice:', err);
-    }
+  const persistDatabase = (newDb: any[]) => {
+    setDb(newDb, true); // Immediate save to Firestore & LocalStorage
   };
 
-  // Realtime Cloud Firestore database synchronization
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    try {
-      const docRef = doc(firestoreDb, 'fast_food_safety_crm', 'database');
-      unsubscribe = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (Array.isArray(data?.records)) {
-            setDb(data.records);
-            try {
-              localStorage.setItem('FAST_ATTP_1013855_CRM_DATABASE_V2', JSON.stringify(data.records));
-            } catch (e) {}
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore onSnapshot fallback notice:', err);
-      });
-    } catch (e) {
-      console.warn('Firestore initialization notice:', e);
-    }
+  const [syncStatus, setSyncStatus] = useState<string>('Tự động đồng bộ');
 
-    return () => {
-      if (unsubscribe) unsubscribe();
+  useEffect(() => {
+    if (dbSyncStatus) {
+      setSyncStatus(dbSyncStatus);
+    }
+  }, [dbSyncStatus]);
+
+  // Use unified synchronization hook for active draft session
+  const initialSession = {
+    id: 'cust_' + Date.now(),
+    fastStaff: '',
+    name: '',
+    contact: '',
+    phone: '',
+    location: '',
+    orderDate: getTodayDateString(),
+    status: 'Đang chuẩn bị hồ sơ',
+    submitDate: '',
+    targetDate: '',
+    inspectDate: '',
+    certDate: '',
+    certNumber: '',
+    expireDate: '',
+    checklist: {} as Record<string, boolean>
+  };
+
+  const [activeSession, setActiveSession] = useCloudSync<typeof initialSession>(
+    'fast_food_safety_crm',
+    'current_session',
+    'FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2',
+    initialSession
+  );
+
+  // Synchronize incoming remote session updates with individual state variables
+  useEffect(() => {
+    if (activeSession) {
+      setCurrentCustomerId(prev => prev !== activeSession.id ? (activeSession.id || '') : prev);
+      setFastStaff(prev => prev !== activeSession.fastStaff ? (activeSession.fastStaff || '') : prev);
+      setCustName(prev => prev !== activeSession.name ? (activeSession.name || '') : prev);
+      setCustContact(prev => prev !== activeSession.contact ? (activeSession.contact || '') : prev);
+      setCustPhone(prev => prev !== activeSession.phone ? (activeSession.phone || '') : prev);
+      setCustLocation(prev => prev !== activeSession.location ? (activeSession.location || '') : prev);
+      setCustOrderDate(prev => prev !== activeSession.orderDate ? (activeSession.orderDate || '') : prev);
+      setCustStatus(prev => prev !== activeSession.status ? (activeSession.status || '') : prev);
+      setCustSubmitDate(prev => prev !== activeSession.submitDate ? (activeSession.submitDate || '') : prev);
+      setCustTargetDate(prev => prev !== activeSession.targetDate ? (activeSession.targetDate || '') : prev);
+      setCustInspectDate(prev => prev !== activeSession.inspectDate ? (activeSession.inspectDate || '') : prev);
+      setCustCertDate(prev => prev !== activeSession.certDate ? (activeSession.certDate || '') : prev);
+      setCustCertNumber(prev => prev !== activeSession.certNumber ? (activeSession.certNumber || '') : prev);
+      setCustExpireDate(prev => prev !== activeSession.expireDate ? (activeSession.expireDate || '') : prev);
+      setChecklist(prev => JSON.stringify(prev) !== JSON.stringify(activeSession.checklist) ? (activeSession.checklist || {}) : prev);
+    }
+  }, [activeSession]);
+
+  // Synchronize local changes to active session with cloud debounce
+  useEffect(() => {
+    if (!custName && !fastStaff && !custContact && !custPhone && !custLocation) return;
+    const currentSessionStr = JSON.stringify(activeSession);
+    const newSession = {
+      id: currentCustomerId || ('cust_' + Date.now()),
+      fastStaff,
+      name: custName,
+      contact: custContact,
+      phone: custPhone,
+      location: custLocation,
+      orderDate: custOrderDate,
+      status: custStatus,
+      submitDate: custSubmitDate,
+      targetDate: custTargetDate,
+      inspectDate: custInspectDate,
+      certDate: custCertDate,
+      certNumber: custCertNumber,
+      expireDate: custExpireDate,
+      checklist
     };
-  }, []);
-
-  // Load initial draft state
-  useEffect(() => {
-    const savedActive = localStorage.getItem('FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2');
-    if (savedActive) {
-      try {
-        const data = JSON.parse(savedActive);
-        setCurrentCustomerId(data.id || '');
-        setFastStaff(data.fastStaff || '');
-        setCustName(data.name || '');
-        setCustContact(data.contact || '');
-        setCustPhone(data.phone || '');
-        setCustLocation(data.location || '');
-        setCustOrderDate(data.orderDate || getTodayDateString());
-        setCustStatus(data.status || 'Đang chuẩn bị hồ sơ');
-        setCustSubmitDate(data.submitDate || '');
-        setCustTargetDate(data.targetDate || '');
-        setCustInspectDate(data.inspectDate || '');
-        setCustCertDate(data.certDate || '');
-        setCustCertNumber(data.certNumber || '');
-        setCustExpireDate(data.expireDate || '');
-        setChecklist(data.checklist || {});
-      } catch (e) {
-        resetForm();
-      }
-    } else {
-      resetForm();
+    if (currentSessionStr !== JSON.stringify(newSession)) {
+      setActiveSession(newSession);
     }
-
-    const savedDb = localStorage.getItem('FAST_ATTP_1013855_CRM_DATABASE_V2');
-    if (savedDb) {
-      try {
-        setDb(JSON.parse(savedDb));
-      } catch (e) {
-        setDb([]);
-      }
-    }
-  }, []);
+  }, [
+    currentCustomerId,
+    fastStaff,
+    custName,
+    custContact,
+    custPhone,
+    custLocation,
+    custOrderDate,
+    custStatus,
+    custSubmitDate,
+    custTargetDate,
+    custInspectDate,
+    custCertDate,
+    custCertNumber,
+    custExpireDate,
+    checklist
+  ]);
 
   const resetForm = () => {
     setCurrentCustomerId('cust_' + Date.now());
@@ -209,46 +234,6 @@ export const FastFoodSafetyManagement: React.FC = () => {
     setCustExpireDate('');
     setChecklist({});
   };
-
-  // Sync active profile state automatically to localStorage
-  useEffect(() => {
-    if (!custName && !fastStaff && !custContact && !custPhone && !custLocation) return;
-    const activeData = {
-      id: currentCustomerId || ('cust_' + Date.now()),
-      fastStaff,
-      name: custName,
-      contact: custContact,
-      phone: custPhone,
-      location: custLocation,
-      orderDate: custOrderDate,
-      status: custStatus,
-      submitDate: custSubmitDate,
-      targetDate: custTargetDate,
-      inspectDate: custInspectDate,
-      certDate: custCertDate,
-      certNumber: custCertNumber,
-      expireDate: custExpireDate,
-      checklist
-    };
-    localStorage.setItem('FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2', JSON.stringify(activeData));
-    setSyncStatus('Đã lưu nháp');
-  }, [
-    currentCustomerId,
-    fastStaff,
-    custName,
-    custContact,
-    custPhone,
-    custLocation,
-    custOrderDate,
-    custStatus,
-    custSubmitDate,
-    custTargetDate,
-    custInspectDate,
-    custCertDate,
-    custCertNumber,
-    custExpireDate,
-    checklist
-  ]);
 
   // Date and Business Day Logic
   const calculateBusinessDays = (startDateStr: string, numBusinessDays = 20) => {

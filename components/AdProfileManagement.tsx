@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { useCloudSync } from '../utils/cloudSyncUtility';
 import { 
   Building2, 
   FileText, 
@@ -130,14 +131,30 @@ const INITIAL_DOCS = [
 
 export const AdProfileManagement: React.FC = () => {
   // Database states
-  const [database, setDatabase] = useState<CustomerRecord[]>(() => {
+  // Use unified synchronization hook for the records list database
+  const [database, setDatabase, isCloudSavingState, dbSyncStatus] = useCloudSync<CustomerRecord[]>(
+    'ad_profile_crm',
+    'database',
+    CRM_DB_KEY,
+    []
+  );
+
+  const persistDatabase = async (newDb: CustomerRecord[]) => {
+    setDatabase(newDb, true); // Immediate cloud save
+    
+    // Server Disk API Backup
     try {
-      const raw = localStorage.getItem(CRM_DB_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+      await fetch('/api/ad-profiles/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_all', records: newDb })
+      });
+    } catch (err) {}
+  };
+
+  const syncStatus = dbSyncStatus;
+  const isCloudSaving = isCloudSavingState;
+  const [cloudSynced, setCloudSynced] = useState(true);
 
   // Current active customer form
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -165,34 +182,9 @@ export const AdProfileManagement: React.FC = () => {
     secTechnical: false,
     secLegal: false
   });
-  const [syncStatus, setSyncStatus] = useState<string>('Đã đồng bộ');
-  const [cloudSynced, setCloudSynced] = useState<boolean>(true);
-  const [isCloudSaving, setIsCloudSaving] = useState<boolean>(false);
 
-  // Synchronize with Cloud Firestore and Server Disk API
+  // Secondary sync from server disk (runs only once on mount)
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    try {
-      const docRef = doc(db, 'ad_profile_crm', 'database');
-      unsubscribe = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (Array.isArray(data?.records)) {
-            setDatabase(data.records);
-            setCloudSynced(true);
-            try {
-              localStorage.setItem(CRM_DB_KEY, JSON.stringify(data.records));
-            } catch (e) {}
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore onSnapshot fallback notice:', err);
-      });
-    } catch (e) {
-      console.warn('Firestore initialization notice:', e);
-    }
-
-    // Secondary sync from server disk
     fetch('/api/ad-profiles')
       .then(res => res.json())
       .then(data => {
@@ -202,69 +194,86 @@ export const AdProfileManagement: React.FC = () => {
         }
       })
       .catch(() => {});
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, []);
 
-  // Persist to local storage, Cloud Firestore & Server Disk API
-  const persistDatabase = async (newDb: CustomerRecord[]) => {
-    setIsCloudSaving(true);
-    setDatabase(newDb);
-
-    // 1. LocalStorage
-    try {
-      localStorage.setItem(CRM_DB_KEY, JSON.stringify(newDb));
-    } catch (e) {}
-
-    // 2. Cloud Firestore
-    try {
-      await setDoc(doc(db, 'ad_profile_crm', 'database'), {
-        records: newDb,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      setCloudSynced(true);
-    } catch (err) {
-      console.warn('Firestore sync notice:', err);
-    }
-
-    // 3. Server Disk API
-    try {
-      await fetch('/api/ad-profiles/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sync_all', records: newDb })
-      });
-      setCloudSynced(true);
-    } catch (err) {}
-
-    setIsCloudSaving(false);
+  // Use unified synchronization hook for active draft session
+  const initialSession = {
+    id: null as string | null,
+    fastStaff: '',
+    name: '',
+    phone: '',
+    location: '',
+    orderDate: new Date().toISOString().slice(0, 10),
+    submitDate: '',
+    targetDate: '',
+    actualDate: '',
+    status: 'Đang chuẩn bị hồ sơ',
+    receipt: '',
+    checklist: {} as Record<string, boolean>
   };
 
-  // Load last active customer
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(CUST_ACTIVE_KEY);
-      if (saved) {
-        const d = JSON.parse(saved);
-        setCurrentId(d.id || null);
-        setFastStaff(d.fastStaff || '');
-        setCustName(d.name || '');
-        setCustPhone(d.phone || '');
-        setCustLocation(d.location || '');
-        setOrderDate(d.orderDate || new Date().toISOString().slice(0, 10));
-        setSubmitDate(d.submitDate || '');
-        setTargetDate(d.targetDate || '');
-        setActualDate(d.actualDate || '');
-        setCustStatus(d.status || 'Đang chuẩn bị hồ sơ');
-        setCustReceipt(d.receipt || '');
-        setChecklist(d.checklist || {});
-      }
-    } catch (e) {}
-  }, []);
+  const [activeSession, setActiveSession] = useCloudSync<typeof initialSession>(
+    'ad_profile_crm',
+    'current_session',
+    CUST_ACTIVE_KEY,
+    initialSession
+  );
 
-  // Save active draft
+  // Synchronize incoming remote session updates with individual state variables
+  useEffect(() => {
+    if (activeSession) {
+      setCurrentId(prev => prev !== activeSession.id ? (activeSession.id || null) : prev);
+      setFastStaff(prev => prev !== activeSession.fastStaff ? (activeSession.fastStaff || '') : prev);
+      setCustName(prev => prev !== activeSession.name ? (activeSession.name || '') : prev);
+      setCustPhone(prev => prev !== activeSession.phone ? (activeSession.phone || '') : prev);
+      setCustLocation(prev => prev !== activeSession.location ? (activeSession.location || '') : prev);
+      setOrderDate(prev => prev !== activeSession.orderDate ? (activeSession.orderDate || '') : prev);
+      setSubmitDate(prev => prev !== activeSession.submitDate ? (activeSession.submitDate || '') : prev);
+      setTargetDate(prev => prev !== activeSession.targetDate ? (activeSession.targetDate || '') : prev);
+      setActualDate(prev => prev !== activeSession.actualDate ? (activeSession.actualDate || '') : prev);
+      setCustStatus(prev => prev !== activeSession.status ? (activeSession.status || '') : prev);
+      setCustReceipt(prev => prev !== activeSession.receipt ? (activeSession.receipt || '') : prev);
+      setChecklist(prev => JSON.stringify(prev) !== JSON.stringify(activeSession.checklist) ? (activeSession.checklist || {}) : prev);
+    }
+  }, [activeSession]);
+
+  // Synchronize local changes to active session with cloud debounce
+  useEffect(() => {
+    if (!custName && !fastStaff && !custPhone && !custLocation) return;
+    const currentSessionStr = JSON.stringify(activeSession);
+    const newSession = {
+      id: currentId,
+      fastStaff,
+      name: custName,
+      phone: custPhone,
+      location: custLocation,
+      orderDate,
+      submitDate,
+      targetDate,
+      actualDate,
+      status: custStatus,
+      receipt: custReceipt,
+      checklist
+    };
+    if (currentSessionStr !== JSON.stringify(newSession)) {
+      setActiveSession(newSession);
+    }
+  }, [
+    currentId,
+    fastStaff,
+    custName,
+    custPhone,
+    custLocation,
+    orderDate,
+    submitDate,
+    targetDate,
+    actualDate,
+    custStatus,
+    custReceipt,
+    checklist
+  ]);
+
+  // Save active draft helper (backwards compatibility trigger)
   const saveActiveDraft = () => {
     const active = {
       id: currentId || ('cust_' + Date.now()),
@@ -282,8 +291,6 @@ export const AdProfileManagement: React.FC = () => {
     };
     try {
       localStorage.setItem(CUST_ACTIVE_KEY, JSON.stringify(active));
-      setSyncStatus('Đã lưu nháp');
-      setTimeout(() => setSyncStatus('Tự động đồng bộ CSDL'), 2000);
     } catch (e) {}
   };
 
