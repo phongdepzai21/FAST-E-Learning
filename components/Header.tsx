@@ -170,7 +170,7 @@ const Header: React.FC = () => {
                 <img 
                   src={logoUrl} 
                   alt="FAST Logo" 
-                  className="h-16 md:h-24 w-auto object-contain transition-transform group-hover:scale-105"
+                  className="h-14 md:h-20 w-auto object-contain transition-transform group-hover:scale-105"
                   onError={() => setLogoError(true)}
                   loading="eager"
                 />
@@ -186,7 +186,7 @@ const Header: React.FC = () => {
           {/* Right Side Navigation and Profile Menu */}
           <div className="flex items-center gap-4 md:gap-6">
             {/* Desktop Navigation Links */}
-            <nav className="hidden xl:flex items-center space-x-6">
+            <nav className="hidden xl:flex items-center space-x-8">
               {NAV_LINKS.map((link) => {
                 const isActive = location.pathname === link.path;
                 return (
@@ -196,8 +196,8 @@ const Header: React.FC = () => {
                     className={`${
                       isActive 
                         ? 'text-primary font-black border-b-2 border-primary' 
-                        : 'text-text-muted hover:text-primary font-bold'
-                    } text-xs py-1 transition-all duration-200 uppercase tracking-wider flex items-center gap-2`}
+                        : 'text-text-muted hover:text-primary font-extrabold'
+                    } text-sm py-1 transition-all duration-200 uppercase tracking-wide flex items-center gap-2`}
                   >
                     {link.label}
                   </Link>
