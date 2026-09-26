@@ -177,7 +177,7 @@ export const AdProfileManagement: React.FC = () => {
       unsubscribe = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (Array.isArray(data?.records) && data.records.length > 0) {
+          if (Array.isArray(data?.records)) {
             setDatabase(data.records);
             setCloudSynced(true);
             try {
