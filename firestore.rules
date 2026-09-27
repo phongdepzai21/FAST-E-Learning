@@ -24,11 +24,18 @@ service cloud.firestore {
     }
 
     function isSystemOwner() {
-      return isSignedIn() && request.auth.token.email.lower() == 'h1h4phong@gmail.com';
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
+          get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isOwner', false) == true
+        )
+      );
     }
 
     function isAdmin() {
       return isSignedIn() && (
+        isSystemOwner() ||
         request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
         request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
         request.auth.token.email.lower() == 'trdung153@gmail.com' ||
@@ -42,6 +49,7 @@ service cloud.firestore {
     
     function isTeacher() {
       return isSignedIn() && (
+        isSystemOwner() ||
         request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
         request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
         request.auth.token.email.lower() == 'trdung153@gmail.com' ||
@@ -65,6 +73,7 @@ service cloud.firestore {
              (!('isVip' in data) || data.isVip is bool) &&
              (!('isAdmin' in data) || data.isAdmin is bool) &&
              (!('isTeacher' in data) || data.isTeacher is bool) &&
+             (!('isOwner' in data) || data.isOwner is bool) &&
              (!('isLocked' in data) || data.isLocked is bool) &&
              (!('lockedAt' in data) || data.lockedAt == null || (data.lockedAt is string && data.lockedAt.size() <= 64)) &&
              (!('lockReason' in data) || data.lockReason == null || (data.lockReason is string && data.lockReason.size() <= 256)) &&

@@ -815,6 +815,8 @@ async function startServer() {
         const isHardcodedAdmin = admins.includes(normalizedEmail);
         const isHardcodedTeacher = admins.includes(normalizedEmail);
 
+        const isOwner = normalizedEmail === 'h1h4phong@gmail.com';
+
         if (!userDoc.exists) {
           // Document does not exist in Firestore users collection, let's create it!
           await userRef.set({
@@ -824,8 +826,9 @@ async function startServer() {
             photoURL: authUser.photoURL || "",
             createdAt: authUser.metadata.creationTime || new Date().toISOString(),
             lastLoginAt: authUser.metadata.lastSignInTime || new Date().toISOString(),
-            isAdmin: isHardcodedAdmin,
-            isTeacher: isHardcodedTeacher || isHardcodedAdmin,
+            isAdmin: isHardcodedAdmin || isOwner,
+            isTeacher: isHardcodedTeacher || isHardcodedAdmin || isOwner,
+            isOwner: isOwner,
             isVip: false,
             isLocked: authUser.disabled || false,
             status: "approved",
@@ -839,6 +842,11 @@ async function startServer() {
           }
           if (authUser.disabled !== undefined && docData?.isLocked !== authUser.disabled) {
             updates.isLocked = authUser.disabled;
+          }
+          if (isOwner && docData?.isOwner !== true) {
+            updates.isOwner = true;
+            updates.isAdmin = true;
+            updates.isTeacher = true;
           }
           if (Object.keys(updates).length > 0) {
             updates.updatedAt = new Date().toISOString();
@@ -880,17 +888,25 @@ async function startServer() {
       if (displayName) updateData.displayName = displayName;
       if (photoURL) updateData.photoURL = photoURL;
 
+      const isOwner = normalizedEmail === 'h1h4phong@gmail.com';
+
       if (!userDoc.exists) {
         // Create new user profile document
         updateData.createdAt = new Date().toISOString();
         updateData.isVip = false;
-        updateData.isAdmin = isHardcodedAdmin;
-        updateData.isTeacher = isHardcodedTeacher || isHardcodedAdmin;
+        updateData.isAdmin = isHardcodedAdmin || isOwner;
+        updateData.isTeacher = isHardcodedTeacher || isHardcodedAdmin || isOwner;
+        updateData.isOwner = isOwner;
         updateData.status = "approved";
         
         await userRef.set(updateData);
       } else {
         // Merge updates safely
+        if (isOwner) {
+          updateData.isOwner = true;
+          updateData.isAdmin = true;
+          updateData.isTeacher = true;
+        }
         await userRef.set(updateData, { merge: true });
       }
 
