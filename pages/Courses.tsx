@@ -633,7 +633,7 @@ const Courses: React.FC = () => {
                                     </div>
 
                                     <Link 
-                                        to="/account/vip-upgrade"
+                                        to="/lien-he"
                                         className={`px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all ${
                                             isVip 
                                                 ? 'bg-amber-500 text-amber-950 hover:bg-amber-600' 

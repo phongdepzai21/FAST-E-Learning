@@ -182,14 +182,7 @@ const MyOwnedCoursesView: React.FC<{
                  </Link>
                )}
                
-               {!isVip && (
-                 <Link 
-                   to="/account/vip-upgrade" 
-                   className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                 >
-                   <span>⭐ Nâng cấp VIP trọn đời</span>
-                 </Link>
-               )}
+               
              </div>
         </div>
       )}
@@ -275,14 +268,6 @@ const BuyCoursesView: React.FC<{
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {!isVip && (
-            <Link 
-              to="/account/vip-upgrade" 
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
-            >
-              <span>⭐ Nâng cấp VIP trọn đời</span>
-            </Link>
-          )}
         </div>
       </div>
 
@@ -1698,16 +1683,10 @@ const Account: React.FC = () => {
                   >
                     <span className="text-base">{isVip ? '⭐' : '👑'}</span>
                   </div>
-                ) : isVip ? (
-                  <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-[24px] p-6 text-white text-center shadow-lg shadow-yellow-500/20">
-                    <p className="text-xs font-black uppercase tracking-widest mb-1">Thành viên VIP</p>
-                    <p className="text-[10px] opacity-90">Truy cập không giới hạn</p>
-                  </div>
                 ) : (
                   <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Thành viên</p>
-                    <p className="text-sm font-black mb-3">NÂNG CẤP VIP</p>
-                    <Link to="/account/vip-upgrade" className="block w-full bg-white text-[#007c76] py-2 rounded-xl text-xs font-black uppercase tracking-widest">XEM ƯU ĐÃI</Link>
+                    <p className="text-xs font-black uppercase tracking-widest mb-1">Thành viên</p>
+                    <p className="text-[10px] opacity-90">Khám phá tri thức cùng FAST</p>
                   </div>
                 )}
               </div>
@@ -2030,12 +2009,7 @@ const Account: React.FC = () => {
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                              Mua khóa học ngay
                            </button>
-                           <Link 
-                             to="/account/vip-upgrade" 
-                             className="w-full sm:w-auto bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                           >
-                             <span>⭐ Nâng cấp VIP trọn đời</span>
-                           </Link>
+                           
                          </div>
                     </div>
                   )}

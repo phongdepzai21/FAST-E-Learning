@@ -29,7 +29,6 @@ const Consulting = lazy(() => import('./pages/Consulting'));
 const Handbook = lazy(() => import('./pages/Handbook'));
 const Account = lazy(() => import('./pages/Account'));
 const AccountSettings = lazy(() => import('./pages/AccountSettings'));
-const VipUpgrade = lazy(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Classroom = lazy(() => import('./pages/Classroom'));
@@ -150,7 +149,6 @@ const AppLayout: React.FC = () => {
             <Route path="/account" element={<Account />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
-            <Route path="/account/vip-upgrade" element={<VipUpgrade />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />
           </Routes>

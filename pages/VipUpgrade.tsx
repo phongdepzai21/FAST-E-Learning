@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc, getDocs, collection, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { Course } from '../types';
 import { getMergedCourses } from '../constants';
 import PaymentModal from '../components/PaymentModal';
@@ -86,10 +86,15 @@ const VipUpgrade: React.FC = () => {
 
       const all = [...merged, ...customCombos]
         .filter(c => !deletedIds.includes(c.id))
-        .filter(c => (c as any).status !== 'inactive');
+        .filter(c => (c as any).status !== 'inactive')
+        .filter(c => c.id !== 'khoa-vip' && c.id !== 'combo-vip');
 
       setCombos(all);
     };
+
+    // Clean up Firestore data
+    deleteDoc(doc(db, 'combos', 'khoa-vip')).catch(() => {});
+    deleteDoc(doc(db, 'combos', 'combo-vip')).catch(() => {});
 
     const unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
       const dbCombos: Combo[] = [];
@@ -313,7 +318,7 @@ const VipUpgrade: React.FC = () => {
 
       {/* Pricing Grid */}
       <div id="pricing-grid" className="max-w-7xl mx-auto px-4 py-12 scroll-mt-24">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-8">
           {combos.map((combo) => {
             const isVipPackage = combo.id === 'khoa-vip';
             const isProPackage = combo.id === 'combo-pro';
