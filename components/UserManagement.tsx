@@ -320,7 +320,7 @@ export const UserManagement: React.FC = () => {
       const normalizedEmail = selectedUser.id.toLowerCase().trim();
       const userRef = doc(db, 'users', normalizedEmail);
 
-      const isOwner = normalizedEmail === 'h1h4phong@gmail.com';
+      const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
       const updatedPayload = {
         email: normalizedEmail,
         displayName: selectedUser.displayName || 'Học viên',
@@ -608,9 +608,9 @@ export const UserManagement: React.FC = () => {
             email: data.email || normalizedEmail,
             displayName: data.displayName || 'Học viên',
             photoURL: data.photoURL,
-            isAdmin: data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com',
-            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com',
-            isOwner: data.isOwner === true || normalizedEmail === 'h1h4phong@gmail.com',
+            isAdmin: data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
+            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
+            isOwner: data.isOwner === true || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
             isVip: data.isVip || false,
             isLocked: data.isLocked === true,
             lockedAt: data.lockedAt,
@@ -688,9 +688,9 @@ export const UserManagement: React.FC = () => {
             email: data.email || normalizedEmail,
             displayName: data.displayName || 'Học viên',
             photoURL: data.photoURL,
-            isAdmin: data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com',
-            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com',
-            isOwner: data.isOwner === true || normalizedEmail === 'h1h4phong@gmail.com',
+            isAdmin: data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
+            isTeacher: data.isTeacher === true || isHardcodedTeacher || data.isAdmin === true || isHardcodedAdmin || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
+            isOwner: data.isOwner === true || normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com',
             isVip: data.isVip || false,
             isLocked: data.isLocked === true,
             lockedAt: data.lockedAt,

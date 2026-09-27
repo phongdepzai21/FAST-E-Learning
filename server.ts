@@ -815,7 +815,7 @@ async function startServer() {
         const isHardcodedAdmin = admins.includes(normalizedEmail);
         const isHardcodedTeacher = admins.includes(normalizedEmail);
 
-        const isOwner = normalizedEmail === 'h1h4phong@gmail.com';
+        const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
 
         if (!userDoc.exists) {
           // Document does not exist in Firestore users collection, let's create it!
@@ -888,7 +888,7 @@ async function startServer() {
       if (displayName) updateData.displayName = displayName;
       if (photoURL) updateData.photoURL = photoURL;
 
-      const isOwner = normalizedEmail === 'h1h4phong@gmail.com';
+      const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
 
       if (!userDoc.exists) {
         // Create new user profile document

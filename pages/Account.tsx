@@ -1330,7 +1330,7 @@ const Account: React.FC = () => {
   // 4. Không mua VIP (< 5 khóa) -> Màu trắng
   const avatarConfig = useMemo(() => {
     const courseCount = purchasedCourses.filter(c => c.courseId !== 'vip-lifetime-access').length;
-    const isOwner = userEmailLower === 'h1h4phong@gmail.com';
+    const isOwner = userEmailLower === 'h1h4phong@gmail.com' || userEmailLower === 'trdung153@gmail.com';
     if (isOwner) {
       return {
         borderClass: 'border-2 border-indigo-500 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/25 bg-indigo-50',

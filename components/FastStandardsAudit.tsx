@@ -372,8 +372,14 @@ export const FastStandardsAudit: React.FC = () => {
     }
 
     setDatabase(updatedDb, true);
-    alert(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${clientName}" vào Cơ sở dữ liệu FSA-Checklist.`);
+    
+    // Clear form instantly to refresh the UI immediately
+    const savedName = clientName;
     clearForm();
+    
+    setTimeout(() => {
+      alert(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu FSA-Checklist.`);
+    }, 150);
   };
 
   const loadAudit = (record: SavedAuditRecord) => {

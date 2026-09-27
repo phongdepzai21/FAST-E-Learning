@@ -26,6 +26,7 @@ service cloud.firestore {
     function isSystemOwner() {
       return isSignedIn() && (
         request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
+        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
         (
           exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
           get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isOwner', false) == true

@@ -362,8 +362,14 @@ export const FastFoodSafetyManagement: React.FC = () => {
 
     persistDatabase(updatedDb);
     setSyncStatus('Đã lưu CRM ✓');
-    alert(`Đã lưu thành công hồ sơ toàn trình "${custName}" vào Cơ sở dữ liệu FAST CRM.`);
+    
+    // Reset form immediately to refresh the UI instantly
+    const savedName = custName;
     resetForm();
+    
+    setTimeout(() => {
+      alert(`Đã lưu thành công hồ sơ toàn trình "${savedName}" vào Cơ sở dữ liệu FAST CRM.`);
+    }, 150);
   };
 
   const handleCreateNewCustomer = () => {

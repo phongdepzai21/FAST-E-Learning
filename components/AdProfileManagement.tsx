@@ -415,8 +415,14 @@ export const AdProfileManagement: React.FC = () => {
     }
 
     persistDatabase(newDb);
+    
+    // Clear form instantly to refresh the UI immediately
+    const savedName = custName.trim();
     clearForm();
-    alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${custName.trim()}" vào cơ sở dữ liệu FAST!`);
+    
+    setTimeout(() => {
+      alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${savedName}" vào cơ sở dữ liệu FAST!`);
+    }, 150);
   };
 
   const clearForm = () => {
