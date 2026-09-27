@@ -1330,6 +1330,18 @@ const Account: React.FC = () => {
   // 4. Không mua VIP (< 5 khóa) -> Màu trắng
   const avatarConfig = useMemo(() => {
     const courseCount = purchasedCourses.filter(c => c.courseId !== 'vip-lifetime-access').length;
+    const isOwner = userEmailLower === 'h1h4phong@gmail.com';
+    if (isOwner) {
+      return {
+        borderClass: 'border-2 border-indigo-500 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-500/25 bg-indigo-50',
+        badgeBg: 'bg-indigo-600',
+        badgeText: 'text-indigo-600',
+        fallbackBg: 'bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-black',
+        statusText: 'OWNER / SÁNG LẬP',
+        statusColor: 'text-indigo-600 font-extrabold',
+        badgeTitle: 'Sáng lập / Chủ sở hữu (Màu Indigo cao cấp)'
+      };
+    }
     if (isAdmin || isTeacher) {
       return {
         borderClass: 'border-2 border-blue-500 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20 bg-blue-50',
@@ -1651,8 +1663,10 @@ const Account: React.FC = () => {
                       { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
                       { id: 'fast-standards-audit', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }
                     ] : []),
-                    { id: 'ad-profile-management', label: 'Hồ sơ quảng cáo', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-                    { id: 'fast-food-safety', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }
+                    ...(isAdmin ? [
+                      { id: 'ad-profile-management', label: 'Hồ sơ quảng cáo', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+                      { id: 'fast-food-safety', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }
+                    ] : [])
                   ].map((item) => {
                     const isActive = activeTab === item.id;
                     return (
@@ -1721,8 +1735,8 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
                   {(isTeacher || isAdmin) && <option value="user-management">Quản lý tài khoản</option>}
                   {(isTeacher || isAdmin) && <option value="fast-standards-audit">FSA-Checklist</option>}
-                  <option value="ad-profile-management">Hồ sơ quảng cáo</option>
-                  <option value="fast-food-safety">Hồ sơ ATTP</option>
+                  {isAdmin && <option value="ad-profile-management">Hồ sơ quảng cáo</option>}
+                  {isAdmin && <option value="fast-food-safety">Hồ sơ ATTP</option>}
                 </select>
              </div>
              
@@ -1791,9 +1805,9 @@ const Account: React.FC = () => {
                   <UserManagement />
                 ) : activeTab === 'fast-standards-audit' && (isTeacher || isAdmin) ? (
                   <FastStandardsAudit />
-                ) : activeTab === 'ad-profile-management' ? (
+                ) : activeTab === 'ad-profile-management' && isAdmin ? (
                   <AdProfileManagement />
-                ) : activeTab === 'fast-food-safety' ? (
+                ) : activeTab === 'fast-food-safety' && isAdmin ? (
                   <FastFoodSafetyManagement />
                 ) : activeTab === 'settings' ? (
                   <AccountSettings embed={true} />
