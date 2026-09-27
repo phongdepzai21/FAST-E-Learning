@@ -78,6 +78,21 @@ const AppLayout: React.FC = () => {
           displayName: currentUser.displayName,
           emailVerified: currentUser.emailVerified
         });
+
+        // Automatically sync the authenticated user with Firestore via server-side Admin SDK
+        if (currentUser.email) {
+          fetch('/api/user/sync-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: currentUser.email,
+              displayName: currentUser.displayName || 'Học viên',
+              photoURL: currentUser.photoURL || ''
+            })
+          }).catch((err) => {
+            console.warn("AuthListener sync-profile fetch warning:", err);
+          });
+        }
       } else {
         otpLogger.logAuthListenerEvent(null, true, "User authenticated state changed: LOGGED_OUT");
         console.log("[AuthListener] User authenticated state changed: LOGGED_OUT");

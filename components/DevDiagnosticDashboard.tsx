@@ -31,7 +31,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { authDebugger, DiagnosticState, DiagnosticLogEntry, PromiseRecord } from '../utils/authDebugger';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
 const REQUIRED_DEV_PASSWORD = 'Family2515@';
@@ -39,9 +40,21 @@ const REQUIRED_DEV_PASSWORD = 'Family2515@';
 export const DevDiagnosticDashboard: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'raw'>('stream');
+  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'sync' | 'raw'>('stream');
   const [state, setState] = useState<DiagnosticState>(authDebugger.getState());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Diagnostics and Sync Monitor States
+  const [collectionTimestamps, setCollectionTimestamps] = useState<Record<string, string>>({
+    attp_db: 'Chưa cập nhật',
+    attp_session: 'Chưa cập nhật',
+    ads_db: 'Chưa cập nhật',
+    ads_session: 'Chưa cập nhật',
+    fsa_session: 'Chưa cập nhật'
+  });
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [isPinging, setIsPinging] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
 
   // Security password protection state
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -174,6 +187,124 @@ export const DevDiagnosticDashboard: React.FC = () => {
       delete (window as any).closeDevDiagnostic;
     };
   }, []);
+
+  // Monitor network online/offline state
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      authDebugger.addLog({
+        category: 'system',
+        level: 'info',
+        title: 'Trực tuyến',
+        details: 'Kết nối internet được khôi phục. Đang kết nối lại Firestore...'
+      });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      authDebugger.addLog({
+        category: 'system',
+        level: 'error',
+        title: 'Ngoại tuyến',
+        details: 'Mất kết nối internet. Dữ liệu sẽ lưu tạm vào local cache.'
+      });
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Set up real-time metadata listeners on key documents to generate live logs inside Ctrl+Shift+X
+  useEffect(() => {
+    const listeners: (() => void)[] = [];
+    const configs = [
+      { path: ['fast_food_safety_crm', 'database'], name: 'Hồ sơ ATTP (CSDL)', key: 'attp_db' },
+      { path: ['fast_food_safety_crm', 'current_session'], name: 'Hồ sơ ATTP (Nháp)', key: 'attp_session' },
+      { path: ['ad_profile_crm', 'database'], name: 'Hồ sơ Quảng cáo (CSDL)', key: 'ads_db' },
+      { path: ['ad_profile_crm', 'current_session'], name: 'Hồ sơ Quảng cáo (Nháp)', key: 'ads_session' },
+      { path: ['fast_standards_audits', 'current_session'], name: 'FSA-Checklist (Nháp)', key: 'fsa_session' }
+    ];
+
+    configs.forEach(cfg => {
+      try {
+        const docRef = doc(db, cfg.path[0], cfg.path[1]);
+        const unsub = onSnapshot(docRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const updateTime = data?.updatedAt || new Date().toISOString();
+            const formattedTime = new Date(updateTime).toLocaleTimeString();
+            
+            setCollectionTimestamps(prev => ({
+              ...prev,
+              [cfg.key]: formattedTime
+            }));
+
+            authDebugger.addLog({
+              category: 'system',
+              level: 'success',
+              title: `onSnapshot [${cfg.name}]`,
+              details: `Nhận gói tin đồng bộ hóa từ xa lúc ${formattedTime}.`,
+              payload: { path: `${cfg.path[0]}/${cfg.path[1]}`, updatedAt: updateTime }
+            });
+          }
+        }, (err) => {
+          authDebugger.addLog({
+            category: 'system',
+            level: 'error',
+            title: `onSnapshot Error: [${cfg.name}]`,
+            details: err.message
+          });
+        });
+        listeners.push(unsub);
+      } catch (e: any) {
+        console.warn(`[DevDiagnostic] Failed to set up snapshot for ${cfg.name}:`, e);
+      }
+    });
+
+    return () => {
+      listeners.forEach(unsub => unsub());
+    };
+  }, []);
+
+  // Measure write-then-read Latency with a real document transaction
+  const handleTestLatency = async () => {
+    setIsPinging(true);
+    authDebugger.addLog({
+      category: 'system',
+      level: 'info',
+      title: 'Ping Firestore',
+      details: 'Đang gửi gói tin kiểm thử độ trễ khứ hồi...'
+    });
+    const startTime = performance.now();
+    try {
+      const pingDocRef = doc(db, 'system_diagnostics', 'ping');
+      await setDoc(pingDocRef, {
+        testedBy: auth.currentUser?.email || 'Guest Developer',
+        timestamp: new Date().toISOString()
+      }, { merge: true });
+      const duration = Math.round(performance.now() - startTime);
+      setLatencyMs(duration);
+      authDebugger.addLog({
+        category: 'system',
+        level: 'success',
+        title: 'Ping Firestore thành công',
+        details: `Độ trễ phản hồi: ${duration} ms (Khứ hồi).`
+      });
+    } catch (err: any) {
+      console.error(err);
+      authDebugger.addLog({
+        category: 'system',
+        level: 'error',
+        title: 'Ping Firestore thất bại',
+        details: err.message
+      });
+      setLatencyMs(null);
+    } finally {
+      setIsPinging(false);
+    }
+  };
 
   // Auto scroll logs
   useEffect(() => {
@@ -671,6 +802,18 @@ export const DevDiagnosticDashboard: React.FC = () => {
                     >
                       <Play className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Test Dispatcher</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('sync')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        activeTab === 'sync'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm animate-pulse'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Giám sát đồng bộ (Real-time)</span>
                     </button>
 
                     <button
@@ -1292,6 +1435,136 @@ export const DevDiagnosticDashboard: React.FC = () => {
                           </pre>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: GIÁM SÁT ĐỒNG BỘ REAL-TIME */}
+                {activeTab === 'sync' && (
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isOnline ? 'bg-emerald-500/10 text-emerald-400 animate-pulse' : 'bg-rose-500/10 text-rose-400'}`}>
+                          <Activity className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Trạng thái mạng</div>
+                          <div className="text-sm font-bold text-white mt-0.5">
+                            {isOnline ? 'Trực tuyến (Online)' : 'Ngoại tuyến (Offline)'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                          <Terminal className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Cloud Firestore</div>
+                          <div className="text-sm font-bold text-white mt-0.5 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                            Đang liên kết thời gian thực
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Độ trễ Firestore</div>
+                            <div className="text-sm font-bold text-white mt-0.5 font-mono">
+                              {latencyMs !== null ? `${latencyMs} ms` : 'Chưa kiểm tra'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleTestLatency}
+                          disabled={isPinging || !isOnline}
+                          className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-cyan-600/10 cursor-pointer shrink-0 font-mono"
+                        >
+                          {isPinging ? 'Đang gửi...' : 'Test Ping'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Shared Collections Matrix */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-200 font-mono">
+                          Bảng giám sát đồng bộ cơ sở dữ liệu (Firestore Sync Matrix)
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Thời điểm ghi nhận dữ liệu remote được cập nhật gần nhất cho từng tập hợp dữ liệu dùng chung (Không phân biệt UID/Tài khoản).
+                        </p>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border border-slate-800">
+                        <table className="w-full text-left border-collapse whitespace-nowrap font-mono text-xs">
+                          <thead>
+                            <tr className="bg-slate-950 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b border-slate-800">
+                              <th className="py-3 px-4">Tập hợp dữ liệu</th>
+                              <th className="py-3 px-4">Đường dẫn tài liệu (Firestore Path)</th>
+                              <th className="py-3 px-4">Trạng thái đồng bộ</th>
+                              <th className="py-3 px-4 text-right">Cập nhật cuối (Last Updated)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 text-slate-300">
+                            <tr className="hover:bg-slate-900/40">
+                              <td className="py-3 px-4 font-bold text-white">Hồ sơ ATTP (CSDL)</td>
+                              <td className="py-3 px-4 text-slate-500">fast_food_safety_crm/database</td>
+                              <td className="py-3 px-4">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Listening
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.attp_db}</td>
+                            </tr>
+                            <tr className="hover:bg-slate-900/40">
+                              <td className="py-3 px-4 font-bold text-white">Hồ sơ ATTP (Nháp)</td>
+                              <td className="py-3 px-4 text-slate-500">fast_food_safety_crm/current_session</td>
+                              <td className="py-3 px-4">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Listening
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.attp_session}</td>
+                            </tr>
+                            <tr className="hover:bg-slate-900/40">
+                              <td className="py-3 px-4 font-bold text-white">Hồ sơ Quảng cáo (CSDL)</td>
+                              <td className="py-3 px-4 text-slate-500">ad_profile_crm/database</td>
+                              <td className="py-3 px-4">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Listening
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.ads_db}</td>
+                            </tr>
+                            <tr className="hover:bg-slate-900/40">
+                              <td className="py-3 px-4 font-bold text-white">Hồ sơ Quảng cáo (Nháp)</td>
+                              <td className="py-3 px-4 text-slate-500">ad_profile_crm/current_session</td>
+                              <td className="py-3 px-4">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Listening
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.ads_session}</td>
+                            </tr>
+                            <tr className="hover:bg-slate-900/40">
+                              <td className="py-3 px-4 font-bold text-white">FSA-Checklist (Nháp)</td>
+                              <td className="py-3 px-4 text-slate-500">fast_standards_audits/current_session</td>
+                              <td className="py-3 px-4">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active Listening
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.fsa_session}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 )}

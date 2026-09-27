@@ -177,20 +177,17 @@ service cloud.firestore {
 
     // 4. Fast Standards Audits
     match /fast_standards_audits/{auditId} {
-      allow read: if true;
-      allow write: if isSignedIn() || isAdmin() || isTeacher();
+      allow read, write: if isAdmin() || isTeacher();
     }
 
     // 5. Ad Profile CRM Records
     match /ad_profile_crm/{recordId} {
-      allow read: if true;
-      allow write: if isSignedIn() || isAdmin() || isTeacher();
+      allow read, write: if isAdmin() || isTeacher();
     }
 
     // 6. Food Safety CRM Records
     match /fast_food_safety_crm/{recordId} {
-      allow read: if true;
-      allow write: if isSignedIn() || isAdmin() || isTeacher();
+      allow read, write: if isAdmin() || isTeacher();
     }
   }
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
+import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, Database, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
 import { addApprovalNotification } from '../utils/courseNotificationService';
@@ -66,6 +66,126 @@ export const UserManagement: React.FC = () => {
   // Pagination states (20 tài khoản mỗi trang)
   const PAGE_SIZE = 20;
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Tabs for Admin Panel: Users or Diagnostics
+  const [activeTab, setActiveTab] = useState<'users' | 'diagnostics'>('users');
+
+  // Diagnostics and Sync Logs states
+  interface SyncLog {
+    id: string;
+    timestamp: string;
+    type: 'info' | 'remote' | 'local' | 'error';
+    message: string;
+    collection: string;
+  }
+  const [syncLogs, setSyncLogs] = useState<SyncLog[]>([
+    { id: 'init-1', timestamp: new Date().toLocaleTimeString(), type: 'info', message: 'Hệ thống giám sát dữ liệu thời gian thực đã kích hoạt.', collection: 'system' }
+  ]);
+  const [collectionTimestamps, setCollectionTimestamps] = useState<Record<string, string>>({
+    attp_db: 'Chưa cập nhật',
+    attp_session: 'Chưa cập nhật',
+    ads_db: 'Chưa cập nhật',
+    ads_session: 'Chưa cập nhật',
+    fsa_session: 'Chưa cập nhật'
+  });
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [isPinging, setIsPinging] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
+
+  const addLog = (type: 'info' | 'remote' | 'local' | 'error', message: string, collection: string) => {
+    const newLog: SyncLog = {
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: new Date().toLocaleTimeString(),
+      type,
+      message,
+      collection
+    };
+    setSyncLogs(prev => [newLog, ...prev].slice(0, 50));
+  };
+
+  // Monitor network online/offline state
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      addLog('info', 'Kết nối internet được khôi phục. Đang kết nối lại Firestore...', 'system');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      addLog('error', 'Mất kết nối internet. Dữ liệu sẽ lưu tạm vào local cache.', 'system');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Set up real-time metadata listeners on key documents to generate live logs
+  useEffect(() => {
+    const listeners: (() => void)[] = [];
+    const configs = [
+      { path: ['fast_food_safety_crm', 'database'], name: 'Hồ sơ ATTP (CSDL)', key: 'attp_db' },
+      { path: ['fast_food_safety_crm', 'current_session'], name: 'Hồ sơ ATTP (Nháp)', key: 'attp_session' },
+      { path: ['ad_profile_crm', 'database'], name: 'Hồ sơ Quảng cáo (CSDL)', key: 'ads_db' },
+      { path: ['ad_profile_crm', 'current_session'], name: 'Hồ sơ Quảng cáo (Nháp)', key: 'ads_session' },
+      { path: ['fast_standards_audits', 'current_session'], name: 'FSA-Checklist (Nháp)', key: 'fsa_session' }
+    ];
+
+    addLog('info', 'Đang thiết lập liên kết onSnapshot tới 5 tài liệu dữ liệu cốt lõi...', 'system');
+
+    configs.forEach(cfg => {
+      try {
+        const docRef = doc(db, cfg.path[0], cfg.path[1]);
+        const unsub = onSnapshot(docRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const updateTime = data?.updatedAt || new Date().toISOString();
+            const formattedTime = new Date(updateTime).toLocaleTimeString();
+            
+            setCollectionTimestamps(prev => ({
+              ...prev,
+              [cfg.key]: formattedTime
+            }));
+
+            addLog('remote', `Dữ liệu remote của [${cfg.name}] được cập nhật trên Cloud Firestore.`, cfg.path[0]);
+          }
+        }, (err) => {
+          addLog('error', `Lỗi kết nối bộ lắng nghe cho [${cfg.name}]: ${err.message}`, cfg.path[0]);
+        });
+        listeners.push(unsub);
+      } catch (e: any) {
+        addLog('error', `Không thể khởi tạo listener cho [${cfg.name}]: ${e.message}`, cfg.path[0]);
+      }
+    });
+
+    return () => {
+      listeners.forEach(unsub => unsub());
+    };
+  }, []);
+
+  // Measure write-then-read Latency with a real document transaction
+  const handleTestLatency = async () => {
+    setIsPinging(true);
+    addLog('info', 'Đang gửi truy vấn kiểm tra độ trễ (Ping) tới Firestore...', 'system');
+    const startTime = performance.now();
+    try {
+      const pingDocRef = doc(db, 'system_diagnostics', 'ping');
+      await setDoc(pingDocRef, {
+        testedBy: adminEmail,
+        timestamp: new Date().toISOString()
+      }, { merge: true });
+      const duration = Math.round(performance.now() - startTime);
+      setLatencyMs(duration);
+      addLog('info', `Kiểm tra độ trễ thành công. Thời gian phản hồi: ${duration} ms (Khứ hồi).`, 'system');
+    } catch (err: any) {
+      console.error(err);
+      addLog('error', `Lỗi kiểm tra độ trễ: ${err.message}`, 'system');
+      setLatencyMs(null);
+    } finally {
+      setIsPinging(false);
+    }
+  };
 
   // Custom mouse-drag horizontal scroll and smooth navigation
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -434,6 +554,11 @@ export const UserManagement: React.FC = () => {
 
   // Real-time synchronization of users collection
   useEffect(() => {
+    // Fire-and-forget backend sync call to synchronize Firebase Auth users with Firestore doc schemas
+    fetch('/api/admin/list-auth-users')
+      .then(res => res.json())
+      .catch(() => {});
+
     let unsubscribe: (() => void) | undefined;
     try {
       const colRef = collection(db, 'users');
@@ -522,6 +647,9 @@ export const UserManagement: React.FC = () => {
     if (forceRefresh) {
       setIsLoading(true);
       try {
+        // Trigger server-side Firebase Authentication synchronization before listing
+        await fetch('/api/admin/list-auth-users').catch(() => {});
+
         const usersRefCol = collection(db, 'users');
         const snapshot = await getDocs(usersRefCol);
         const promises = snapshot.docs.map(async (docSnap) => {
@@ -631,7 +759,35 @@ export const UserManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Horizontal Scroll Bar Navigation & Mouse-Drag Tip on Desktop */}
+      {/* Sub-tab Navigation for User list or Real-time Diagnostics Monitor */}
+      <div className="flex border-b border-gray-100 pb-px gap-6 mb-4">
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 px-1 cursor-pointer flex items-center gap-2 ${
+            activeTab === 'users'
+              ? 'border-[#007c76] text-[#007c76]'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <UserIcon className="w-4.5 h-4.5 text-gray-400" />
+          Danh sách học viên
+        </button>
+        <button
+          onClick={() => setActiveTab('diagnostics')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 px-1 cursor-pointer flex items-center gap-2 ${
+            activeTab === 'diagnostics'
+              ? 'border-[#007c76] text-[#007c76]'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Activity className={`w-4.5 h-4.5 text-emerald-500 ${isOnline ? 'animate-pulse' : ''}`} />
+          Giám sát & Đồng bộ (Diagnostics)
+        </button>
+      </div>
+
+      {activeTab === 'users' ? (
+        <>
+          {/* Horizontal Scroll Bar Navigation & Mouse-Drag Tip on Desktop */}
       <div className="flex items-center justify-between text-xs text-gray-500 px-1">
         <div className="flex items-center gap-2 font-medium">
           <MoveHorizontal className="w-4 h-4 text-[#007c76]" />
@@ -911,6 +1067,185 @@ export const UserManagement: React.FC = () => {
             >
               <ChevronsRight className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+        </>
+      ) : (
+        /* Render beautiful diagnostics view */
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250">
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isOnline ? 'bg-emerald-50 text-emerald-600 animate-pulse' : 'bg-rose-50 text-rose-600'}`}>
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái mạng</div>
+                <div className="text-base sm:text-lg font-black text-gray-900 mt-0.5">
+                  {isOnline ? 'Trực tuyến (Online)' : 'Ngoại tuyến (Offline)'}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#007c76] flex items-center justify-center">
+                <Database className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cloud Firestore</div>
+                <div className="text-base sm:text-lg font-black text-gray-900 mt-0.5 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  Đang kết nối
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Độ trễ Firestore</div>
+                  <div className="text-base sm:text-lg font-black text-gray-900 mt-0.5">
+                    {latencyMs !== null ? `${latencyMs} ms` : 'Chưa kiểm tra'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleTestLatency}
+                disabled={isPinging || !isOnline}
+                className="px-4 py-2.5 bg-[#007c76] hover:bg-[#00746e] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm cursor-pointer shrink-0"
+              >
+                {isPinging ? 'Đang gửi...' : 'Kiểm tra Ping'}
+              </button>
+            </div>
+          </div>
+
+          {/* Collections Sync Matrix */}
+          <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-gray-900">Bảng giám sát đồng bộ cơ sở dữ liệu (Firestore Sync Matrix)</h3>
+              <p className="text-xs font-semibold text-gray-400 mt-0.5">Thời điểm ghi nhận dữ liệu remote được cập nhật gần nhất cho từng tài liệu.</p>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-gray-100">
+              <table className="w-full text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-widest">
+                    <th className="py-3.5 px-5">Tập hợp dữ liệu (Collection)</th>
+                    <th className="py-3.5 px-5">Đường dẫn tài liệu (Path)</th>
+                    <th className="py-3.5 px-5">Kiểu dữ liệu</th>
+                    <th className="py-3.5 px-5">Trạng thái đồng bộ</th>
+                    <th className="py-3.5 px-5 text-right">Cập nhật cuối</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-xs sm:text-sm">
+                  {/* ATTP CRM Database */}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="py-3.5 px-5 font-bold text-gray-900">Hồ sơ ATTP (CSDL)</td>
+                    <td className="py-3.5 px-5 text-gray-500 font-mono">fast_food_safety_crm/database</td>
+                    <td className="py-3.5 px-5 text-gray-400 font-semibold">CRM Database (Array)</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active listening
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.attp_db}</td>
+                  </tr>
+
+                  {/* ATTP CRM Active Session */}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="py-3.5 px-5 font-bold text-gray-900">Hồ sơ ATTP (Draft Nháp)</td>
+                    <td className="py-3.5 px-5 text-gray-500 font-mono">fast_food_safety_crm/current_session</td>
+                    <td className="py-3.5 px-5 text-gray-400 font-semibold">Active Session (Object)</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active listening
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.attp_session}</td>
+                  </tr>
+
+                  {/* Ads CRM Database */}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="py-3.5 px-5 font-bold text-gray-900">Hồ sơ Quảng cáo (CSDL)</td>
+                    <td className="py-3.5 px-5 text-gray-500 font-mono">ad_profile_crm/database</td>
+                    <td className="py-3.5 px-5 text-gray-400 font-semibold">CRM Database (Array)</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active listening
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.ads_db}</td>
+                  </tr>
+
+                  {/* Ads CRM Active Session */}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="py-3.5 px-5 font-bold text-gray-900">Hồ sơ Quảng cáo (Draft Nháp)</td>
+                    <td className="py-3.5 px-5 text-gray-500 font-mono">ad_profile_crm/current_session</td>
+                    <td className="py-3.5 px-5 text-gray-400 font-semibold">Active Session (Object)</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active listening
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.ads_session}</td>
+                  </tr>
+
+                  {/* FSA-Checklist Active Session */}
+                  <tr className="hover:bg-gray-50/50">
+                    <td className="py-3.5 px-5 font-bold text-gray-900">FSA-Checklist (Nháp)</td>
+                    <td className="py-3.5 px-5 text-gray-500 font-mono">fast_standards_audits/current_session</td>
+                    <td className="py-3.5 px-5 text-gray-400 font-semibold">Active Checklist (Object)</td>
+                    <td className="py-3.5 px-5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active listening
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.fsa_session}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Terminal Console Logs */}
+          <div className="bg-slate-900 rounded-3xl p-6 shadow-md border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                <h3 className="text-xs font-black text-slate-200 uppercase tracking-widest ml-2">Console Live Sync Stream</h3>
+              </div>
+              <button
+                onClick={() => setSyncLogs([{ id: 'init-clean', timestamp: new Date().toLocaleTimeString(), type: 'info', message: 'Bộ nhớ log đã dọn dẹp sạch sẽ.', collection: 'system' }])}
+                className="px-3 py-1 text-[10px] font-black uppercase text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-all cursor-pointer"
+              >
+                Clear Log
+              </button>
+            </div>
+
+            <div className="bg-slate-950 rounded-2xl p-4 h-72 overflow-y-auto font-mono text-xs text-slate-300 divide-y divide-slate-900 border border-slate-900 custom-scrollbar flex flex-col-reverse">
+              {syncLogs.map(log => {
+                let badgeColor = 'text-sky-400 bg-sky-950/40 border-sky-900/40';
+                if (log.type === 'remote') badgeColor = 'text-purple-400 bg-purple-950/40 border-purple-900/40';
+                if (log.type === 'local') badgeColor = 'text-amber-400 bg-amber-950/40 border-amber-900/40';
+                if (log.type === 'error') badgeColor = 'text-rose-400 bg-rose-950/40 border-rose-900/40';
+
+                return (
+                  <div key={log.id} className="py-2.5 flex items-start gap-3.5 hover:bg-slate-900/30 border-b border-slate-900/45 text-left">
+                    <span className="text-slate-500 shrink-0 font-semibold">[{log.timestamp}]</span>
+                    <span className={`px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider shrink-0 ${badgeColor}`}>
+                      {log.type}
+                    </span>
+                    <span className="text-slate-200">{log.message}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

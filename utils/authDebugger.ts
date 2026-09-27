@@ -182,13 +182,14 @@ class DiagnosticStore {
     }
   }
 
-  private addLog(entry: Omit<DiagnosticLogEntry, 'id' | 'timestamp'>) {
+  public addLog(entry: Omit<DiagnosticLogEntry, 'id' | 'timestamp'>) {
     const newLog: DiagnosticLogEntry = {
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       timestamp: new Date().toISOString(),
       ...entry,
     };
     this.state.logs = [newLog, ...this.state.logs.slice(0, this.maxLogs - 1)];
+    this.notify();
   }
 
   // --- 1. AUTH LISTENER TRACKING ---

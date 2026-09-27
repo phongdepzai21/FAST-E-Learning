@@ -1026,6 +1026,20 @@ const Account: React.FC = () => {
           } catch (dbErr) {
               console.warn("User profile setDoc warning:", dbErr);
           }
+
+          // Trigger server-side synchronization via Admin SDK to guarantee profile creation
+          try {
+              await fetch('/api/user/sync-profile', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      email: normalizedEmail,
+                      displayName: fullName
+                  })
+              });
+          } catch (syncErr) {
+              console.warn("Server profile sync during registration warning:", syncErr);
+          }
           
           // Save to local backup
           try {

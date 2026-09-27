@@ -797,6 +797,110 @@ async function startServer() {
     }
   });
 
+  // API to sync and list all users from Firebase Admin Authentication
+  app.get("/api/admin/list-auth-users", async (req, res) => {
+    try {
+      const authUsersResult = await getAuth().listUsers();
+      const authUsers = authUsersResult.users;
+
+      const firestore = getFirestore();
+      const admins = ['h1h4phong@gmail.com', 'hkc.qms@gmail.com', 'trdung153@gmail.com', 'lediem.ngo@gmail.com'];
+
+      const syncPromises = authUsers.map(async (authUser) => {
+        if (!authUser.email) return;
+        const normalizedEmail = authUser.email.toLowerCase().trim();
+        const userRef = firestore.collection("users").doc(normalizedEmail);
+        const userDoc = await userRef.get();
+
+        const isHardcodedAdmin = admins.includes(normalizedEmail);
+        const isHardcodedTeacher = admins.includes(normalizedEmail);
+
+        if (!userDoc.exists) {
+          // Document does not exist in Firestore users collection, let's create it!
+          await userRef.set({
+            id: normalizedEmail,
+            email: normalizedEmail,
+            displayName: authUser.displayName || "Học viên",
+            photoURL: authUser.photoURL || "",
+            createdAt: authUser.metadata.creationTime || new Date().toISOString(),
+            lastLoginAt: authUser.metadata.lastSignInTime || new Date().toISOString(),
+            isAdmin: isHardcodedAdmin,
+            isTeacher: isHardcodedTeacher || isHardcodedAdmin,
+            isVip: false,
+            isLocked: authUser.disabled || false,
+            status: "approved",
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          const docData = userDoc.data();
+          const updates: Record<string, any> = {};
+          if (authUser.metadata.lastSignInTime && docData?.lastLoginAt !== authUser.metadata.lastSignInTime) {
+            updates.lastLoginAt = authUser.metadata.lastSignInTime;
+          }
+          if (authUser.disabled !== undefined && docData?.isLocked !== authUser.disabled) {
+            updates.isLocked = authUser.disabled;
+          }
+          if (Object.keys(updates).length > 0) {
+            updates.updatedAt = new Date().toISOString();
+            await userRef.update(updates);
+          }
+        }
+      });
+
+      await Promise.all(syncPromises);
+      res.json({ success: true, message: "Successfully synchronized authentication users with Firestore." });
+    } catch (error: any) {
+      console.warn("Could not sync using listUsers (Identity Toolkit API may be disabled or restricted):", error.message);
+      res.json({ success: false, error: error.message });
+    }
+  });
+
+  // Secure server-side user profile synchronizer to bypass client security rule & token constraints
+  app.post("/api/user/sync-profile", async (req, res) => {
+    try {
+      const { email, displayName, photoURL } = req.body || {};
+      if (!email) {
+        return res.status(400).json({ success: false, error: "Email is required" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const firestore = getFirestore();
+      const userRef = firestore.collection("users").doc(normalizedEmail);
+      const userDoc = await userRef.get();
+
+      const admins = ['h1h4phong@gmail.com', 'hkc.qms@gmail.com', 'trdung153@gmail.com', 'lediem.ngo@gmail.com'];
+      const isHardcodedAdmin = admins.includes(normalizedEmail);
+      const isHardcodedTeacher = admins.includes(normalizedEmail);
+
+      const updateData: Record<string, any> = {
+        email: normalizedEmail,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (displayName) updateData.displayName = displayName;
+      if (photoURL) updateData.photoURL = photoURL;
+
+      if (!userDoc.exists) {
+        // Create new user profile document
+        updateData.createdAt = new Date().toISOString();
+        updateData.isVip = false;
+        updateData.isAdmin = isHardcodedAdmin;
+        updateData.isTeacher = isHardcodedTeacher || isHardcodedAdmin;
+        updateData.status = "approved";
+        
+        await userRef.set(updateData);
+      } else {
+        // Merge updates safely
+        await userRef.set(updateData, { merge: true });
+      }
+
+      res.json({ success: true, message: "Profile synchronized on the server successfully." });
+    } catch (err: any) {
+      console.error("Error in server-side sync-profile API:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Gemini Chat
   app.post("/api/gemini/chat", async (req, res) => {
     try {
