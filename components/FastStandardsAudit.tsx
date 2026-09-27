@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { useGlobalSync } from '../hooks/useGlobalSync';
 import { ALL_AUDIT_ITEMS, AuditItem, AuditItemState, VAL_METHODS_LIST, IMP_METHODS_LIST } from '../data/fastStandardsData';
 import { 
   ClipboardCheck, 
@@ -339,6 +340,12 @@ export const FastStandardsAudit: React.FC = () => {
     setAuditState(init);
   };
 
+  const { triggerGlobalSaveReset } = useGlobalSync(
+    'fast-audit-form-channel',
+    'fast_audit_form',
+    clearForm
+  );
+
   const handleSaveToDatabase = () => {
     if (!clientName) {
       alert('Vui lòng nhập Tên Đơn vị được đánh giá trước khi lưu.');
@@ -373,9 +380,9 @@ export const FastStandardsAudit: React.FC = () => {
 
     setDatabase(updatedDb, true);
     
-    // Clear form instantly to refresh the UI immediately
+    // Trigger global form reset across all connected admin sessions simultaneously
     const savedName = clientName;
-    clearForm();
+    triggerGlobalSaveReset();
     
     setTimeout(() => {
       alert(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu FSA-Checklist.`);

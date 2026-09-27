@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { useGlobalSync } from '../hooks/useGlobalSync';
 import { 
   Building2, 
   FileText, 
@@ -196,7 +197,20 @@ export const AdProfileManagement: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // Use unified synchronization hook for active draft session
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('guest');
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user && user.email) {
+        setCurrentUserEmail(user.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
+      } else {
+        setCurrentUserEmail('guest');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Use unified synchronization hook for active draft session (isolated per administrator)
   const initialSession = {
     id: null as string | null,
     fastStaff: '',
@@ -214,8 +228,8 @@ export const AdProfileManagement: React.FC = () => {
 
   const [activeSession, setActiveSession] = useCloudSync<typeof initialSession>(
     'ad_profile_crm',
-    'current_session',
-    CUST_ACTIVE_KEY,
+    'current_session_' + currentUserEmail,
+    CUST_ACTIVE_KEY + '_' + currentUserEmail,
     initialSession
   );
 
@@ -416,9 +430,9 @@ export const AdProfileManagement: React.FC = () => {
 
     persistDatabase(newDb);
     
-    // Clear form instantly to refresh the UI immediately
+    // Trigger global form reset across all connected admin sessions simultaneously
     const savedName = custName.trim();
-    clearForm();
+    triggerGlobalSaveReset();
     
     setTimeout(() => {
       alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${savedName}" vào cơ sở dữ liệu FAST!`);
@@ -427,6 +441,22 @@ export const AdProfileManagement: React.FC = () => {
 
   const clearForm = () => {
     const newId = 'cust_' + Date.now();
+    const freshSession = {
+      id: newId,
+      fastStaff: '',
+      name: '',
+      phone: '',
+      location: '',
+      orderDate: new Date().toISOString().slice(0, 10),
+      submitDate: '',
+      targetDate: '',
+      actualDate: '',
+      status: 'Đang chuẩn bị hồ sơ',
+      receipt: '',
+      checklist: {} as Record<string, boolean>
+    };
+
+    // Reset local states for instant responsiveness
     setCurrentId(newId);
     setFastStaff('');
     setCustName('');
@@ -439,8 +469,21 @@ export const AdProfileManagement: React.FC = () => {
     setCustStatus('Đang chuẩn bị hồ sơ');
     setCustReceipt('');
     setChecklist({});
-    saveActiveDraft();
+
+    // Save empty draft to LocalStorage backward-compatibility key
+    try {
+      localStorage.setItem(CUST_ACTIVE_KEY, JSON.stringify(freshSession));
+    } catch (e) {}
+
+    // Instantly wipe the cloud session draft
+    setActiveSession(freshSession, true);
   };
+
+  const { triggerGlobalSaveReset } = useGlobalSync(
+    'fast-ad-form-channel',
+    'fast_ad_form',
+    clearForm
+  );
 
   // New Customer creation
   const handleNewCustomer = () => {

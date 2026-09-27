@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Search, Clipboard, FileText, Database, Plus, Trash2, Edit } from 'lucide-react';
-import { db as firestoreDb } from '../firebase';
+import { db as firestoreDb, auth } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { useGlobalSync } from '../hooks/useGlobalSync';
 
 interface ChecklistDoc {
   id: string;
@@ -128,7 +129,20 @@ export const FastFoodSafetyManagement: React.FC = () => {
     }
   }, [dbSyncStatus]);
 
-  // Use unified synchronization hook for active draft session
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('guest');
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user && user.email) {
+        setCurrentUserEmail(user.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
+      } else {
+        setCurrentUserEmail('guest');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Use unified synchronization hook for active draft session (isolated per administrator)
   const initialSession = {
     id: 'cust_' + Date.now(),
     fastStaff: '',
@@ -149,8 +163,8 @@ export const FastFoodSafetyManagement: React.FC = () => {
 
   const [activeSession, setActiveSession] = useCloudSync<typeof initialSession>(
     'fast_food_safety_crm',
-    'current_session',
-    'FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2',
+    'current_session_' + currentUserEmail,
+    'FAST_ATTP_1013855_ACTIVE_CUSTOMER_V2_' + currentUserEmail,
     initialSession
   );
 
@@ -218,7 +232,27 @@ export const FastFoodSafetyManagement: React.FC = () => {
   ]);
 
   const resetForm = () => {
-    setCurrentCustomerId('cust_' + Date.now());
+    const freshId = 'cust_' + Date.now();
+    const freshSession = {
+      id: freshId,
+      fastStaff: '',
+      name: '',
+      contact: '',
+      phone: '',
+      location: '',
+      orderDate: getTodayDateString(),
+      status: 'Đang chuẩn bị hồ sơ',
+      submitDate: '',
+      targetDate: '',
+      inspectDate: '',
+      certDate: '',
+      certNumber: '',
+      expireDate: '',
+      checklist: {} as Record<string, boolean>
+    };
+
+    // Reset local states for instant responsiveness
+    setCurrentCustomerId(freshId);
     setFastStaff('');
     setCustName('');
     setCustContact('');
@@ -233,7 +267,16 @@ export const FastFoodSafetyManagement: React.FC = () => {
     setCustCertNumber('');
     setCustExpireDate('');
     setChecklist({});
+
+    // Instantly wipe the cloud session draft
+    setActiveSession(freshSession, true);
   };
+
+  const { triggerGlobalSaveReset } = useGlobalSync(
+    'fast-safety-form-channel',
+    'fast_safety_form',
+    resetForm
+  );
 
   // Date and Business Day Logic
   const calculateBusinessDays = (startDateStr: string, numBusinessDays = 20) => {
@@ -363,9 +406,9 @@ export const FastFoodSafetyManagement: React.FC = () => {
     persistDatabase(updatedDb);
     setSyncStatus('Đã lưu CRM ✓');
     
-    // Reset form immediately to refresh the UI instantly
+    // Trigger global form reset across all connected admin sessions simultaneously
     const savedName = custName;
-    resetForm();
+    triggerGlobalSaveReset();
     
     setTimeout(() => {
       alert(`Đã lưu thành công hồ sơ toàn trình "${savedName}" vào Cơ sở dữ liệu FAST CRM.`);
