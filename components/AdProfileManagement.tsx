@@ -415,27 +415,31 @@ export const AdProfileManagement: React.FC = () => {
     }
 
     persistDatabase(newDb);
-    saveActiveDraft();
+    clearForm();
     alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${custName.trim()}" vào cơ sở dữ liệu FAST!`);
+  };
+
+  const clearForm = () => {
+    const newId = 'cust_' + Date.now();
+    setCurrentId(newId);
+    setFastStaff('');
+    setCustName('');
+    setCustPhone('');
+    setCustLocation('');
+    setOrderDate(new Date().toISOString().slice(0, 10));
+    setSubmitDate('');
+    setTargetDate('');
+    setActualDate('');
+    setCustStatus('Đang chuẩn bị hồ sơ');
+    setCustReceipt('');
+    setChecklist({});
+    saveActiveDraft();
   };
 
   // New Customer creation
   const handleNewCustomer = () => {
     if (window.confirm('Tạo một hồ sơ khách hàng mới? Dữ liệu trên form hiện tại sẽ được đặt lại.')) {
-      const newId = 'cust_' + Date.now();
-      setCurrentId(newId);
-      setFastStaff('');
-      setCustName('');
-      setCustPhone('');
-      setCustLocation('');
-      setOrderDate(new Date().toISOString().slice(0, 10));
-      setSubmitDate('');
-      setTargetDate('');
-      setActualDate('');
-      setCustStatus('Đang chuẩn bị hồ sơ');
-      setCustReceipt('');
-      setChecklist({});
-      saveActiveDraft();
+      clearForm();
     }
   };
 

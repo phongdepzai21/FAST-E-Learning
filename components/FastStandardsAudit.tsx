@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
+import { useCloudSync } from '../utils/cloudSyncUtility';
 import { ALL_AUDIT_ITEMS, AuditItem, AuditItemState, VAL_METHODS_LIST, IMP_METHODS_LIST } from '../data/fastStandardsData';
 import { 
   ClipboardCheck, 
@@ -33,8 +34,35 @@ import {
 const STORAGE_KEY = 'FAST_AUDIT_STATE_SAVE_V1';
 const META_KEY = 'FAST_AUDIT_META_SAVE_V1';
 
+export interface SavedAuditRecord {
+  id: string;
+  clientName: string;
+  managerName: string;
+  businessModel: string;
+  auditorName: string;
+  auditDate: string;
+  auditState: Record<string, AuditItemState>;
+  finalScore: number;
+  isPassed: boolean;
+  hasMajor: boolean;
+  majorCount: number;
+  minorCount: number;
+  obsCount: number;
+  updatedAt: string;
+}
+
 export const FastStandardsAudit: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<string>('library');
+  const [currentAuditId, setCurrentAuditId] = useState<string>('');
+  
+  // Synchronized database/history of saved audits
+  const [database, setDatabase, isDbSaving, dbSyncStatus] = useCloudSync<SavedAuditRecord[]>(
+    'fast_standards_audits',
+    'database',
+    'FAST_STANDARDS_CRM_DATABASE_V1',
+    []
+  );
+
   const [clientName, setClientName] = useState<string>('Chuỗi Cửa Hàng / Nhà Hàng FAST');
   const [managerName, setManagerName] = useState<string>('');
   const [businessModel, setBusinessModel] = useState<string>('Chuỗi Nhà Hàng (F&B Chain)');
@@ -281,22 +309,89 @@ export const FastStandardsAudit: React.FC = () => {
 
   const resetAllAudit = () => {
     if (window.confirm('Bạn có chắc chắn muốn làm mới toàn bộ kết quả đánh giá để bắt đầu đợt đánh giá mới?')) {
-      const init: Record<string, AuditItemState> = {};
-      ALL_AUDIT_ITEMS.forEach(item => {
-        init[item.id] = {
-          status: 'pass',
-          note: '',
-          capa: '',
-          valMethod: '',
-          valNotes: '',
-          impMethod: '',
-          impNotes: ''
-        };
-      });
-      setAuditState(init);
+      clearForm();
       try {
         localStorage.removeItem(STORAGE_KEY);
       } catch (e) {}
+    }
+  };
+
+  const clearForm = () => {
+    setCurrentAuditId('');
+    setClientName('Chuỗi Cửa Hàng / Nhà Hàng FAST');
+    setManagerName('');
+    setBusinessModel('Chuỗi Nhà Hàng (F&B Chain)');
+    setAuditorName('Dung Trần (FAST CONSULTING)');
+    setAuditDate(new Date().toLocaleDateString('vi-VN'));
+    
+    const init: Record<string, AuditItemState> = {};
+    ALL_AUDIT_ITEMS.forEach(item => {
+      init[item.id] = {
+        status: 'pass',
+        note: '',
+        capa: '',
+        valMethod: '',
+        valNotes: '',
+        impMethod: '',
+        impNotes: ''
+      };
+    });
+    setAuditState(init);
+  };
+
+  const handleSaveToDatabase = () => {
+    if (!clientName) {
+      alert('Vui lòng nhập Tên Đơn vị được đánh giá trước khi lưu.');
+      return;
+    }
+
+    const auditId = currentAuditId || ('audit_' + Date.now());
+    const newRecord: SavedAuditRecord = {
+      id: auditId,
+      clientName,
+      managerName,
+      businessModel,
+      auditorName,
+      auditDate,
+      auditState,
+      finalScore,
+      isPassed,
+      hasMajor,
+      majorCount,
+      minorCount,
+      obsCount,
+      updatedAt: new Date().toLocaleString('vi-VN')
+    };
+
+    let updatedDb = [...database];
+    const existingIdx = updatedDb.findIndex(r => r.id === auditId);
+    if (existingIdx >= 0) {
+      updatedDb[existingIdx] = newRecord;
+    } else {
+      updatedDb.unshift(newRecord);
+    }
+
+    setDatabase(updatedDb, true);
+    alert(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${clientName}" vào Cơ sở dữ liệu FSA-Checklist.`);
+    clearForm();
+  };
+
+  const loadAudit = (record: SavedAuditRecord) => {
+    setCurrentAuditId(record.id);
+    setClientName(record.clientName || '');
+    setManagerName(record.managerName || '');
+    setBusinessModel(record.businessModel || '');
+    setAuditorName(record.auditorName || '');
+    setAuditDate(record.auditDate || '');
+    setAuditState(record.auditState || {});
+    setActiveSubTab('checklist');
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const deleteAudit = (id: string, client: string) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa kết quả đánh giá của "${client}" khỏi cơ sở dữ liệu?`)) {
+      const updated = database.filter(r => r.id !== id);
+      setDatabase(updated, true);
     }
   };
 
@@ -578,7 +673,8 @@ export const FastStandardsAudit: React.FC = () => {
           { id: 'product', label: 'Product', icon: UtensilsCrossed, count: 61, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
           { id: 'safety', label: 'Safety', icon: ShieldAlert, count: 19, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
           { id: 'speed', label: 'Speed', icon: Timer, count: 25, activeGradient: 'bg-[#005c56]', textColor: 'text-[#005c56]' },
-          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'bg-amber-600', textColor: 'text-amber-800' }
+          { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'bg-amber-600', textColor: 'text-amber-800' },
+          { id: 'database', label: 'Cơ Sở Dữ Liệu', icon: Database, count: null, activeGradient: 'bg-teal-900', textColor: 'text-teal-950' }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -663,6 +759,39 @@ export const FastStandardsAudit: React.FC = () => {
                 onChange={(e) => setAuditorName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none"
               />
+            </div>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="bg-teal-50/50 p-4 rounded-2xl border border-teal-100 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-[#005c56]" />
+              <div>
+                <span className="text-xs font-black uppercase text-gray-800 tracking-wider block">Thao tác hồ sơ đánh giá</span>
+                {currentAuditId ? (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-0.5 inline-block">Đang chỉnh sửa bản ghi từ CSDL (ID: {currentAuditId})</span>
+                ) : (
+                  <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 mt-0.5 inline-block">Đang nhập bản ghi mới</span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveToDatabase}
+                className="px-4 py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 cursor-pointer"
+              >
+                <Database className="w-4 h-4" />
+                Lưu vào CSDL
+              </button>
+              <button
+                type="button"
+                onClick={clearForm}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border border-gray-300 transition-all cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Làm mới Form
+              </button>
             </div>
           </div>
 
@@ -944,6 +1073,14 @@ export const FastStandardsAudit: React.FC = () => {
             >
               <FileSpreadsheet className="w-4 h-4" />
               Xuất Excel
+            </button>
+            <button
+              onClick={handleSaveToDatabase}
+              className="px-5 py-3 bg-teal-800 hover:bg-teal-900 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-sm hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+              title="Lưu trữ kết quả đánh giá hiện tại vào cơ sở dữ liệu lịch sử"
+            >
+              <Database className="w-4 h-4" />
+              Lưu vào CSDL
             </button>
           </div>
 
@@ -1230,6 +1367,112 @@ export const FastStandardsAudit: React.FC = () => {
             <div className="text-gray-400 text-[10px] mt-1">
               © 2026 FAST CONSULTING.
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 11: DATABASE / CƠ SỞ DỮ LIỆU */}
+      {activeSubTab === 'database' && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
+                  <Database className="w-6 h-6 text-[#005c56]" />
+                  Cơ sở dữ liệu lịch sử đánh giá FAST
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">Lưu trữ, rà soát, tái tải và chỉnh sửa kết quả đánh giá của các cơ sở F&B.</p>
+              </div>
+              <div className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                {dbSyncStatus || 'Tự động đồng bộ'}
+              </div>
+            </div>
+
+            {database.length === 0 ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto border border-teal-100">
+                  <Database className="w-8 h-8 text-[#005c56]" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-black text-gray-800">Cơ sở dữ liệu trống</p>
+                  <p className="text-xs text-gray-400 max-w-sm mx-auto">Vui lòng hoàn thành bảng đánh giá của một cơ sở và nhấp "Lưu vào CSDL" để bắt đầu ghi nhận dữ liệu.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
+                        <th className="p-4 w-12 text-center">STT</th>
+                        <th className="p-4 min-w-[200px]">Đơn vị được đánh giá (Auditee)</th>
+                        <th className="p-4">Chuyên gia đánh giá</th>
+                        <th className="p-4">Quản lý cơ sở</th>
+                        <th className="p-4 text-center">Ngày đánh giá</th>
+                        <th className="p-4 text-center">Mức lỗi (NCs)</th>
+                        <th className="p-4 text-center">Điểm số</th>
+                        <th className="p-4 text-center w-36">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {database.map((record, index) => {
+                        return (
+                          <tr key={record.id} className="hover:bg-teal-50/20 transition-colors">
+                            <td className="p-4 text-center font-bold text-gray-500">{index + 1}</td>
+                            <td className="p-4">
+                              <div className="font-extrabold text-gray-900 leading-snug">{record.clientName}</div>
+                              <div className="text-[10px] text-teal-700 font-medium mt-0.5">{record.businessModel}</div>
+                            </td>
+                            <td className="p-4 font-semibold text-gray-700">{record.auditorName}</td>
+                            <td className="p-4 text-gray-600 font-medium">{record.managerName || 'Chưa rõ'}</td>
+                            <td className="p-4 text-center text-gray-600 font-bold">{record.auditDate}</td>
+                            <td className="p-4">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-bold text-[10px] border border-red-200">
+                                  {record.majorCount || 0} M
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
+                                  {record.minorCount || 0} m
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-bold text-[10px] border border-sky-200">
+                                  {record.obsCount || 0} O
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-center">
+                              <div className="font-black text-sm text-gray-900">{record.finalScore}%</div>
+                              <span className={`inline-block text-[9px] font-black uppercase px-2 py-0.5 rounded-full mt-1 ${record.isPassed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                {record.isPassed ? 'ĐẠT' : 'KHÔNG ĐẠT'}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => loadAudit(record)}
+                                  className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors border border-indigo-200"
+                                  title="Tải lại kết quả đánh giá lên form để xem/sửa"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  Xem/Sửa
+                                </button>
+                                <button
+                                  onClick={() => deleteAudit(record.id, record.clientName)}
+                                  className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer transition-colors border border-rose-200"
+                                  title="Xóa bản ghi"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
