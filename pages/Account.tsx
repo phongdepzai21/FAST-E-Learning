@@ -434,7 +434,7 @@ const Account: React.FC = () => {
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning'>('dashboard');
-  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('fsa');
+  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('student');
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
