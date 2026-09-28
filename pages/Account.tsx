@@ -434,6 +434,7 @@ const Account: React.FC = () => {
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning'>('dashboard');
+  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('fsa');
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -1601,6 +1602,131 @@ const Account: React.FC = () => {
       );
     }
 
+    if (user && user.isAdmin && adminViewMode !== 'student') {
+      return (
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col animate-fade-in relative">
+          <Helmet>
+            <title>Hệ Thống Kiểm Toán & Hồ Sơ | FAST Admin</title>
+          </Helmet>
+
+          {/* Premium Full-Width Top Bar */}
+          <header className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shadow-xs sticky top-0 z-40">
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
+                FAST Compliance Control Center
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setAdminViewMode('student')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Chuyển sang giao diện học viên thông thường"
+              >
+                🎓 Chế độ Học viên
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Trang chủ
+              </button>
+              <button
+                onClick={async () => {
+                  await signOut(auth);
+                  navigate('/');
+                }}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Đăng xuất
+              </button>
+            </div>
+          </header>
+
+          {/* Main centered body */}
+          <div className="flex-1 p-6 md:p-10 space-y-8 max-w-7xl mx-auto w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-1">
+                <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Hệ Thống Kiểm Toán & Hồ Sơ</h1>
+                <p className="text-xs md:text-sm text-gray-500 font-semibold leading-relaxed">
+                  Quản lý hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
+                </p>
+              </div>
+            </div>
+
+            {/* Standalone Tab Switcher */}
+            <div className="bg-white border border-gray-150 rounded-3xl p-3 flex flex-col sm:flex-row gap-3 shadow-xs">
+              {[
+                { id: 'fsa', label: '📋 FSA-Checklist', desc: 'Đánh giá audit chuẩn ISO/HACCP' },
+                { id: 'attp', label: '🛡️ Hồ sơ ATTP', desc: 'Xét duyệt hồ sơ An toàn TP' },
+                { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', desc: 'Phê duyệt hồ sơ quảng cáo QC' }
+              ].map((tab) => {
+                const isSelected = adminViewMode === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAdminViewMode(tab.id as any)}
+                    className={`flex-1 p-4.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
+                      isSelected 
+                        ? 'bg-[#007c76]/10 border-[#007c76] text-[#007c76] ring-1 ring-[#007c76]/20' 
+                        : 'bg-slate-50/50 border-gray-100 hover:bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <span className="block font-black text-xs md:text-sm uppercase tracking-wide">{tab.label}</span>
+                    <span className={`text-[10px] block mt-0.5 font-bold ${isSelected ? 'text-[#005c56]' : 'text-gray-400'}`}>
+                      {tab.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected audit content */}
+            <div className="bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px]">
+              {adminViewMode === 'fsa' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Mô-đun: Fast Standards Audit (FSA)</h4>
+                      <p className="text-xs text-emerald-600 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP.</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200">System Ready</span>
+                  </div>
+                  <FastStandardsAudit />
+                </div>
+              )}
+
+              {adminViewMode === 'attp' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Mô-đun: Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
+                      <p className="text-xs text-amber-600 font-medium">Cập nhật, phê duyệt và xử lý hồ sơ pháp lý, giấy phép ATTP cho cơ sở.</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200">System Ready</span>
+                  </div>
+                  <FastFoodSafetyManagement />
+                </div>
+              )}
+
+              {adminViewMode === 'hsqc' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-cyan-50 rounded-2xl border border-cyan-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Mô-đun: Hồ sơ Quảng cáo / QC</h4>
+                      <p className="text-xs text-cyan-600 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl border border-cyan-200">System Ready</span>
+                  </div>
+                  <AdProfileManagement />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
@@ -1648,7 +1774,7 @@ const Account: React.FC = () => {
                       { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
                     ] : []),
                     ...(isAdmin ? [
-                      { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isExternalRoute: '/admin/audit-center' }
+                      { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
                   ].map((item) => {
                     const isActive = activeTab === item.id;
@@ -1657,8 +1783,8 @@ const Account: React.FC = () => {
                         key={item.id} 
                         title={!isExpanded ? item.label : undefined}
                         onClick={() => {
-                          if (item.isExternalRoute) {
-                            navigate(item.isExternalRoute);
+                          if (item.isAuditViewLink) {
+                            setAdminViewMode('fsa');
                           } else {
                             setActiveTab(item.id as any);
                           }
@@ -1703,7 +1829,7 @@ const Account: React.FC = () => {
                   value={activeTab} 
                   onChange={(e) => {
                     if (e.target.value === 'admin-audit-center') {
-                      navigate('/admin/audit-center');
+                      setAdminViewMode('fsa');
                     } else {
                       setActiveTab(e.target.value as any);
                     }
