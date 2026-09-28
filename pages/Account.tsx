@@ -1645,12 +1645,10 @@ const Account: React.FC = () => {
                     ...(isTeacher || isAdmin ? [
                       { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
                       { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-                      { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-                      { id: 'fast-standards-audit', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }
+                      { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
                     ] : []),
                     ...(isAdmin ? [
-                      { id: 'ad-profile-management', label: 'Hồ sơ quảng cáo', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-                      { id: 'fast-food-safety', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }
+                      { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isExternalRoute: '/admin/audit-center' }
                     ] : [])
                   ].map((item) => {
                     const isActive = activeTab === item.id;
@@ -1659,7 +1657,11 @@ const Account: React.FC = () => {
                         key={item.id} 
                         title={!isExpanded ? item.label : undefined}
                         onClick={() => {
-                          setActiveTab(item.id as any);
+                          if (item.isExternalRoute) {
+                            navigate(item.isExternalRoute);
+                          } else {
+                            setActiveTab(item.id as any);
+                          }
                         }}
                         className={`w-full flex items-center rounded-2xl font-bold text-sm transition-all cursor-pointer ${
                           !isExpanded ? 'justify-center p-3.5' : 'gap-4 px-5 py-3.5'
@@ -1700,7 +1702,11 @@ const Account: React.FC = () => {
                 <select 
                   value={activeTab} 
                   onChange={(e) => {
-                    setActiveTab(e.target.value as any);
+                    if (e.target.value === 'admin-audit-center') {
+                      navigate('/admin/audit-center');
+                    } else {
+                      setActiveTab(e.target.value as any);
+                    }
                   }}
                   className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
                 >
@@ -1713,9 +1719,7 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
                   {(isTeacher || isAdmin) && <option value="user-management">Quản lý tài khoản</option>}
-                  {(isTeacher || isAdmin) && <option value="fast-standards-audit">FSA-Checklist</option>}
-                  {isAdmin && <option value="ad-profile-management">Hồ sơ quảng cáo</option>}
-                  {isAdmin && <option value="fast-food-safety">Hồ sơ ATTP</option>}
+                  {isAdmin && <option value="admin-audit-center">➜ Hệ thống Kiểm toán (FSA • ATTP • HSQC)</option>}
                 </select>
              </div>
              
