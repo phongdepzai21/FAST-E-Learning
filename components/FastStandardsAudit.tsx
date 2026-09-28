@@ -541,7 +541,7 @@ export const FastStandardsAudit: React.FC = () => {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
             <thead>
               <tr className={`bg-gradient-to-r ${getPillarGradient(pillarName)} text-white font-bold tracking-wide`}>
                 <th className="p-3.5 w-14 text-center border-r border-white/15">Mã</th>
@@ -1415,7 +1415,7 @@ export const FastStandardsAudit: React.FC = () => {
             ) : (
               <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
                     <thead>
                       <tr className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
                         <th className="p-4 w-12 text-center">STT</th>

@@ -1196,7 +1196,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs border-collapse min-w-[1100px]">
                 <thead>
                   <tr className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
                     <th className="p-3 text-center w-14">Đã có</th>

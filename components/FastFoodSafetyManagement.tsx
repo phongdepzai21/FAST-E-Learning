@@ -1059,7 +1059,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
             {openSections['sec-checklist'] && (
               <div className="p-5">
                 <div className="overflow-x-auto rounded-xl border border-gray-200">
-                  <table className="w-full text-xs text-left border-collapse">
+                  <table className="w-full text-xs text-left border-collapse min-w-[1100px]">
                     <thead>
                       <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider">
                         <th className="p-3 text-center w-16">Đã có</th>
@@ -1340,8 +1340,8 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 </div>
 
                 {/* Checklist items list */}
-                <div className="mb-4">
-                  <table className="w-full text-xs text-left border-collapse border border-gray-300">
+                <div className="mb-4 overflow-x-auto rounded-xl border border-gray-250">
+                  <table className="w-full text-xs text-left border-collapse border border-gray-300 min-w-[950px]">
                     <thead>
                       <tr className="bg-gray-100 border-b border-gray-300">
                         <th className="p-2 border border-gray-300 w-16 text-center">Đã Có</th>
