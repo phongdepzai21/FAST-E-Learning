@@ -28,12 +28,18 @@ import {
   Sliders,
   AlertOctagon,
   Eye,
-  EyeOff
+  EyeOff,
+  Award,
+  Bell,
+  Wifi,
+  WifiOff,
+  HelpCircle
 } from 'lucide-react';
 import { authDebugger, DiagnosticState, DiagnosticLogEntry, PromiseRecord } from '../utils/authDebugger';
 import { auth, db } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
+import { addCourseNotification, addApprovalNotification } from '../utils/courseNotificationService';
 
 const REQUIRED_DEV_PASSWORD = 'Family2515@';
 
@@ -49,6 +55,18 @@ export const DevDiagnosticDashboard: React.FC = () => {
   const [unlockedCourses, setUnlockedCourses] = useState<string[]>([]);
   const [customCourseId, setCustomCourseId] = useState<string>('');
 
+  // Gamification Simulation States
+  const [gamificationPoints, setGamificationPoints] = useState<number>(0);
+  const [gamificationStreak, setGamificationStreak] = useState<number>(1);
+  const [gamificationLessons, setGamificationLessons] = useState<number>(0);
+  const [gamificationNotes, setGamificationNotes] = useState<number>(0);
+  const [gamificationCourses, setGamificationCourses] = useState<number>(0);
+
+  // Notification Simulation States
+  const [notifType, setNotifType] = useState<'new' | 'updated' | 'approval'>('new');
+  const [notifCourseTitle, setNotifCourseTitle] = useState<string>('Khóa học Quảng cáo Facebook Ads đỉnh cao');
+  const [notifMessage, setNotifMessage] = useState<string>('Bài giảng số 5 vừa được cập nhật thêm tài liệu đính kèm.');
+
   const refreshUnlockedCourses = () => {
     const unlocked: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -58,6 +76,120 @@ export const DevDiagnosticDashboard: React.FC = () => {
       }
     }
     setUnlockedCourses(unlocked);
+  };
+
+  const loadGamificationStats = async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+    const email = user.email.toLowerCase().trim();
+    const localKey = `gamification_${email}`;
+    let stats = {
+      points: 0,
+      streakDays: 1,
+      totalLessonsCompleted: 0,
+      totalNotesCreated: 0,
+      completedCoursesCount: 0
+    };
+    try {
+      const cached = localStorage.getItem(localKey);
+      if (cached) {
+        stats = { ...stats, ...JSON.parse(cached) };
+      }
+    } catch (e) {}
+
+    try {
+      const docRef = doc(db, 'users', email, 'gamification', 'stats');
+      const remoteSnap = await getDoc(docRef);
+      if (remoteSnap.exists()) {
+        const r = remoteSnap.data();
+        stats = {
+          ...stats,
+          points: r.points !== undefined ? r.points : stats.points,
+          streakDays: r.streakDays !== undefined ? r.streakDays : stats.streakDays,
+          totalLessonsCompleted: r.totalLessonsCompleted !== undefined ? r.totalLessonsCompleted : stats.totalLessonsCompleted,
+          totalNotesCreated: r.totalNotesCreated !== undefined ? r.totalNotesCreated : stats.totalNotesCreated,
+          completedCoursesCount: r.completedCoursesCount !== undefined ? r.completedCoursesCount : stats.completedCoursesCount
+        };
+      }
+    } catch (e) {}
+
+    setGamificationPoints(stats.points);
+    setGamificationStreak(stats.streakDays);
+    setGamificationLessons(stats.totalLessonsCompleted);
+    setGamificationNotes(stats.totalNotesCreated);
+    setGamificationCourses(stats.completedCoursesCount);
+  };
+
+  const saveGamificationStats = async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      alert('Vui lòng đăng nhập để lưu chỉ số học tập!');
+      return;
+    }
+    const email = user.email.toLowerCase().trim();
+    const localKey = `gamification_${email}`;
+    
+    let existing: any = {};
+    try {
+      const cached = localStorage.getItem(localKey);
+      if (cached) existing = JSON.parse(cached);
+    } catch (e) {}
+
+    const updated = {
+      ...existing,
+      points: Number(gamificationPoints),
+      streakDays: Number(gamificationStreak),
+      totalLessonsCompleted: Number(gamificationLessons),
+      totalNotesCreated: Number(gamificationNotes),
+      completedCoursesCount: Number(gamificationCourses),
+      lastActiveDate: new Date().toISOString().split('T')[0],
+      level: Math.floor(Math.sqrt(Number(gamificationPoints) / 25)) + 1
+    };
+
+    try {
+      localStorage.setItem(localKey, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('gamification_updated', { detail: updated }));
+      
+      const docRef = doc(db, 'users', email, 'gamification', 'stats');
+      await setDoc(docRef, updated, { merge: true });
+      
+      authDebugger.addLog({
+        category: 'system',
+        level: 'success',
+        title: 'Cập nhật Gamification',
+        details: `Đã lưu chỉ số giả lập (Điểm: ${gamificationPoints}, Chuỗi: ${gamificationStreak}) thành công!`
+      });
+      alert('Cập nhật chỉ số Gamification thành công!');
+    } catch (e: any) {
+      alert('Lỗi khi lưu chỉ số: ' + e.message);
+    }
+  };
+
+  const handleDispatchNotification = () => {
+    const user = auth.currentUser;
+    if (notifType === 'approval') {
+      addApprovalNotification({
+        userEmail: user?.email || 'learner@fast.edu.vn',
+        userName: user?.displayName || 'Học viên Danh dự',
+        roles: { isAdmin: true, isTeacher: false, isVip: true }
+      });
+    } else {
+      addCourseNotification({
+        id: 'notif_' + Date.now(),
+        title: notifCourseTitle,
+        category: 'Marketing',
+        image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&q=80',
+        price: '1.299.000đ',
+        description: notifMessage
+      } as any, notifType);
+    }
+    authDebugger.addLog({
+      category: 'system',
+      level: 'success',
+      title: 'Đã phát thông báo',
+      details: `Đã phát thông báo giả lập dạng "${notifType}" tới hệ thống.`
+    });
+    alert('Đã phát thông báo thành công! Vui lòng kiểm tra biểu tượng quả chuông trên Header.');
   };
 
   // Diagnostics and Sync Monitor States
@@ -287,6 +419,9 @@ export const DevDiagnosticDashboard: React.FC = () => {
   useEffect(() => {
     if (isOpen && isUnlocked) {
       refreshUnlockedCourses();
+      if (activeTab === 'control') {
+        loadGamificationStats();
+      }
     }
   }, [isOpen, isUnlocked, activeTab]);
 
@@ -1777,6 +1912,163 @@ export const DevDiagnosticDashboard: React.FC = () => {
                               ))}
                             </div>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Card 3: Gamification Manager */}
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center gap-2.5">
+                          <Award className="w-5 h-5 text-emerald-400" />
+                          <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                            Quản Lý Gamification & Điểm Số
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-semibold">
+                          Sửa đổi và đồng bộ tức thì các điểm số, chuỗi liên tục (streak) và chỉ số học tập lên cơ sở dữ liệu để kiểm thử danh hiệu và cấp độ của bạn.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Điểm Tích Lũy (XP)</label>
+                            <input
+                              type="number"
+                              value={gamificationPoints}
+                              onChange={(e) => setGamificationPoints(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500 font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Chuỗi Học (Ngày)</label>
+                            <input
+                              type="number"
+                              value={gamificationStreak}
+                              onChange={(e) => setGamificationStreak(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-orange-400 font-bold focus:outline-none focus:border-orange-500 font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Bài Học Đã Học</label>
+                            <input
+                              type="number"
+                              value={gamificationLessons}
+                              onChange={(e) => setGamificationLessons(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-bold focus:outline-none focus:border-cyan-500 font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Ghi Chú Đã Tạo</label>
+                            <input
+                              type="number"
+                              value={gamificationNotes}
+                              onChange={(e) => setGamificationNotes(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-purple-400 font-bold focus:outline-none focus:border-purple-500 font-mono"
+                            />
+                          </div>
+
+                          <div className="col-span-2 space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Khóa Học Đã Hoàn Thành</label>
+                            <input
+                              type="number"
+                              value={gamificationCourses}
+                              onChange={(e) => setGamificationCourses(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-pink-400 font-bold focus:outline-none focus:border-pink-500 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            onClick={loadGamificationStats}
+                            className="flex-1 py-3 bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold rounded-xl text-xs uppercase cursor-pointer transition-all"
+                          >
+                            Tải Lại Thực Tế
+                          </button>
+                          <button
+                            onClick={saveGamificationStats}
+                            className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black rounded-xl text-xs uppercase cursor-pointer transition-all shadow-md shadow-emerald-500/10"
+                          >
+                            Đồng bộ lên Cloud
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Card 4: simulated Notifications dispatcher */}
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center gap-2.5">
+                          <Bell className="w-5 h-5 text-indigo-400 animate-swing" />
+                          <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                            Phát Thông Báo Thử Nghiệm (Simulated Push)
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-semibold">
+                          Gửi một thông báo hệ thống giả lập trực tiếp vào khay thông báo trên Header của bạn để kiểm nghiệm giao diện và luồng xử lý.
+                        </p>
+
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Loại thông báo</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { label: 'Khóa học Mới', value: 'new' },
+                                { label: 'Cập nhật', value: 'updated' },
+                                { label: 'Phê duyệt', value: 'approval' }
+                              ].map((item) => (
+                                <button
+                                  key={item.value}
+                                  onClick={() => {
+                                    setNotifType(item.value as any);
+                                    if (item.value === 'approval') {
+                                      setNotifCourseTitle('Phê duyệt phân quyền hệ thống');
+                                      setNotifMessage('Tài khoản của bạn đã được Admin phê duyệt phân quyền VIP!');
+                                    } else if (item.value === 'updated') {
+                                      setNotifCourseTitle('Khóa học Facebook Ads Pro');
+                                      setNotifMessage('Giảng viên vừa cập nhật thêm 3 bài giảng mới và bộ tài liệu hướng dẫn.');
+                                    } else {
+                                      setNotifCourseTitle('Combo Chiến Binh Ads Thực Chiến');
+                                      setNotifMessage('Khóa học mới xuất sắc đã lên sóng, giảm giá 50% hôm nay.');
+                                    }
+                                  }}
+                                  className={`p-2 rounded-lg text-[10px] font-bold text-center border cursor-pointer transition-all ${
+                                    notifType === item.value
+                                      ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300 font-black'
+                                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-300'
+                                  }`}
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Tiêu đề thông báo / Tên khóa học</label>
+                            <input
+                              type="text"
+                              value={notifCourseTitle}
+                              onChange={(e) => setNotifCourseTitle(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nội dung chi tiết thông báo</label>
+                            <textarea
+                              value={notifMessage}
+                              onChange={(e) => setNotifMessage(e.target.value)}
+                              rows={2}
+                              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 resize-none"
+                            />
+                          </div>
+
+                          <button
+                            onClick={handleDispatchNotification}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-xs uppercase cursor-pointer transition-all shadow-md shadow-indigo-600/15"
+                          >
+                            Phát Thông Báo Ngay
+                          </button>
                         </div>
                       </div>
 
