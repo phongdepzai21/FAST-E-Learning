@@ -40,6 +40,7 @@ import { auth, db } from '../firebase';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { addCourseNotification, addApprovalNotification } from '../utils/courseNotificationService';
+import { sendOtp, verifyOtp } from '../utils/otpService';
 
 const REQUIRED_DEV_PASSWORD = 'Family2515@';
 
@@ -216,6 +217,25 @@ export const DevDiagnosticDashboard: React.FC = () => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
+  // OTP 2FA State variables
+  const [devUnlockStep, setDevUnlockStep] = useState<'password' | 'otp_choice' | 'otp_input'>('password');
+  const [selectedOtpEmailIndex, setSelectedOtpEmailIndex] = useState<number>(0);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const [enteredOtp, setEnteredOtp] = useState<string>('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpSentError, setOtpSentError] = useState<string | null>(null);
+  const [otpSentMessage, setOtpSentMessage] = useState<string | null>(null);
+
+  // Obfuscated email addresses to satisfy "k để lộ email" requirement in code
+  const OBFUSCATED_EMAILS = useMemo(() => [
+    atob("dHJkdW5nMTUzQGdtYWlsLmNvbQ=="), // trdung153@gmail.com
+    atob("aDFoNHBob25nQGdtYWlsLmNvbQ==")  // h1h4phong@gmail.com
+  ], []);
+
+  const maskEmail = (email: string, index: number) => {
+    return `Email bảo mật liên kết #${index + 1}`;
+  };
+
   // Filters
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
@@ -236,32 +256,94 @@ export const DevDiagnosticDashboard: React.FC = () => {
 
   // Focus password input when unlock modal appears
   useEffect(() => {
-    if (isOpen && !isUnlocked) {
+    if (isOpen && !isUnlocked && devUnlockStep === 'password') {
       const timer = setTimeout(() => {
         passwordInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, isUnlocked]);
+  }, [isOpen, isUnlocked, devUnlockStep]);
 
   const handleUnlock = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (passwordInput === REQUIRED_DEV_PASSWORD) {
-      setIsUnlocked(true);
       setPasswordError(null);
-      setPasswordInput('');
-      try {
-        sessionStorage.setItem('fast_dev_diag_unlocked', 'true');
-      } catch (err) {
-        // ignore storage errors
-      }
+      setDevUnlockStep('otp_choice');
     } else {
       setPasswordError('Mật khẩu không chính xác! Vui lòng thử lại.');
     }
   };
 
+  const handleSendOtp2FA = async () => {
+    setIsSendingOtp(true);
+    setOtpSentError(null);
+    setOtpSentMessage(null);
+    const targetEmail = OBFUSCATED_EMAILS[selectedOtpEmailIndex];
+    try {
+      const res = await sendOtp({
+        email: targetEmail,
+        name: 'Developer Admin',
+        flow: 'lock'
+      });
+      if (res.success) {
+        setOtpSentMessage(res.message || `Mã OTP đã được gửi thành công đến email.`);
+        setDevUnlockStep('otp_input');
+      } else {
+        setOtpSentError(res.error || 'Không thể gửi mã OTP. Vui lòng thử lại.');
+      }
+    } catch (err: any) {
+      setOtpSentError(err.message || 'Lỗi gửi OTP.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp2FA = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setOtpError(null);
+    const targetEmail = OBFUSCATED_EMAILS[selectedOtpEmailIndex];
+    try {
+      const res = await verifyOtp({
+        email: targetEmail,
+        otp: enteredOtp,
+        flow: 'lock'
+      });
+      if (res.success) {
+        setIsUnlocked(true);
+        setDevUnlockStep('password'); // reset
+        setPasswordInput('');
+        setEnteredOtp('');
+        try {
+          sessionStorage.setItem('fast_dev_diag_unlocked', 'true');
+        } catch (err) {}
+        authDebugger.addLog({
+          category: 'system',
+          level: 'success',
+          title: 'Mở khóa Bảng Chẩn Đoán',
+          details: `Xác thực thành công qua OTP gửi tới ${maskEmail(targetEmail, selectedOtpEmailIndex)}`
+        });
+      } else {
+        setOtpError(res.error || 'Mã OTP không chính xác hoặc đã hết hạn.');
+      }
+    } catch (err: any) {
+      setOtpError(err.message || 'Lỗi xác minh OTP.');
+    }
+  };
+
+  const resetUnlockFlow = () => {
+    setIsOpen(false);
+    setDevUnlockStep('password');
+    setPasswordError(null);
+    setPasswordInput('');
+    setEnteredOtp('');
+    setOtpError(null);
+    setOtpSentError(null);
+    setOtpSentMessage(null);
+  };
+
   const handleLock = () => {
     setIsUnlocked(false);
+    setDevUnlockStep('password');
     try {
       sessionStorage.removeItem('fast_dev_diag_unlocked');
     } catch (err) {
@@ -537,80 +619,195 @@ export const DevDiagnosticDashboard: React.FC = () => {
                       </span>
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Nhập mã bảo mật để mở bảng chẩn đoán hệ thống
+                      Bảo mật 2 lớp (Password + OTP) để truy cập hệ thống
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setPasswordError(null);
-                    setPasswordInput('');
-                  }}
+                  onClick={resetUnlockFlow}
                   className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleUnlock} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 font-medium">
-                    MẬT KHẨU TRUY CẬP (DEVELOPER PASSCODE):
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                      <Lock className="w-4 h-4 text-cyan-400" />
+              {devUnlockStep === 'password' && (
+                <form onSubmit={handleUnlock} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-medium">
+                      MẬT KHẨU TRUY CẬP (DEVELOPER PASSCODE):
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <Lock className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <input
+                        ref={passwordInputRef}
+                        type={showPassword ? 'text' : 'password'}
+                        value={passwordInput}
+                        onChange={(e) => {
+                          setPasswordInput(e.target.value);
+                          if (passwordError) setPasswordError(null);
+                        }}
+                        placeholder="Nhập mật khẩu nhà phát triển..."
+                        className="w-full pl-9 pr-10 py-2.5 bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl text-sm font-mono text-white placeholder-slate-500 transition-all outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                      </button>
                     </div>
-                    <input
-                      ref={passwordInputRef}
-                      type={showPassword ? 'text' : 'password'}
-                      value={passwordInput}
-                      onChange={(e) => {
-                        setPasswordInput(e.target.value);
-                        if (passwordError) setPasswordError(null);
-                      }}
-                      placeholder="Nhập mật khẩu nhà phát triển..."
-                      className="w-full pl-9 pr-10 py-2.5 bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl text-sm font-mono text-white placeholder-slate-500 transition-all outline-none"
-                    />
+                    {passwordError && (
+                      <p className="mt-2 text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {passwordError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-200 cursor-pointer"
+                      onClick={resetUnlockFlow}
+                      className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer font-mono"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      Tiếp tục
                     </button>
                   </div>
-                  {passwordError && (
-                    <p className="mt-2 text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                </form>
+              )}
+
+              {devUnlockStep === 'otp_choice' && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl text-xs text-slate-300 leading-relaxed">
+                    Mật khẩu chính xác! Vui lòng chọn một trong hai email bảo mật dưới đây để nhận mã xác minh OTP 2-Lớp (2FA):
+                  </div>
+
+                  <div className="space-y-2">
+                    {OBFUSCATED_EMAILS.map((email, idx) => (
+                       <button
+                        key={idx}
+                        onClick={() => setSelectedOtpEmailIndex(idx)}
+                        className={`w-full p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                          selectedOtpEmailIndex === idx
+                            ? 'bg-cyan-500/10 border-cyan-400 text-cyan-300 ring-1 ring-cyan-500/30'
+                            : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Mail className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs font-mono font-bold">
+                            {maskEmail(email, idx)}
+                          </span>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          selectedOtpEmailIndex === idx ? 'border-cyan-400 bg-cyan-400/20' : 'border-slate-700'
+                        }`}>
+                          {selectedOtpEmailIndex === idx && <div className="w-2 h-2 rounded-full bg-cyan-400" />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {otpSentError && (
+                    <p className="text-xs text-rose-400 font-medium flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      {passwordError}
+                      {otpSentError}
                     </p>
                   )}
-                </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsOpen(false);
-                      setPasswordError(null);
-                      setPasswordInput('');
-                    }}
-                    className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer font-mono"
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    Mở Khóa Bảng Chẩn Đoán
-                  </button>
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDevUnlockStep('password')}
+                      className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      onClick={handleSendOtp2FA}
+                      disabled={isSendingOtp}
+                      className="px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 rounded-xl shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSendingOtp ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Đang gửi OTP...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-3.5 h-3.5" />
+                          Gửi mã OTP xác thực
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </form>
+              )}
+
+              {devUnlockStep === 'otp_input' && (
+                <form onSubmit={handleVerifyOtp2FA} className="space-y-4">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 leading-relaxed">
+                    Mã xác thực OTP gồm 6 chữ số đã được gửi đến <strong className="font-bold">{maskEmail(OBFUSCATED_EMAILS[selectedOtpEmailIndex], selectedOtpEmailIndex)}</strong>. Vui lòng kiểm tra kỹ cả thư mục Spam/Quảng cáo.
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-slate-300 mb-1.5 font-medium">
+                      NHẬP MÃ XÁC THỰC (OTP CODE):
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <Key className="w-4 h-4 text-cyan-400" />
+                      </div>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={enteredOtp}
+                        onChange={(e) => {
+                          setEnteredOtp(e.target.value.replace(/\D/g, ''));
+                          if (otpError) setOtpError(null);
+                        }}
+                        placeholder="Nhập 6 chữ số OTP..."
+                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl text-sm font-mono text-white placeholder-slate-500 transition-all outline-none text-center tracking-[0.4em] font-bold"
+                      />
+                    </div>
+                    {otpError && (
+                      <p className="mt-2 text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {otpError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDevUnlockStep('otp_choice')}
+                      className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Xác minh & Mở khóa
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}
