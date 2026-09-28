@@ -435,7 +435,131 @@ const Account: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning'>('dashboard');
   const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('student');
+  const [masterSearch, setMasterSearch] = useState('');
+  const [attpClients, setAttpClients] = useState<any[]>([]);
+  const [qcClients, setQcClients] = useState<any[]>([]);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+
+  // Listen to CRM customer databases in Firestore in real-time
+  useEffect(() => {
+    if (!user || !user.isAdmin) return;
+
+    // 1. ATTP CRM Database Listener
+    const attpRef = doc(db, 'fast_food_safety_crm', 'database');
+    const unsubAttp = onSnapshot(attpRef, (snap) => {
+      if (snap.exists()) {
+        const records = snap.data()?.records || [];
+        setAttpClients(records);
+      }
+    }, (err) => {
+      console.warn('[CRM Search] ATTP doc listener error:', err);
+    });
+
+    // 2. QC CRM Database Listener
+    const qcRef = doc(db, 'ad_profile_crm', 'database');
+    const unsubQc = onSnapshot(qcRef, (snap) => {
+      if (snap.exists()) {
+        const records = snap.data()?.records || [];
+        setQcClients(records);
+      }
+    }, (err) => {
+      console.warn('[CRM Search] QC doc listener error:', err);
+    });
+
+    return () => {
+      unsubAttp();
+      unsubQc();
+    };
+  }, [user]);
+
+  // Combined client search list
+  const filteredClients = useMemo(() => {
+    if (!masterSearch.trim()) return [];
+    const query = masterSearch.toLowerCase().trim();
+
+    const results: any[] = [];
+
+    // Filter ATTP Clients
+    attpClients.forEach(c => {
+      if (
+        (c.name && c.name.toLowerCase().includes(query)) ||
+        (c.phone && c.phone.toLowerCase().includes(query)) ||
+        (c.location && c.location.toLowerCase().includes(query)) ||
+        (c.fastStaff && c.fastStaff.toLowerCase().includes(query))
+      ) {
+        results.push({ ...c, module: 'attp', moduleLabel: '🛡️ Hồ sơ ATTP' });
+      }
+    });
+
+    // Filter QC Clients
+    qcClients.forEach(c => {
+      if (
+        (c.name && c.name.toLowerCase().includes(query)) ||
+        (c.phone && c.phone.toLowerCase().includes(query)) ||
+        (c.location && c.location.toLowerCase().includes(query)) ||
+        (c.fastStaff && c.fastStaff.toLowerCase().includes(query))
+      ) {
+        results.push({ ...c, module: 'hsqc', moduleLabel: '💼 Hồ sơ QC' });
+      }
+    });
+
+    return results;
+  }, [masterSearch, attpClients, qcClients]);
+
+  const handleSelectClient = async (client: any) => {
+    if (!user) return;
+    const emailKey = user.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+
+    try {
+      if (client.module === 'attp') {
+        const payload = {
+          activeData: {
+            id: client.id,
+            fastStaff: client.fastStaff || '',
+            name: client.name || '',
+            contact: client.contact || '',
+            phone: client.phone || '',
+            location: client.location || '',
+            orderDate: client.orderDate || '',
+            status: client.status || 'Đang chuẩn bị hồ sơ',
+            submitDate: client.submitDate || '',
+            targetDate: client.targetDate || '',
+            inspectDate: client.inspectDate || '',
+            certDate: client.certDate || '',
+            certNumber: client.certNumber || '',
+            expireDate: client.expireDate || '',
+            checklist: client.checklist || {}
+          }
+        };
+        await setDoc(doc(db, 'fast_food_safety_crm', 'current_session_' + emailKey), payload, { merge: true });
+        setAdminViewMode('attp');
+        toast.success(`Đã tải hồ sơ ATTP: ${client.name}`);
+      } else if (client.module === 'hsqc') {
+        const payload = {
+          active: {
+            id: client.id,
+            fastStaff: client.fastStaff || '',
+            name: client.name || '',
+            phone: client.phone || '',
+            location: client.location || '',
+            orderDate: client.orderDate || '',
+            submitDate: client.submitDate || '',
+            targetDate: client.targetDate || '',
+            actualDate: client.actualDate || '',
+            status: client.status || 'Đang chuẩn bị hồ sơ',
+            receipt: client.receipt || '',
+            checklist: client.checklist || {}
+          }
+        };
+        await setDoc(doc(db, 'ad_profile_crm', 'current_session_' + emailKey), payload, { merge: true });
+        setAdminViewMode('hsqc');
+        toast.success(`Đã tải hồ sơ QC: ${client.name}`);
+      }
+      setMasterSearch('');
+    } catch (err) {
+      console.warn('[CRM Master Select] Error loading client:', err);
+    }
+  };
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -514,6 +638,23 @@ const Account: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+
+  // Anti-bot CAPTCHA Protection States
+  const [captchaNum1, setCaptchaNum1] = useState(0);
+  const [captchaNum2, setCaptchaNum2] = useState(0);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
+
+  const generateCaptcha = () => {
+    setCaptchaNum1(Math.floor(Math.random() * 9) + 2);
+    setCaptchaNum2(Math.floor(Math.random() * 8) + 2);
+    setCaptchaAnswer('');
+    setCaptchaError('');
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, [isRegistering]);
 
   // OTP Verification States
   const [isOtpPending, setIsOtpPending] = useState(false);
@@ -1144,6 +1285,18 @@ const Account: React.FC = () => {
         toast.error("Vui lòng điền đầy đủ thông tin vào các trường được đánh dấu đỏ.");
         return;
     }
+
+    if (isRegistering) {
+      const parsedAns = parseInt(captchaAnswer.trim(), 10);
+      if (isNaN(parsedAns) || parsedAns !== (captchaNum1 + captchaNum2)) {
+        setCaptchaError("Câu trả lời CAPTCHA không chính xác. Vui lòng thử lại!");
+        toast.error("Xác minh chống Bot thất bại!");
+        generateCaptcha();
+        setIsAuthenticating(false);
+        return;
+      }
+    }
+
     try {
       if (isRegistering) {
         setIsAuthenticating(false);
@@ -1603,90 +1756,196 @@ const Account: React.FC = () => {
     }
 
     if (user && user.isAdmin && adminViewMode !== 'student') {
+      const isExpanded = isSidebarHovered;
+
       return (
-        <div className="min-h-screen bg-[#f8fafc] flex flex-col animate-fade-in relative">
+        <div className="min-h-screen bg-[#f8fafc] flex animate-fade-in overflow-hidden">
           <Helmet>
             <title>Hệ Thống Kiểm Toán & Hồ Sơ | FAST Admin</title>
           </Helmet>
 
-          {/* Premium Full-Width Top Bar */}
-          <header className="bg-white border-b border-gray-150 px-6 py-4 flex items-center justify-between shadow-xs sticky top-0 z-40">
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
-                FAST Compliance Control Center
-              </span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setAdminViewMode('student')}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Chuyển sang giao diện học viên thông thường"
-              >
-                🎓 Chế độ Học viên
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-              >
-                Trang chủ
-              </button>
-              <button
-                onClick={async () => {
-                  await signOut(auth);
-                  navigate('/');
-                }}
-                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          </header>
-
-          {/* Main centered body */}
-          <div className="flex-1 p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-gray-150">
-              <div className="space-y-1">
-                <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Hệ Thống Kiểm Toán & Hồ Sơ</h1>
-                <p className="text-xs md:text-sm text-gray-500 font-semibold leading-relaxed">
-                  Quản lý hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-8 items-start">
-              {/* Left Column Standalone Tab Switcher */}
-              <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-150 rounded-3xl p-3.5 space-y-3 shadow-xs">
-                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-3 pb-1 border-b border-gray-100">
-                  Phân hệ quản lý
-                </p>
+          {/* EXACT IDENTICAL SIDEBAR */}
+          <aside 
+            onMouseEnter={() => setIsSidebarHovered(true)}
+            onMouseLeave={() => setIsSidebarHovered(false)}
+            className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
+              isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+            }`}
+          >
+            <div className={`transition-all duration-300 ${!isExpanded ? 'p-3' : 'p-8'}`}>
+              {!isExpanded ? (
+                <div className="mb-6 flex flex-col items-center justify-center pt-2">
+                  <div 
+                    className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group"
+                    title="Lia chuột vào để mở rộng"
+                  >
+                    <svg className="w-5 h-5 text-[#007c76] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-10 block">
+                  <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
+                    FAST Compliance
+                  </span>
+                </div>
+              )}
+              
+              <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: '📋 FSA-Checklist', desc: 'Đánh giá audit chuẩn ISO/HACCP' },
-                  { id: 'attp', label: '🛡️ Hồ sơ ATTP', desc: 'Xét duyệt hồ sơ An toàn TP' },
-                  { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', desc: 'Phê duyệt hồ sơ quảng cáo QC' }
-                ].map((tab) => {
-                  const isSelected = adminViewMode === tab.id;
+                  { id: 'fsa', label: '📋 FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                  { id: 'attp', label: '🛡️ Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+                  { id: 'student', label: '🎓 Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
+                ].map((item) => {
+                  const isActive = adminViewMode === item.id;
                   return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setAdminViewMode(tab.id as any)}
-                      className={`w-full p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer block ${
-                        isSelected 
-                          ? 'bg-[#007c76]/10 border-[#007c76] text-[#007c76] ring-1 ring-[#007c76]/15 shadow-xs' 
-                          : 'bg-slate-50/50 border-gray-100 hover:bg-gray-50 text-gray-500'
-                      }`}
+                    <button 
+                      key={item.id} 
+                      title={!isExpanded ? item.label : undefined}
+                      onClick={() => {
+                        if (item.isBackLink) {
+                          setAdminViewMode('student');
+                        } else {
+                          setAdminViewMode(item.id as any);
+                        }
+                      }}
+                      className={`w-full flex items-center rounded-2xl font-bold text-sm transition-all cursor-pointer ${
+                        !isExpanded ? 'justify-center p-3.5' : 'gap-4 px-5 py-3.5'
+                      } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
                     >
-                      <span className="block font-black text-xs md:text-sm uppercase tracking-wide">{tab.label}</span>
-                      <span className={`text-[10px] block mt-0.5 font-bold ${isSelected ? 'text-[#005c56]' : 'text-gray-400'}`}>
-                        {tab.desc}
-                      </span>
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
+                      {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
                     </button>
                   );
                 })}
+              </nav>
+            </div>
+            
+            <div className={`mt-auto border-t border-gray-100 transition-all duration-300 ${!isExpanded ? 'p-3 flex justify-center' : 'p-6'}`}>
+              {!isExpanded ? (
+                <div 
+                  title="FAST Compliance Portal"
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-[#007c76] text-white"
+                >
+                  <span className="text-base">🛡️</span>
+                </div>
+              ) : (
+                <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">FAST Admin</p>
+                  <p className="text-[10px] opacity-90">Hệ Thống Kiểm Toán</p>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc] print:bg-white print:overflow-visible print:p-0 print:m-0">
+            <div className="p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-gray-150">
+                <div className="space-y-1">
+                  <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Hệ Thống Kiểm Toán & Hồ Sơ</h1>
+                  <p className="text-xs md:text-sm text-gray-500 font-semibold leading-relaxed">
+                    Quản lý hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
+                  </p>
+                </div>
               </div>
 
-              {/* Right Column: Selected audit content */}
-              <div className="flex-1 min-w-0 bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
+              {/* Customer Database Master Search Bar */}
+              <div className="relative w-full max-w-xl">
+                <div className="flex items-center bg-white border border-gray-250 rounded-2xl px-4 py-3.5 shadow-sm focus-within:ring-2 focus-within:ring-[#007c76]/25 focus-within:border-[#007c76] transition-all">
+                  <svg className="w-5 h-5 text-gray-400 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input 
+                    type="text" 
+                    value={masterSearch}
+                    onChange={(e) => setMasterSearch(e.target.value)}
+                    placeholder="Tìm kiếm cơ sở dữ liệu khách hàng (Tên, SĐT, Địa chỉ, Người phụ trách...)" 
+                    className="bg-transparent border-none outline-none text-sm font-semibold w-full text-gray-800 placeholder-gray-400" 
+                  />
+                  {masterSearch && (
+                    <button 
+                      onClick={() => setMasterSearch('')}
+                      className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer shrink-0"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Results Dropdown */}
+                {masterSearch && (
+                  <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-150 max-h-96 overflow-y-auto z-50 divide-y divide-gray-100 animate-in slide-in-from-top-3 duration-200">
+                    <div className="p-3 bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-wider flex justify-between items-center">
+                      <span>Kết quả từ cơ sở dữ liệu khách hàng</span>
+                      <span className="bg-teal-50 text-[#007c76] px-2 py-0.5 rounded font-bold">{filteredClients.length} khách hàng</span>
+                    </div>
+
+                    {filteredClients.length === 0 ? (
+                      <div className="p-8 text-center text-gray-400 font-bold text-sm">
+                        😞 Không tìm thấy khách hàng nào khớp với từ khóa.
+                      </div>
+                    ) : (
+                      filteredClients.map((client) => (
+                        <button
+                          key={client.id}
+                          onClick={() => handleSelectClient(client)}
+                          className="w-full text-left p-4 hover:bg-slate-50 transition-colors flex items-start gap-3.5 cursor-pointer"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-[#007c76]/10 text-[#007c76] flex items-center justify-center font-bold text-lg shrink-0">
+                            {client.module === 'attp' ? '🛡️' : '💼'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-extrabold text-sm text-gray-800 truncate">{client.name}</p>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-150 shrink-0">
+                                {client.moduleLabel}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 font-semibold mt-0.5 truncate">{client.location || 'Chưa cập nhật địa chỉ'}</p>
+                            <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400 font-bold">
+                              {client.phone && <span>📞 {client.phone}</span>}
+                              {client.fastStaff && <span>👤 Phụ trách: {client.fastStaff}</span>}
+                              {client.status && (
+                                <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                  ⏱️ {client.status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile selector */}
+              <div className="flex items-center gap-4 lg:hidden print:hidden mb-4">
+                <select 
+                  value={adminViewMode} 
+                  onChange={(e) => {
+                    if (e.target.value === 'student') {
+                      setAdminViewMode('student');
+                    } else {
+                      setAdminViewMode(e.target.value as any);
+                    }
+                  }}
+                  className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
+                >
+                  <option value="fsa">📋 FSA-Checklist</option>
+                  <option value="attp">🛡️ Hồ sơ ATTP</option>
+                  <option value="hsqc">💼 Hồ sơ Quảng cáo / QC</option>
+                  <option value="student">🎓 Quay lại Học viên</option>
+                </select>
+              </div>
+
+              {/* Display area */}
+              <div className="bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
                 {adminViewMode === 'fsa' && (
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
@@ -1727,7 +1986,7 @@ const Account: React.FC = () => {
                 )}
               </div>
             </div>
-          </div>
+          </main>
         </div>
       );
     }
@@ -2477,6 +2736,53 @@ const Account: React.FC = () => {
                                 )}
                             </button>
                         </div>
+
+                        {isRegistering && (
+                          <div className="space-y-3 p-4.5 bg-slate-50 border border-gray-200 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">🛡️ Xác thực chống BOT & AI</span>
+                              <button 
+                                type="button" 
+                                onClick={generateCaptcha}
+                                className="text-xs font-bold text-[#007c76] hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                🔄 Đổi mã
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {/* CAPTCHA Display box with Distortion effect */}
+                              <div className="bg-gradient-to-r from-gray-100 to-slate-100 border border-gray-300 rounded-xl px-4 py-2.5 font-mono text-lg font-black text-gray-700 tracking-wider select-none relative overflow-hidden shadow-2xs flex items-center justify-center min-w-[100px]">
+                                <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,124,118,0.05)_50%,transparent_75%)] bg-[length:10px_10px]" />
+                                <span className="rotate-3 inline-block scale-105 text-[#007c76]">{captchaNum1}</span>
+                                <span className="mx-2 text-gray-400 font-bold">+</span>
+                                <span className="-rotate-3 inline-block scale-95 text-[#007c76]">{captchaNum2}</span>
+                                <span className="mx-2 text-gray-400 font-bold">=</span>
+                                <span className="text-gray-400 font-bold">?</span>
+                              </div>
+
+                              {/* Input box */}
+                              <input 
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
+                                value={captchaAnswer}
+                                onChange={e => {
+                                  setCaptchaAnswer(e.target.value.replace(/[^0-9]/g, ''));
+                                  setCaptchaError('');
+                                }}
+                                placeholder="Kết quả?"
+                                className="flex-1 bg-white border border-gray-200 rounded-xl py-3 px-4 font-bold text-gray-700 text-center outline-none focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/15 transition-all text-sm"
+                              />
+                            </div>
+
+                            {captchaError && (
+                              <p className="text-[11px] font-bold text-rose-600 mt-1">
+                                {captchaError}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         <button 
                             disabled={isAuthenticating}
