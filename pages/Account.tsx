@@ -1644,8 +1644,8 @@ const Account: React.FC = () => {
           </header>
 
           {/* Main centered body */}
-          <div className="flex-1 p-6 md:p-10 space-y-8 max-w-7xl mx-auto w-full">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex-1 p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-gray-150">
               <div className="space-y-1">
                 <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Hệ Thống Kiểm Toán & Hồ Sơ</h1>
                 <p className="text-xs md:text-sm text-gray-500 font-semibold leading-relaxed">
@@ -1654,73 +1654,78 @@ const Account: React.FC = () => {
               </div>
             </div>
 
-            {/* Standalone Tab Switcher */}
-            <div className="bg-white border border-gray-150 rounded-3xl p-3 flex flex-col sm:flex-row gap-3 shadow-xs">
-              {[
-                { id: 'fsa', label: '📋 FSA-Checklist', desc: 'Đánh giá audit chuẩn ISO/HACCP' },
-                { id: 'attp', label: '🛡️ Hồ sơ ATTP', desc: 'Xét duyệt hồ sơ An toàn TP' },
-                { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', desc: 'Phê duyệt hồ sơ quảng cáo QC' }
-              ].map((tab) => {
-                const isSelected = adminViewMode === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setAdminViewMode(tab.id as any)}
-                    className={`flex-1 p-4.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
-                      isSelected 
-                        ? 'bg-[#007c76]/10 border-[#007c76] text-[#007c76] ring-1 ring-[#007c76]/20' 
-                        : 'bg-slate-50/50 border-gray-100 hover:bg-gray-50 text-gray-500'
-                    }`}
-                  >
-                    <span className="block font-black text-xs md:text-sm uppercase tracking-wide">{tab.label}</span>
-                    <span className={`text-[10px] block mt-0.5 font-bold ${isSelected ? 'text-[#005c56]' : 'text-gray-400'}`}>
-                      {tab.desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="flex flex-col lg:flex-row gap-8 items-start">
+              {/* Left Column Standalone Tab Switcher */}
+              <div className="w-full lg:w-80 shrink-0 bg-white border border-gray-150 rounded-3xl p-3.5 space-y-3 shadow-xs">
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-3 pb-1 border-b border-gray-100">
+                  Phân hệ quản lý
+                </p>
+                {[
+                  { id: 'fsa', label: '📋 FSA-Checklist', desc: 'Đánh giá audit chuẩn ISO/HACCP' },
+                  { id: 'attp', label: '🛡️ Hồ sơ ATTP', desc: 'Xét duyệt hồ sơ An toàn TP' },
+                  { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', desc: 'Phê duyệt hồ sơ quảng cáo QC' }
+                ].map((tab) => {
+                  const isSelected = adminViewMode === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setAdminViewMode(tab.id as any)}
+                      className={`w-full p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer block ${
+                        isSelected 
+                          ? 'bg-[#007c76]/10 border-[#007c76] text-[#007c76] ring-1 ring-[#007c76]/15 shadow-xs' 
+                          : 'bg-slate-50/50 border-gray-100 hover:bg-gray-50 text-gray-500'
+                      }`}
+                    >
+                      <span className="block font-black text-xs md:text-sm uppercase tracking-wide">{tab.label}</span>
+                      <span className={`text-[10px] block mt-0.5 font-bold ${isSelected ? 'text-[#005c56]' : 'text-gray-400'}`}>
+                        {tab.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Selected audit content */}
-            <div className="bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px]">
-              {adminViewMode === 'fsa' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                    <div>
-                      <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Mô-đun: Fast Standards Audit (FSA)</h4>
-                      <p className="text-xs text-emerald-600 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP.</p>
+              {/* Right Column: Selected audit content */}
+              <div className="flex-1 min-w-0 bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
+                {adminViewMode === 'fsa' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Mô-đun: Fast Standards Audit (FSA)</h4>
+                        <p className="text-xs text-emerald-600 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP.</p>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200">System Ready</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200">System Ready</span>
+                    <FastStandardsAudit />
                   </div>
-                  <FastStandardsAudit />
-                </div>
-              )}
+                )}
 
-              {adminViewMode === 'attp' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                    <div>
-                      <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Mô-đun: Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
-                      <p className="text-xs text-amber-600 font-medium">Cập nhật, phê duyệt và xử lý hồ sơ pháp lý, giấy phép ATTP cho cơ sở.</p>
+                {adminViewMode === 'attp' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Mô-đun: Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
+                        <p className="text-xs text-amber-600 font-medium">Cập nhật, phê duyệt và xử lý hồ sơ pháp lý, giấy phép ATTP cho cơ sở.</p>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200">System Ready</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200">System Ready</span>
+                    <FastFoodSafetyManagement />
                   </div>
-                  <FastFoodSafetyManagement />
-                </div>
-              )}
+                )}
 
-              {adminViewMode === 'hsqc' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-cyan-50 rounded-2xl border border-cyan-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                    <div>
-                      <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Mô-đun: Hồ sơ Quảng cáo / QC</h4>
-                      <p className="text-xs text-cyan-600 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                {adminViewMode === 'hsqc' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-cyan-50 rounded-2xl border border-cyan-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Mô-đun: Hồ sơ Quảng cáo / QC</h4>
+                        <p className="text-xs text-cyan-600 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl border border-cyan-200">System Ready</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl border border-cyan-200">System Ready</span>
+                    <AdProfileManagement />
                   </div>
-                  <AdProfileManagement />
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
