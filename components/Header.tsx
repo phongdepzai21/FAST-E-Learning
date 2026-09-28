@@ -47,6 +47,35 @@ const Header: React.FC = () => {
         setIsAdmin(localIsAdmin);
         setIsTeacher(localIsTeacher);
 
+        const applyDevOverride = (vip: boolean, admin: boolean, teacher: boolean) => {
+          const override = localStorage.getItem('dev_role_override');
+          if (override === 'Owner') {
+            setIsVip(true);
+            setIsAdmin(true);
+            setIsTeacher(true);
+            return true;
+          } else if (override === 'Admin') {
+            setIsVip(true);
+            setIsAdmin(true);
+            setIsTeacher(true);
+            return true;
+          } else if (override === 'Teacher') {
+            setIsVip(false);
+            setIsAdmin(false);
+            setIsTeacher(true);
+            return true;
+          } else if (override === 'User') {
+            setIsVip(false);
+            setIsAdmin(false);
+            setIsTeacher(false);
+            return true;
+          }
+          return false;
+        };
+
+        // Trigger immediate dev override if active
+        applyDevOverride(localIsVip, localIsAdmin, localIsTeacher);
+
         // Real-time listener for user document roles
         let currentIsVip = localIsVip;
         let currentIsAdmin = localIsAdmin;
@@ -57,21 +86,30 @@ const Header: React.FC = () => {
             const data = docSnap.data();
             if (data.isVip !== undefined) {
               currentIsVip = !!data.isVip;
-              setIsVip(!!data.isVip);
             }
             if (data.isAdmin !== undefined) {
               currentIsAdmin = !!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
-              setIsAdmin(!!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail));
             }
             if (data.isTeacher !== undefined) {
               currentIsTeacher = !!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
-              setIsTeacher(!!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail));
             }
+
+            if (!applyDevOverride(currentIsVip, currentIsAdmin, currentIsTeacher)) {
+              setIsVip(currentIsVip);
+              setIsAdmin(currentIsAdmin);
+              setIsTeacher(currentIsTeacher);
+            }
+
             setUserProfile({
               name: data.fullName || data.name || user.displayName || 'Học viên',
               avatar: data.avatar || user.photoURL || ''
             });
           } else {
+            if (!applyDevOverride(currentIsVip, currentIsAdmin, currentIsTeacher)) {
+              setIsVip(currentIsVip);
+              setIsAdmin(currentIsAdmin);
+              setIsTeacher(currentIsTeacher);
+            }
             setUserProfile({
               name: user.displayName || 'Học viên',
               avatar: user.photoURL || ''
@@ -84,7 +122,10 @@ const Header: React.FC = () => {
         const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
           const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
           if (isVipDoc) {
-            setIsVip(true);
+            currentIsVip = true;
+            if (!applyDevOverride(currentIsVip, currentIsAdmin, currentIsTeacher)) {
+              setIsVip(true);
+            }
           }
         }, () => {});
         unsubs.push(unsubPurchased);
@@ -95,17 +136,27 @@ const Header: React.FC = () => {
             const str = localStorage.getItem(`user_roles_${normalizedEmail}`);
             if (str) {
               const r = JSON.parse(str);
-              if (r.isVip !== undefined) setIsVip(!!r.isVip);
-              if (r.isAdmin !== undefined) setIsAdmin(!!r.isAdmin);
-              if (r.isTeacher !== undefined) setIsTeacher(!!r.isTeacher);
+              if (r.isVip !== undefined) currentIsVip = !!r.isVip;
+              if (r.isAdmin !== undefined) currentIsAdmin = !!r.isAdmin;
+              if (r.isTeacher !== undefined) currentIsTeacher = !!r.isTeacher;
+            }
+            if (!applyDevOverride(currentIsVip, currentIsAdmin, currentIsTeacher)) {
+              setIsVip(currentIsVip);
+              setIsAdmin(currentIsAdmin);
+              setIsTeacher(currentIsTeacher);
             }
           } catch (e) {}
         };
+        const handleDevControlUpdate = () => {
+          applyDevOverride(currentIsVip, currentIsAdmin, currentIsTeacher);
+        };
         window.addEventListener('user_roles_updated', handleLocalRoleUpdate);
         window.addEventListener('storage', handleLocalRoleUpdate);
+        window.addEventListener('dev_control_updated', handleDevControlUpdate);
         unsubs.push(() => {
           window.removeEventListener('user_roles_updated', handleLocalRoleUpdate);
           window.removeEventListener('storage', handleLocalRoleUpdate);
+          window.removeEventListener('dev_control_updated', handleDevControlUpdate);
         });
       } else {
         setUserProfile(null);

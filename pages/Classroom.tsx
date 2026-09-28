@@ -144,6 +144,11 @@ const Classroom: React.FC = () => {
   // Load Course
   useEffect(() => {
     if (!courseId) return;
+    if (courseId.toLowerCase() === 'khoa-vip') {
+      toast.error('Khóa học VIP không tồn tại hoặc đã bị xóa vĩnh viễn.', 5000, 'Lỗi truy cập');
+      navigate('/khoa-hoc', { replace: true });
+      return;
+    }
 
     let cachedDocData: any = null;
 

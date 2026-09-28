@@ -78,7 +78,8 @@ service cloud.firestore {
              (!('isLocked' in data) || data.isLocked is bool) &&
              (!('lockedAt' in data) || data.lockedAt == null || (data.lockedAt is string && data.lockedAt.size() <= 64)) &&
              (!('lockReason' in data) || data.lockReason == null || (data.lockReason is string && data.lockReason.size() <= 256)) &&
-             (!('rolePromotedByAdmin' in data) || data.rolePromotedByAdmin is bool);
+             (!('rolePromotedByAdmin' in data) || data.rolePromotedByAdmin is bool) &&
+             (!('role' in data) || (data.role is string && data.role.size() <= 32));
     }
 
     function isValidPurchasedCourse(data) {
@@ -189,19 +190,19 @@ service cloud.firestore {
       allow delete: if isAdmin() || isTeacher();
     }
 
-    // 4. Fast Standards Audits
+    // 4. Fast Standards Audits (FSA-Checklist)
     match /fast_standards_audits/{auditId} {
-      allow read, write: if isAdmin() || isTeacher();
+      allow read, write: if isSystemOwner() || isAdmin();
     }
 
-    // 5. Ad Profile CRM Records
+    // 5. Ad Profile CRM Records (Ads)
     match /ad_profile_crm/{recordId} {
-      allow read, write: if isAdmin() || isTeacher();
+      allow read, write: if isSystemOwner() || isAdmin();
     }
 
-    // 6. Food Safety CRM Records
+    // 6. Food Safety CRM Records (ATTP)
     match /fast_food_safety_crm/{recordId} {
-      allow read, write: if isAdmin() || isTeacher();
+      allow read, write: if isSystemOwner() || isAdmin();
     }
   }
 }

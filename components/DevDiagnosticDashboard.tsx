@@ -40,9 +40,25 @@ const REQUIRED_DEV_PASSWORD = 'Family2515@';
 export const DevDiagnosticDashboard: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'sync' | 'raw'>('stream');
+  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'sync' | 'control' | 'raw'>('stream');
   const [state, setState] = useState<DiagnosticState>(authDebugger.getState());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Dev control panel states
+  const [devRoleOverride, setDevRoleOverride] = useState<string | null>(() => localStorage.getItem('dev_role_override'));
+  const [unlockedCourses, setUnlockedCourses] = useState<string[]>([]);
+  const [customCourseId, setCustomCourseId] = useState<string>('');
+
+  const refreshUnlockedCourses = () => {
+    const unlocked: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('course_unlocked_')) {
+        unlocked.push(key.replace('course_unlocked_', ''));
+      }
+    }
+    setUnlockedCourses(unlocked);
+  };
 
   // Diagnostics and Sync Monitor States
   const [collectionTimestamps, setCollectionTimestamps] = useState<Record<string, string>>({
@@ -267,6 +283,12 @@ export const DevDiagnosticDashboard: React.FC = () => {
       listeners.forEach(unsub => unsub());
     };
   }, []);
+
+  useEffect(() => {
+    if (isOpen && isUnlocked) {
+      refreshUnlockedCourses();
+    }
+  }, [isOpen, isUnlocked, activeTab]);
 
   // Measure write-then-read Latency with a real document transaction
   const handleTestLatency = async () => {
@@ -814,6 +836,18 @@ export const DevDiagnosticDashboard: React.FC = () => {
                     >
                       <Activity className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Giám sát đồng bộ (Real-time)</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('control')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        activeTab === 'control'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Bảng Điều Khiển Dev</span>
                     </button>
 
                     <button
@@ -1566,6 +1600,269 @@ export const DevDiagnosticDashboard: React.FC = () => {
                         </table>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* TAB: BẢNG ĐIỀU KHIỂN DEV */}
+                {activeTab === 'control' && (
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-100">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      
+                      {/* Left Block: Role Override Control */}
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center gap-2.5">
+                          <Shield className="w-5 h-5 text-amber-400" />
+                          <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                            Giả Lập Ghi Đè Vai Trò (Local Role Override)
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Thử nghiệm tức thì giao diện Admin, Giáo viên hoặc Chủ sở hữu mà không cần sửa đổi trực tiếp tài khoản trên Database đám mây.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: 'Không ghi đè (Mặc định)', value: null },
+                            { label: 'Owner (Chủ sở hữu)', value: 'Owner' },
+                            { label: 'Admin (Quản trị)', value: 'Admin' },
+                            { label: 'Teacher (Giảng viên)', value: 'Teacher' },
+                            { label: 'User (Học viên thường)', value: 'User' }
+                          ].map((item) => (
+                            <button
+                              key={item.value || 'none'}
+                              onClick={() => {
+                                if (item.value) {
+                                  localStorage.setItem('dev_role_override', item.value);
+                                  setDevRoleOverride(item.value);
+                                } else {
+                                  localStorage.removeItem('dev_role_override');
+                                  setDevRoleOverride(null);
+                                }
+                                // Dispatch event to Header
+                                window.dispatchEvent(new Event('dev_control_updated'));
+                                authDebugger.addLog({
+                                  category: 'system',
+                                  level: 'warn',
+                                  title: 'Thay đổi Role giả lập',
+                                  details: `Hệ thống đã ghi đè vai trò thành: ${item.value || 'Database mặc định'}`
+                                });
+                              }}
+                              className={`p-3 text-left rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                devRoleOverride === item.value
+                                  ? 'bg-amber-500/25 border-amber-400 text-amber-200 ring-2 ring-amber-500/50'
+                                  : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-850'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-300 font-medium">
+                          <strong>💡 Lưu ý:</strong> Quyền này chỉ có tác dụng cục bộ trên trình duyệt hiện tại và không ảnh hưởng đến quyền thực của tài khoản trên cơ sở dữ liệu.
+                        </div>
+                      </div>
+
+                      {/* Right Block: Instant Local Course Unlocker */}
+                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center gap-2.5">
+                          <Key className="w-5 h-5 text-cyan-400" />
+                          <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                            Mở khóa Khóa học tức thì (LocalStorage Bypass)
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Bypass cơ chế thanh toán để kiểm thử phòng học (Classroom) và bài giảng của bất kỳ gói Combo hoặc khóa lẻ nào.
+                        </p>
+
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Nhập ID khóa học (Ví dụ: combo-pro, ads-pro...)"
+                              value={customCourseId}
+                              onChange={(e) => setCustomCourseId(e.target.value)}
+                              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+                            />
+                            <button
+                              onClick={() => {
+                                if (!customCourseId.trim()) return;
+                                const cid = customCourseId.trim().toLowerCase();
+                                localStorage.setItem(`course_unlocked_${cid}`, 'true');
+                                refreshUnlockedCourses();
+                                setCustomCourseId('');
+                                authDebugger.addLog({
+                                  category: 'system',
+                                  level: 'success',
+                                  title: 'Đã mở khóa khóa học',
+                                  details: `Đã kích hoạt khóa học "${cid}" cục bộ.`
+                                });
+                              }}
+                              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-xl text-xs uppercase cursor-pointer transition-all"
+                            >
+                              Mở khóa
+                            </button>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Các gói Combo Phổ Biến</span>
+                            <div className="flex flex-wrap gap-2">
+                              {[
+                                { id: 'combo-basic', name: 'Combo Basic' },
+                                { id: 'combo-pro', name: 'Combo Pro' },
+                                { id: 'fast-basic', name: 'Khóa lẻ Basic' },
+                                { id: 'ads-pro', name: 'Ads Pro' }
+                              ].map(c => {
+                                const isUnlockedNow = unlockedCourses.includes(c.id);
+                                return (
+                                  <button
+                                    key={c.id}
+                                    onClick={() => {
+                                      if (isUnlockedNow) {
+                                        localStorage.removeItem(`course_unlocked_${c.id}`);
+                                      } else {
+                                        localStorage.setItem(`course_unlocked_${c.id}`, 'true');
+                                      }
+                                      refreshUnlockedCourses();
+                                      authDebugger.addLog({
+                                        category: 'system',
+                                        level: 'info',
+                                        title: 'Cập nhật mở khóa',
+                                        details: `Thay đổi mở khóa "${c.id}": ${!isUnlockedNow}`
+                                      });
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                                      isUnlockedNow
+                                        ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-black'
+                                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-300'
+                                    }`}
+                                  >
+                                    {isUnlockedNow ? '✓ ' : '+ '} {c.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* List of currently unlocked course keys */}
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Danh sách ID đang mở khóa ({unlockedCourses.length})</span>
+                          {unlockedCourses.length === 0 ? (
+                            <div className="p-3 text-center border border-dashed border-slate-800 rounded-xl text-xs text-slate-500">
+                              Chưa mở khóa thủ công khóa học nào.
+                            </div>
+                          ) : (
+                            <div className="max-h-28 overflow-y-auto divide-y divide-slate-800/50 bg-slate-950 rounded-xl border border-slate-850 p-2 space-y-1">
+                              {unlockedCourses.map(id => (
+                                <div key={id} className="flex items-center justify-between py-1 px-2 text-xs font-mono">
+                                  <span className="text-cyan-400 font-bold">{id}</span>
+                                  <button
+                                    onClick={() => {
+                                      localStorage.removeItem(`course_unlocked_${id}`);
+                                      refreshUnlockedCourses();
+                                      authDebugger.addLog({
+                                        category: 'system',
+                                        level: 'warn',
+                                        title: 'Khóa lại khóa học',
+                                        details: `Đã thu hồi quyền truy cập khóa học "${id}" cục bộ.`
+                                      });
+                                    }}
+                                    className="p-1 rounded hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-all cursor-pointer"
+                                    title="Thu hồi quyền truy cập"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Full Diagnostic & Cache Flush Actions */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                      <div className="flex items-center gap-2.5">
+                        <Zap className="w-5 h-5 text-amber-400 animate-bounce" />
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-100">
+                          Thao Tác Bảo Trì & Reset Hệ Thống
+                        </h3>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Bạn có chắc chắn muốn dọn sạch toàn bộ LocalStorage? Mọi cài đặt, bài học tạm và token đồng bộ cục bộ sẽ bị reset.')) {
+                              localStorage.clear();
+                              refreshUnlockedCourses();
+                              window.dispatchEvent(new Event('dev_control_updated'));
+                              alert('Đã dọn dẹp sạch sẽ cache trình duyệt!');
+                              window.location.reload();
+                            }
+                          }}
+                          className="p-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-300 text-xs font-bold text-left transition-all flex flex-col justify-between h-24 cursor-pointer"
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="p-1 rounded-lg bg-rose-500/10 text-rose-400"><Trash2 className="w-4 h-4" /></span>
+                            <span className="text-[10px] font-black uppercase font-mono tracking-widest text-rose-400">System Danger</span>
+                          </div>
+                          <div>
+                            <span className="block font-black uppercase">Wipe local storage</span>
+                            <span className="text-[10px] text-slate-400">Xóa toàn bộ cache, unlock và tùy chọn</span>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const dummyLogId = Date.now().toString();
+                            authDebugger.addLog({
+                              category: 'system',
+                              level: 'warn',
+                              title: 'Cảnh Báo Chẩn Đoán',
+                              details: 'Đây là dòng cảnh báo thử nghiệm được kích hoạt bởi nhà phát triển.',
+                              payload: { testId: dummyLogId, triggeredAt: new Date().toISOString() }
+                            });
+                            setActiveTab('stream');
+                          }}
+                          className="p-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 text-amber-300 text-xs font-bold text-left transition-all flex flex-col justify-between h-24 cursor-pointer"
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="p-1 rounded-lg bg-amber-500/10 text-amber-400"><AlertTriangle className="w-4 h-4" /></span>
+                            <span className="text-[10px] font-black uppercase font-mono tracking-widest text-amber-400">Logs Trigger</span>
+                          </div>
+                          <div>
+                            <span className="block font-black uppercase">Dispatch dummy warning</span>
+                            <span className="text-[10px] text-slate-400">Tạo log cảnh báo thử nghiệm</span>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const customEvent = new CustomEvent('course_unlocked_khoa-vip');
+                            window.dispatchEvent(customEvent);
+                            authDebugger.addLog({
+                              category: 'system',
+                              level: 'success',
+                              title: 'Phát tín hiệu VIP',
+                              details: 'Đã phát tín hiệu mở khóa VIP giả lập tới các phân hệ lắng nghe.'
+                            });
+                          }}
+                          className="p-4 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 text-cyan-300 text-xs font-bold text-left transition-all flex flex-col justify-between h-24 cursor-pointer"
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="p-1 rounded-lg bg-cyan-500/10 text-cyan-400"><Zap className="w-4 h-4" /></span>
+                            <span className="text-[10px] font-black uppercase font-mono tracking-widest text-cyan-400">Global Sync</span>
+                          </div>
+                          <div>
+                            <span className="block font-black uppercase">Simulate global VIP purchase</span>
+                            <span className="text-[10px] text-slate-400">Phát tin hiệu mở khóa trọn đời</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 )}
 

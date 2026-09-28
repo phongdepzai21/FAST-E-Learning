@@ -3,7 +3,7 @@ import React, { Suspense, lazy, useState, useEffect } from 'react';
 // Migration: Switch from HashRouter to BrowserRouter for clean production URLs (e.g. /home) without #
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import Header from './components/Header';
 import ScrollToTop from './components/ScrollToTop';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -29,9 +29,11 @@ const Consulting = lazy(() => import('./pages/Consulting'));
 const Handbook = lazy(() => import('./pages/Handbook'));
 const Account = lazy(() => import('./pages/Account'));
 const AccountSettings = lazy(() => import('./pages/AccountSettings'));
+const VipUpgrade = lazy(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Classroom = lazy(() => import('./pages/Classroom'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Lazy load Components phụ trợ & Footer
 const FloatingContact = lazy(() => import('./components/FloatingContact'));
@@ -64,6 +66,35 @@ const AppLayout: React.FC = () => {
 
   useEffect(() => {
     initCourseSyncService();
+
+    // Programmatically delete 'khoa-vip' from the database and from all user purchased collections
+    const executeGlobalVipCleanup = async () => {
+      try {
+        const { doc, collection, getDocs, deleteDoc } = await import('firebase/firestore');
+        
+        // 1. Delete the course document itself from the global courses collection
+        await deleteDoc(doc(db, 'courses', 'khoa-vip'));
+        console.log('[Cleanup] Deleted courses/khoa-vip from database successfully.');
+
+        // 2. Fetch all users and delete the VIP course from their subcollection
+        const usersSnap = await getDocs(collection(db, 'users'));
+        for (const userDoc of usersSnap.docs) {
+          const userEmail = userDoc.id;
+          if (userEmail) {
+            await deleteDoc(doc(db, 'users', userEmail, 'purchased_courses', 'khoa-vip'));
+          }
+        }
+        console.log('[Cleanup] Deleted khoa-vip from all user accounts.');
+
+        // 3. Clear local storage cache for the current user
+        try {
+          localStorage.removeItem('course_unlocked_khoa-vip');
+        } catch (e) {}
+      } catch (err) {
+        console.warn('[Cleanup] Error executing VIP course global deletion:', err);
+      }
+    };
+    executeGlobalVipCleanup();
   }, []);
 
   useEffect(() => {
@@ -149,8 +180,10 @@ const AppLayout: React.FC = () => {
             <Route path="/account" element={<Account />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
+            <Route path="/account/vip-upgrade" element={<VipUpgrade />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>

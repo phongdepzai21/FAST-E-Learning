@@ -879,6 +879,8 @@ async function startServer() {
       const admins = ['h1h4phong@gmail.com', 'hkc.qms@gmail.com', 'trdung153@gmail.com', 'lediem.ngo@gmail.com'];
       const isHardcodedAdmin = admins.includes(normalizedEmail);
       const isHardcodedTeacher = admins.includes(normalizedEmail);
+      const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
+      const determinedRole = isOwner ? 'Owner' : (isHardcodedAdmin ? 'Admin' : 'User');
 
       const updateData: Record<string, any> = {
         email: normalizedEmail,
@@ -888,8 +890,6 @@ async function startServer() {
       if (displayName) updateData.displayName = displayName;
       if (photoURL) updateData.photoURL = photoURL;
 
-      const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
-
       if (!userDoc.exists) {
         // Create new user profile document
         updateData.createdAt = new Date().toISOString();
@@ -897,11 +897,13 @@ async function startServer() {
         updateData.isAdmin = isHardcodedAdmin || isOwner;
         updateData.isTeacher = isHardcodedTeacher || isHardcodedAdmin || isOwner;
         updateData.isOwner = isOwner;
+        updateData.role = determinedRole;
         updateData.status = "approved";
         
         await userRef.set(updateData);
       } else {
         // Merge updates safely
+        updateData.role = determinedRole;
         if (isOwner) {
           updateData.isOwner = true;
           updateData.isAdmin = true;

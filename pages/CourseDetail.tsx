@@ -60,6 +60,11 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
   useEffect(() => {
     if (!id) return;
+    if (id.toLowerCase() === 'khoa-vip') {
+      showToast('Khóa học VIP không tồn tại hoặc đã bị xóa vĩnh viễn.', 'error', 5000);
+      navigate('/khoa-hoc', { replace: true });
+      return;
+    }
     markCourseAsSeen(id);
 
     const loadFromLocalAndFallback = (firestoreData?: any) => {
