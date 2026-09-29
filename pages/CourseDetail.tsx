@@ -152,27 +152,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             if (isPrivileged) {
                 setIsAdmin(true);
                 setIsVip(true);
-            } else {
-               const localRolesStr = localStorage.getItem(`user_roles_${normalizedEmail}`);
-               if (localRolesStr) {
-                   try {
-                       const localRoles = JSON.parse(localRolesStr);
-                       if (localRoles.isAdmin === true && localRoles.rolePromotedByAdmin === true) {
-                           setIsAdmin(true);
-                           isPrivileged = true;
-                       }
-                       if (localRoles.isVip) {
-                           setIsVip(true);
-                           isVipUser = true;
-                       }
-                   } catch (e) {}
-               }
-            }
-
-            // Local Check
-            const localUnlocked = localStorage.getItem(`course_unlocked_${id}`);
-            if (localUnlocked === 'true') {
-                setIsOwned(true);
             }
 
             // DB Real-time Check
@@ -184,13 +163,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         setIsOwned(true);
                         setCourseProgress(data.progress || 0);
                         setCompletedLessons(data.completedLessons || []);
-                        try {
-                            localStorage.setItem(`course_unlocked_${id}`, 'true');
-                        } catch (e) {}
 
                         if (typeof data.lastLessonIdx === 'number' && data.lastLessonIdx >= 0) {
                             setLastSavedLessonIdx(data.lastLessonIdx);
                         }
+                    } else {
+                        setIsOwned(false);
                     }
                 }, (error) => {
                     console.error("Lỗi kiểm tra khóa học realtime:", error);
@@ -232,7 +210,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         }
     }
 
-    localStorage.setItem(`course_unlocked_${id}`, 'true');
     setIsOwned(true);
     setIsActivating(false);
     setShowPaymentModal(false);

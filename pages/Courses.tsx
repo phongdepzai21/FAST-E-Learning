@@ -181,33 +181,20 @@ const Courses: React.FC = () => {
                 return;
             }
             
-            // Check VIP/Admin status
+            // Check real Admin/VIP status from ADMIN_EMAILS
             import('../constants').then(({ ADMIN_EMAILS }) => {
-                let isPrivileged = ADMIN_EMAILS.includes(normalizedEmail);
-                if (!isPrivileged) {
-                   const localRolesStr = localStorage.getItem(`user_roles_${normalizedEmail}`);
-                   if (localRolesStr) {
-                       try {
-                           const localRoles = JSON.parse(localRolesStr);
-                           if (localRoles.isVip || localRoles.isAdmin) isPrivileged = true;
-                       } catch (e) {}
-                   }
-                }
+                const isPrivileged = ADMIN_EMAILS.includes(normalizedEmail);
                 setIsVipOrAdmin(isPrivileged);
             });
 
             // Fast local storage cache preload
             try {
               const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
-              const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
               if (cachedStr) {
                 const cachedIds = JSON.parse(cachedStr);
                 if (Array.isArray(cachedIds) && cachedIds.length > 0) {
                   setOwnedCourseIds(cachedIds);
                 }
-              } else if (hasClaimedAll) {
-                const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
-                setOwnedCourseIds(allActiveIds);
               }
             } catch (e) {}
 
@@ -215,17 +202,10 @@ const Courses: React.FC = () => {
                 collection(db, "users", normalizedEmail, "purchased_courses"),
                 (snapshot: QuerySnapshot<DocumentData>) => {
                     const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
-                    const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
-                    let mergedIds = ids;
-                    if (hasClaimedAll) {
-                      const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
-                      mergedIds = Array.from(new Set([...ids, ...allActiveIds]));
-                    }
-                    setOwnedCourseIds(mergedIds);
+                    setOwnedCourseIds(ids);
                     setIsLoadingOwnership(false);
                     try {
-                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(mergedIds));
-                      mergedIds.forEach(cid => localStorage.setItem(`course_unlocked_${cid}`, 'true'));
+                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
                     } catch (e) {}
                 },
                 (error) => {
@@ -266,136 +246,7 @@ const Courses: React.FC = () => {
     };
   }, [allCourses]);
 
-  const [isClaimingAll, setIsClaimingAll] = useState(false);
 
-  const handleClaimCourse = async (course: Course) => {
-    if (!currentUserEmail) {
-      toast.error('Vui lòng đăng nhập để nhận khóa học.');
-      return;
-    }
-    setClaimingId(course.id);
-    try {
-      const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
-      await setDoc(courseRef, {
-        courseId: course.id,
-        courseTitle: course.title || '',
-        title: course.title || '',
-        price: course.price || '',
-        progress: 0,
-        unlockedAt: new Date().toISOString(),
-        purchasedAt: new Date().toISOString(),
-        status: 'active',
-        claimedVia: 'INSTANT_CLAIM'
-      }, { merge: true });
-
-      try {
-        localStorage.setItem('course_unlocked_' + course.id, 'true');
-      } catch (e) {}
-      setOwnedCourseIds(prev => {
-        const next = prev.includes(course.id) ? prev : [...prev, course.id];
-        try {
-          localStorage.setItem(`user_courses_${currentUserEmail}`, JSON.stringify(next));
-        } catch (e) {}
-        return next;
-      });
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      window.dispatchEvent(new Event('storage'));
-      toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
-    } catch (err: any) {
-      console.error("Lỗi nhận khóa học:", err);
-      const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${auth.currentUser?.email}/purchased_courses/${course.id}`, err);
-      
-      // Fallback mở khóa cục bộ
-      try {
-        localStorage.setItem('course_unlocked_' + course.id, 'true');
-      } catch (e) {}
-      setOwnedCourseIds(prev => prev.includes(course.id) ? prev : [...prev, course.id]);
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      window.dispatchEvent(new Event('storage'));
-      
-      toast.success(`✨ Đã mở khóa khóa học "${course.title}" trên thiết bị của bạn!`);
-      if (errorInfo.code === 'permission-denied') {
-        toast.info('Lưu ý: Cloud Firestore đang chờ cấp quyền Rules trên Firebase Console. Khóa học đã được lưu ngoại tuyến để bạn vào học ngay!', 7000);
-      } else {
-        toast.info(errorInfo.solution, 6000);
-      }
-    } finally {
-      setClaimingId(null);
-    }
-  };
-
-  const handleClaimAllCourses = async () => {
-    if (!currentUserEmail) {
-      toast.error('Vui lòng đăng nhập để nhận tất cả khóa học.');
-      return;
-    }
-    setIsClaimingAll(true);
-    try {
-      const unowned = allCourses.filter(c => !ownedCourseIds.includes(c.id) && c.status !== 'draft' && c.status !== 'inactive');
-      if (unowned.length === 0) {
-        toast.info('Bạn đã sở hữu toàn bộ các khóa học trên hệ thống!');
-        setIsClaimingAll(false);
-        return;
-      }
-
-      let hasFirestoreError = false;
-      let firstError: any = null;
-
-      for (const course of unowned) {
-        try {
-          const courseRef = doc(db, "users", currentUserEmail, "purchased_courses", course.id);
-          await setDoc(courseRef, {
-            courseId: course.id,
-            courseTitle: course.title || '',
-            title: course.title || '',
-            price: course.price || '',
-            progress: 0,
-            unlockedAt: new Date().toISOString(),
-            purchasedAt: new Date().toISOString(),
-            status: 'active',
-            claimedVia: 'VIP_CLAIM_ALL'
-          }, { merge: true });
-        } catch (e) {
-          console.warn('Firestore claim error for course:', course.id, e);
-          hasFirestoreError = true;
-          if (!firstError) firstError = e;
-        }
-        try {
-          localStorage.setItem('course_unlocked_' + course.id, 'true');
-        } catch (e) {}
-      }
-
-      const allActiveIds = allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
-      const newOwned = Array.from(new Set([...ownedCourseIds, ...allActiveIds]));
-      setOwnedCourseIds(newOwned);
-      try {
-        localStorage.setItem(`user_courses_${currentUserEmail}`, JSON.stringify(newOwned));
-        localStorage.setItem(`has_claimed_all_${currentUserEmail}`, 'true');
-      } catch (e) {}
-      window.dispatchEvent(new CustomEvent('courses_updated'));
-      window.dispatchEvent(new Event('storage'));
-
-      toast.success(`👑 Đã kích hoạt toàn bộ ${unowned.length} khóa học vào tài khoản của bạn!`);
-      if (hasFirestoreError && firstError) {
-        const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, firstError);
-        if (errorInfo.code === 'permission-denied') {
-          toast.info('Lưu ý: Cloud Firestore đang chờ cấp quyền Rules trên Firebase Console. Dữ liệu đã sẵn sàng ngoại tuyến để bạn học ngay!', 7000);
-        }
-      }
-    } catch (err: any) {
-      console.error("Lỗi mở khóa tất cả:", err);
-      const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${auth.currentUser?.email}/purchased_courses/*`, err);
-      toast.info('Lưu ý: ' + errorInfo.solution, 7000);
-    } finally {
-      setIsClaimingAll(false);
-    }
-  };
-
-  // Danh sách khóa học chưa sở hữu (chỉ hiển thị nút nhận tất cả khi còn khóa chưa nhận và đã tải xong dữ liệu)
-  const unownedCourses = useMemo(() => {
-    if (isLoadingOwnership) return [];
-    return allCourses.filter(c => !ownedCourseIds.includes(c.id) && c.status !== 'draft' && c.status !== 'inactive');
-  }, [allCourses, ownedCourseIds, isLoadingOwnership]);
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
@@ -503,26 +354,6 @@ const Courses: React.FC = () => {
                 {activeCategory === 'Tất cả' ? 'Tất cả bài học' : `Khóa học ${activeCategory}`}
                 <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
             </h2>
-
-            {isVipOrAdmin && unownedCourses.length > 0 && (
-                <button
-                    onClick={handleClaimAllCourses}
-                    disabled={isClaimingAll}
-                    className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                >
-                    {isClaimingAll ? (
-                        <>
-                            <svg className="w-4 h-4 animate-spin text-slate-950" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            <span>Đang kích hoạt toàn bộ...</span>
-                        </>
-                    ) : (
-                        <>
-                            <span>👑 Nhận {unownedCourses.length} Khóa Học Còn Lại (VIP / Admin)</span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                        </>
-                    )}
-                </button>
-            )}
         </div>
 
         {isLoadingOwnership ? (
@@ -553,10 +384,7 @@ const Courses: React.FC = () => {
                             key={course.id} 
                             course={course}
                             isOwned={isOwned} 
-                            isVipAvailable={!isOwned && isVipOrAdmin}
                             progress={isOwned ? 0 : undefined} 
-                            onClaimCourse={isVipOrAdmin ? handleClaimCourse : undefined}
-                            isClaiming={claimingId === course.id}
                         />
                     );
                 })}

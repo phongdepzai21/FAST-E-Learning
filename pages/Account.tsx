@@ -66,16 +66,12 @@ const MyOwnedCoursesView: React.FC<{
   isVip?: boolean;
   isAdmin?: boolean;
   unownedCount?: number;
-  onClaimAllCourses?: () => void;
-  isClaimingAll?: boolean;
 }> = ({ 
   myCourses, 
   onGoToBuyCourses,
   isVip = false,
   isAdmin = false,
-  unownedCount = 0,
-  onClaimAllCourses,
-  isClaimingAll = false
+  unownedCount = 0
 }) => {
   const isPrivileged = isVip || isAdmin;
 
@@ -92,26 +88,6 @@ const MyOwnedCoursesView: React.FC<{
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{myCourses.length} Khóa học</span>
           
-          {isPrivileged && unownedCount > 0 && onClaimAllCourses && (
-            <button
-              onClick={onClaimAllCourses}
-              disabled={isClaimingAll}
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
-            >
-              {isClaimingAll ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Đang nhận...</span>
-                </>
-              ) : (
-                <>
-                  <span>⭐</span>
-                  <span>Nhận {unownedCount} khóa còn lại</span>
-                </>
-              )}
-            </button>
-          )}
-
           {onGoToBuyCourses && (
             <button
               onClick={onGoToBuyCourses}
@@ -131,7 +107,7 @@ const MyOwnedCoursesView: React.FC<{
                 key={course.id} 
                 course={course} 
                 isOwned={true} 
-             />
+              />
           ))}
         </div>
       ) : (
@@ -141,50 +117,28 @@ const MyOwnedCoursesView: React.FC<{
              </div>
              <h3 className="text-2xl font-black text-gray-800 mb-2">Chưa có khóa học nào</h3>
              <p className="text-gray-500 text-sm mb-8 max-w-md mx-auto leading-relaxed">
-               {isPrivileged 
-                 ? "Bạn có đặc quyền mở khóa toàn bộ khóa học ngay lập tức mà không mất phí!" 
-                 : "Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu hành trình nâng cao kiến thức!"}
+               Tài khoản của bạn hiện chưa có khóa học nào. Hãy khám phá và mua khóa học ngay để bắt đầu hành trình nâng cao kiến thức!
              </p>
              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-               {isPrivileged && onClaimAllCourses ? (
-                 <button 
-                   onClick={onClaimAllCourses}
-                   disabled={isClaimingAll}
-                   className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
-                 >
-                   {isClaimingAll ? (
-                     <>
-                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                       <span>Đang mở khóa tất cả...</span>
-                     </>
-                   ) : (
-                     <>
-                       <span>⭐</span>
-                       <span>Nhận tất cả khóa học ngay</span>
-                     </>
-                   )}
-                 </button>
-               ) : onGoToBuyCourses ? (
-                 <button 
-                   onClick={onGoToBuyCourses} 
-                   className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
-                 >
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                   Mua khóa học ngay
-                 </button>
-               ) : (
-                 <Link 
-                   to="/khoa-hoc" 
-                   className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
-                 >
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                   Mua khóa học ngay
-                 </Link>
-               )}
-               
-               
+               {onGoToBuyCourses ? (
+                  <button 
+                    onClick={onGoToBuyCourses} 
+                    className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    Mua khóa học ngay
+                  </button>
+                ) : (
+                  <Link 
+                    to="/khoa-hoc" 
+                    className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    Mua khóa học ngay
+                  </Link>
+                )}
              </div>
-        </div>
+         </div>
       )}
     </section>
   );
@@ -195,20 +149,12 @@ const BuyCoursesView: React.FC<{
   ownedCourseIds: string[];
   isVip: boolean;
   isAdmin: boolean;
-  onClaimSingleCourse: (course: Course) => Promise<void>;
-  onClaimAllCourses: () => Promise<void>;
-  claimingId: string | null;
-  isClaimingAll: boolean;
   onGoToMyCourses: () => void;
 }> = ({ 
   allCourses, 
   ownedCourseIds, 
   isVip, 
   isAdmin, 
-  onClaimSingleCourse, 
-  onClaimAllCourses,
-  claimingId,
-  isClaimingAll,
   onGoToMyCourses
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -271,92 +217,9 @@ const BuyCoursesView: React.FC<{
         </div>
       </div>
 
-      {/* VIP / Admin Quick Claim Banner */}
-      {isPrivileged && unownedCount > 0 && (
-        <div className="bg-gradient-to-r from-[#003835] via-[#005a54] to-[#003835] border border-teal-500/30 rounded-[32px] p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-400/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
 
-          <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/30 text-amber-300 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider">
-                <span>⭐</span> {isVip ? 'ĐẶC QUYỀN VIP TRỌN ĐỜI' : 'QUYỀN QUẢN TRỊ VIÊN'}
-              </div>
-              <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
-                Có {unownedCount} Khóa Học Mới Chưa Kích Hoạt
-              </h4>
-              <p className="text-teal-100/80 text-xs md:text-sm font-medium max-w-2xl leading-relaxed">
-                Bạn có thể bấm <strong className="text-amber-300">"Nhận khóa học ngay"</strong> ở từng khóa học bên dưới, hoặc bấm nút bên cạnh để mở khóa toàn bộ {unownedCount} khóa học mới vào phòng học chỉ với 1 click!
-              </p>
-              <div className="flex items-center gap-4 text-xs font-bold pt-1">
-                <span className="text-teal-200">
-                  Đã sở hữu: <strong className="text-white font-black">{ownedActiveCount}/{activeCourses.length}</strong> khóa học
-                </span>
-                <span className="text-amber-300/90 font-medium">
-                  (Còn {unownedCount} khóa học chưa mở khóa)
-                </span>
-              </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto shrink-0">
-              <button
-                type="button"
-                onClick={onClaimAllCourses}
-                disabled={isClaimingAll}
-                className="px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2.5 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-600 hover:to-yellow-600 text-white shadow-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                {isClaimingAll ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Đang nhận tất cả...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-                    <span>⭐ Nhận tất cả ({unownedCount} khóa)</span>
-                  </>
-                )}
-              </button>
 
-              <button
-                type="button"
-                onClick={onGoToMyCourses}
-                className="px-6 py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl font-bold text-xs uppercase tracking-widest text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Vào phòng học</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* When all courses are already owned */}
-      {isPrivileged && unownedCount === 0 && (
-        <div className="bg-gradient-to-r from-[#003835] via-[#005a54] to-[#003835] border border-teal-500/30 rounded-[32px] p-6 md:p-8 text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <div>
-              <h4 className="text-lg md:text-xl font-black uppercase tracking-tight text-white">
-                Bạn đã sở hữu trọn bộ toàn bộ {activeCourses.length} khóa học
-              </h4>
-              <p className="text-teal-100/80 text-xs md:text-sm font-medium">
-                Tất cả khóa học đều đã được kích hoạt vĩnh viễn vào tài khoản của bạn.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onGoToMyCourses}
-            className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 shrink-0"
-          >
-            <span>Vào học ngay</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-          </button>
-        </div>
-      )}
 
       {/* Search & Category Filter */}
       <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
@@ -395,15 +258,11 @@ const BuyCoursesView: React.FC<{
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredCourses.map(course => {
             const isOwned = ownedCourseIds.includes(course.id);
-            const isVipAvailable = isPrivileged && !isOwned;
             return (
               <CourseCard 
                 key={course.id} 
                 course={course} 
                 isOwned={isOwned}
-                isVipAvailable={isVipAvailable}
-                onClaimCourse={isPrivileged ? onClaimSingleCourse : undefined}
-                isClaiming={claimingId === course.id}
               />
             );
           })}
@@ -2229,10 +2088,6 @@ const Account: React.FC = () => {
                     ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
                     isVip={isVip}
                     isAdmin={isAdmin}
-                    onClaimSingleCourse={handleClaimSingleCourse}
-                    onClaimAllCourses={handleClaimAllCourses}
-                    claimingId={claimingId}
-                    isClaimingAll={isClaimingAll}
                     onGoToMyCourses={() => setActiveTab('my-courses')}
                   />
                 ) : activeTab === 'my-courses' ? (
@@ -2243,8 +2098,6 @@ const Account: React.FC = () => {
                     isVip={isVip}
                     isAdmin={isAdmin}
                     unownedCount={unownedCoursesCount}
-                    onClaimAllCourses={handleClaimAllCourses}
-                    isClaimingAll={isClaimingAll}
                   />
                 ) : (
                   <div className="space-y-10">
@@ -2279,113 +2132,7 @@ const Account: React.FC = () => {
                       </div>
                     </section>
 
-                {/* Admin Status Activation Panel */}
-                {ADMIN_EMAILS.includes(user?.email || '') && !(user?.isVip === true && user?.isAdmin === true && user?.isTeacher === true) && (
-                  <section className="bg-gradient-to-br from-[#024c48] to-[#012d2b] rounded-[32px] p-8 text-white relative overflow-hidden shadow-xl animate-in fade-in duration-500">
-                    {/* Decorative Elements */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                    
-                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                      <div className="text-center md:text-left">
-                        <div className="inline-flex items-center gap-2 bg-teal-400/20 text-teal-200 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest mb-4">
-                          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-                          Chế Đô Kích Hoạt Quyền quản trị viên
-                        </div>
-                        <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight">Kích hoạt quyền Quản trị viên & Giáo viên</h3>
-                        <p className="text-teal-200/70 text-xs md:text-sm font-semibold max-w-xl mt-2 leading-relaxed">
-                          Bạn có thể kích hoạt quyền **Quản trị viên (Admin)** và **Giáo viên (Teacher)** cho tài khoản này để cập nhật thông tin bài học, chỉnh sửa toàn bộ nội dung của trang web và tải lên không giới hạn.
-                        </p>
-                        
-                        {/* Active Roles Display */}
-                        <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
-                          <span className={`px-3 py-1 rounded-lg text-xs font-bold ${isAdmin ? 'bg-green-500/25 text-green-300 border border-green-500/30' : 'bg-white/10 text-white/50'}`}>
-                            Admin: {isAdmin ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
-                          </span>
-                          <span className={`px-3 py-1 rounded-lg text-xs font-bold ${isTeacher ? 'bg-green-500/25 text-green-300 border border-green-500/30' : 'bg-white/10 text-white/50'}`}>
-                            Giáo viên: {isTeacher ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
-                          </span>
-                          <span className={`px-3 py-1 rounded-lg text-xs font-bold ${isVip ? 'bg-yellow-500/25 text-yellow-300 border border-yellow-500/30' : 'bg-white/10 text-white/50'}`}>
-                            VIP Trọn đời: {isVip ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div className="shrink-0 w-full md:w-auto">
-                        <button
-                          onClick={async () => {
-                            if (!user?.email) return;
-                            try {
-                              const userDocRef = doc(db, "users", user.email);
-                              await setDoc(userDocRef, {
-                                email: user.email,
-                                displayName: user.name,
-                                isVip: true,
-                                isAdmin: true,
-                                isTeacher: true,
-                                rolePromotedByAdmin: true,
-                                updatedAt: new Date().toISOString()
-                              }, { merge: true });
-
-                              // Save to local backup
-                              try {
-                                localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
-                                  isVip: true,
-                                  isAdmin: true,
-                                  isTeacher: true,
-                                  rolePromotedByAdmin: true
-                                }));
-                              } catch (e) {}
-                              
-                              // Immediately update local state
-                              setUser(prev => prev ? {
-                                ...prev,
-                                isVip: true,
-                                isAdmin: true,
-                                isTeacher: true,
-                                rolePromotedByAdmin: true
-                              } : null);
-                              
-                              setAdminSuccess("Kích hoạt quyền Quản trị viên tối cao thành công! Quyền hạn đã được lưu trữ an toàn trên cả hệ thống Cloud Database.");
-                              setTimeout(() => setAdminSuccess(null), 8000);
-                            } catch (err: any) {
-                              console.error("Lỗi kích hoạt Admin:", err);
-                              const errorMsg = err instanceof Error ? err.message : String(err);
-
-                              // Save to local backup anyway so user is NEVER blocked
-                              try {
-                                localStorage.setItem(`user_roles_${user.email}`, JSON.stringify({
-                                  isVip: true,
-                                  isAdmin: true,
-                                  isTeacher: true
-                                }));
-                              } catch (e) {}
-
-                              // Immediately update local state
-                              setUser(prev => prev ? {
-                                ...prev,
-                                isVip: true,
-                                isAdmin: true,
-                                isTeacher: true
-                              } : null);
-
-                              setAdminSuccess(`Kích hoạt quyền toàn diện THÀNH CÔNG trên thiết bị này nhờ hệ thống tự động lưu trữ dự phòng (Offline fallback)! (Firestore report: "${errorMsg}")`);
-                              setTimeout(() => setAdminSuccess(null), 12000);
-                            }
-                          }}
-                          className="w-full md:w-auto px-8 py-4 bg-teal-400 text-teal-950 hover:bg-teal-300 bg-opacity-100 hover:opacity-90 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-teal-400/20 hover:scale-105 transition-all text-center cursor-pointer"
-                        >
-                          {isAdmin && isTeacher ? "Cập nhật quyền tối cao" : "Kích hoạt toàn quyền"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {adminSuccess && (
-                      <div className="mt-4 p-4 bg-teal-950/50 border border-teal-500/30 rounded-xl text-teal-200 text-xs font-bold animate-in slide-in-from-top-2">
-                        🎉 {adminSuccess}
-                      </div>
-                    )}
-                  </section>
-                )}
 
                 <section className="animate-in slide-in-from-bottom-5 duration-700 delay-150">
                   <div className="flex items-center justify-between mb-8">

@@ -220,15 +220,6 @@ const Classroom: React.FC = () => {
         // Trigger daily learning streak recording
         recordDailyLearningActivity(normalizedEmail);
 
-        // Local storage unlock check
-        let isLocalUnlocked = false;
-        try {
-          isLocalUnlocked = courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true';
-        } catch (e) {}
-        if (isLocalUnlocked) {
-          setIsOwned(true);
-        }
-
         // Realtime Firestore Check
         if (courseId) {
           const userDocRef = doc(db, "users", normalizedEmail, "purchased_courses", courseId);
@@ -248,9 +239,6 @@ const Classroom: React.FC = () => {
                   localStorage.setItem(`notes_${courseId}`, JSON.stringify(data.notes));
                 } catch (e) {}
               }
-              try {
-                localStorage.setItem(`course_unlocked_${courseId}`, 'true');
-              } catch (e) {}
 
               // Tự động khôi phục vị trí bài học cuối cùng từ Firestore
               const params = new URLSearchParams(location.search);
@@ -265,6 +253,8 @@ const Classroom: React.FC = () => {
                   hasRestoredFromFirestoreRef.current = true;
                 }
               }
+            } else {
+              setIsOwned(false);
             }
           }, (err) => {
             console.warn("Lưu ý đồng bộ Firestore tiến trình bài học:", err?.message || err);
@@ -272,15 +262,7 @@ const Classroom: React.FC = () => {
         }
       } else {
         setCurrentUser(null);
-        let isLocalUnlocked = false;
-        try {
-          isLocalUnlocked = courseId && localStorage.getItem(`course_unlocked_${courseId}`) === 'true';
-        } catch (e) {}
-        if (isLocalUnlocked) {
-          setIsOwned(true);
-        } else {
-          setIsOwned(false);
-        }
+        setIsOwned(false);
       }
     });
 
