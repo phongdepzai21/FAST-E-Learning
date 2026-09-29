@@ -213,6 +213,33 @@ async function startServer() {
     });
   });
 
+  // Google reCAPTCHA v3 verification endpoint
+  app.post("/api/verify-captcha", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ success: false, error: "Missing token" });
+      }
+
+      const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=6LdEkdQtAAAAAOeAKhhpvsu9Qi3YirwXip8HCqRc&response=${token}`;
+      const response = await fetch(verifyUrl, {
+        method: "POST"
+      });
+      const data = await response.json();
+
+      // For reCAPTCHA v3, we check the score. Usually scores >= 0.5 are human.
+      // If it's a test key or v2 key used, score might be undefined, so we accept data.success
+      if (data.success) {
+        return res.json({ success: true, score: data.score ?? 1.0 });
+      } else {
+        return res.json({ success: false, score: data.score, errors: data["error-codes"] });
+      }
+    } catch (err: any) {
+      console.error("[reCAPTCHA Backend] Verification error:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Endpoint to generate expiring signed URLs for Firebase Storage videos
   app.post("/api/video/signed-url", async (req, res) => {
     try {

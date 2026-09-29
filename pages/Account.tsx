@@ -639,21 +639,22 @@ const Account: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
 
-  // Anti-bot CAPTCHA Protection States
-  const [captchaNum1, setCaptchaNum1] = useState(0);
-  const [captchaNum2, setCaptchaNum2] = useState(0);
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  // Premium Google reCAPTCHA v3 states
   const [captchaError, setCaptchaError] = useState('');
 
-  const generateCaptcha = () => {
-    setCaptchaNum1(Math.floor(Math.random() * 9) + 2);
-    setCaptchaNum2(Math.floor(Math.random() * 8) + 2);
-    setCaptchaAnswer('');
-    setCaptchaError('');
-  };
-
+  // Load Google reCAPTCHA v3 script dynamically
   useEffect(() => {
-    generateCaptcha();
+    if (!isRegistering) return;
+    
+    const existingScript = document.getElementById('recaptcha-v3-script');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.id = 'recaptcha-v3-script';
+      script.src = 'https://www.google.com/recaptcha/api.js?render=6LdEkdQtAAAAABcenIZjUuHFBkC9qqkgEt3Nf9bz';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
   }, [isRegistering]);
 
   // OTP Verification States
@@ -1287,11 +1288,39 @@ const Account: React.FC = () => {
     }
 
     if (isRegistering) {
-      const parsedAns = parseInt(captchaAnswer.trim(), 10);
-      if (isNaN(parsedAns) || parsedAns !== (captchaNum1 + captchaNum2)) {
-        setCaptchaError("Câu trả lời CAPTCHA không chính xác. Vui lòng thử lại!");
-        toast.error("Xác minh chống Bot thất bại!");
-        generateCaptcha();
+      setCaptchaError("");
+      try {
+        const grecaptcha = (window as any).grecaptcha;
+        if (!grecaptcha) {
+          setCaptchaError("Hệ thống bảo mật reCAPTCHA chưa tải xong. Vui lòng đợi 1 giây rồi thử lại.");
+          toast.error("Hệ thống bảo mật reCAPTCHA chưa sẵn sàng!");
+          setIsAuthenticating(false);
+          return;
+        }
+
+        // Execute reCAPTCHA v3 with client Site Key
+        const token = await grecaptcha.execute('6LdEkdQtAAAAABcenIZjUuHFBkC9qqkgEt3Nf9bz', { action: 'register' });
+        
+        // Verify with server endpoint
+        const verifyResponse = await fetch('/api/verify-captcha', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ token })
+        });
+        
+        const verifyData = await verifyResponse.json();
+        if (!verifyData.success) {
+          setCaptchaError("Google reCAPTCHA xác định đây có thể là hoạt động tự động bất thường.");
+          toast.error("Xác minh bảo mật chống Bot thất bại!");
+          setIsAuthenticating(false);
+          return;
+        }
+      } catch (err: any) {
+        console.error("reCAPTCHA v3 execution error:", err);
+        setCaptchaError("Lỗi kết nối máy chủ Google reCAPTCHA.");
+        toast.error("Không thể kết nối máy chủ bảo mật Google!");
         setIsAuthenticating(false);
         return;
       }
@@ -2738,47 +2767,23 @@ const Account: React.FC = () => {
                         </div>
 
                         {isRegistering && (
-                          <div className="space-y-3 p-4.5 bg-slate-50 border border-gray-200 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">🛡️ Xác thực chống BOT & AI</span>
-                              <button 
-                                type="button" 
-                                onClick={generateCaptcha}
-                                className="text-xs font-bold text-[#007c76] hover:underline flex items-center gap-1 cursor-pointer"
-                              >
-                                🔄 Đổi mã
-                              </button>
+                          <div className="space-y-1.5 text-center animate-in fade-in duration-300">
+                            {/* Standard Google reCAPTCHA v3 Badge Info */}
+                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-50 border border-slate-150 rounded-xl text-[11px] font-bold text-gray-500">
+                              <svg className="w-4 h-4 text-[#4a90e2] shrink-0 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                              </svg>
+                              <span>
+                                Được bảo mật bởi <span className="text-[#4a90e2] font-black">Google reCAPTCHA v3</span>
+                              </span>
                             </div>
-                            
-                            <div className="flex items-center gap-3">
-                              {/* CAPTCHA Display box with Distortion effect */}
-                              <div className="bg-gradient-to-r from-gray-100 to-slate-100 border border-gray-300 rounded-xl px-4 py-2.5 font-mono text-lg font-black text-gray-700 tracking-wider select-none relative overflow-hidden shadow-2xs flex items-center justify-center min-w-[100px]">
-                                <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,124,118,0.05)_50%,transparent_75%)] bg-[length:10px_10px]" />
-                                <span className="rotate-3 inline-block scale-105 text-[#007c76]">{captchaNum1}</span>
-                                <span className="mx-2 text-gray-400 font-bold">+</span>
-                                <span className="-rotate-3 inline-block scale-95 text-[#007c76]">{captchaNum2}</span>
-                                <span className="mx-2 text-gray-400 font-bold">=</span>
-                                <span className="text-gray-400 font-bold">?</span>
-                              </div>
-
-                              {/* Input box */}
-                              <input 
-                                type="text"
-                                pattern="[0-9]*"
-                                inputMode="numeric"
-                                value={captchaAnswer}
-                                onChange={e => {
-                                  setCaptchaAnswer(e.target.value.replace(/[^0-9]/g, ''));
-                                  setCaptchaError('');
-                                }}
-                                placeholder="Kết quả?"
-                                className="flex-1 bg-white border border-gray-200 rounded-xl py-3 px-4 font-bold text-gray-700 text-center outline-none focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/15 transition-all text-sm"
-                              />
-                            </div>
+                            <p className="text-[9.5px] text-gray-400 font-semibold px-2 leading-relaxed">
+                              Trang web này tuân thủ <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline font-bold">Chính sách bảo mật</a> và <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline font-bold">Điều khoản dịch vụ</a> của Google.
+                            </p>
 
                             {captchaError && (
                               <p className="text-[11px] font-bold text-rose-600 mt-1">
-                                {captchaError}
+                                ⚠️ {captchaError}
                               </p>
                             )}
                           </div>
