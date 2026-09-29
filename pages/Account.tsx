@@ -2766,20 +2766,10 @@ const Account: React.FC = () => {
                             </button>
                         </div>
 
-                        {isRegistering && (
-                          <div className="flex flex-col items-center justify-center py-1.5 animate-in fade-in duration-300">
-                            {/* Tiny elegant official-style reCAPTCHA v3 icon */}
-                            <svg className="w-6 h-6 text-[#4a90e2] opacity-70 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M19.91 15.51c-.13-.42-.58-.65-1-.52-.42.13-.65.58-.52 1 .74 2.43.1 5.09-1.74 6.93-2.61 2.61-6.87 2.61-9.49 0a6.723 6.723 0 0 1-1.42-7.44l1.63 1.63c.2.2.51.2.71 0 .2-.2.2-.51 0-.71l-2.5-2.5c-.2-.2-.51-.2-.71 0l-2.5 2.5c-.2.2-.2.51 0 .71.2.2.51.2.71 0l1.45-1.45a7.711 7.711 0 0 0 1.64 8.52c3 3 7.89 3 10.9 0 2.11-2.11 2.85-5.18 2-7.98z" />
-                              <path d="M4.09 8.49c.13.42.58.65 1 .52.42-.13.65-.58.52-1A7.721 7.721 0 0 1 7.35 1.08c2.61-2.61 6.87-2.61 9.49 0 .54.54 1.01 1.15 1.42 1.83l-1.63-1.63c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l2.5 2.5c.2.2.51.2.71 0l2.5-2.5c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.45 1.45A8.724 8.724 0 0 0 18.06.71c-3-3-7.89-3-10.9 0a8.72 8.72 0 0 0-3.07 7.78z" />
-                            </svg>
-
-                            {captchaError && (
-                              <p className="text-[11px] font-bold text-rose-600 mt-1.5 text-center">
-                                ⚠️ {captchaError}
-                              </p>
-                            )}
-                          </div>
+                        {isRegistering && captchaError && (
+                          <p className="text-[11px] font-bold text-rose-600 mt-1.5 text-center animate-in fade-in duration-300">
+                            ⚠️ {captchaError}
+                          </p>
                         )}
 
                         <button 

@@ -19,6 +19,11 @@
   background: #94a3b8;
 }
 
+/* Hide Google reCAPTCHA v3 floating badge from UI layout */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
 /* Smooth interaction utilities */
 .hover-lift {
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease;
