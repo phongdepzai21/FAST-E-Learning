@@ -2767,22 +2767,15 @@ const Account: React.FC = () => {
                         </div>
 
                         {isRegistering && (
-                          <div className="space-y-1.5 text-center animate-in fade-in duration-300">
-                            {/* Standard Google reCAPTCHA v3 Badge Info */}
-                            <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-50 border border-slate-150 rounded-xl text-[11px] font-bold text-gray-500">
-                              <svg className="w-4 h-4 text-[#4a90e2] shrink-0 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                              </svg>
-                              <span>
-                                Được bảo mật bởi <span className="text-[#4a90e2] font-black">Google reCAPTCHA v3</span>
-                              </span>
-                            </div>
-                            <p className="text-[9.5px] text-gray-400 font-semibold px-2 leading-relaxed">
-                              Trang web này tuân thủ <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline font-bold">Chính sách bảo mật</a> và <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#4a90e2] hover:underline font-bold">Điều khoản dịch vụ</a> của Google.
-                            </p>
+                          <div className="flex flex-col items-center justify-center py-1.5 animate-in fade-in duration-300">
+                            {/* Tiny elegant official-style reCAPTCHA v3 icon */}
+                            <svg className="w-6 h-6 text-[#4a90e2] opacity-70 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M19.91 15.51c-.13-.42-.58-.65-1-.52-.42.13-.65.58-.52 1 .74 2.43.1 5.09-1.74 6.93-2.61 2.61-6.87 2.61-9.49 0a6.723 6.723 0 0 1-1.42-7.44l1.63 1.63c.2.2.51.2.71 0 .2-.2.2-.51 0-.71l-2.5-2.5c-.2-.2-.51-.2-.71 0l-2.5 2.5c-.2.2-.2.51 0 .71.2.2.51.2.71 0l1.45-1.45a7.711 7.711 0 0 0 1.64 8.52c3 3 7.89 3 10.9 0 2.11-2.11 2.85-5.18 2-7.98z" />
+                              <path d="M4.09 8.49c.13.42.58.65 1 .52.42-.13.65-.58.52-1A7.721 7.721 0 0 1 7.35 1.08c2.61-2.61 6.87-2.61 9.49 0 .54.54 1.01 1.15 1.42 1.83l-1.63-1.63c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l2.5 2.5c.2.2.51.2.71 0l2.5-2.5c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.45 1.45A8.724 8.724 0 0 0 18.06.71c-3-3-7.89-3-10.9 0a8.72 8.72 0 0 0-3.07 7.78z" />
+                            </svg>
 
                             {captchaError && (
-                              <p className="text-[11px] font-bold text-rose-600 mt-1">
+                              <p className="text-[11px] font-bold text-rose-600 mt-1.5 text-center">
                                 ⚠️ {captchaError}
                               </p>
                             )}
