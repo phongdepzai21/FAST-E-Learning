@@ -209,5 +209,12 @@ service cloud.firestore {
     match /manual_unlocks/{unlockId} {
       allow read, write: if isAdmin() || isSystemOwner();
     }
+
+    // 8. Course Registrations Logs and Notices
+    match /course_registrations/{registrationId} {
+      allow read: if isAdmin() || isSystemOwner() || isTeacher();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || isSystemOwner();
+    }
   }
 }

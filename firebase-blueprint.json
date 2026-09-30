@@ -72,6 +72,22 @@
         "unlockedAt": { "type": "string", "description": "ISO timestamp when the course was unlocked" }
       },
       "required": ["studentEmail", "courseId", "unlockedBy"]
+    },
+    "CourseRegistration": {
+      "title": "CourseRegistration",
+      "description": "Log record of a student self-registering or purchase enrollment of a course",
+      "type": "object",
+      "properties": {
+        "studentEmail": { "type": "string", "description": "Lowercase email address of the student" },
+        "studentName": { "type": "string", "description": "Display name of the student" },
+        "courseId": { "type": "string", "description": "ID of the registered course" },
+        "courseTitle": { "type": "string", "description": "Title of the registered course" },
+        "registeredAt": { "type": "string", "description": "ISO timestamp when enrollment occurred" },
+        "price": { "type": "string", "description": "Price at registration time" },
+        "status": { "type": "string", "description": "Active status" },
+        "type": { "type": "string", "description": "Type of claim or purchase" }
+      },
+      "required": ["studentEmail", "courseId", "registeredAt"]
     }
   },
   "firestore": {
@@ -94,6 +110,10 @@
     "manual_unlocks/{unlockId}": {
       "schema": "ManualUnlock",
       "description": "Log records tracking administrative course activations"
+    },
+    "course_registrations/{registrationId}": {
+      "schema": "CourseRegistration",
+      "description": "Public/Admin feed tracking course enrollments on the platform"
     }
   }
 }

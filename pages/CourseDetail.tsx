@@ -321,10 +321,27 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     "Tham gia cộng đồng học viên FAST"
   ];
 
-  if (!course) return (
-    <div className="min-h-screen flex flex-col items-center justify-center animate-fade-in">
-      <h2 className="text-2xl font-bold text-gray-400">Khóa học không tồn tại</h2>
-      {embeddedCourseId ? null : <Link to="/khoa-hoc" className="mt-4 text-primary font-bold hover:underline">Quay lại danh sách</Link>}
+  const isCourseHidden = course && (course.status === 'draft' || course.status === 'inactive');
+
+  if (!course || (isCourseHidden && !isAdmin)) return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-6 max-w-md mx-auto text-center px-4 animate-fade-in">
+      <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 shadow-xs">
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+      </div>
+      <div className="space-y-2">
+        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Khóa học tạm khóa</h3>
+        <p className="text-gray-500 text-xs font-semibold leading-relaxed">
+          Khóa học này hiện đã tạm ngưng hoạt động hoặc được đưa vào trạng thái nháp bởi Quản trị viên. Bạn không thể tiếp tục xem nội dung vào lúc này.
+        </p>
+      </div>
+      {embeddedCourseId ? null : (
+        <Link 
+          to="/khoa-hoc"
+          className="bg-[#007c76] hover:bg-[#00605b] text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+        >
+          Quay lại danh sách khóa học
+        </Link>
+      )}
     </div>
   );
 

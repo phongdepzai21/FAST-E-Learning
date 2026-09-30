@@ -166,6 +166,23 @@ export const AdminManualUnlock: React.FC = () => {
         unlockedAt: new Date().toISOString()
       });
 
+      // 3b. Ghi nhận đăng ký/claim khóa học phục vụ console & thông báo cho Admin
+      try {
+        const regId = `${email.replace(/[^a-z0-9]/g, '_')}_${targetCourse.id}_${Date.now()}`;
+        await setDoc(doc(db, 'course_registrations', regId), {
+          studentEmail: email,
+          studentName: email.split('@')[0],
+          courseId: targetCourse.id,
+          courseTitle: targetCourse.title,
+          registeredAt: new Date().toISOString(),
+          price: targetCourse.price || 'Miễn phí',
+          status: 'active',
+          type: 'MANUAL_UNLOCK'
+        });
+      } catch (e) {
+        console.warn('Lỗi ghi log course_registrations trên manual unlock:', e);
+      }
+
 
       toast.success(`Đã kích hoạt thành công khóa học "${targetCourse.title}" cho ${email}!`);
       
