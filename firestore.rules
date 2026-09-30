@@ -159,8 +159,8 @@ service cloud.firestore {
       match /purchased_courses/{courseId} {
         allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
         
-        allow create: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
-        allow update: if isOwner(userEmail) && isValidId(courseId) && isValidPurchasedCourse(incoming());
+        allow create: if (isOwner(userEmail) || isAdmin()) && isValidId(courseId) && isValidPurchasedCourse(incoming());
+        allow update: if (isOwner(userEmail) || isAdmin()) && isValidId(courseId) && isValidPurchasedCourse(incoming());
         allow delete: if isAdmin();
       }
 
@@ -203,6 +203,11 @@ service cloud.firestore {
     // 6. Food Safety CRM Records (ATTP)
     match /fast_food_safety_crm/{recordId} {
       allow read, write: if isSystemOwner() || isAdmin();
+    }
+
+    // 7. Manual Unlocks Logs
+    match /manual_unlocks/{unlockId} {
+      allow read, write: if isAdmin() || isSystemOwner();
     }
   }
 }

@@ -59,6 +59,19 @@
         "updatedAt": { "type": "string", "description": "ISO update timestamp string" }
       },
       "required": ["title"]
+    },
+    "ManualUnlock": {
+      "title": "ManualUnlock",
+      "description": "Log record of a course manually activated for a user by an administrator",
+      "type": "object",
+      "properties": {
+        "studentEmail": { "type": "string", "description": "Lowercase email address of the student" },
+        "courseId": { "type": "string", "description": "ID of the activated course" },
+        "courseTitle": { "type": "string", "description": "Title of the activated course" },
+        "unlockedBy": { "type": "string", "description": "Email address of the administrator who authorized the unlock" },
+        "unlockedAt": { "type": "string", "description": "ISO timestamp when the course was unlocked" }
+      },
+      "required": ["studentEmail", "courseId", "unlockedBy"]
     }
   },
   "firestore": {
@@ -77,6 +90,10 @@
     "combos/{comboId}": {
       "schema": "Combo",
       "description": "Platform combo packages editable by admins and teachers"
+    },
+    "manual_unlocks/{unlockId}": {
+      "schema": "ManualUnlock",
+      "description": "Log records tracking administrative course activations"
     }
   }
 }

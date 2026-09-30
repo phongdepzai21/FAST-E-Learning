@@ -10,6 +10,32 @@ import { collection, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'fi
 import { Course } from '../types';
 import CountUp from 'react-countup';
 import { Helmet } from 'react-helmet-async';
+import { motion } from 'motion/react';
+
+// Animation variants for staggered scroll reveal
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.18,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 48 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring" as const, 
+      stiffness: 85, 
+      damping: 18 
+    } 
+  }
+};
 
 const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
@@ -157,16 +183,23 @@ const Home: React.FC = () => {
             </div>
             <Link to="/khoa-hoc" className="hidden md:inline-block bg-white text-[#007c76] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl border border-gray-100 hover:shadow-2xl transition-all">Xem tất cả khóa học</Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-80px" }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10"
+          >
             {allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').slice(0, 3).map(course => (
-              <CourseCard 
-                key={course.id} 
-                course={course} 
-                isOwned={ownedCourseIds.includes(course.id)}
-                progress={ownedCourseIds.includes(course.id) ? 0 : undefined}
-              />
+              <motion.div key={course.id} variants={itemVariants} className="h-full">
+                <CourseCard 
+                  course={course} 
+                  isOwned={ownedCourseIds.includes(course.id)}
+                  progress={ownedCourseIds.includes(course.id) ? 0 : undefined}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
           <div className="mt-8 text-center md:hidden">
               <Link to="/khoa-hoc" className="inline-block bg-white text-[#007c76] px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg border border-gray-100 hover:shadow-xl transition-all">Xem tất cả khóa học</Link>
           </div>

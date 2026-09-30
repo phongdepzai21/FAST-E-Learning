@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, Database, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight } from 'lucide-react';
+import { User as UserIcon, Shield, GraduationCap, Crown, Search, Mail, BookOpen, Clock, Activity, Database, X, Save, Bell, CheckCheck, Check, Lock, Unlock, AlertTriangle, ShoppingBag, Eye, Calendar, KeyRound, ShieldAlert, RotateCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoveHorizontal, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
+import { ADMIN_EMAILS, TEACHER_EMAILS, getMergedCourses } from '../constants';
+import { Course } from '../types';
 import { addApprovalNotification } from '../utils/courseNotificationService';
 import { sendOtp, verifyOtp } from '../utils/otpService';
 
@@ -68,8 +69,35 @@ export const UserManagement: React.FC = () => {
   const PAGE_SIZE = 20;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Tabs for Admin Panel: Users or Diagnostics
-  const [activeTab, setActiveTab] = useState<'users' | 'diagnostics'>('users');
+  // Tabs for Admin Panel: Users, Diagnostics or Provisioning
+  const [activeTab, setActiveTab] = useState<'users' | 'diagnostics' | 'provisioning'>('users');
+
+  // Provisioning course states
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [provisionEmail, setProvisionEmail] = useState('');
+  const [provisionCourseId, setProvisionCourseId] = useState('');
+  const [provisionPrice, setProvisionPrice] = useState('');
+  const [isProvisioning, setIsProvisioning] = useState(false);
+
+  // Fetch courses list for provisioning dropdown
+  useEffect(() => {
+    const fetchCoursesList = async () => {
+      try {
+        const colRef = collection(db, 'courses');
+        const querySnapshot = await getDocs(colRef);
+        const list: Course[] = [];
+        querySnapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as Course);
+        });
+        const merged = getMergedCourses(list);
+        setAllCourses(merged.filter(c => c.status !== 'draft' && c.status !== 'inactive'));
+      } catch (e) {
+        console.warn('Error fetching courses list for dropdown:', e);
+        setAllCourses(getMergedCourses([]).filter(c => c.status !== 'draft' && c.status !== 'inactive'));
+      }
+    };
+    fetchCoursesList();
+  }, []);
 
   // Diagnostics and Sync Logs states
   interface SyncLog {
@@ -397,6 +425,97 @@ export const UserManagement: React.FC = () => {
       error('Không thể cập nhật quyền. Hãy chắc chắn bạn là Admin.', 5000, 'Lỗi');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleProvisionCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provisionEmail.trim() || !provisionCourseId) {
+      error('Vui lòng điền đầy đủ email học viên và chọn khóa học.');
+      return;
+    }
+
+    const normalizedEmail = provisionEmail.toLowerCase().trim();
+    const selectedCourse = allCourses.find(c => c.id === provisionCourseId);
+    if (!selectedCourse) {
+      error('Khóa học được chọn không khả dụng.');
+      return;
+    }
+
+    setIsProvisioning(true);
+    try {
+      // 1. Check if user document exists in 'users' collection. If not, create a stub document.
+      const userDocRef = doc(db, 'users', normalizedEmail);
+      const userExists = users.some(u => u.id === normalizedEmail);
+
+      if (!userExists) {
+        await setDoc(userDocRef, {
+          email: normalizedEmail,
+          displayName: 'Học viên Chuyển khoản',
+          createdAt: new Date().toISOString(),
+          isVip: false,
+          isAdmin: false,
+          isTeacher: false,
+          purchasedCoursesCount: 1
+        }, { merge: true });
+      } else {
+        const prevCount = users.find(u => u.id === normalizedEmail)?.purchasedCoursesCount || 0;
+        await setDoc(userDocRef, {
+          purchasedCoursesCount: prevCount + 1
+        }, { merge: true });
+      }
+
+      // 2. Add course to purchased_courses subcollection
+      const courseRef = doc(db, 'users', normalizedEmail, 'purchased_courses', provisionCourseId);
+      const finalPrice = provisionPrice.trim() || selectedCourse.price || 'Đã kích hoạt';
+      
+      await setDoc(courseRef, {
+        courseId: provisionCourseId,
+        courseTitle: selectedCourse.title,
+        title: selectedCourse.title,
+        price: finalPrice,
+        progress: 0,
+        purchasedAt: new Date().toISOString(),
+        unlockedAt: new Date().toISOString(),
+        status: 'active',
+        claimedVia: 'BANK_TRANSFER_ACTIVATION',
+        activatedBy: adminEmail
+      }, { merge: true });
+
+      // 3. Add bell notification to user's notifications subcollection in Firestore
+      try {
+        const notifDocRef = doc(collection(db, 'users', normalizedEmail, 'notifications'));
+        await setDoc(notifDocRef, {
+          title: 'Kích hoạt khóa học thành công 🎉',
+          message: `Khóa học "${selectedCourse.title}" của bạn đã được kích hoạt thành công qua hình thức Chuyển khoản. Hãy vào phòng học để học ngay!`,
+          type: 'purchase',
+          createdAt: new Date().toISOString(),
+          isRead: false
+        }, { merge: true });
+      } catch (notifErr) {
+        console.warn('Could not persist user subcollection notification:', notifErr);
+      }
+
+      // 4. Trigger instant local synchronization bypass
+      try {
+        localStorage.setItem('course_unlocked_' + provisionCourseId, 'true');
+      } catch (e) {}
+
+      // Dispatch event to update state in-app
+      window.dispatchEvent(new CustomEvent('courses_updated'));
+      window.dispatchEvent(new Event('storage'));
+
+      success(`Đã kích hoạt thành công khóa học "${selectedCourse.title}" cho tài khoản ${normalizedEmail}.`, 5000, 'Kích hoạt thành công');
+      
+      // Reset form
+      setProvisionEmail('');
+      setProvisionCourseId('');
+      setProvisionPrice('');
+    } catch (err: any) {
+      console.error('Error provisioning course:', err);
+      error(`Không thể kích hoạt khóa học: ${err.message}`);
+    } finally {
+      setIsProvisioning(false);
     }
   };
 
@@ -739,32 +858,34 @@ export const UserManagement: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-80">
-            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tìm theo email, tên..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all shadow-sm"
-            />
-          </div>
+        {activeTab === 'users' && (
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-80">
+              <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm theo email, tên..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all shadow-sm"
+              />
+            </div>
 
-          {/* Nút tải lại mỗi trang tài khoản */}
-          <button
-            onClick={() => fetchUsers(true)}
-            disabled={isLoading}
-            title="Tải lại danh sách tài khoản ngay lập tức"
-            className="px-4 py-2.5 sm:py-3 bg-white hover:bg-teal-50/60 border border-gray-200 hover:border-[#007c76] text-gray-700 hover:text-[#007c76] rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
-          >
-            <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#007c76]' : ''}`} />
-            <span className="hidden sm:inline">Tải lại</span>
-          </button>
-        </div>
+            {/* Nút tải lại mỗi trang tài khoản */}
+            <button
+              onClick={() => fetchUsers(true)}
+              disabled={isLoading}
+              title="Tải lại danh sách tài khoản ngay lập tức"
+              className="px-4 py-2.5 sm:py-3 bg-white hover:bg-teal-50/60 border border-gray-200 hover:border-[#007c76] text-gray-700 hover:text-[#007c76] rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#007c76]' : ''}`} />
+              <span className="hidden sm:inline">Tải lại</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Sub-tab Navigation for User list or Real-time Diagnostics Monitor */}
+      {/* Sub-tab Navigation for User list, Real-time Diagnostics Monitor or Bank Provisioning */}
       <div className="flex border-b border-gray-100 pb-px gap-6 mb-4">
         <button
           onClick={() => setActiveTab('users')}
@@ -788,9 +909,20 @@ export const UserManagement: React.FC = () => {
           <Activity className={`w-4.5 h-4.5 text-emerald-500 ${isOnline ? 'animate-pulse' : ''}`} />
           Giám sát & Đồng bộ (Diagnostics)
         </button>
+        <button
+          onClick={() => setActiveTab('provisioning')}
+          className={`pb-3 text-sm font-extrabold transition-all border-b-2 px-1 cursor-pointer flex items-center gap-2 ${
+            activeTab === 'provisioning'
+              ? 'border-[#007c76] text-[#007c76]'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Sparkles className="w-4.5 h-4.5 text-amber-500" />
+          Cấp khóa học chuyển khoản
+        </button>
       </div>
 
-      {activeTab === 'users' ? (
+      {activeTab === 'users' && (
         <>
           {/* Horizontal Scroll Bar Navigation & Mouse-Drag Tip on Desktop */}
       <div className="flex items-center justify-between text-xs text-gray-500 px-1">
@@ -1076,7 +1208,9 @@ export const UserManagement: React.FC = () => {
         </div>
       )}
         </>
-      ) : (
+      )}
+
+      {activeTab === 'diagnostics' && (
         /* Render beautiful diagnostics view */
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-250">
           {/* Metrics Grid */}
@@ -1252,6 +1386,123 @@ export const UserManagement: React.FC = () => {
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'provisioning' && (
+        <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-6 sm:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-250">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-gray-100 pb-6">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 shadow-inner">
+              <Sparkles className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">Kích hoạt & Cấp quyền Khóa học Chuyển khoản</h3>
+              <p className="text-xs sm:text-sm font-semibold text-gray-500 mt-0.5">
+                Cấp quyền truy cập trực tiếp cho học viên thanh toán chuyển khoản ngân hàng thủ công. Hệ thống tự động tạo hồ sơ, kích hoạt khóa học và bắn thông báo đẩy.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleProvisionCourse} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Email field */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">Email Học viên <span className="text-rose-500">*</span></label>
+              <div className="relative">
+                <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  required
+                  value={provisionEmail}
+                  onChange={(e) => setProvisionEmail(e.target.value)}
+                  placeholder="vi_du_hocvien@gmail.com"
+                  className="w-full pl-12 pr-4 py-3 sm:py-3.5 bg-gray-50/50 hover:bg-white focus:bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all"
+                />
+              </div>
+              <p className="text-[11px] font-semibold text-gray-400 leading-normal">
+                Nếu email này chưa đăng ký tài khoản trên hệ thống, một hồ sơ học viên mới sẽ tự động được khởi tạo tạm thời.
+              </p>
+            </div>
+
+            {/* Course Dropdown Selection */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">Chọn Khóa học <span className="text-rose-500">*</span></label>
+              <div className="relative">
+                <BookOpen className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <select
+                  required
+                  value={provisionCourseId}
+                  onChange={(e) => setProvisionCourseId(e.target.value)}
+                  className="w-full pl-12 pr-10 py-3 sm:py-3.5 bg-gray-50/50 hover:bg-white focus:bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">-- Chọn khóa học cần kích hoạt --</option>
+                  {allCourses.map(course => (
+                    <option key={course.id} value={course.id}>
+                      {course.title} {course.price ? `(${course.price})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </div>
+              <p className="text-[11px] font-semibold text-gray-400 leading-normal">
+                Danh sách hiển thị toàn bộ các khóa học đang có trạng thái hoạt động trên FAST E-Learning.
+              </p>
+            </div>
+
+            {/* Actual Payment Price */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">Giá trị thanh toán thực tế (Không bắt buộc)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[#007c76]">₫</span>
+                <input
+                  type="text"
+                  value={provisionPrice}
+                  onChange={(e) => setProvisionPrice(e.target.value)}
+                  placeholder="Ví dụ: 399.000đ (Để trống sẽ lấy giá trị niêm yết mặc định của khóa học)"
+                  className="w-full pl-10 pr-4 py-3 sm:py-3.5 bg-gray-50/50 hover:bg-white focus:bg-white border border-gray-200 rounded-2xl text-sm font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#007c76]/20 focus:border-[#007c76] transition-all"
+                />
+              </div>
+              <p className="text-[11px] font-semibold text-gray-400 leading-normal">
+                Dùng để lưu lịch sử và thống kê tài chính chính xác theo số tiền thực tế học viên đã chuyển khoản ngân hàng.
+              </p>
+            </div>
+
+            {/* Process Notification Explainer */}
+            <div className="p-5 bg-teal-50/50 border border-teal-100 rounded-2xl md:col-span-2 flex items-start gap-3.5">
+              <Bell className="w-5 h-5 text-[#007c76] shrink-0 mt-0.5" />
+              <div className="text-xs font-semibold text-teal-950/80 leading-relaxed">
+                <p className="font-extrabold text-[#007c76] text-sm mb-1">Quy trình xử lý tự động sau khi bấm kích hoạt:</p>
+                <ol className="list-decimal pl-4 space-y-1.5 text-gray-600 font-medium">
+                  <li>Tự động tăng số lượng khóa học sở hữu (`purchasedCoursesCount`) của học viên trong Firestore.</li>
+                  <li>Tạo tài liệu mới trong subcollection <code className="bg-white px-1 py-0.5 rounded border border-gray-200 font-mono text-gray-700">purchased_courses</code> của học viên kèm gắn cờ <code className="bg-white px-1 py-0.5 rounded border border-gray-200 font-mono text-amber-600">BANK_TRANSFER_ACTIVATION</code>.</li>
+                  <li>Bắn thông báo quả chuông trực tiếp thời gian thực vào bảng tin thông báo của tài khoản học viên để họ nhận được ngay lập tức khi đăng nhập.</li>
+                  <li>Đồng bộ hóa cache trình duyệt của học viên để mở khóa toàn bộ bài học tương ứng ngay không cần tải lại trang.</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Action submit button */}
+            <div className="md:col-span-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={isProvisioning}
+                className="px-8 py-3.5 bg-[#007c76] hover:bg-[#00605b] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 shadow-md shadow-[#007c76]/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isProvisioning ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang kích hoạt hệ thống...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>Xác nhận & kích hoạt khóa học</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
