@@ -40,8 +40,30 @@
    ========================================================================== */
 @media print {
   @page {
-    margin: 8mm 10mm;
-    size: A4;
+    margin: 8mm 10mm !important;
+    size: A4 portrait !important;
+  }
+
+  /* Global portrait print enforcement - resets any landscape forcing layout widths */
+  [class*="min-w-"],
+  [class*="min-w-["],
+  .min-w-\[1100px\] {
+    min-width: 0 !important;
+  }
+
+  table, tr, td, th {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  th, td {
+    word-wrap: break-word !important;
+    white-space: normal !important;
   }
 
   /* Global print resets */
