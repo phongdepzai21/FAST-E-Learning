@@ -1965,11 +1965,9 @@ const Account: React.FC = () => {
                     ...(isTeacher || isAdmin ? [
                       { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
                       { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-                      { id: 'user-management', label: 'Quản lý tài khoản', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
+                      { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
                     ] : []),
                     ...(isAdmin ? [
-                      { id: 'admin-student-console', label: 'Kiểm tra học viên', icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
-                      { id: 'admin-manual-unlock', label: 'Kích hoạt & Duyệt khóa', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
                       { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
                   ].map((item) => {
@@ -2040,9 +2038,7 @@ const Account: React.FC = () => {
                   <option value="settings">Cài đặt tài khoản</option>
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
-                  {(isTeacher || isAdmin) && <option value="user-management">Quản lý tài khoản</option>}
-                  {isAdmin && <option value="admin-student-console">Kiểm tra học viên đăng ký</option>}
-                  {isAdmin && <option value="admin-manual-unlock">Kích hoạt & Duyệt chuyển khoản</option>}
+                  {(isTeacher || isAdmin) && <option value="user-management">Học viên & Khóa học</option>}
                   {isAdmin && <option value="admin-audit-center">➜ Hệ thống Kiểm toán (FSA • ATTP • HSQC)</option>}
                 </select>
              </div>
