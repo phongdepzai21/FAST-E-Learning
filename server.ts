@@ -201,77 +201,124 @@ async function startServer() {
       // SePay / Casso / PayOS body structure standardizes transaction info:
       // content / description containing the memo (e.g. "FAST ISO9001 TRDUNG" or "FAST HACCP PHONG")
       // transferAmount / amount containing the received value (e.g. 599003)
+      const matchedSePayCode = (req.body.code || "").toString().trim().toUpperCase();
       const content = (req.body.content || req.body.description || req.body.memo || "").toString().trim().toUpperCase();
       const amount = Number(req.body.transferAmount || req.body.amount || 0);
       const referenceId = (req.body.referenceId || req.body.id || `TXN_${Date.now()}`).toString();
 
-      console.log(`[Server-Webhook] Extracted Transaction Details: Amount: ${amount} | Content: "${content}"`);
+      console.log(`[Server-Webhook] Incoming Webhook: SePayCode: "${matchedSePayCode}" | Content: "${content}" | Amount: ${amount}`);
 
-      // Match payment memo format: "FAST <CODE>" or "FAST <COURSE_ID> <EMAIL_PREFIX>"
-      const parts = content.split(/\s+/);
-      if (parts[0] !== 'FAST') {
-        console.log("[Server-Webhook] Ignored: Memo prefix does not start with 'FAST'.");
+      let targetCode = "";
+
+      // Step 1: Detect transaction code (e.g. FASTRYUWCW0S3)
+      if (matchedSePayCode && matchedSePayCode.startsWith("FAST")) {
+        targetCode = matchedSePayCode;
+      } else {
+        // Fallback: Scan full content sentence for any word starting with "FAST"
+        const words = content.split(/\s+/);
+        const foundWord = words.find(w => w.startsWith("FAST"));
+        if (foundWord) {
+          targetCode = foundWord;
+        }
+      }
+
+      if (!targetCode) {
+        console.log("[Server-Webhook] Ignored: No FAST transaction code found in transaction details.");
         return res.json({ success: false, message: "Ignored: Not a FAST transaction" });
       }
 
-      const code = parts[1]?.toUpperCase();
+      // Step 2: Extract dynamic suffix after "FAST"
+      const suffix = targetCode.slice(4).trim();
+      if (!suffix) {
+        console.warn("[Server-Webhook] Empty suffix found for code:", targetCode);
+        return res.status(400).json({ success: false, error: "Empty payment code suffix." });
+      }
+
+      console.log(`[Server-Webhook] Identified transaction suffix: "${suffix}". Performing lookup...`);
+
       let matchedEmail: string | null = null;
       let courseId: string | null = null;
 
       const dbInstance = getFirestore();
 
-      // Try 6-character payment code lookup first
-      if (code && code.length === 6) {
-        const pendingSnap = await dbInstance.collection("pending_payments").doc(code).get();
-        if (pendingSnap.exists) {
+      // Step 3: Safeguard against Firestore hanging on external servers with a 5-second timeout
+      const timeoutPromise = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Firebase database request timed out after 5 seconds.")), ms));
+
+      try {
+        const pendingDocRef = dbInstance.collection("pending_payments").doc(suffix);
+        const pendingSnap = await Promise.race([
+          pendingDocRef.get(),
+          timeoutPromise(5000)
+        ]) as any;
+
+        if (pendingSnap && pendingSnap.exists) {
           const pData = pendingSnap.data()!;
           matchedEmail = pData.email;
           courseId = pData.courseId;
-          console.log(`[Server-Webhook] Matched via Pending Payment Code "${code}": Email: ${matchedEmail}, Course: ${courseId}`);
+          console.log(`[Server-Webhook] Matched via Pending Payment doc: Email: ${matchedEmail}, Course: ${courseId}`);
         }
+      } catch (dbErr: any) {
+        console.error("[Server-Webhook:Database] Pending Payment database query error/timeout:", dbErr.message);
       }
 
-      // Fallback to older positional format: "FAST <COURSE_ID> <EMAIL_PREFIX>"
+      // Step 4: Fallback to old positional space-separated format if pending_payments didn't resolve it
       if (!matchedEmail || !courseId) {
-        courseId = parts[1]?.toLowerCase();
-        const emailPrefix = parts[2]?.toLowerCase();
+        console.log("[Server-Webhook] Fallback: Searching users collection directly using positional values...");
+        const parts = content.split(/\s+/);
+        const index = parts.findIndex(p => p.startsWith("FAST"));
+        if (index !== -1) {
+          const potentialCourseWord = parts[index + 1]?.toLowerCase();
+          const potentialEmailWord = parts[index + 2]?.toLowerCase();
 
-        if (courseId && emailPrefix) {
-          const usersSnap = await dbInstance.collection("users").get();
-          usersSnap.forEach((docSnap) => {
-            const docEmail = docSnap.id.toLowerCase().trim();
-            if (docEmail.startsWith(emailPrefix)) {
-              matchedEmail = docEmail;
+          if (potentialCourseWord && potentialEmailWord) {
+            try {
+              const usersSnap = await Promise.race([
+                dbInstance.collection("users").get(),
+                timeoutPromise(5000)
+              ]) as any;
+
+              usersSnap.forEach((docSnap: any) => {
+                const docEmail = docSnap.id.toLowerCase().trim();
+                if (docEmail.startsWith(potentialEmailWord)) {
+                  matchedEmail = docEmail;
+                  courseId = potentialCourseWord;
+                }
+              });
+            } catch (dbErr: any) {
+              console.error("[Server-Webhook:Database] Fallback users database query error/timeout:", dbErr.message);
             }
-          });
+          }
         }
       }
 
       if (!matchedEmail || !courseId) {
-        console.error(`[Server-Webhook] Could not resolve user/course from memo. Code: "${code}", Parts:`, parts);
-        return res.status(400).json({ success: false, error: "Could not resolve student or course from transaction memo." });
+        console.error(`[Server-Webhook] Match failed: Could not resolve student or course from memo: "${targetCode}"`);
+        return res.status(400).json({ success: false, error: `Could not resolve student or course from transaction memo suffix: ${suffix}` });
       }
 
       console.log(`[Server-Webhook] Match Succeeded! User: "${matchedEmail}" | Course: "${courseId}"`);
 
-      // Provision course inside user's purchased_courses subcollection
+      // Step 5: Provision course inside user's purchased_courses collection
       const courseDocRef = dbInstance
         .collection("users")
         .doc(matchedEmail)
         .collection("purchased_courses")
         .doc(courseId);
 
-      await courseDocRef.set({
-        courseId,
-        purchasedAt: new Date().toISOString(),
-        unlockedAt: new Date().toISOString(),
-        price: amount > 0 ? `${amount.toLocaleString('vi-VN')}đ` : "Đã kích hoạt",
-        status: 'active',
-        claimedVia: 'AUTO_BANKING_WEBHOOK_SYNC',
-        bankRefId: referenceId
-      }, { merge: true });
+      await Promise.race([
+        courseDocRef.set({
+          courseId,
+          purchasedAt: new Date().toISOString(),
+          unlockedAt: new Date().toISOString(),
+          price: amount > 0 ? `${amount.toLocaleString('vi-VN')}đ` : "Đã kích hoạt",
+          status: 'active',
+          claimedVia: 'AUTO_BANKING_WEBHOOK_SYNC',
+          bankRefId: referenceId
+        }, { merge: true }),
+        timeoutPromise(5000)
+      ]);
 
-      // Persist notification to make sure they get a nice bell ping as well
+      // Step 6: Persist notifications for the student
       try {
         const notifDocRef = dbInstance
           .collection("users")
@@ -279,13 +326,16 @@ async function startServer() {
           .collection("notifications")
           .doc();
         
-        await notifDocRef.set({
-          title: 'Kích hoạt tự động thành công 🎉',
-          message: `Cổng thanh toán tự động đã khớp thành công số dư. Khóa học của bạn đã được mở khóa tự động thời gian thực!`,
-          type: 'purchase',
-          createdAt: new Date().toISOString(),
-          isRead: false
-        });
+        await Promise.race([
+          notifDocRef.set({
+            title: 'Kích hoạt tự động thành công 🎉',
+            message: `Cổng thanh toán tự động đã khớp thành công số dư. Khóa học của bạn đã được mở khóa tự động thời gian thực!`,
+            type: 'purchase',
+            createdAt: new Date().toISOString(),
+            isRead: false
+          }),
+          timeoutPromise(3000)
+        ]);
       } catch (err) {}
 
       console.log("[Server-Webhook] Auto-provisioned course successfully!");
