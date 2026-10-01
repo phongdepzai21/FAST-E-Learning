@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Course } from '../types';
 import { auth, db } from '../firebase';
 import { ADMIN_EMAILS } from '../constants';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { authDebugger } from '../utils/authDebugger';
 import { otpLogger } from '../auth/otp-logger';
 import { sendOtp, verifyOtp } from '../utils/otpService';
@@ -29,6 +29,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [config, setConfig] = useState(getPaymentConfig);
+  const [paymentCode, setPaymentCode] = useState<string>('');
   
   // OTP States
   const [showOtpForm, setShowOtpForm] = useState(false);
@@ -84,7 +85,31 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     setOtpError('');
     setOtpNotice('');
     setOtpCountdown(0);
-  }, [isOpen]);
+
+    if (isOpen) {
+      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let result = '';
+      for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      setPaymentCode(result);
+
+      const user = auth.currentUser;
+      const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim().toLowerCase();
+      const amount = parseNumericPrice(course.price);
+
+      const pendingRef = doc(db, 'pending_payments', result);
+      setDoc(pendingRef, {
+        code: result,
+        email,
+        courseId: course.id,
+        amount,
+        createdAt: new Date().toISOString()
+      }).catch((err) => {
+        console.warn("[PaymentModal] Failed to create pending_payment doc:", err);
+      });
+    }
+  }, [isOpen, course.id, course.price]);
 
   // Diagnostic Hook: Trace PaymentModal state transitions in real-time
   useEffect(() => {
@@ -99,11 +124,44 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     });
   }, [isOpen, showOtpForm, userInputOtp, otpNotice, otpError, otpCountdown]);
 
+  // Real-time listener for automated payment detection and course activation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const user = auth.currentUser;
+    const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || '').trim().toLowerCase();
+    if (!email) return;
+
+    console.log(`[PaymentModal:RealtimeSync] Active listening at users/${email}/purchased_courses/${course.id} for auto-activation...`);
+
+    const docRef = doc(db, 'users', email, 'purchased_courses', course.id);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.status === 'active') {
+          console.log("[PaymentModal:RealtimeSync] AUTO-ACTIVATION DETECTED on Server! Setting state to completed!");
+          localStorage.setItem(`course_unlocked_${course.id}`, 'true');
+          
+          setIsCompleted(true);
+          setTimeout(() => {
+            onSuccess();
+            setIsCompleted(false);
+          }, 1500);
+        }
+      }
+    }, (err) => {
+      console.warn("[PaymentModal:RealtimeSync] Auto-listener subscription warning:", err);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, course.id]);
+
   if (!isOpen) return null;
 
   const numericAmount = parseNumericPrice(course.price);
   const isFreeCourse = numericAmount === 0;
-  const transferMemo = generatePaymentMemo(course.id, course.title);
+
+  const transferMemo = `FAST ${paymentCode || 'TEST'}`;
 
   const vietQrUrl = getVietQrUrl({
     bankId: config.bankId,
@@ -606,6 +664,54 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 <p className="text-[10px] text-center text-gray-400 font-medium">
                   Hệ thống tự động kích hoạt khóa học vào phòng học ngay sau khi quét mã thành công.
                 </p>
+
+                {/* SePay Test Simulator Box */}
+                <div className="mt-4 p-3 bg-teal-50 border border-teal-200/60 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-teal-800 tracking-wider flex items-center gap-1">
+                      <span>🛠️</span> Thử nghiệm SePay (Mô phỏng)
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-teal-200 text-teal-950 rounded font-bold">Local Test</span>
+                  </div>
+                  <p className="text-[10px] text-teal-700 leading-normal">
+                    Vì bạn chưa làm Bước 2 & 3 của SePay, bạn có thể bấm nút bên dưới để giả lập SePay gửi tín hiệu chuyển khoản về Server trong tích tắc.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const mockRefId = "SIM_SP_" + Math.random().toString(36).substring(7).toUpperCase();
+                        console.log("[PaymentModal:Simulator] Sending simulated SePay webhook request for reference ID:", mockRefId);
+                        
+                        const response = await fetch("/api/payment/webhook?token=SEPAY_SECRET_FAST_E_LEARNING", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                          },
+                          body: JSON.stringify({
+                            transferType: "in",
+                            transferAmount: numericAmount,
+                            content: transferMemo,
+                            referenceId: mockRefId
+                          })
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          console.log("[PaymentModal:Simulator] Webhook mock processed successfully!", result);
+                        } else {
+                          console.error("[PaymentModal:Simulator] Webhook mock failed:", result.error);
+                          alert("Mô phỏng thất bại: " + result.error);
+                        }
+                      } catch (err: any) {
+                        console.error("[PaymentModal:Simulator] Connection error:", err);
+                        alert("Lỗi kết nối khi gửi webhook mô phỏng.");
+                      }
+                    }}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black uppercase rounded-lg transition-all cursor-pointer shadow-sm text-center"
+                  >
+                    🚀 Giả lập SePay báo có +{formatVND(numericAmount)} thành công
+                  </button>
+                </div>
               </div>
             )}
             </>

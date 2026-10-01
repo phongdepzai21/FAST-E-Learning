@@ -179,6 +179,124 @@ async function startServer() {
     res.json({ combos: Object.values(serverCombos) });
   });
 
+  // 1.5. Automated Auto-Banking Payment Webhook for SePay / Casso / PayOS
+  app.post("/api/payment/webhook", async (req, res) => {
+    console.log("[Server-Webhook] Incoming transaction request:", req.body);
+    
+    // Security verification for SePay Webhook
+    const authHeader = req.headers["authorization"] || req.headers["x-api-key"];
+    const queryToken = req.query.token;
+    const EXPECTED_SECRET = process.env.SEPAY_WEBHOOK_SECRET || "SEPAY_SECRET_FAST_E_LEARNING";
+    
+    const isAuthorized = 
+      (authHeader && authHeader.toString().includes(EXPECTED_SECRET)) ||
+      (queryToken && queryToken.toString() === EXPECTED_SECRET);
+
+    if (!isAuthorized) {
+      console.warn("[Server-Webhook:Security] Unauthorized webhook access attempt blocked.");
+      return res.status(401).json({ success: false, error: "Unauthorized SePay Webhook Token. Access denied." });
+    }
+
+    try {
+      // SePay / Casso / PayOS body structure standardizes transaction info:
+      // content / description containing the memo (e.g. "FAST ISO9001 TRDUNG" or "FAST HACCP PHONG")
+      // transferAmount / amount containing the received value (e.g. 599003)
+      const content = (req.body.content || req.body.description || req.body.memo || "").toString().trim().toUpperCase();
+      const amount = Number(req.body.transferAmount || req.body.amount || 0);
+      const referenceId = (req.body.referenceId || req.body.id || `TXN_${Date.now()}`).toString();
+
+      console.log(`[Server-Webhook] Extracted Transaction Details: Amount: ${amount} | Content: "${content}"`);
+
+      // Match payment memo format: "FAST <CODE>" or "FAST <COURSE_ID> <EMAIL_PREFIX>"
+      const parts = content.split(/\s+/);
+      if (parts[0] !== 'FAST') {
+        console.log("[Server-Webhook] Ignored: Memo prefix does not start with 'FAST'.");
+        return res.json({ success: false, message: "Ignored: Not a FAST transaction" });
+      }
+
+      const code = parts[1]?.toUpperCase();
+      let matchedEmail: string | null = null;
+      let courseId: string | null = null;
+
+      const dbInstance = getFirestore();
+
+      // Try 6-character payment code lookup first
+      if (code && code.length === 6) {
+        const pendingSnap = await dbInstance.collection("pending_payments").doc(code).get();
+        if (pendingSnap.exists) {
+          const pData = pendingSnap.data()!;
+          matchedEmail = pData.email;
+          courseId = pData.courseId;
+          console.log(`[Server-Webhook] Matched via Pending Payment Code "${code}": Email: ${matchedEmail}, Course: ${courseId}`);
+        }
+      }
+
+      // Fallback to older positional format: "FAST <COURSE_ID> <EMAIL_PREFIX>"
+      if (!matchedEmail || !courseId) {
+        courseId = parts[1]?.toLowerCase();
+        const emailPrefix = parts[2]?.toLowerCase();
+
+        if (courseId && emailPrefix) {
+          const usersSnap = await dbInstance.collection("users").get();
+          usersSnap.forEach((docSnap) => {
+            const docEmail = docSnap.id.toLowerCase().trim();
+            if (docEmail.startsWith(emailPrefix)) {
+              matchedEmail = docEmail;
+            }
+          });
+        }
+      }
+
+      if (!matchedEmail || !courseId) {
+        console.error(`[Server-Webhook] Could not resolve user/course from memo. Code: "${code}", Parts:`, parts);
+        return res.status(400).json({ success: false, error: "Could not resolve student or course from transaction memo." });
+      }
+
+      console.log(`[Server-Webhook] Match Succeeded! User: "${matchedEmail}" | Course: "${courseId}"`);
+
+      // Provision course inside user's purchased_courses subcollection
+      const courseDocRef = dbInstance
+        .collection("users")
+        .doc(matchedEmail)
+        .collection("purchased_courses")
+        .doc(courseId);
+
+      await courseDocRef.set({
+        courseId,
+        purchasedAt: new Date().toISOString(),
+        unlockedAt: new Date().toISOString(),
+        price: amount > 0 ? `${amount.toLocaleString('vi-VN')}đ` : "Đã kích hoạt",
+        status: 'active',
+        claimedVia: 'AUTO_BANKING_WEBHOOK_SYNC',
+        bankRefId: referenceId
+      }, { merge: true });
+
+      // Persist notification to make sure they get a nice bell ping as well
+      try {
+        const notifDocRef = dbInstance
+          .collection("users")
+          .doc(matchedEmail)
+          .collection("notifications")
+          .doc();
+        
+        await notifDocRef.set({
+          title: 'Kích hoạt tự động thành công 🎉',
+          message: `Cổng thanh toán tự động đã khớp thành công số dư. Khóa học của bạn đã được mở khóa tự động thời gian thực!`,
+          type: 'purchase',
+          createdAt: new Date().toISOString(),
+          isRead: false
+        });
+      } catch (err) {}
+
+      console.log("[Server-Webhook] Auto-provisioned course successfully!");
+      return res.json({ success: true, message: `Successfully auto-unlocked course ${courseId} for user ${matchedEmail}` });
+
+    } catch (err: any) {
+      console.error("[Server-Webhook] Exception thrown:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
   app.get("/api/courses/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
