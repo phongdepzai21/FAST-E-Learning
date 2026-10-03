@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Security and Credentials
+firebase-key.json
+.env
+.env.production
+.env.local
+

@@ -3,13 +3,22 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import { initializeApp, getApps } from "firebase-admin/app";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 if (!getApps().length) {
-  initializeApp();
+  const keyPath = path.join(process.cwd(), "firebase-key.json");
+  if (fs.existsSync(keyPath)) {
+    console.log("[Firebase] Initializing Firebase Admin with local firebase-key.json...");
+    initializeApp({
+      credential: cert(keyPath)
+    });
+  } else {
+    console.log("[Firebase] Initializing Firebase Admin with default credentials...");
+    initializeApp();
+  }
 }
 
 /**
