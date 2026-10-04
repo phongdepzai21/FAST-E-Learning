@@ -30,6 +30,37 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [qrLoaded, setQrLoaded] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string>('');
+
+  const handleSyncFromFirestore = async () => {
+    setIsSyncing(true);
+    setSyncNotice('');
+    try {
+      const { doc, getDoc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../firebase');
+      const docRef = doc(db, 'payment_config', 'default');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as PaymentAccountConfig;
+        setConfig(data);
+        await savePaymentConfig(data);
+        setSyncNotice('Đồng bộ Firestore thành công! 🎉');
+        setTimeout(() => setSyncNotice(''), 3000);
+      } else {
+        setSyncNotice('Chưa có cấu hình trên Firestore. Đang tải lên thiết lập hiện tại...');
+        await setDoc(docRef, config, { merge: true });
+        setTimeout(() => setSyncNotice('Đã tải lên Firestore thành công!'), 2000);
+        setTimeout(() => setSyncNotice(''), 5000);
+      }
+    } catch (err: any) {
+      console.warn('Manual Firestore sync error:', err);
+      setSyncNotice('Lỗi kết nối đồng bộ.');
+      setTimeout(() => setSyncNotice(''), 3000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const handleConfigUpdate = (e: any) => {
@@ -107,12 +138,41 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
       {/* Account Configuration Drawer / Box */}
       {showConfigModal && !readOnly && (
         <div className="bg-white rounded-xl p-4 border border-teal-200 shadow-sm space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
               Thông tin tài khoản nhận học phí
             </span>
-            <span className="text-[11px] text-teal-600 font-medium">Lưu tự động vào hệ thống</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncFromFirestore}
+                disabled={isSyncing}
+                className="text-[11px] text-[#007c76] hover:text-white font-bold flex items-center gap-1 bg-teal-50 hover:bg-[#007c76] px-2.5 py-1 rounded-lg border border-teal-200/60 transition-all duration-200 disabled:opacity-50 cursor-pointer shadow-sm"
+              >
+                <svg
+                  className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5"
+                  />
+                </svg>
+                <span>{isSyncing ? 'Đồng bộ...' : 'Đồng bộ Cloud'}</span>
+              </button>
+              <span className="text-[11px] text-teal-600 font-medium">Lưu tự động</span>
+            </div>
           </div>
+
+          {syncNotice && (
+            <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 font-bold animate-in fade-in duration-200">
+              {syncNotice}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>

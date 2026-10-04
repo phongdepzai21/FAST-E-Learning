@@ -16,6 +16,7 @@ import { NetworkStatusNotifier } from './components/NetworkStatusNotifier';
 import { DevDiagnosticDashboard } from './components/DevDiagnosticDashboard';
 import { authDebugger } from './utils/authDebugger';
 import { otpLogger } from './auth/otp-logger';
+import { subscribeToPaymentConfig } from './utils/qrService';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
@@ -55,6 +56,12 @@ const AppLayout: React.FC = () => {
   const [isDelayedLoaded, setIsDelayedLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+
+  // Real-time Firestore Banking Settings Sync
+  useEffect(() => {
+    const unsubscribe = subscribeToPaymentConfig();
+    return () => unsubscribe();
+  }, []);
 
   // Auto clean legacy #/ hash URLs to clean pathname (e.g. /home)
   useEffect(() => {

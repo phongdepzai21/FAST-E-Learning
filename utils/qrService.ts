@@ -1,3 +1,6 @@
+import { db } from '../firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+
 export interface PaymentAccountConfig {
   bankId: string;
   bankName: string;
@@ -45,17 +48,46 @@ export function getPaymentConfig(): PaymentAccountConfig {
 }
 
 /**
- * Save updated payment account config
+ * Save updated payment account config to local storage and Firestore
  */
-export function savePaymentConfig(config: Partial<PaymentAccountConfig>) {
+export async function savePaymentConfig(config: Partial<PaymentAccountConfig>) {
   if (typeof window === 'undefined') return;
   try {
     const current = getPaymentConfig();
     const updated = { ...current, ...config };
     localStorage.setItem('fast_payment_account_config', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('payment_config_updated', { detail: updated }));
+
+    // Persist globally to Firestore so all students see it instantly
+    const docRef = doc(db, 'payment_config', 'default');
+    await setDoc(docRef, updated, { merge: true });
+    console.log('[QRService] Persisted new payment config to Firestore:', updated);
   } catch (e) {
-    console.warn('Could not save payment config:', e);
+    console.warn('Could not save payment config to Firestore/localStorage:', e);
+  }
+}
+
+/**
+ * Real-time listener for Firestore payment config changes.
+ * Call this at the app level or in components to sync the frontend in real-time.
+ */
+export function subscribeToPaymentConfig(onUpdate?: (config: PaymentAccountConfig) => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  try {
+    const docRef = doc(db, 'payment_config', 'default');
+    return onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as PaymentAccountConfig;
+        localStorage.setItem('fast_payment_account_config', JSON.stringify(data));
+        window.dispatchEvent(new CustomEvent('payment_config_updated', { detail: data }));
+        if (onUpdate) onUpdate(data);
+      }
+    }, (err) => {
+      console.warn('Error listening to Firestore payment_config:', err);
+    });
+  } catch (e) {
+    console.warn('Could not subscribe to payment config:', e);
+    return () => {};
   }
 }
 

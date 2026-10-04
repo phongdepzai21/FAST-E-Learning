@@ -7,7 +7,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { verifySePayWebhookToken, processWebhookTransaction } from "./utils/paymentService";
+import { verifySePayWebhookToken, processWebhookTransaction, verifySePayHMACSignature } from "./utils/paymentService";
 
 if (!getApps().length) {
   const keyPath = path.join(process.cwd(), "firebase-key.json");
@@ -177,7 +177,12 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ 
+    limit: "10mb",
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf.toString();
+    }
+  }));
 
   // API routes
   // 1. Get current synchronized courses & combos
@@ -219,6 +224,36 @@ async function startServer() {
       }
     } catch (err: any) {
       console.error("[Server-Webhook] Exception thrown:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 1.5b. Secure SePay Webhook with HMAC-SHA256 signature verification
+  app.post("/api/sepay/webhook", async (req: any, res) => {
+    console.log("[SePay-HMAC-Webhook] Incoming webhook request:", req.body);
+
+    const signatureHeader = req.headers["x-sepay-signature"] || req.headers["x-signature"];
+    const isSignatureValid = verifySePayHMACSignature(
+      req.rawBody,
+      signatureHeader ? signatureHeader.toString() : undefined
+    );
+
+    if (!isSignatureValid) {
+      console.warn("[SePay-HMAC-Webhook:Security] Invalid HMAC-SHA256 signature detected!");
+      return res.status(401).json({ success: false, error: "Invalid HMAC-SHA256 signature. Access denied." });
+    }
+
+    try {
+      const result = await processWebhookTransaction(req.body);
+      if (result.success) {
+        console.log("[SePay-HMAC-Webhook] Transaction processed and course provisioned successfully!");
+        return res.status(200).json(result);
+      } else {
+        console.warn("[SePay-HMAC-Webhook] Failed or ignored:", result.message || result.error);
+        return res.status(result.error ? 400 : 200).json(result);
+      }
+    } catch (err: any) {
+      console.error("[SePay-HMAC-Webhook] Server-side exception:", err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });

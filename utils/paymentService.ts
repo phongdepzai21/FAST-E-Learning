@@ -1,4 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
+import crypto from "crypto";
 
 export interface SePayWebhookBody {
   code?: string;
@@ -188,5 +189,37 @@ export async function processWebhookTransaction(
       message: "Internal server error during webhook processing",
       error: err.message
     };
+  }
+}
+
+/**
+ * Validates the SePay HMAC-SHA256 signature using the raw body and the webhook secret.
+ */
+export function verifySePayHMACSignature(
+  rawBody: string | undefined,
+  signatureHeader: string | undefined
+): boolean {
+  const secret = process.env.SEPAY_WEBHOOK_SECRET || "X85V4RCQQ6CMMMZ8K2P3BOKAOTRPIZ7RYLY7HSVHUG3ZXW95VTUPKDUTRAQXWBNG";
+  if (!signatureHeader || !rawBody) {
+    console.warn("[PaymentService:HMAC] Missing signature header or raw body.");
+    return false;
+  }
+
+  try {
+    const computedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("hex");
+
+    console.log(`[PaymentService:HMAC] Computed Signature: "${computedSignature}" | Header: "${signatureHeader}"`);
+    
+    // Time-constant comparison to prevent timing attacks
+    return crypto.timingSafeEqual(
+      Buffer.from(computedSignature, "hex"),
+      Buffer.from(signatureHeader, "hex")
+    );
+  } catch (err: any) {
+    console.error("[PaymentService:HMAC] Signature verification exception:", err.message);
+    return false;
   }
 }
