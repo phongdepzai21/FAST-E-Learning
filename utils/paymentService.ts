@@ -197,6 +197,17 @@ export async function processWebhookTransaction(
       console.warn("[PaymentService] Failed to clean up pending_payments doc:", cleanupErr.message);
     }
 
+    // Log successful webhook execution for unified dashboard lifecycle tracking
+    try {
+      await logFailedWebhookAttempt(
+        body,
+        `Successfully provisioned course "${courseId}" for user "${matchedEmail}". Ref: ${referenceId}`,
+        "success" as any
+      );
+    } catch (logSuccessErr: any) {
+      console.warn("[PaymentService] Failed to log success status to payment_logs:", logSuccessErr.message);
+    }
+
     return {
       success: true,
       message: `Successfully provisioned course "${courseId}" for user "${matchedEmail}". Transaction reference: ${referenceId}`

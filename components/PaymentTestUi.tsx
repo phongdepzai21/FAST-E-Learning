@@ -36,6 +36,9 @@ export const PaymentTestUi: React.FC = () => {
   const [content, setContent] = useState('FAST 128492');
   const [referenceId, setReferenceId] = useState('');
   const [secretKey, setSecretKey] = useState('X85V4RCQQ6CMMMZ8K2P3BOKAOTRPIZ7RYLY7HSVHUG3ZXW95VTUPKDUTRAQXWBNG');
+  
+  // Target Endpoint configuration
+  const [targetUrl, setTargetUrl] = useState('');
 
   // Diagnostic states
   const [rawPayload, setRawPayload] = useState('');
@@ -43,6 +46,11 @@ export const PaymentTestUi: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [serverResponse, setServerResponse] = useState<any>(null);
   const [serverStatus, setServerStatus] = useState<number | null>(null);
+
+  // Initialize URL on client load
+  useEffect(() => {
+    setTargetUrl(window.location.origin + '/api/sepay/webhook');
+  }, []);
 
   // Generate a mock reference ID on load
   useEffect(() => {
@@ -75,9 +83,11 @@ export const PaymentTestUi: React.FC = () => {
     setServerResponse(null);
     setServerStatus(null);
 
+    const activeUrl = targetUrl.trim() || (window.location.origin + '/api/sepay/webhook');
+
     try {
-      console.log("[PaymentTestUi:Debug] Sending simulated webhook to /api/sepay/webhook with signature:", calculatedSignature);
-      const res = await fetch("/api/sepay/webhook", {
+      console.log(`[PaymentTestUi:Debug] Dispatching request to ${activeUrl} with signature ${calculatedSignature}`);
+      const res = await fetch(activeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,14 +103,26 @@ export const PaymentTestUi: React.FC = () => {
       if (res.ok && data.success) {
         toast.success("Giả lập Webhook bảo mật HMAC-SHA256 thành công rực rỡ!");
       } else {
-        toast.error(`Máy chủ từ chối: ${data.error || 'Lỗi không xác định'}`);
+        toast.error(`Máy chủ phản hồi lỗi: ${data.error || 'Từ chối giao dịch'}`);
       }
     } catch (err: any) {
-      console.error(err);
+      console.error("[PaymentTestUi:Error] Network connection failure:", err);
       toast.error("Lỗi kết nối khi gửi yêu cầu giả lập.");
+      
+      setServerStatus(0);
+      setServerResponse({
+        success: false,
+        error: "Connection Failed (Lỗi Kết Nối)",
+        message: err.message || String(err),
+        diagnosticTip: "Không thể kết kết nối đến Endpoint đích. Nếu đây là lỗi CORS hoặc 'Failed to fetch', hãy chắc chắn địa chỉ đích khớp với Tên miền hiện tại trên thanh địa chỉ trình duyệt, hoặc thay thế bằng đường dẫn tương đối (ví dụ: '/api/sepay/webhook')."
+      });
     } finally {
       setIsSending(false);
     }
+  };
+
+  const selectPresetEndpoint = (presetPath: string) => {
+    setTargetUrl(window.location.origin + presetPath);
   };
 
   return (
@@ -123,6 +145,50 @@ export const PaymentTestUi: React.FC = () => {
           <h4 className="font-extrabold text-sm text-gray-800 uppercase tracking-wider pb-2 border-b border-gray-100 font-sans">Thông tin chuyển khoản giả lập</h4>
           
           <div className="space-y-3 text-xs font-semibold">
+            {/* Target URL Selector */}
+            <div className="space-y-1.5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <label className="text-[#007c76] flex items-center gap-1.5 font-bold uppercase tracking-wider">
+                <span>🎯</span> Endpoint Đích (Target URL)
+              </label>
+              <input
+                type="text"
+                value={targetUrl}
+                onChange={(e) => setTargetUrl(e.target.value)}
+                placeholder="/api/sepay/webhook"
+                className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-mono text-[10px] text-slate-700"
+              />
+              <div className="flex flex-wrap gap-1.5 pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => selectPresetEndpoint('/api/sepay/webhook')}
+                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-100 rounded-lg text-[9px] font-bold cursor-pointer"
+                >
+                  sepay/webhook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectPresetEndpoint('/api/payment/webhook')}
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-lg text-[9px] font-bold cursor-pointer"
+                >
+                  payment/webhook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectPresetEndpoint('/api/debug/headers')}
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-lg text-[9px] font-bold cursor-pointer"
+                >
+                  debug/headers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectPresetEndpoint('/api/debug/request-flow')}
+                  className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 rounded-lg text-[9px] font-bold cursor-pointer"
+                >
+                  debug/request-flow
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-gray-400 font-bold">Ngân hàng nhận</label>

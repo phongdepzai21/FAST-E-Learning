@@ -246,6 +246,44 @@ async function startServer() {
     }
   });
 
+  // Temporary request flow diagnostic logger route
+  app.all("/api/debug/request-flow", async (req: any, res) => {
+    try {
+      const logInfo = {
+        method: req.method,
+        url: req.url,
+        originalUrl: req.originalUrl,
+        headers: req.headers || {},
+        query: req.query || {},
+        body: req.body || null,
+        rawBodySample: req.rawBody ? req.rawBody.substring(0, 500) : "Empty",
+        timestamp: new Date().toISOString()
+      };
+
+      console.log("[Request-Flow-Debug] Received request-flow signal:", JSON.stringify(logInfo, null, 2));
+
+      // Log directly to Firestore payment_logs under status 'ignored' for real-time dashboard visibility
+      try {
+        await logFailedWebhookAttempt(
+          logInfo,
+          `Request Flow: ${req.method} ${req.originalUrl}`,
+          "ignored"
+        );
+      } catch (logErr: any) {
+        console.warn("[Request-Flow-Debug] Failed to save diagnostic logs to Firestore:", logErr.message);
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Request flow captured perfectly.",
+        debug: logInfo
+      });
+    } catch (err: any) {
+      console.error("[Request-Flow-Debug] Internal capture failure:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 1.5. Automated Auto-Banking Payment Webhook for SePay / Casso / PayOS
   app.post("/api/payment/webhook", async (req, res) => {
     console.log("[Server-Webhook] Incoming transaction request:", req.body);

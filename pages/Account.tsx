@@ -16,6 +16,7 @@ import FastFoodSafetyManagement from '../components/FastFoodSafetyManagement';
 import { PurchaseHistory } from '../components/PurchaseHistory';
 import { AdminQrUtility } from '../components/AdminQrUtility';
 import { PaymentTestUi } from '../components/PaymentTestUi';
+import { WebhookStatusDashboard } from '../components/WebhookStatusDashboard';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
@@ -296,7 +297,7 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'admin-qr-utility' | 'payment-test-ui'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'admin-qr-utility' | 'payment-test-ui' | 'webhook-status-dashboard'>('dashboard');
   const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('student');
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
@@ -1972,6 +1973,7 @@ const Account: React.FC = () => {
                     ...(isAdmin ? [
                       { id: 'admin-qr-utility', label: 'Công cụ Tạo mã QR', icon: 'M4 4h8v8H4zm10 0h6v6h-6zm0 10h6v6h-6zm-10 4h6v2H4zm0-2h4v-2H4z' },
                       { id: 'payment-test-ui', label: 'Thử Webhook HMAC', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+                      { id: 'webhook-status-dashboard', label: 'Bảng Đô Lường Webhook', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
                       { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
                   ].map((item) => {
@@ -2045,6 +2047,7 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="user-management">Học viên & Khóa học</option>}
                   {isAdmin && <option value="admin-qr-utility">Công cụ Tạo mã QR</option>}
                   {isAdmin && <option value="payment-test-ui">Thử Webhook HMAC</option>}
+                  {isAdmin && <option value="webhook-status-dashboard">Bảng Đô Lường Webhook</option>}
                   {isAdmin && <option value="admin-audit-center">➜ Hệ thống Kiểm toán (FSA • ATTP • HSQC)</option>}
                 </select>
              </div>
@@ -2106,7 +2109,9 @@ const Account: React.FC = () => {
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full"
               >
-                {activeTab === 'payment-test-ui' && isAdmin ? (
+                {activeTab === 'webhook-status-dashboard' && isAdmin ? (
+                  <WebhookStatusDashboard />
+                ) : activeTab === 'payment-test-ui' && isAdmin ? (
                   <PaymentTestUi />
                 ) : activeTab === 'admin-qr-utility' && isAdmin ? (
                   <AdminQrUtility />
