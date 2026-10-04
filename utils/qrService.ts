@@ -24,10 +24,10 @@ export const POPULAR_BANKS = [
 ];
 
 export const DEFAULT_PAYMENT_CONFIG: PaymentAccountConfig = {
-  bankId: 'ICB',
-  bankName: 'VietinBank (Công Thương)',
-  accountNo: '0989499579',
-  accountName: 'FAST ACADEMY',
+  bankId: 'ACB',
+  bankName: 'ACB (Á Châu)',
+  accountNo: '989499568',
+  accountName: 'CONG TY TNHH TU VAN FAST',
 };
 
 /**
