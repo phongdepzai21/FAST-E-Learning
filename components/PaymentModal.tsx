@@ -87,7 +87,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     setOtpCountdown(0);
 
     if (isOpen) {
-      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const chars = '0123456789';
       let result = '';
       for (let i = 0; i < 6; i++) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
