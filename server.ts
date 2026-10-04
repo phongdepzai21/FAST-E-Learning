@@ -175,9 +175,17 @@ function broadcastCombosUpdate(event: string, payload: any) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ 
+    limit: "10mb",
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf.toString();
+    }
+  }));
+
+  app.use(express.urlencoded({ 
+    extended: true,
     limit: "10mb",
     verify: (req: any, res, buf) => {
       req.rawBody = buf.toString();
@@ -192,6 +200,50 @@ async function startServer() {
 
   app.get("/api/combos", (req, res) => {
     res.json({ combos: Object.values(serverCombos) });
+  });
+
+  // Endpoint to debug incoming headers and protocol forwarders
+  app.all("/api/debug/headers", async (req, res) => {
+    try {
+      const headers = req.headers || {};
+      const query = req.query || {};
+      const method = req.method || 'GET';
+      const protocol = req.protocol;
+      const secure = req.secure;
+      const url = req.originalUrl;
+
+      const logInfo = {
+        method,
+        protocol,
+        secure,
+        url,
+        query,
+        headers,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log("[Headers-Debug-API] Received request headers:", JSON.stringify(logInfo, null, 2));
+
+      // Also log directly to Firestore payment_logs so the admin sees it live in the dashboard!
+      try {
+        await logFailedWebhookAttempt(
+          logInfo,
+          `Headers Debug Request: ${method} ${url}`,
+          "ignored"
+        );
+      } catch (logErr: any) {
+        console.warn("[Headers-Debug-API] Failed to write headers log to Firestore:", logErr.message);
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Headers captured and logged successfully.",
+        requestInfo: logInfo
+      });
+    } catch (err: any) {
+      console.error("[Headers-Debug-API] Exception:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // 1.5. Automated Auto-Banking Payment Webhook for SePay / Casso / PayOS
@@ -231,7 +283,23 @@ async function startServer() {
 
   // 1.5b. Secure SePay Webhook with HMAC-SHA256 signature verification
   app.post("/api/sepay/webhook", async (req: any, res) => {
-    console.log("[SePay-HMAC-Webhook] Incoming webhook request:", req.body);
+    const origin = req.headers["origin"] || "No Origin Header";
+    const referer = req.headers["referer"] || "No Referer Header";
+    const contentType = req.headers["content-type"] || "No Content-Type Header";
+    
+    // Determine payload parsing status
+    const isParsedAsObject = typeof req.body === 'object' && req.body !== null;
+    const bodyKeysCount = isParsedAsObject ? Object.keys(req.body).length : 0;
+    const rawBodyLength = req.rawBody ? req.rawBody.length : 0;
+
+    console.log("[SePay-HMAC-Webhook] HTTP Header Diagnostics:");
+    console.log(`  - Origin: ${origin}`);
+    console.log(`  - Referer: ${referer}`);
+    console.log(`  - Content-Type: ${contentType}`);
+    console.log(`  - Parsed Body Type: ${typeof req.body}`);
+    console.log(`  - Number of Keys in Parsed Body: ${bodyKeysCount}`);
+    console.log(`  - Raw Body Size: ${rawBodyLength} characters`);
+    console.log(`  - Raw Body Sample: ${req.rawBody ? req.rawBody.substring(0, 150) : "Empty"}`);
 
     const signatureHeader = req.headers["x-sepay-signature"] || req.headers["x-signature"];
     const isSignatureValid = verifySePayHMACSignature(
@@ -241,8 +309,34 @@ async function startServer() {
 
     if (!isSignatureValid) {
       console.warn("[SePay-HMAC-Webhook:Security] Invalid HMAC-SHA256 signature detected!");
-      await logFailedWebhookAttempt(req.body, "Invalid HMAC-SHA256 signature verification failed", "failed");
-      return res.status(401).json({ success: false, error: "Invalid HMAC-SHA256 signature. Access denied." });
+      
+      const debugPayload = {
+        origin,
+        referer,
+        contentType,
+        bodyType: typeof req.body,
+        bodyKeysCount,
+        rawBodyLength,
+        rawBodyPreview: req.rawBody ? req.rawBody.substring(0, 500) : "Empty",
+        parsedBody: req.body,
+        signatureHeaderReceived: signatureHeader || "None"
+      };
+
+      await logFailedWebhookAttempt(
+        debugPayload, 
+        "Invalid HMAC-SHA256 signature verification failed. Please check payload or secret.", 
+        "failed"
+      );
+      
+      return res.status(401).json({ 
+        success: false, 
+        error: "Invalid HMAC-SHA256 signature. Access denied.",
+        diagnostics: {
+          contentType,
+          isParsedAsObject,
+          hasRawBody: !!req.rawBody
+        }
+      });
     }
 
     try {

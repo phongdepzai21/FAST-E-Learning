@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Link } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -17,6 +17,48 @@ export const PurchaseHistory: React.FC = () => {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const renderStatusBadge = (status: string) => {
+    const s = (status || "").toLowerCase();
+    switch (s) {
+      case 'active':
+      case 'completed':
+      case 'verified':
+      case 'success':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 shadow-sm border border-green-200/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+            Đã xác thực
+          </span>
+        );
+      case 'pending':
+      case 'processing':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 shadow-sm border border-amber-200/60 animate-pulse">
+            <svg className="animate-spin h-3 w-3 text-amber-600 mr-0.5" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Đang xử lý
+          </span>
+        );
+      case 'failed':
+      case 'rejected':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 shadow-sm border border-red-200/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            Thất bại
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-700 border border-gray-200/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            Đã thanh toán
+          </span>
+        );
+    }
+  };
 
   const handleDownloadReceipt = (purchase: PurchaseRecord) => {
     try {
@@ -137,47 +179,44 @@ export const PurchaseHistory: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchPurchases = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      const currentUser = auth.currentUser;
-      if (!currentUser || !currentUser.email) {
-        setError('Vui lòng đăng nhập để xem lịch sử mua hàng.');
-        setIsLoading(false);
-        return;
-      }
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
+      setError('Vui lòng đăng nhập để xem lịch sử mua hàng.');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const userEmail = currentUser.email.toLowerCase();
-        const purchasesRef = collection(db, "users", userEmail, "purchased_courses");
-        const q = query(purchasesRef);
-        const snapshot = await getDocs(q);
-        
-        const records: PurchaseRecord[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          records.push({
-            id: doc.id,
-            courseId: data.courseId,
-            courseTitle: data.courseTitle || data.courseId,
-            purchasedAt: data.purchasedAt || data.activatedAt || new Date().toISOString(),
-            price: data.price || (data.paymentAmount ? `${Number(data.paymentAmount).toLocaleString('vi-VN')}đ` : "Đã thanh toán"),
-            status: data.status,
-          });
+    setIsLoading(true);
+    setError(null);
+
+    const userEmail = currentUser.email.toLowerCase();
+    const purchasesRef = collection(db, "users", userEmail, "purchased_courses");
+
+    // Real-time listener using onSnapshot for direct UI reactivity
+    const unsubscribe = onSnapshot(purchasesRef, (snapshot) => {
+      const records: PurchaseRecord[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        records.push({
+          id: doc.id,
+          courseId: data.courseId,
+          courseTitle: data.courseTitle || data.courseId,
+          purchasedAt: data.purchasedAt || data.activatedAt || new Date().toISOString(),
+          price: data.price || (data.paymentAmount ? `${Number(data.paymentAmount).toLocaleString('vi-VN')}đ` : "Đã thanh toán"),
+          status: data.status || "active",
         });
+      });
 
-        records.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
-        setPurchases(records);
-      } catch (err: any) {
-        console.error("Lỗi lấy lịch sử mua hàng:", err);
-        setError('Không thể tải lịch sử mua hàng. Vui lòng thử lại sau.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      records.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
+      setPurchases(records);
+      setIsLoading(false);
+    }, (err) => {
+      console.error("Lỗi đồng bộ lịch sử mua hàng:", err);
+      setError('Không thể tải lịch sử mua hàng thời gian thực.');
+      setIsLoading(false);
+    });
 
-    fetchPurchases();
+    return () => unsubscribe();
   }, []);
 
   if (isLoading) {
@@ -251,10 +290,7 @@ export const PurchaseHistory: React.FC = () => {
                   <span className="font-bold text-gray-800 whitespace-nowrap">{purchase.price}</span>
                 </td>
                 <td className="p-4 whitespace-nowrap">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                    Thành công
-                  </span>
+                  {renderStatusBadge(purchase.status)}
                 </td>
                 <td className="p-4 text-center whitespace-nowrap">
                   <button

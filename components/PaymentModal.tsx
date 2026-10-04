@@ -568,11 +568,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
                 {/* QR Code and Instructions */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 justify-center">
-                  <div className="relative w-44 h-44 bg-white p-2 rounded-2xl shadow-md border-2 border-teal-200 shrink-0 flex items-center justify-center">
+                  <div className="relative w-60 h-60 bg-white p-2.5 rounded-3xl shadow-lg border-2 border-[#007c76] shrink-0 flex items-center justify-center transition-transform duration-300 hover:scale-[1.03]">
                     <img
                       src={currentQrUrl}
                       alt={`Mã QR ${formatVND(numericAmount)}`}
-                      className="w-full h-full object-contain rounded-lg"
+                      className="w-full h-full object-contain rounded-xl"
                     />
                   </div>
 
