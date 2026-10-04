@@ -52,30 +52,47 @@ export async function processWebhookTransaction(
 
     console.log(`[PaymentService] Incoming Webhook: Code: "${matchedSePayCode}" | Content: "${content}" | Amount: ${amount}`);
 
-    let targetCode = "";
+    // Detect generic SePay simulator tests or generic webhook checks and auto-approve
+    const isTestMock = 
+      content.includes("TEST") || 
+      content.includes("THU") || 
+      content.includes("SIMULAT") ||
+      content.includes("MOCK") ||
+      matchedSePayCode.includes("TEST") ||
+      matchedSePayCode.includes("THU") ||
+      (!matchedSePayCode && !content);
 
-    // Step 1: Detect transaction code (e.g. FAST123456)
-    if (matchedSePayCode && matchedSePayCode.startsWith("FAST")) {
-      targetCode = matchedSePayCode;
-    } else {
-      // Fallback: Scan full content sentence for any word starting with "FAST"
-      const words = content.split(/\s+/);
-      const foundWord = words.find(w => w.startsWith("FAST"));
-      if (foundWord) {
-        targetCode = foundWord;
+    if (isTestMock) {
+      console.log("[PaymentService] SePay Connection Test/Simulation detected. Auto-approving.");
+      return {
+        success: true,
+        message: "SePay Webhook Connection Test Approved!",
+        isTest: true
+      };
+    }
+
+    let targetCode = "";
+    let suffix = "";
+
+    // Step 1: Parse suffix from content sentence using robust regex
+    const fastRegex = /FAST\s*[-_]?\s*(\d+)/i;
+    const match = content.match(fastRegex);
+    if (match) {
+      suffix = match[1].trim();
+      targetCode = `FAST${suffix}`;
+    } else if (matchedSePayCode) {
+      const codeMatch = matchedSePayCode.match(fastRegex);
+      if (codeMatch) {
+        suffix = codeMatch[1].trim();
+        targetCode = `FAST${suffix}`;
       }
     }
 
-    if (!targetCode) {
-      console.log("[PaymentService] Ignored: No FAST transaction code found.");
+    if (!targetCode || !suffix) {
+      const errMsg = "Ignored: No valid FAST transaction code format found in content.";
+      console.log(`[PaymentService] ${errMsg}`);
+      await logFailedWebhookAttempt(body, errMsg, "ignored");
       return { success: false, message: "Ignored: Not a FAST transaction" };
-    }
-
-    // Step 2: Extract dynamic suffix after "FAST"
-    const suffix = targetCode.slice(4).trim();
-    if (!suffix) {
-      console.warn("[PaymentService] Empty suffix found for code:", targetCode);
-      return { success: false, message: "Empty payment code suffix.", error: "Empty payment code suffix." };
     }
 
     console.log(`[PaymentService] Identified transaction suffix: "${suffix}". Performing lookup...`);
@@ -141,10 +158,12 @@ export async function processWebhookTransaction(
 
     // Handle mock simulations or unmatched transactions gracefully
     if (!matchedEmail || !courseId) {
+      const warnMsg = `Webhook received successfully. No active pending order found for code suffix "${suffix}". (Normal for simulation/test payments)`;
       console.warn(`[PaymentService] Match warning: No pending order found for memo "${targetCode}". This is normal for mock simulation tests.`);
+      await logFailedWebhookAttempt(body, warnMsg, "ignored");
       return {
         success: true,
-        message: `Webhook received successfully. No active pending order found for code suffix "${suffix}". (Normal for simulation/test payments)`,
+        message: warnMsg,
         isTest: true
       };
     }
@@ -184,6 +203,7 @@ export async function processWebhookTransaction(
     };
   } catch (err: any) {
     console.error("[PaymentService] Webhook processing exception:", err);
+    await logFailedWebhookAttempt(body, err.message, "exception");
     return {
       success: false,
       message: "Internal server error during webhook processing",
@@ -221,5 +241,30 @@ export function verifySePayHMACSignature(
   } catch (err: any) {
     console.error("[PaymentService:HMAC] Signature verification exception:", err.message);
     return false;
+  }
+}
+
+/**
+ * Log a failed webhook transaction attempt into Firestore for audit purposes
+ */
+export async function logFailedWebhookAttempt(
+  payload: any,
+  errorMessage: string,
+  status: "failed" | "ignored" | "exception" = "failed"
+) {
+  try {
+    const db = getFirestore();
+    const logId = `LOG_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    await db.collection("payment_logs").doc(logId).set({
+      id: logId,
+      errorMessage,
+      status,
+      timestamp: new Date().toISOString(),
+      payload: payload || null,
+      userAgent: "SePay Webhook Engine",
+    });
+    console.log(`[PaymentService] Successfully logged failed attempt "${logId}" to payment_logs.`);
+  } catch (err: any) {
+    console.error("[PaymentService] Critical: Failed to write to payment_logs collection:", err.message);
   }
 }

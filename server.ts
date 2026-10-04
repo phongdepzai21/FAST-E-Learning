@@ -7,7 +7,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { verifySePayWebhookToken, processWebhookTransaction, verifySePayHMACSignature } from "./utils/paymentService";
+import { verifySePayWebhookToken, processWebhookTransaction, verifySePayHMACSignature, logFailedWebhookAttempt } from "./utils/paymentService";
 
 if (!getApps().length) {
   const keyPath = path.join(process.cwd(), "firebase-key.json");
@@ -209,6 +209,7 @@ async function startServer() {
 
     if (!isAuthorized) {
       console.warn("[Server-Webhook:Security] Unauthorized webhook access attempt blocked.");
+      await logFailedWebhookAttempt(req.body, "Unauthorized Webhook Access: Invalid Token or API Key", "failed");
       return res.status(401).json({ success: false, error: "Unauthorized SePay Webhook Token. Access denied." });
     }
 
@@ -240,6 +241,7 @@ async function startServer() {
 
     if (!isSignatureValid) {
       console.warn("[SePay-HMAC-Webhook:Security] Invalid HMAC-SHA256 signature detected!");
+      await logFailedWebhookAttempt(req.body, "Invalid HMAC-SHA256 signature verification failed", "failed");
       return res.status(401).json({ success: false, error: "Invalid HMAC-SHA256 signature. Access denied." });
     }
 
