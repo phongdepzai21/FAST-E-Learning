@@ -1,4 +1,10 @@
 [[redirects]]
+  from = "/api/*"
+  to = "https://ais-pre-dafarqvpnahvaovgrtcg6d-145100924001.asia-southeast1.run.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
