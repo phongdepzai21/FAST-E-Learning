@@ -72,8 +72,9 @@ export const PaymentTestUi: React.FC = () => {
     const payloadString = JSON.stringify(payloadObj, null, 2);
     setRawPayload(payloadString);
 
-    // Compute signature using exact web crypto API
-    computeHmacSha256(secretKey, JSON.stringify(payloadObj))
+    // CRITICAL FIX: Compute signature using the EXACT payload string that will be sent as the body.
+    // Standardizing string spaces & newline formatting avoids signature mismatch on the backend parser.
+    computeHmacSha256(secretKey, payloadString)
       .then(sig => setCalculatedSignature(sig))
       .catch(err => console.error("Error computing signature:", err));
   }, [gateway, accountNumber, transferType, transferAmount, content, referenceId, secretKey]);

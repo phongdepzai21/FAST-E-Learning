@@ -244,11 +244,16 @@ export function verifySePayHMACSignature(
 
     console.log(`[PaymentService:HMAC] Computed Signature: "${computedSignature}" | Header: "${signatureHeader}"`);
     
+    const bufComputed = Buffer.from(computedSignature, "hex");
+    const bufHeader = Buffer.from(signatureHeader, "hex");
+
+    if (bufComputed.length !== bufHeader.length) {
+      console.warn("[PaymentService:HMAC] Signature length mismatch.");
+      return false;
+    }
+
     // Time-constant comparison to prevent timing attacks
-    return crypto.timingSafeEqual(
-      Buffer.from(computedSignature, "hex"),
-      Buffer.from(signatureHeader, "hex")
-    );
+    return crypto.timingSafeEqual(bufComputed, bufHeader);
   } catch (err: any) {
     console.error("[PaymentService:HMAC] Signature verification exception:", err.message);
     return false;

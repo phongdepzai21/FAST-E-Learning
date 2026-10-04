@@ -284,6 +284,108 @@ async function startServer() {
     }
   });
 
+  // API to look up student email based on FAST payment code
+  app.get("/api/payment/lookup", async (req, res) => {
+    try {
+      const queryCode = req.query.code as string;
+      if (!queryCode) {
+        return res.status(400).json({ success: false, error: "Mã thanh toán không được để trống." });
+      }
+
+      // Robust regex to parse suffix
+      const fastRegex = /FAST\s*[-_]?\s*(\d+)/i;
+      let suffix = "";
+      const match = queryCode.match(fastRegex);
+      if (match) {
+        suffix = match[1].trim();
+      } else {
+        // Fallback to extract numbers directly if they only input "128492"
+        const numMatch = queryCode.match(/\d+/);
+        if (numMatch) {
+          suffix = numMatch[0].trim();
+        }
+      }
+
+      if (!suffix) {
+        return res.status(400).json({ success: false, error: "Định dạng mã thanh toán không đúng (Ví dụ: FAST 128492 hoặc 128492)." });
+      }
+
+      const db = getFirestore();
+      let pendingOrder: any = null;
+      let logsFound: any[] = [];
+      let studentEmail: string | null = null;
+
+      // 1. Check pending_payments
+      try {
+        const pendingDoc = await db.collection("pending_payments").doc(suffix).get();
+        if (pendingDoc.exists) {
+          pendingOrder = pendingDoc.data();
+          studentEmail = pendingOrder.email;
+        }
+      } catch (err: any) {
+        console.error("Pending payment lookup error:", err.message);
+      }
+
+      // 2. Check payment_logs
+      try {
+        const logsSnap = await db.collection("payment_logs").get();
+        logsSnap.forEach((doc) => {
+          const logData = doc.data();
+          const payloadStr = logData.payload ? JSON.stringify(logData.payload).toLowerCase() : '';
+          const errMsgLower = (logData.errorMessage || '').toLowerCase();
+          
+          if (
+            payloadStr.includes(suffix) || 
+            errMsgLower.includes(suffix) ||
+            (logData.id && logData.id.includes(suffix))
+          ) {
+            logsFound.push(logData);
+            
+            // Extract email from success message if not found in pending
+            if (!studentEmail) {
+              const emailMatch = (logData.errorMessage || '').match(/user "([^"]+)"/i);
+              if (emailMatch) {
+                studentEmail = emailMatch[1];
+              } else if (logData.payload && logData.payload.email) {
+                studentEmail = logData.payload.email;
+              }
+            }
+          }
+        });
+      } catch (err: any) {
+        console.error("Payment logs lookup error:", err.message);
+      }
+
+      // 3. Check if user exists and get course details
+      let studentProfile: any = null;
+      if (studentEmail) {
+        try {
+          const userDoc = await db.collection("users").doc(studentEmail).get();
+          if (userDoc.exists) {
+            studentProfile = userDoc.data();
+          }
+        } catch (err: any) {
+          console.error("User profile lookup error:", err.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        suffix,
+        targetCode: `FAST${suffix}`,
+        studentEmail,
+        studentProfile,
+        pendingOrder,
+        logsCount: logsFound.length,
+        logs: logsFound.slice(0, 5), // return top 5 matching logs
+        status: pendingOrder ? "pending_payment" : (logsFound.some(l => l.status === "success") ? "completed" : "unknown")
+      });
+    } catch (err: any) {
+      console.error("FAST code lookup exception:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // 1.5. Automated Auto-Banking Payment Webhook for SePay / Casso / PayOS
   app.post("/api/payment/webhook", async (req, res) => {
     console.log("[Server-Webhook] Incoming transaction request:", req.body);
