@@ -14,11 +14,11 @@ interface PersonalNotesSidebarProps {
 }
 
 const TAG_CONFIG = {
-  general: { label: 'Ghi chú', icon: '📝', color: 'text-slate-300 bg-slate-800/80 border-slate-700' },
-  important: { label: 'Quan trọng', icon: '⭐', color: 'text-amber-300 bg-amber-500/15 border-amber-500/30' },
-  concept: { label: 'Ý chính', icon: '💡', color: 'text-teal-300 bg-teal-500/15 border-teal-500/30' },
-  warning: { label: 'Lưu ý', icon: '📌', color: 'text-rose-300 bg-rose-500/15 border-rose-500/30' },
-  question: { label: 'Câu hỏi', icon: '❓', color: 'text-sky-300 bg-sky-500/15 border-sky-500/30' },
+  general: { label: 'Ghi chú', color: 'text-slate-300 bg-slate-800/80 border-slate-700' },
+  important: { label: 'Quan trọng', color: 'text-amber-300 bg-amber-500/15 border-amber-500/30' },
+  concept: { label: 'Ý chính', color: 'text-teal-300 bg-teal-500/15 border-teal-500/30' },
+  warning: { label: 'Lưu ý', color: 'text-rose-300 bg-rose-500/15 border-rose-500/30' },
+  question: { label: 'Câu hỏi', color: 'text-sky-300 bg-sky-500/15 border-sky-500/30' },
 };
 
 type TagKey = keyof typeof TAG_CONFIG;

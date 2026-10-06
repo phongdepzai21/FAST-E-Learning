@@ -27,7 +27,6 @@ export const ADMIN_EMAILS = [
   'h1h4phong@gmail.com',
   'hkc.qms@gmail.com',
   'trdung153@gmail.com',
-  'lediem.ngo@gmail.com'
 ];
 
 /**

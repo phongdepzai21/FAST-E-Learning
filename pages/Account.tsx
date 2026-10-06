@@ -1729,7 +1729,7 @@ const Account: React.FC = () => {
                   { id: 'fsa', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
                   { id: 'attp', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
                   { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
-                  { id: 'student', label: '🎓 Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
+                  { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;
                   return (
@@ -1766,7 +1766,7 @@ const Account: React.FC = () => {
               ) : (
                 <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
                   <p className="text-xs font-black uppercase tracking-widest mb-1">FAST Admin</p>
-                  <p className="text-[10px] opacity-90">Hệ Thống Kiểm Toán</p>
+                  <p className="text-[10px] opacity-90">type of service</p>
                 </div>
               )}
             </div>
