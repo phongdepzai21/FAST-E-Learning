@@ -1766,7 +1766,7 @@ const Account: React.FC = () => {
               ) : (
                 <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
                   <p className="text-xs font-black uppercase tracking-widest mb-1">FAST Admin</p>
-                  <p className="text-[10px] opacity-90">type of service</p>
+                  <p className="text-[10px] opacity-90">Các loại dịch vụ</p>
                 </div>
               )}
             </div>
