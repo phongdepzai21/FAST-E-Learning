@@ -3,6 +3,51 @@ import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Se
 import { db as firestoreDb, auth } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+
+interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
+  value: string;
+  onCommit: (val: string) => void;
+  className?: string;
+}
+
+const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, className, ...props }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    // Strictly ignore parent/remote updates while the user is actively typing to prevent character stutters
+    if (!isFocused.current) {
+      setLocalVal(value);
+    }
+  }, [value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onCommit(localVal);
+    }
+  };
+
+  const handleFocus = () => {
+    isFocused.current = true;
+  };
+
+  const handleBlur = () => {
+    isFocused.current = false;
+    onCommit(localVal);
+  };
+
+  return (
+    <input
+      {...props}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
 import { useGlobalSync } from '../hooks/useGlobalSync';
 
 interface ChecklistDoc {
@@ -833,7 +878,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
-                <input type="text" value={fastStaff} onChange={(e) => setFastStaff(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Tên nhân viên FAST..." />
+                <LocalSyncInput type="text" value={fastStaff} onCommit={(val) => setFastStaff(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" placeholder="Tên nhân viên FAST..." />
               </div>
             </div>
 
@@ -843,7 +888,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><FileText className="w-4 h-4" /></span>
-                <input type="text" value={custName} onChange={(e) => setCustName(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Tên công ty / bếp ăn / nhà hàng..." />
+                <LocalSyncInput type="text" value={custName} onCommit={(val) => setCustName(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-bold" placeholder="Tên công ty / bếp ăn / nhà hàng..." />
               </div>
             </div>
 
@@ -853,7 +898,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
-                <input type="text" value={custContact} onChange={(e) => setCustContact(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Họ tên người liên hệ..." />
+                <LocalSyncInput type="text" value={custContact} onCommit={(val) => setCustContact(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" placeholder="Họ tên người liên hệ..." />
               </div>
             </div>
 
@@ -863,7 +908,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Phone className="w-4 h-4" /></span>
-                <input type="text" value={custPhone} onChange={(e) => setCustPhone(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Số điện thoại di động..." />
+                <LocalSyncInput type="text" value={custPhone} onCommit={(val) => setCustPhone(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" placeholder="Số điện thoại di động..." />
               </div>
             </div>
 
@@ -873,7 +918,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Search className="w-4 h-4" /></span>
-                <input type="text" value={custLocation} onChange={(e) => setCustLocation(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="Số nhà, tên đường, Phường, Quận..." />
+                <LocalSyncInput type="text" value={custLocation} onCommit={(val) => setCustLocation(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" placeholder="Số nhà, tên đường, Phường, Quận..." />
               </div>
             </div>
 
@@ -883,7 +928,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custOrderDate} onChange={(e) => setCustOrderDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custOrderDate} onCommit={(val) => setCustOrderDate(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
 
@@ -891,7 +936,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <label className="block font-bold text-gray-700 mb-1">Trạng Thái Hồ Sơ:</label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium">
+                <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ &amp; Cơ sở</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
                   <option value="Đang thẩm định thực tế">🟣 Đang thẩm định thực tế tại bếp</option>
@@ -908,7 +953,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custSubmitDate} onChange={(e) => handleFastSubmitDateChange(e.target.value, 'business')} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custSubmitDate} onCommit={(val) => handleFastSubmitDateChange(val, 'business')} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
 
@@ -919,7 +964,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custTargetDate} onChange={(e) => setCustTargetDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custTargetDate} onCommit={(val) => setCustTargetDate(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
 
@@ -927,7 +972,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <label className="block font-bold text-gray-700 mb-1">Ngày Thẩm Định Thực Tế:</label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custInspectDate} onChange={(e) => setCustInspectDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custInspectDate} onCommit={(val) => setCustInspectDate(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
 
@@ -938,7 +983,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               </label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custCertDate} onChange={(e) => handleCertDateChange(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custCertDate} onCommit={(val) => handleCertDateChange(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
 
@@ -946,7 +991,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <label className="block font-bold text-gray-700 mb-1">Số GCN / Mã Biên Nhận:</label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><FileText className="w-4 h-4" /></span>
-                <input type="text" value={custCertNumber} onChange={(e) => setCustCertNumber(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" placeholder="1234/2026/ATTP-CN..." />
+                <LocalSyncInput type="text" value={custCertNumber} onCommit={(val) => setCustCertNumber(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" placeholder="1234/2026/ATTP-CN..." />
               </div>
             </div>
 
@@ -954,7 +999,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <label className="block font-bold text-gray-700 mb-1">Ngày Hết Hạn (+3 năm):</label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <input type="date" value={custExpireDate} onChange={(e) => setCustExpireDate(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium" />
+                <LocalSyncInput type="date" value={custExpireDate} onCommit={(val) => setCustExpireDate(val)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-semibold" />
               </div>
             </div>
           </div>

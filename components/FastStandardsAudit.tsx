@@ -2,6 +2,51 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+
+interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
+  value: string;
+  onCommit: (val: string) => void;
+  className?: string;
+}
+
+const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, className, ...props }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    // Strictly ignore parent/remote updates while the user is actively typing to prevent character stutters
+    if (!isFocused.current) {
+      setLocalVal(value);
+    }
+  }, [value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onCommit(localVal);
+    }
+  };
+
+  const handleFocus = () => {
+    isFocused.current = true;
+  };
+
+  const handleBlur = () => {
+    isFocused.current = false;
+    onCommit(localVal);
+  };
+
+  return (
+    <input
+      {...props}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
 import { useGlobalSync } from '../hooks/useGlobalSync';
 import { ALL_AUDIT_ITEMS, AuditItem, AuditItemState, VAL_METHODS_LIST, IMP_METHODS_LIST } from '../data/fastStandardsData';
 import { 
@@ -724,12 +769,12 @@ export const FastStandardsAudit: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 Đơn vị được đánh giá (Auditee):
               </label>
-              <input
+              <LocalSyncInput
                 type="text"
                 value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
+                onCommit={(val) => setClientName(val)}
                 placeholder="VD: Cửa hàng tiện lợi / Siêu thị ABC..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none text-slate-800 font-bold"
               />
             </div>
 
@@ -737,12 +782,12 @@ export const FastStandardsAudit: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 Quản lý cơ sở (Store Manager):
               </label>
-              <input
+              <LocalSyncInput
                 type="text"
                 value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
+                onCommit={(val) => setManagerName(val)}
                 placeholder="Họ tên Quản lý cơ sở..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none text-slate-800 font-semibold"
               />
             </div>
 
@@ -753,7 +798,7 @@ export const FastStandardsAudit: React.FC = () => {
               <select
                 value={businessModel}
                 onChange={(e) => setBusinessModel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white text-slate-800"
               >
                 <option>Chuỗi Nhà Hàng (F&B Chain)</option>
                 <option>Cửa Hàng Tiện Lợi (Convenience Store)</option>
@@ -766,11 +811,11 @@ export const FastStandardsAudit: React.FC = () => {
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                 Chuyên gia đánh giá (Lead Auditor):
               </label>
-              <input
+              <LocalSyncInput
                 type="text"
                 value={auditorName}
-                onChange={(e) => setAuditorName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none"
+                onCommit={(val) => setAuditorName(val)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none text-slate-800 font-semibold"
               />
             </div>
           </div>

@@ -2,6 +2,51 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+
+interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
+  value: string;
+  onCommit: (val: string) => void;
+  className?: string;
+}
+
+const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, className, ...props }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    // Strictly ignore parent/remote updates while the user is actively typing to prevent character stutters
+    if (!isFocused.current) {
+      setLocalVal(value);
+    }
+  }, [value]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onCommit(localVal);
+    }
+  };
+
+  const handleFocus = () => {
+    isFocused.current = true;
+  };
+
+  const handleBlur = () => {
+    isFocused.current = false;
+    onCommit(localVal);
+  };
+
+  return (
+    <input
+      {...props}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
 import { useGlobalSync } from '../hooks/useGlobalSync';
 import { 
   Building2, 
@@ -905,12 +950,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Nhân Viên FAST Phụ Trách: <span className="text-red-500">*</span>
             </label>
-            <input
+            <LocalSyncInput
               type="text"
               value={fastStaff}
-              onChange={(e) => { setFastStaff(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setFastStaff(val); saveActiveDraft(); }}
               placeholder="Nhập họ tên chuyên viên FAST..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
@@ -918,12 +963,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Tên Khách Hàng / Doanh Nghiệp: <span className="text-red-500">*</span>
             </label>
-            <input
+            <LocalSyncInput
               type="text"
               value={custName}
-              onChange={(e) => { setCustName(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setCustName(val); saveActiveDraft(); }}
               placeholder="Nhập tên khách hàng / công ty..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-bold text-slate-900"
             />
           </div>
 
@@ -931,12 +976,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Số Điện Thoại Khách Hàng: <span className="text-red-500">*</span>
             </label>
-            <input
+            <LocalSyncInput
               type="tel"
               value={custPhone}
-              onChange={(e) => { setCustPhone(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setCustPhone(val); saveActiveDraft(); }}
               placeholder="VD: 0912 345 678..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
@@ -944,12 +989,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Địa Điểm Cơ Sở / Vị Trí QC: <span className="text-red-500">*</span>
             </label>
-            <input
+            <LocalSyncInput
               type="text"
               value={custLocation}
-              onChange={(e) => { setCustLocation(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setCustLocation(val); saveActiveDraft(); }}
               placeholder="Địa chỉ, tuyến đường treo..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
@@ -957,11 +1002,11 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Mốc 1: Ngày Order / Tiếp Nhận: <span className="text-red-500">*</span>
             </label>
-            <input
+            <LocalSyncInput
               type="date"
               value={orderDate}
-              onChange={(e) => { setOrderDate(e.target.value); saveActiveDraft(); }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              onCommit={(val) => { setOrderDate(val); saveActiveDraft(); }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
@@ -979,12 +1024,11 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 Cổng DVC <ExternalLink className="w-2.5 h-2.5" />
               </a>
             </div>
-            <input
+            <LocalSyncInput
               type="date"
               value={submitDate}
-              onChange={(e) => { setSubmitDate(e.target.value); }}
-              onBlur={() => handleFastSubmitDateChange('business')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              onCommit={(val) => { setSubmitDate(val); handleFastSubmitDateChange('business'); }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
@@ -1012,10 +1056,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 </button>
               </div>
             </div>
-            <input
+            <LocalSyncInput
               type="date"
               value={targetDate}
-              onChange={(e) => { setTargetDate(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setTargetDate(val); saveActiveDraft(); }}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-amber-700"
             />
           </div>
@@ -1024,10 +1068,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Mốc 4: Ngày Thực Tế Hoàn Thành:
             </label>
-            <input
+            <LocalSyncInput
               type="date"
               value={actualDate}
-              onChange={(e) => { setActualDate(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setActualDate(val); saveActiveDraft(); }}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-green-700"
             />
           </div>
@@ -1039,7 +1083,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <select
               value={custStatus}
               onChange={(e) => { setCustStatus(e.target.value); saveActiveDraft(); }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none bg-white font-semibold"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none bg-white font-semibold text-slate-800"
             >
               <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ (Drafting)</option>
               <option value="Đã nộp Sở - Chờ 5 ngày">🔵 Đã nộp Sở - Chờ 5 ngày làm việc</option>
@@ -1052,12 +1096,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <label className="block font-bold text-gray-700 mb-1">
               Số Biên Nhận / Mã Hồ Sơ DVC:
             </label>
-            <input
+            <LocalSyncInput
               type="text"
               value={custReceipt}
-              onChange={(e) => { setCustReceipt(e.target.value); saveActiveDraft(); }}
+              onCommit={(val) => { setCustReceipt(val); saveActiveDraft(); }}
               placeholder="VD: H01.2026.00416..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-800"
             />
           </div>
 
