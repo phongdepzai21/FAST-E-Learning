@@ -1,5 +1,6 @@
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 // Migration: Switch from HashRouter to BrowserRouter for clean production URLs (e.g. /home) without #
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -212,14 +213,16 @@ const AppLayout: React.FC = () => {
 };
 
 const App: React.FC = () => (
-  <ThemeProvider>
-    <ToastProvider>
-      <Router>
-        <ScrollToTop />
-        <AppLayout />
-      </Router>
-    </ToastProvider>
-  </ThemeProvider>
+  <HelmetProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <Router>
+          <ScrollToTop />
+          <AppLayout />
+        </Router>
+      </ToastProvider>
+    </ThemeProvider>
+  </HelmetProvider>
 );
 
 export default App;

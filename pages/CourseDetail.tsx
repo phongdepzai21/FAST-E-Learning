@@ -743,11 +743,41 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     <main className="min-h-screen bg-background pb-20 relative">
       <Helmet>
         <title>{course.title} | Học Viện FAST</title>
-        <meta name="description" content={course.description || "Chi tiết khóa học"} />
-        <meta property="og:title" content={course.title} />
-        <meta property="og:description" content={course.description || "Chi tiết khóa học"} />
-        {course.image && <meta property="og:image" content={course.image} />}
+        <meta name="description" content={course.description || "Tham gia khóa học đào tạo tiêu chuẩn ISO, HACCP chuyên sâu tại FAST Elearning để nâng tầm kiến thức và cải thiện kỹ năng chuyên môn."} />
+        
+        {/* OpenGraph Social sharing cards */}
         <meta property="og:type" content="website" />
+        <meta property="og:title" content={`${course.title} | Học Viện FAST`} />
+        <meta property="og:description" content={course.description || "Nắm vững các tiêu chuẩn và quy trình vận hành chuyên nghiệp."} />
+        {course.image && <meta property="og:image" content={course.image} />}
+        <meta property="og:url" content={typeof window !== 'undefined' ? window.location.origin + window.location.pathname : `https://fastelearning.com.vn/khoa-hoc/${id}`} />
+        <meta property="og:site_name" content="FAST Elearning" />
+
+        {/* Twitter Cards */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${course.title} | Học Viện FAST`} />
+        <meta name="twitter:description" content={course.description || "Nắm vững các tiêu chuẩn và quy trình vận hành chuyên nghiệp."} />
+        {course.image && <meta name="twitter:image" content={course.image} />}
+
+        {/* Schema.org Structured Data (JSON-LD) for rich search snippets */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Course",
+            "name": course.title,
+            "description": course.description || "Khóa học đào tạo chất lượng cao của FAST Consulting.",
+            "provider": {
+              "@type": "Organization",
+              "name": "FAST Consulting",
+              "sameAs": "https://fastelearning.com.vn"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": parseNumericPrice(course.price || "599000"),
+              "priceCurrency": "VND"
+            }
+          })}
+        </script>
       </Helmet>
       {/* CSS Block to prevent Printing and Selection */}
       <style>{`

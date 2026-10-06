@@ -1693,7 +1693,7 @@ const Account: React.FC = () => {
       return (
         <div className="min-h-screen bg-[#f8fafc] flex animate-fade-in overflow-hidden">
           <Helmet>
-            <title>Hệ Thống Kiểm Toán & Hồ Sơ | FAST Admin</title>
+            <title>FAST SERVICE | FAST Admin</title>
           </Helmet>
 
           {/* EXACT IDENTICAL SIDEBAR */}
@@ -1701,7 +1701,7 @@ const Account: React.FC = () => {
             onMouseEnter={() => setIsSidebarHovered(true)}
             onMouseLeave={() => setIsSidebarHovered(false)}
             className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
-              isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+              isSidebarHovered ? 'w-80 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
             }`}
           >
             <div className={`transition-all duration-300 ${!isExpanded ? 'p-3' : 'p-8'}`}>
@@ -1726,9 +1726,9 @@ const Account: React.FC = () => {
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: '📋 FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-                  { id: 'attp', label: '🛡️ Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-                  { id: 'hsqc', label: '💼 Hồ sơ Quảng cáo / QC', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+                  { id: 'fsa', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                  { id: 'attp', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
                   { id: 'student', label: '🎓 Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;

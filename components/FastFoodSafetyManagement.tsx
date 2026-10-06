@@ -49,6 +49,7 @@ const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, classN
   );
 };
 import { useGlobalSync } from '../hooks/useGlobalSync';
+import { useToast } from '../contexts/ToastContext';
 
 interface ChecklistDoc {
   id: string;
@@ -125,6 +126,15 @@ const getTodayDateString = () => {
 };
 
 export const FastFoodSafetyManagement: React.FC = () => {
+  const { success: showSuccessToast, error: showErrorToast, warning: showWarningToast } = useToast();
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   const [currentCustomerId, setCurrentCustomerId] = useState<string>('');
   
   // Fields for currently active profile
@@ -413,7 +423,7 @@ export const FastFoodSafetyManagement: React.FC = () => {
 
   const handleSaveActiveCustomer = () => {
     if (!custName) {
-      alert('Vui lòng nhập Tên Khách Hàng / Cơ Sở trước khi lưu vào bảng CRM.');
+      showWarningToast("Vui lòng nhập Tên Khách Hàng / Cơ Sở trước khi lưu.", 4000, "Thiếu thông tin");
       return;
     }
 
@@ -456,15 +466,21 @@ export const FastFoodSafetyManagement: React.FC = () => {
     triggerGlobalSaveReset();
     
     setTimeout(() => {
-      alert(`Đã lưu thành công hồ sơ toàn trình "${savedName}" vào Cơ sở dữ liệu FAST CRM.`);
+      showSuccessToast(`Đã lưu thành công hồ sơ toàn trình "${savedName}"!`, 5000, "Thành công");
     }, 150);
   };
 
   const handleCreateNewCustomer = () => {
-    if (window.confirm('Tạo hồ sơ khách hàng mới? Form nhập và checklist sẽ được làm mới hoàn toàn.')) {
-      resetForm();
-      setSyncStatus('Đã tạo mới');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Tạo khách hàng mới",
+      message: "Tạo hồ sơ khách hàng mới? Form nhập và checklist sẽ được làm mới hoàn toàn.",
+      onConfirm: () => {
+        resetForm();
+        setSyncStatus('Đã tạo mới');
+        showSuccessToast("Đã khởi tạo biểu mẫu mới.");
+      }
+    });
   };
 
   const handleLoadCustomerToActive = (id: string) => {
@@ -496,19 +512,25 @@ export const FastFoodSafetyManagement: React.FC = () => {
     const target = db.find(c => c.id === id);
     const name = target ? target.name : 'này';
 
-    if (window.confirm(`Bạn có chắc chắn muốn xóa hồ sơ "${name}" khỏi cơ sở dữ liệu CRM?`)) {
-      const newDb = db.filter(c => c.id !== id);
-      persistDatabase(newDb);
-      if (currentCustomerId === id) {
-        resetForm();
+    setConfirmDialog({
+      isOpen: true,
+      title: "Xóa hồ sơ khách hàng",
+      message: `Bạn có chắc chắn muốn xóa hồ sơ "${name}" khỏi cơ sở dữ liệu CRM?`,
+      onConfirm: () => {
+        const newDb = db.filter(c => c.id !== id);
+        persistDatabase(newDb);
+        showSuccessToast(`Đã xóa hồ sơ "${name}" thành công.`);
+        if (currentCustomerId === id) {
+          resetForm();
+        }
       }
-    }
+    });
   };
 
   // Export functions
   const handleExportToExcel = () => {
     if (db.length === 0) {
-      alert('Chưa có dữ liệu khách hàng nào trong FAST CRM để xuất file Excel.');
+      showWarningToast('Chưa có dữ liệu khách hàng nào trong FAST CRM để xuất file Excel.');
       return;
     }
 

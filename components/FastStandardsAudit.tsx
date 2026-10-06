@@ -47,6 +47,43 @@ const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, classN
     />
   );
 };
+
+interface LocalSyncTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onCommit'> {
+  value: string;
+  onCommit: (val: string) => void;
+  className?: string;
+}
+
+const LocalSyncTextarea: React.FC<LocalSyncTextareaProps> = ({ value, onCommit, className, ...props }) => {
+  const [localVal, setLocalVal] = useState(value);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setLocalVal(value);
+    }
+  }, [value]);
+
+  const handleFocus = () => {
+    isFocused.current = true;
+  };
+
+  const handleBlur = () => {
+    isFocused.current = false;
+    onCommit(localVal);
+  };
+
+  return (
+    <textarea
+      {...props}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+};
 import { useGlobalSync } from '../hooks/useGlobalSync';
 import { ALL_AUDIT_ITEMS, AuditItem, AuditItemState, VAL_METHODS_LIST, IMP_METHODS_LIST } from '../data/fastStandardsData';
 import { 
@@ -97,7 +134,17 @@ export interface SavedAuditRecord {
   updatedAt: string;
 }
 
+import { useToast } from '../contexts/ToastContext';
+
 export const FastStandardsAudit: React.FC = () => {
+  const { success: showSuccessToast, error: showErrorToast, warning: showWarningToast } = useToast();
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   const [activeSubTab, setActiveSubTab] = useState<string>('library');
   const [currentAuditId, setCurrentAuditId] = useState<string>('');
   
@@ -354,12 +401,18 @@ export const FastStandardsAudit: React.FC = () => {
   };
 
   const resetAllAudit = () => {
-    if (window.confirm('Bạn có chắc chắn muốn làm mới toàn bộ kết quả đánh giá để bắt đầu đợt đánh giá mới?')) {
-      clearForm();
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (e) {}
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Làm mới toàn bộ đánh giá",
+      message: "Bạn có chắc chắn muốn làm mới toàn bộ kết quả đánh giá để bắt đầu đợt đánh giá mới?",
+      onConfirm: () => {
+        clearForm();
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch (e) {}
+        showSuccessToast("Đã làm mới toàn bộ biểu mẫu đánh giá thành công.");
+      }
+    });
   };
 
   const clearForm = () => {
@@ -393,7 +446,7 @@ export const FastStandardsAudit: React.FC = () => {
 
   const handleSaveToDatabase = () => {
     if (!clientName) {
-      alert('Vui lòng nhập Tên Đơn vị được đánh giá trước khi lưu.');
+      showWarningToast('Vui lòng nhập Tên Đơn vị được đánh giá trước khi lưu.', 4000, 'Thiếu thông tin');
       return;
     }
 
@@ -430,7 +483,7 @@ export const FastStandardsAudit: React.FC = () => {
     triggerGlobalSaveReset();
     
     setTimeout(() => {
-      alert(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu FSA-Checklist.`);
+      showSuccessToast(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu FSA-Checklist.`, 5000, 'Đồng bộ thành công');
     }, 150);
   };
 
@@ -447,10 +500,16 @@ export const FastStandardsAudit: React.FC = () => {
   };
 
   const deleteAudit = (id: string, client: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa kết quả đánh giá của "${client}" khỏi cơ sở dữ liệu?`)) {
-      const updated = database.filter(r => r.id !== id);
-      setDatabase(updated, true);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Xóa kết quả đánh giá",
+      message: `Bạn có chắc chắn muốn xóa kết quả đánh giá của "${client}" khỏi cơ sở dữ liệu?`,
+      onConfirm: () => {
+        const updated = database.filter(r => r.id !== id);
+        setDatabase(updated, true);
+        showSuccessToast(`Đã xóa kết quả đánh giá của "${client}" thành công.`);
+      }
+    });
   };
 
   // Calculations for Report
@@ -652,10 +711,10 @@ export const FastStandardsAudit: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      <input 
+                      <LocalSyncInput 
                         type="text" 
                         value={st.note} 
-                        onChange={(e) => handleNoteChange(item.id, e.target.value, item.type)}
+                        onCommit={(val) => handleNoteChange(item.id, val, item.type)}
                         placeholder={item.type === 'Observation' ? 'Ghi chú / nhận xét...' : 'Nhập bằng chứng (tự động ghi Lỗi)...'} 
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
                       />
@@ -705,7 +764,7 @@ export const FastStandardsAudit: React.FC = () => {
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
-                <ShieldCheck className="w-4 h-4 text-teal-300" />
+                <ShieldCheck className="w-4 h-4 text-white/80" />
                 FAST CONSULTING &bull; DÀNH RIÊNG QUẢN TRỊ VIÊN
               </div>
             </div>
@@ -748,7 +807,7 @@ export const FastStandardsAudit: React.FC = () => {
                     : 'bg-gray-50/80 text-gray-700 hover:bg-teal-50/80 hover:text-[#005c56] border border-gray-100'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-amber-600' : 'text-gray-500'}`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
               <span>{tab.label}</span>
               {tab.count !== null && (
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isActive ? 'bg-white/25 text-white' : 'bg-gray-200/80 text-gray-700'}`}>
@@ -823,7 +882,7 @@ export const FastStandardsAudit: React.FC = () => {
           {/* Action Toolbar */}
           <div className="bg-teal-50/50 p-4 rounded-2xl border border-teal-100 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Database className="w-5 h-5 text-[#005c56]" />
+              <Database className="w-5 h-5 text-gray-400" />
               <div>
                 <span className="text-xs font-black uppercase text-gray-800 tracking-wider block">Thao tác hồ sơ đánh giá</span>
                 {currentAuditId ? (
@@ -1236,7 +1295,7 @@ export const FastStandardsAudit: React.FC = () => {
           {/* Findings Filter Bar */}
           <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-teal-600" />
+              <Filter className="w-4 h-4 text-gray-400" />
               <span className="text-xs font-black uppercase text-gray-800 tracking-wider">Danh Sách Điểm Không Phù Hợp &amp; CAPA</span>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -1333,9 +1392,9 @@ export const FastStandardsAudit: React.FC = () => {
                             </div>
                           </td>
                           <td className="p-3 border-r border-gray-100">
-                            <textarea
+                            <LocalSyncTextarea
                               value={f.capa}
-                              onChange={(e) => updateItemField(f.id, 'capa', e.target.value)}
+                              onCommit={(val) => updateItemField(f.id, 'capa', val)}
                               placeholder="Nhập hành động khắc phục (HĐKP)..."
                               className="w-full p-2 border border-gray-300 rounded text-xs min-h-[50px] outline-none focus:ring-1 focus:ring-teal-500"
                             />
@@ -1354,9 +1413,9 @@ export const FastStandardsAudit: React.FC = () => {
                                 <option key={opt} value={opt}>{opt}</option>
                               ))}
                             </select>
-                            <textarea
+                            <LocalSyncTextarea
                               value={f.valNotes}
-                              onChange={(e) => updateItemField(f.id, 'valNotes', e.target.value)}
+                              onCommit={(val) => updateItemField(f.id, 'valNotes', val)}
                               placeholder="Ghi chú kết quả thẩm tra / Nhập phương pháp khác..."
                               className="w-full p-1.5 border border-gray-300 rounded text-xs min-h-[42px] outline-none focus:ring-1 focus:ring-teal-500"
                             />
@@ -1372,9 +1431,9 @@ export const FastStandardsAudit: React.FC = () => {
                                 <option key={opt} value={opt}>{opt}</option>
                               ))}
                             </select>
-                            <textarea
+                            <LocalSyncTextarea
                               value={f.impNotes}
-                              onChange={(e) => updateItemField(f.id, 'impNotes', e.target.value)}
+                              onCommit={(val) => updateItemField(f.id, 'impNotes', val)}
                               placeholder="Ghi chú đề xuất cải tiến / Lộ trình triển khai..."
                               className="w-full p-1.5 border border-gray-300 rounded text-xs min-h-[42px] outline-none focus:ring-1 focus:ring-teal-500"
                             />
@@ -1531,6 +1590,38 @@ export const FastStandardsAudit: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal to bypass native browser popups */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-gray-150 shadow-2xl space-y-4 animate-scale-up">
+            <div className="flex items-center gap-3 text-amber-600">
+              <AlertCircle className="w-8 h-8" />
+              <h3 className="text-base font-black uppercase tracking-tight text-gray-900">{confirmDialog.title}</h3>
+            </div>
+            <p className="text-xs text-gray-600 font-semibold leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 bg-[#005c56] hover:bg-[#00423e] text-white font-bold rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
+              >
+                Xác nhận
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -48,6 +48,7 @@ const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, classN
   );
 };
 import { useGlobalSync } from '../hooks/useGlobalSync';
+import { useToast } from '../contexts/ToastContext';
 import { 
   Building2, 
   FileText, 
@@ -176,6 +177,15 @@ const INITIAL_DOCS = [
 ];
 
 export const AdProfileManagement: React.FC = () => {
+  const { success: showSuccessToast, error: showErrorToast, warning: showWarningToast } = useToast();
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   // Database states
   // Use unified synchronization hook for the records list database
   const [database, setDatabase, isCloudSavingState, dbSyncStatus] = useCloudSync<CustomerRecord[]>(
@@ -427,16 +437,22 @@ export const AdProfileManagement: React.FC = () => {
 
   // Reset checklist for current customer
   const resetChecklist = () => {
-    if (window.confirm('Bạn có chắc chắn muốn làm mới toàn bộ 7 mục hồ sơ của khách hàng hiện tại?')) {
-      setChecklist({});
-      saveActiveDraft();
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Làm mới mục hồ sơ",
+      message: "Bạn có chắc chắn muốn làm mới toàn bộ 7 mục hồ sơ của khách hàng hiện tại?",
+      onConfirm: () => {
+        setChecklist({});
+        saveActiveDraft();
+        showSuccessToast("Đã làm mới toàn bộ danh mục hồ sơ.");
+      }
+    });
   };
 
   // Save Customer to CRM DB
   const saveCustomerToCRM = () => {
     if (!custName.trim()) {
-      alert('Vui lòng nhập Tên Khách Hàng / Doanh Nghiệp trước khi lưu vào danh sách.');
+      showWarningToast("Vui lòng nhập Tên Khách Hàng / Doanh Nghiệp trước khi lưu.", 4000, "Thiếu thông tin");
       return;
     }
 
@@ -480,7 +496,7 @@ export const AdProfileManagement: React.FC = () => {
     triggerGlobalSaveReset();
     
     setTimeout(() => {
-      alert(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${savedName}" vào cơ sở dữ liệu FAST!`);
+      showSuccessToast(`Đã lưu và đồng bộ thành công hồ sơ khách hàng "${savedName}"!`, 5000, "Thành công");
     }, 150);
   };
 
@@ -532,9 +548,15 @@ export const AdProfileManagement: React.FC = () => {
 
   // New Customer creation
   const handleNewCustomer = () => {
-    if (window.confirm('Tạo một hồ sơ khách hàng mới? Dữ liệu trên form hiện tại sẽ được đặt lại.')) {
-      clearForm();
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Tạo khách hàng mới",
+      message: "Tạo một hồ sơ khách hàng mới? Dữ liệu trên form hiện tại sẽ được đặt lại.",
+      onConfirm: () => {
+        clearForm();
+        showSuccessToast("Đã khởi tạo biểu mẫu mới.");
+      }
+    });
   };
 
   // Load customer into form
@@ -557,13 +579,19 @@ export const AdProfileManagement: React.FC = () => {
 
   // Delete customer
   const deleteCustomer = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa hồ sơ khách hàng "${name}" khỏi cơ sở dữ liệu?`)) {
-      const newDb = database.filter(c => c.id !== id);
-      persistDatabase(newDb);
-      if (currentId === id) {
-        handleNewCustomer();
+    setConfirmDialog({
+      isOpen: true,
+      title: "Xóa hồ sơ khách hàng",
+      message: `Bạn có chắc chắn muốn xóa hồ sơ khách hàng "${name}" khỏi cơ sở dữ liệu?`,
+      onConfirm: () => {
+        const newDb = database.filter(c => c.id !== id);
+        persistDatabase(newDb);
+        showSuccessToast(`Đã xóa hồ sơ "${name}" thành công.`);
+        if (currentId === id) {
+          clearForm();
+        }
       }
-    }
+    });
   };
 
   // Print function: specifically prints ONLY the checklist table
@@ -1646,6 +1674,38 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           </tr>
         </tfoot>
       </table>
+      
+      {/* Custom Confirmation Modal */}
+      {confirmDialog?.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[150] animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full border border-gray-150 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-[#005c56]">
+              <AlertCircle className="w-8 h-8 text-[#005c56]" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{confirmDialog.title}</h3>
+              <p className="text-xs text-gray-500 font-bold leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-teal-900/10"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

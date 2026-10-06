@@ -386,14 +386,8 @@ async function startServer() {
     }
   });
 
-  // 1.5. Automated Auto-Banking Payment Webhook for SePay / Casso / PayOS
-  app.post("/api/payment/webhook", (req, res) => {
-    // Forward the POST request retaining the payload directly to the unified sepay webhook route
-    res.redirect(307, "/api/sepay/webhook");
-  });
-
-  // 1.5b. Unified Robust SePay Webhook managing both HMAC-SHA256 & API Token B2-B3 verification flows
-  app.post("/api/sepay/webhook", async (req: any, res) => {
+  // Unified Webhook Handler Function to process incoming SePay signals on both routes natively (no 307 redirects)
+  const sepayWebhookHandler = async (req: any, res: any) => {
     const origin = req.headers["origin"] || "No Origin Header";
     const referer = req.headers["referer"] || "No Referer Header";
     const contentType = req.headers["content-type"] || "No Content-Type Header";
@@ -484,7 +478,11 @@ async function startServer() {
       await logFailedWebhookAttempt(req.body, `Server exception during webhook process: ${err.message}`, "exception");
       return res.status(500).json({ success: false, error: err.message });
     }
-  });
+  };
+
+  // Register the exact same robust handler for both routes natively (no redirects)
+  app.post("/api/payment/webhook", sepayWebhookHandler);
+  app.post("/api/sepay/webhook", sepayWebhookHandler);
 
   // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
   app.get("/api/courses/stream", (req, res) => {
