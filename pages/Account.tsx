@@ -1726,9 +1726,9 @@ const Account: React.FC = () => {
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-                  { id: 'attp', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+                  { id: 'fsa', label: 'FSA-Checklist', icon: '' },
+                  { id: 'attp', label: 'Hồ sơ ATTP', icon: '' },
+                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: '' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;
@@ -1747,7 +1747,11 @@ const Account: React.FC = () => {
                         !isExpanded ? 'justify-center p-3.5' : 'gap-4 px-5 py-3.5'
                       } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
                     >
-                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
+                      {item.icon && (
+                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
+                        </svg>
+                      )}
                       {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
                     </button>
                   );
@@ -1777,7 +1781,7 @@ const Account: React.FC = () => {
             <div className="p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-gray-150">
                 <div className="space-y-1">
-                  <h1 className="text-2xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">Hệ Thống Kiểm Toán & Hồ Sơ</h1>
+                  <h1 className="text-2xl md:text-4xl font-black text-[#007c76] uppercase tracking-tight">FAST SERVICE &amp; Hồ Sơ</h1>
                   <p className="text-xs md:text-sm text-gray-500 font-semibold leading-relaxed">
                     Quản lý hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
                   </p>
@@ -1785,7 +1789,7 @@ const Account: React.FC = () => {
               </div>
 
               {/* Customer Database Master Search Bar */}
-              <div className="relative w-full max-w-xl">
+              <div className="relative w-full max-w-4xl">
                 <div className="flex items-center bg-white border border-gray-250 rounded-2xl px-4 py-3.5 shadow-sm focus-within:ring-2 focus-within:ring-[#007c76]/25 focus-within:border-[#007c76] transition-all">
                   <svg className="w-5 h-5 text-gray-400 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1869,10 +1873,10 @@ const Account: React.FC = () => {
                   }}
                   className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
                 >
-                  <option value="fsa">📋 FSA-Checklist</option>
-                  <option value="attp">🛡️ Hồ sơ ATTP</option>
-                  <option value="hsqc">💼 Hồ sơ Quảng cáo / QC</option>
-                  <option value="student">🎓 Quay lại Học viên</option>
+                  <option value="fsa">FSA-Checklist</option>
+                  <option value="attp">Hồ sơ ATTP</option>
+                  <option value="hsqc">Hồ sơ Quảng cáo / QC</option>
+                  <option value="student">Quay lại Học viên</option>
                 </select>
               </div>
 
@@ -1972,7 +1976,7 @@ const Account: React.FC = () => {
                     ...(isAdmin ? [
                       { id: 'unified-webhook-center', label: 'Trung tâm Webhook', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
                       { id: 'fast-code-lookup', label: 'Truy vết Giao dịch (Payment Trace)', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
-                      { id: 'admin-audit-center', label: 'Hệ thống Kiểm toán', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
+                      { id: 'admin-audit-center', label: 'FAST SERVICE', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
                   ].map((item) => {
                     const isActive = activeTab === item.id;
@@ -2045,7 +2049,7 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="user-management">Học viên & Khóa học</option>}
                   {isAdmin && <option value="unified-webhook-center">Trung tâm Webhook</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
-                  {isAdmin && <option value="admin-audit-center">➜ Hệ thống Kiểm toán (FSA • ATTP • HSQC)</option>}
+                  {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (FSA • ATTP • HSQC)</option>}
                 </select>
              </div>
              

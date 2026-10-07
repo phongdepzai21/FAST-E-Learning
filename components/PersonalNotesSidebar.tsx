@@ -394,7 +394,6 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
                       : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <span>{cfg.icon}</span>
                   <span>{cfg.label}</span>
                 </button>
               );
@@ -433,7 +432,6 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
                 <div className="flex items-center justify-between gap-2 text-[10px]">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={`px-1.5 py-0.5 rounded-md border font-bold flex items-center gap-1 shrink-0 ${tagCfg.color}`}>
-                      <span>{tagCfg.icon}</span>
                       <span>{tagCfg.label}</span>
                     </span>
 
