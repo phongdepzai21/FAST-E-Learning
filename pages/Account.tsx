@@ -1780,7 +1780,7 @@ const Account: React.FC = () => {
 
           {/* Main Content Area */}
           <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8fafc] print:bg-white print:overflow-visible print:p-0 print:m-0">
-            <div className="p-6 md:p-10 space-y-8 max-w-[1600px] mx-auto w-full">
+            <div className="p-4 md:p-8 lg:p-10 space-y-8 max-w-full w-full">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-gray-150">
                 <div className="space-y-1">
                   <h1 className="text-2xl md:text-4xl font-black text-[#007c76] uppercase tracking-tight">FAST SERVICE &amp; Hồ Sơ</h1>
