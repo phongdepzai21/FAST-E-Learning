@@ -872,13 +872,13 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           </div>
         </div>
 
-        <div className="overflow-x-auto max-h-[300px]">
-          <table className="w-full text-left text-xs border-collapse min-w-[980px]">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[1500px]">
             <thead className="sticky top-0 bg-teal-50/90 text-[#005c56] font-bold z-10 border-b border-teal-200">
-              <tr>
+              <tr className="whitespace-nowrap">
                 <th className="p-2.5 text-center w-12">STT</th>
                 <th className="p-2.5 w-32">Nhân Viên FAST</th>
-                <th className="p-2.5">Tên Khách Hàng / Đơn Vị</th>
+                <th className="p-2.5 w-48">Tên Khách Hàng / Đơn Vị</th>
                 <th className="p-2.5 w-28">Số Điện Thoại</th>
                 <th className="p-2.5">Địa Điểm / Vị Trí</th>
                 <th className="p-2.5 w-24">Ngày Order</th>
@@ -906,7 +906,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                   else if (c.status.includes('Chậm') || c.status.includes('bổ sung')) pillClass = 'bg-red-100 text-red-800 border-red-300';
 
                   return (
-                    <tr key={c.id} className={`hover:bg-teal-50/30 transition-colors ${isCurrent ? 'bg-teal-50/70 font-semibold' : ''}`}>
+                    <tr key={c.id} className={`hover:bg-teal-50/30 transition-colors whitespace-nowrap ${isCurrent ? 'bg-teal-50/70 font-semibold' : ''}`}>
                       <td className="p-2.5 text-center font-bold text-gray-600">{idx + 1}</td>
                       <td className="p-2.5 text-gray-700 font-semibold">{c.fastStaff || 'Chưa gán'}</td>
                       <td className="p-2.5 font-bold text-gray-900">{c.name}</td>

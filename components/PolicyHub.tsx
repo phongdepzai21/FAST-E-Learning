@@ -187,7 +187,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                       FAST Elearning bán <strong>quyền truy cập trực tuyến không giới hạn thời gian (hoặc có giới hạn theo gói) vào nội dung bài giảng video và biểu mẫu chuẩn tương ứng</strong>.
                     </p>
                     <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl text-[#007c76] font-bold text-xs">
-                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa đào tạo kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Chứng chỉ". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
+                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa đào tạo kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Giấy chứng nhận". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
                     </div>
                   </section>
 
@@ -447,7 +447,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                       Giấy chứng nhận được cấp trực tuyến là <strong>"Giấy chứng nhận hoàn thành khóa học" (Certificate of Completion) do FAST Elearning tự cấp</strong>.
                     </p>
                     <p className="text-xs bg-amber-50 border border-amber-200 p-4 rounded-2xl text-amber-800 leading-relaxed font-semibold">
-                      ⚠️ TUYÊN BỐ MIỄN TRỪ: Giấy chứng nhận hoàn thành của chúng tôi thể hiện việc bạn đã nghiên cứu nghiêm túc, vượt qua bài kiểm tra trắc nghiệm chuẩn chỉnh về HACCP, ISO tương ứng. Chứng nhận này KHÔNG phải là văn bằng giáo dục nghề nghiệp hay "Chứng chỉ do Nhà nước/Bộ Công Thương cấp trực tiếp" dưới dạng pháp quy bắt buộc. Bạn không được dùng tên các cơ quan quản lý Nhà nước khi nói về tính pháp lý của chứng nhận này.
+                      ⚠️ TUYÊN BỐ MIỄN TRỪ: Giấy chứng nhận hoàn thành của chúng tôi thể hiện việc bạn đã nghiên cứu nghiêm túc, vượt qua bài kiểm tra trắc nghiệm chuẩn chỉnh về HACCP, ISO tương ứng. Chứng nhận này KHÔNG phải là văn bằng giáo dục nghề nghiệp hay "Giấy chứng nhận do Nhà nước/Bộ Công Thương cấp trực tiếp" dưới dạng pháp quy bắt buộc. Bạn không được dùng tên các cơ quan quản lý Nhà nước khi nói về tính pháp lý của chứng nhận này.
                     </p>
                   </section>
 

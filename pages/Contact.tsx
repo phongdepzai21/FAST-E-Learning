@@ -19,8 +19,8 @@ const FAQS = [
     answer: "Khóa học được thiết kế tối ưu cho sinh viên ngành công nghệ thực phẩm, nhân viên QA/QC, quản lý sản xuất, chủ cơ sở kinh doanh F&B, và bất kỳ ai muốn nắm vững hệ thống quản lý an toàn thực phẩm chuyên nghiệp."
   },
   {
-    question: "Học trực tuyến trên FAST E-Learning có được cấp chứng chỉ uy tín không?",
-    answer: "Hoàn toàn có. Sau khi hoàn thành 100% lộ trình bài giảng và vượt qua bài thi trắc nghiệm đánh giá năng lực cuối khóa, học viên sẽ được cấp chứng chỉ bản cứng/bản mềm hợp lệ và có giá trị sử dụng trên toàn quốc."
+    question: "Học trực tuyến trên FAST E-Learning có được cấp Giấy chứng nhận hoàn thành uy tín không?",
+    answer: "Hoàn toàn có. Sau khi hoàn thành 100% lộ trình bài giảng và vượt qua bài thi trắc nghiệm đánh giá năng lực cuối khóa, học viên sẽ được cấp Giấy chứng nhận hoàn thành bản cứng/bản mềm hợp lệ và có giá trị sử dụng trên toàn quốc."
   },
   {
     question: "Làm thế nào để đăng ký học và kích hoạt khóa học?",
@@ -146,7 +146,7 @@ const Contact: React.FC = () => {
                 Liên Hệ Với <span className="text-[#007c76]">Chúng Tôi</span>
             </h1>
             <p className="text-gray-600 text-lg md:text-xl font-medium leading-relaxed max-w-2xl">
-                Bạn có thắc mắc về khóa học hoặc cần tư vấn về các chứng chỉ ISO/HACCP? Đội ngũ FAST luôn sẵn sàng hỗ trợ bạn tối ưu hóa quy trình An toàn thực phẩm.
+                Bạn có thắc mắc về khóa học hoặc cần tư vấn về các tiêu chuẩn ISO/HACCP? Đội ngũ FAST luôn sẵn sàng hỗ trợ bạn tối ưu hóa quy trình An toàn thực phẩm.
             </p>
         </div>
       </section>
@@ -322,7 +322,7 @@ const Contact: React.FC = () => {
       <section className="pb-32 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
         <div className="text-center mb-12">
             <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-4">Câu Hỏi Thường Gặp (FAQ)</h2>
-            <p className="text-gray-500 font-medium">Giải đáp nhanh những thắc mắc phổ biến về chứng chỉ ISO/HACCP và lộ trình đào tạo.</p>
+            <p className="text-gray-500 font-medium">Giải đáp nhanh những thắc mắc phổ biến về tiêu chuẩn ISO/HACCP và lộ trình học tập.</p>
         </div>
         
         <div className="space-y-4">

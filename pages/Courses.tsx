@@ -412,7 +412,7 @@ const Courses: React.FC = () => {
                     🎁 Gói Combo Tiết Kiệm (Đăng ký học nhiều hơn, ưu đãi nhiều hơn)
                 </h2>
                 <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mt-1">
-                    Lộ trình đào tạo trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa
+                    Lộ trình chuẩn hóa trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa
                 </p>
             </div>
 
@@ -486,7 +486,7 @@ const Courses: React.FC = () => {
         <section className="mt-12 bg-gray-900 rounded-[48px] p-8 md:p-16 text-white flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="space-y-4 text-center md:text-left">
                 <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tight leading-none">Bạn cần lộ trình <br/> <span className="text-[#007c76]">Riêng Biệt?</span></h3>
-                <p className="text-gray-400 font-bold max-w-md">Liên hệ ngay để chuyên gia FAST thiết kế khóa học đào tạo riêng cho doanh nghiệp của bạn.</p>
+                <p className="text-gray-400 font-bold max-w-md">Liên hệ ngay để chuyên gia FAST thiết kế chương trình chuyên sâu riêng cho doanh nghiệp của bạn.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
                 <a href="tel:0927002668" className="bg-[#007c76] text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">Gọi ngay: 0927 002 668</a>

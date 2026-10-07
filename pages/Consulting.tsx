@@ -8,8 +8,8 @@ const Consulting: React.FC = () => {
   const steps = [
     { step: '01', label: 'Khảo sát thực tế', desc: 'Đánh giá hiện trạng cơ sở, nhận diện khoảng cách so với các tiêu chuẩn chuẩn mực.' },
     { step: '02', label: 'Lập phương án', desc: 'Xây dựng kế hoạch tối ưu chi phí, thời gian và thiết lập lộ trình cho nhân sự.' },
-    { step: '03', label: 'Đào tạo & Áp dụng', desc: 'Hướng dẫn nhân sự chuẩn hóa quy trình làm việc và hoàn thiện hệ thống hồ sơ.' },
-    { step: '04', label: 'Đánh giá & Cấp chứng nhận', desc: 'Đồng hành trong quá trình đánh giá, hỗ trợ xử lý sự cố đến khi nhận chứng chỉ.' }
+    { step: '03', label: 'Hướng dẫn & Áp dụng', desc: 'Hướng dẫn nhân sự chuẩn hóa quy trình làm việc và hoàn thiện hệ thống hồ sơ.' },
+    { step: '04', label: 'Đánh giá & Đạt chuẩn', desc: 'Đồng hành trong quá trình đánh giá, hỗ trợ xử lý sự cố đến khi nhận Giấy chứng nhận.' }
   ];
 
   return (

@@ -657,10 +657,10 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
 
   // KPI Calculations
   const totalCount = db.length;
-  const draftCount = db.filter(c => (c.status || '').includes('chuẩn bị')).length;
-  const submittedCount = db.filter(c => (c.status || '').includes('Đã nộp')).length;
-  const inspectCount = db.filter(c => (c.status || '').includes('thẩm định')).length;
-  const completedCount = db.filter(c => (c.status || '').includes('Đã cấp') || (c.status || '').includes('hoàn thành')).length;
+  const draftCount = db.filter(c => c.status === 'Đang chuẩn bị hồ sơ' || (c.status || '').includes('chuẩn bị')).length;
+  const submittedCount = db.filter(c => c.status === 'Đã nộp Sở - Chờ thẩm định').length;
+  const inspectCount = db.filter(c => c.status === 'Đã thẩm định' || c.status === 'Đã thẩm định đạt - Chờ cấp').length;
+  const completedCount = db.filter(c => c.status === 'Đã cấp Giấy chứng nhận ATTP' || (c.status || '').includes('Đã cấp') || (c.status || '').includes('hoàn thành')).length;
 
   const checkedCount = Object.values(checklist).filter(Boolean).length;
   const percentComplete = Math.round((checkedCount / 5) * 100);
@@ -758,7 +758,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           <div className="bg-gradient-to-b from-sky-50/60 to-white p-4 rounded-2xl border border-blue-400/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-blue-800">ĐẦ ĐÃ NỘP SỞ (ĐẾM NGƯỢC 20N)</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (ĐẾM NGƯỢC 20N)</div>
             <div className="text-3xl font-black text-blue-700 my-1">{submittedCount}</div>
             <div className="text-[11px] font-semibold text-blue-700/80">Đang thụ lý hồ sơ</div>
           </div>
@@ -799,7 +799,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse min-w-[1600px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider whitespace-nowrap">
                   <th className="p-3 text-center w-12">STT</th>
                   <th className="p-3 w-32">Nhân Viên</th>
                   <th className="p-3 w-48">Tên Khách Hàng</th>
@@ -835,7 +835,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                     else if ((c.status || '').includes('khắc phục') || (c.status || '').includes('bổ sung')) pillBg = 'bg-red-50 text-red-700 border-red-200';
 
                     return (
-                      <tr key={c.id} className={`hover:bg-slate-50 transition-all ${isActive ? 'bg-teal-50/50 font-semibold' : ''}`}>
+                      <tr key={c.id} className={`hover:bg-slate-50 transition-all whitespace-nowrap ${isActive ? 'bg-teal-50/50 font-semibold' : ''}`}>
                         <td className="p-3 text-center text-gray-400 font-bold">{String(index + 1).padStart(2, '0')}</td>
                         <td className="p-3 text-teal-800 font-bold">{c.fastStaff || 'Chưa gán'}</td>
                         <td className="p-3 font-bold text-gray-900">{c.name}</td>
@@ -959,9 +959,9 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
                 <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
-                  <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ &amp; Cơ sở</option>
+                  <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
-                  <option value="Đang thẩm định thực tế">🟣 Đã thẩm định</option>
+                  <option value="Khác">🟣 Khác</option>
                   <option value="Đã thẩm định đạt - Chờ cấp">🟢 Đã thẩm định đạt - Chờ ký cấp Giấy</option>
                   <option value="Đã cấp Giấy chứng nhận ATTP">✅ Đã cấp Giấy chứng nhận ATTP</option>
                   <option value="Cần khắc phục cơ sở">🔴 Cần bổ sung / Khắc phục cơ sở</option>

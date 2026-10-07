@@ -12,8 +12,8 @@ const FAQS = [
     answer: "Khóa học được thiết kế tối ưu cho sinh viên ngành công nghệ thực phẩm, nhân viên QA/QC, quản lý sản xuất, chủ cơ sở kinh doanh F&B, và bất kỳ ai muốn nắm vững hệ thống quản lý an toàn thực phẩm chuyên nghiệp."
   },
   {
-    question: "Học trực tuyến trên FAST E-Learning có được cấp chứng chỉ uy tín không?",
-    answer: "Hoàn toàn có. Sau khi hoàn thành 100% lộ trình bài giảng và vượt qua bài thi trắc nghiệm đánh giá năng lực cuối khóa, học viên sẽ được cấp chứng chỉ bản cứng/bản mềm hợp lệ và có giá trị sử dụng trên toàn quốc."
+    question: "Học trực tuyến trên FAST E-Learning có được cấp Giấy chứng nhận hoàn thành uy tín không?",
+    answer: "Hoàn toàn có. Sau khi hoàn thành 100% lộ trình bài giảng và vượt qua bài thi trắc nghiệm đánh giá năng lực cuối khóa, học viên sẽ được cấp Giấy chứng nhận hoàn thành bản cứng/bản mềm hợp lệ và có giá trị sử dụng trên toàn quốc."
   },
   {
     question: "Làm thế nào để đăng ký học và kích hoạt khóa học?",
@@ -32,12 +32,12 @@ const FAQS = [
     answer: "Nền tảng FAST E-Learning được thiết kế chuẩn Responsive, hoạt động mượt mà và tối ưu giao diện trên cả điện thoại thông minh (smartphone), máy tính bảng (tablet) và máy tính cá nhân (PC/Laptop)."
   },
   {
-    question: "Chi phí đăng ký khóa học đã bao gồm lệ phí thi và cấp chứng chỉ chưa?",
-    answer: "Tất cả chi phí niêm yết trên website đều là trọn gói. Bạn sẽ không phải đóng thêm bất kỳ khoản phí nào cho việc làm bài thi cuối khóa và nhận chứng chỉ bản mềm."
+    question: "Chi phí đăng ký khóa học đã bao gồm lệ phí thi và cấp Giấy chứng nhận chưa?",
+    answer: "Tất cả chi phí niêm yết trên website đều là trọn gói. Bạn sẽ không phải đóng thêm bất kỳ khoản phí nào cho việc làm bài thi cuối khóa và nhận Giấy chứng nhận bản mềm."
   },
   {
     question: "Nếu tôi thi không đạt bài thi cuối khóa, tôi có được thi lại không?",
-    answer: "Chắc chắn rồi. Nếu chưa đạt điểm yêu cầu ở bài kiểm tra cuối khóa, bạn có thể ôn tập lại các bài giảng bị hổng kiến thức và thực hiện thi lại nhiều lần cho đến khi đạt tiêu chuẩn cấp chứng chỉ."
+    answer: "Chắc chắn rồi. Nếu chưa đạt điểm yêu cầu ở bài kiểm tra cuối khóa, bạn có thể ôn tập lại các bài giảng bị hổng kiến thức và thực hiện thi lại nhiều lần cho đến khi đạt tiêu chuẩn cấp Giấy chứng nhận."
   },
   {
     question: "FAST có hỗ trợ dịch vụ tư vấn doanh nghiệp lấy chứng nhận quốc tế không?",
@@ -76,7 +76,7 @@ const FAQ: React.FC = () => {
             Câu Hỏi <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500">Thường Gặp</span>
           </h1>
           <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
-            Giải đáp chi tiết mọi thắc mắc của bạn về lộ trình học tập, chứng chỉ ISO/HACCP và dịch vụ tư vấn doanh nghiệp tại FAST.
+            Giải đáp chi tiết mọi thắc mắc của bạn về lộ trình học tập, tiêu chuẩn ISO/HACCP và dịch vụ tư vấn doanh nghiệp tại FAST.
           </p>
         </div>
       </section>

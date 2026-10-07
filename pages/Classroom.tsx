@@ -170,7 +170,7 @@ const Classroom: React.FC = () => {
           price: 'Miễn phí',
           image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
           category: 'Chung',
-          description: 'Nội dung khóa học đào tạo chuyên sâu'
+          description: 'Nội dung khóa học chuyên sâu'
         });
         setCurriculum(DEFAULT_LESSONS);
       }
@@ -731,7 +731,7 @@ const Classroom: React.FC = () => {
         <div className="relative z-10 bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border-b border-amber-500/20 px-4 py-2.5 text-center flex items-center justify-center gap-3">
           <span className="text-amber-300 font-bold text-xs md:text-sm flex items-center gap-2">
             <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            Bạn đang xem thử bài giảng mẫu. Hãy đăng ký khóa học để lưu tiến độ và nhận chứng chỉ hoàn thành!
+            Bạn đang xem thử bài giảng mẫu. Hãy đăng ký khóa học để lưu tiến độ và nhận Giấy chứng nhận hoàn thành!
           </span>
           <Link to={`/khoa-hoc/${courseId}`} className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-lg transition-all shadow hover:shadow-amber-400/20 active:scale-95 shrink-0">
             Đăng ký ngay

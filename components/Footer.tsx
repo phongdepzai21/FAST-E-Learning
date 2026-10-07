@@ -27,7 +27,7 @@ const Footer: React.FC = () => {
             Food all standard & training
           </h4>
           <p className="text-sm md:text-base text-[#374151] leading-relaxed font-semibold max-w-3xl text-center md:text-left">
-            Nền tảng học trực tuyến hàng đầu về an toàn thực phẩm. Thành viên của hệ sinh thái đào tạo & tư vấn FAST Consulting.
+            Nền tảng học trực tuyến hàng đầu về an toàn thực phẩm. Thành viên của hệ sinh thái học tập & tư vấn FAST Consulting.
           </p>
         </div>
 

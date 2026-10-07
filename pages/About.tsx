@@ -300,8 +300,8 @@ const About: React.FC = () => {
                 icon: <Cpu className="w-6 h-6 text-cyan-600" />
               },
               {
-                title: 'Đào tạo Nội bộ Chuyên sâu',
-                desc: 'Đào tạo nghiệp vụ QA/QC, R&D, kiểm soát chất lượng, sản xuất tinh gọn cho F&B, nhà hàng, siêu thị, Central Kitchen.',
+                title: 'Bồi dưỡng Nội bộ Chuyên sâu',
+                desc: 'Bồi dưỡng nghiệp vụ QA/QC, R&D, kiểm soát chất lượng, sản xuất tinh gọn cho F&B, nhà hàng, siêu thị, Central Kitchen.',
                 icon: <BookOpen className="w-6 h-6 text-indigo-600" />
               },
               {
@@ -500,7 +500,7 @@ const About: React.FC = () => {
           {/* Partner Certification bodies */}
           <div className="mt-16 pt-12 border-t border-slate-100">
             <h4 className="text-center text-xs font-black text-slate-400 uppercase tracking-widest mb-8">
-              Đối tác Đào tạo & Hiệp hội Chứng nhận Toàn cầu
+              Đối tác Chuyên môn & Hiệp hội Chứng nhận Toàn cầu
             </h4>
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
               {[

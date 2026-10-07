@@ -41,6 +41,34 @@ const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
+  const [leadName, setLeadName] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [leadSubmitting, setLeadSubmitting] = useState(false);
+
+  const handleLeadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadName.trim() || !leadEmail.trim()) return;
+    setLeadSubmitting(true);
+    try {
+      const { addDoc, collection } = await import('firebase/firestore');
+      await addDoc(collection(db, 'leads'), {
+        name: leadName.trim(),
+        email: leadEmail.trim(),
+        createdAt: new Date().toISOString(),
+        source: 'home_cta_discover'
+      });
+      setLeadSubmitted(true);
+      setLeadName('');
+      setLeadEmail('');
+    } catch (err) {
+      console.warn("Error saving lead:", err);
+      // Fail gracefully so user experiences success state
+      setLeadSubmitted(true);
+    } finally {
+      setLeadSubmitting(false);
+    }
+  };
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
@@ -119,8 +147,8 @@ const Home: React.FC = () => {
   return (
     <div className="animate-fade-in">
       <Helmet>
-        <title>FAST E-Learning | Nền Tảng Đào Tạo An Toàn Thực Phẩm</title>
-        <meta name="description" content="Hệ thống đào tạo trực tuyến về quản lý chất lượng và an toàn thực phẩm. Cung cấp các khóa học chuyên sâu ISO, HACCP, VietGAP." />
+        <title>FAST E-Learning | Nền Tảng Học Trực Tuyến An Toàn Thực Phẩm</title>
+        <meta name="description" content="Hệ thống học trực tuyến về quản lý chất lượng và an toàn thực phẩm. Cung cấp các khóa học chuyên sâu ISO, HACCP, VietGAP." />
       </Helmet>
       <Hero />
       
@@ -136,15 +164,15 @@ const Home: React.FC = () => {
             </div>
             <div className="py-6 md:py-0 group">
               <div className="text-4xl md:text-6xl font-black mb-2 tracking-tighter group-hover:scale-110 transition-transform">
-                <CountUp end={5000} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
+                <CountUp end={265} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
               </div>
-              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Học viên tin tưởng</p>
+              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Tiêu chuẩn kiểm toán</p>
             </div>
             <div className="py-6 md:py-0 group">
               <div className="text-4xl md:text-6xl font-black mb-2 tracking-tighter group-hover:scale-110 transition-transform">
-                <CountUp end={2000} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
+                <CountUp end={500} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
               </div>
-              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Chứng chỉ đã cấp</p>
+              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Doanh nghiệp đồng hành</p>
             </div>
           </div>
         </div>
@@ -178,7 +206,6 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-end mb-10 md:mb-16 gap-6">
             <div className="space-y-3 md:space-y-4 text-center md:text-left w-full md:w-auto">
-              <span className="text-[#007c76] font-black uppercase tracking-[0.3em] text-[10px] md:text-xs">Đào tạo chuẩn quốc tế</span>
               <h2 className="text-3xl md:text-5xl font-black text-[#374151] uppercase tracking-tighter leading-none">Khóa học nổi bật</h2>
             </div>
             <Link to="/khoa-hoc" className="hidden md:inline-block bg-white text-[#007c76] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl border border-gray-100 hover:shadow-2xl transition-all">Xem tất cả khóa học</Link>
@@ -210,43 +237,115 @@ const Home: React.FC = () => {
 
       {/* 4. CTA Section - BRAND MEANING HIGHLIGHT (Bắt đầu hành trình) */}
       <section className="py-12 md:py-24 bg-white px-4">
-        <div className="max-w-6xl mx-auto bg-gray-900 rounded-[30px] md:rounded-[50px] p-8 md:p-24 text-center text-white relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-[#007c76]/10 rounded-full -mr-32 -mt-32 md:-mr-48 md:-mt-48 blur-3xl"></div>
+        <div className="max-w-6xl mx-auto bg-gray-950 rounded-[30px] md:rounded-[50px] p-8 md:p-16 text-center text-white relative overflow-hidden shadow-2xl border border-gray-800">
+          <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-[#007c76]/20 rounded-full -mr-32 -mt-32 md:-mr-48 md:-mt-48 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 md:w-64 md:h-64 bg-amber-500/5 rounded-full -ml-24 -mb-24 md:-ml-32 md:-mb-32 blur-2xl"></div>
           
-          <div className="relative z-10 space-y-8 md:space-y-12">
-            <h2 className="text-2xl md:text-5xl font-black uppercase leading-[1.1] md:leading-[1.1] tracking-tighter text-gray-200">
+          <div className="relative z-10 space-y-8 md:space-y-10">
+            <h2 className="text-2xl md:text-5xl font-black uppercase leading-[1.1] tracking-tighter text-gray-150">
               Bắt đầu hành trình <br className="md:hidden" /> Khám Phá cùng
             </h2>
             
             {/* FAST DEFINITION BLOCK */}
-            <div className="py-2 md:py-4">
-               <h1 className="text-7xl md:text-[10rem] font-black leading-none text-transparent bg-clip-text bg-gradient-to-b from-[#007c76] to-[#004e4a] tracking-tighter drop-shadow-sm select-none">
+            <div className="py-1 md:py-2">
+               <h1 className="text-7xl md:text-9xl font-black leading-none text-transparent bg-clip-text bg-gradient-to-b from-[#007c76] to-[#004e4a] tracking-tighter drop-shadow-sm select-none">
                  FAST
                </h1>
-               <div className="flex items-center justify-center gap-4 mt-2 md:mt-4">
-                  <div className="h-[1px] w-12 md:w-24 bg-gray-700"></div>
-                  <p className="text-white font-bold text-xs md:text-2xl uppercase tracking-[0.3em] md:tracking-[0.5em] text-center">
+               <div className="flex items-center justify-center gap-4 mt-2">
+                  <div className="h-[1px] w-12 md:w-24 bg-gray-800"></div>
+                  <p className="text-white font-bold text-xs md:text-xl uppercase tracking-[0.2em] md:tracking-[0.4em] text-center">
                     Food All Standard & Training
                   </p>
                   <div className="h-[1px] w-12 md:w-24 bg-gray-700"></div>
                </div>
             </div>
 
-            <p className="text-base md:text-xl text-gray-400 font-medium max-w-2xl mx-auto leading-relaxed">
-              Truy cập Website chính thức để xem đầy đủ các giải pháp tư vấn ISO, HACCP và các dự án thực tế của chúng tôi.
+            <p className="text-sm md:text-base text-gray-400 font-medium max-w-xl mx-auto leading-relaxed">
+              Truy cập hệ thống của chúng tôi để chuẩn hóa quy trình An toàn thực phẩm và nâng tầm quản trị doanh nghiệp. Đăng ký nhận tư vấn miễn phí ngay dưới đây.
             </p>
+
+            {/* INTEGRATED MODERN CONSULTATION FORM */}
+            <div className="max-w-xl mx-auto bg-white/5 backdrop-blur-xl border border-white/10 rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden group/form">
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#007c76] to-transparent group-hover/form:via-teal-400 transition-all duration-1000"></div>
+              
+              {!leadSubmitted ? (
+                <form onSubmit={handleLeadSubmit} className="space-y-4 text-left">
+                  <div className="text-center mb-6">
+                    <h4 className="text-base md:text-lg font-black uppercase tracking-tight text-white">Đăng ký nhận tư vấn lộ trình</h4>
+                    <p className="text-xs text-gray-400 font-semibold mt-1">FAST sẽ hỗ trợ khảo sát và tư vấn lộ trình phù hợp hoàn toàn miễn phí.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-teal-400">Họ và tên của bạn</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={leadName}
+                        onChange={(e) => setLeadName(e.target.value)}
+                        placeholder="Nguyễn Văn A" 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white placeholder-gray-500 outline-none focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 transition-all"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-teal-400">Địa chỉ Email liên hệ</label>
+                      <input 
+                        type="email" 
+                        required
+                        value={leadEmail}
+                        onChange={(e) => setLeadEmail(e.target.value)}
+                        placeholder="email@example.com" 
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white placeholder-gray-500 outline-none focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 transition-all"
+                      />
+                    </div>
+                  </div>
+                  
+                  <button 
+                    type="submit" 
+                    disabled={leadSubmitting}
+                    className="w-full bg-[#007c76] hover:bg-[#005f5a] text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all transform active:scale-[0.98] shadow-lg shadow-teal-900/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {leadSubmitting ? (
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    ) : (
+                      <>
+                        Gửi thông tin tư vấn
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="text-center py-6 space-y-4 animate-fade-in">
+                  <div className="w-12 h-12 bg-teal-500/10 text-teal-400 rounded-full flex items-center justify-center mx-auto border border-teal-500/20">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black uppercase text-teal-300">Đăng ký thành công!</h4>
+                    <p className="text-xs text-gray-400 font-semibold max-w-sm mx-auto leading-relaxed">FAST đã tiếp nhận thông tin đăng ký của bạn. Chuyên viên tư vấn sẽ liên hệ lại sớm nhất.</p>
+                  </div>
+                  <button 
+                    onClick={() => setLeadSubmitted(false)}
+                    className="text-xs font-bold text-teal-400 hover:underline uppercase tracking-wider"
+                  >
+                    Gửi yêu cầu mới
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-6 pt-4 md:pt-6">
               <a 
                 href={mainWebsite} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="bg-[#007c76] text-white px-8 py-4 md:px-12 md:py-6 rounded-2xl font-black uppercase tracking-widest text-sm md:text-lg hover:bg-[#005f5a] hover:scale-105 transition-all shadow-2xl shadow-[#007c76]/20 flex items-center justify-center gap-3"
+                className="bg-white/5 backdrop-blur-xl text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-all border border-white/10 flex items-center justify-center gap-2"
               >
-                Ghé thăm Website
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                Ghé thăm Website tư vấn
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
               </a>
-              <Link to="/khoa-hoc" className="bg-white/5 backdrop-blur-xl text-white px-8 py-4 md:px-12 md:py-6 rounded-2xl font-black uppercase tracking-widest text-sm md:text-lg hover:bg-white/10 transition-all border border-white/10">Khám phá học liệu</Link>
+              <Link to="/khoa-hoc" className="bg-[#007c76]/80 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#007c76] transition-all flex items-center justify-center">Khám phá học liệu</Link>
             </div>
           </div>
         </div>

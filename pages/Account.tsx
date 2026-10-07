@@ -1783,9 +1783,9 @@ const Account: React.FC = () => {
             <div className="p-4 md:p-8 lg:p-10 space-y-8 max-w-full w-full">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-white/10">
                 <div className="space-y-1">
-                  <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tight">FAST SERVICE &amp; Hồ Sơ</h1>
+                  <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tight">FAST &amp; Hồ Sơ</h1>
                   <p className="text-xs md:text-sm text-teal-100/90 font-semibold leading-relaxed">
-                    Quản lý hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
+                    Hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
                   </p>
                 </div>
               </div>
@@ -1908,12 +1908,12 @@ const Account: React.FC = () => {
               </div>
 
               {/* Display area */}
-              <div className="bg-white border border-gray-150 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
+              <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] border border-teal-600/20 text-white rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
                 {adminViewMode === 'fsa' && (
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                       <div>
-                        <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Mô-đun: Fast Standards Audit (FSA)</h4>
+                        <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Fast Standards Audit (FSA)</h4>
                         <p className="text-xs text-emerald-600 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200">System Ready</span>
@@ -1926,7 +1926,7 @@ const Account: React.FC = () => {
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                       <div>
-                        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Mô-đun: Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
+                        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
                         <p className="text-xs text-amber-600 font-medium">Cập nhật, phê duyệt và xử lý hồ sơ pháp lý, giấy phép ATTP cho cơ sở.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200">System Ready</span>
@@ -1939,7 +1939,7 @@ const Account: React.FC = () => {
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-cyan-50 rounded-2xl border border-cyan-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                       <div>
-                        <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Mô-đun: Hồ sơ Quảng cáo / QC</h4>
+                        <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Hồ sơ Quảng cáo / QC</h4>
                         <p className="text-xs text-cyan-600 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl border border-cyan-200">System Ready</span>
