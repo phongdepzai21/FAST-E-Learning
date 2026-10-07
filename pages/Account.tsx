@@ -350,7 +350,7 @@ const Account: React.FC = () => {
         (c.location && c.location.toLowerCase().includes(query)) ||
         (c.fastStaff && c.fastStaff.toLowerCase().includes(query))
       ) {
-        results.push({ ...c, module: 'attp', moduleLabel: '🛡️ Hồ sơ ATTP' });
+        results.push({ ...c, module: 'attp', moduleLabel: 'Hồ sơ ATTP' });
       }
     });
 
@@ -362,7 +362,7 @@ const Account: React.FC = () => {
         (c.location && c.location.toLowerCase().includes(query)) ||
         (c.fastStaff && c.fastStaff.toLowerCase().includes(query))
       ) {
-        results.push({ ...c, module: 'hsqc', moduleLabel: '💼 Hồ sơ QC' });
+        results.push({ ...c, module: 'hsqc', moduleLabel: 'Hồ sơ QC' });
       }
     });
 
@@ -1719,16 +1719,16 @@ const Account: React.FC = () => {
               ) : (
                 <div className="mb-10 block">
                   <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
-                    FAST Compliance
+                    FAST SERVICE
                   </span>
                 </div>
               )}
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: 'FSA-Checklist', icon: '' },
-                  { id: 'attp', label: 'Hồ sơ ATTP', icon: '' },
-                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: '' },
+                  { id: 'fsa', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+                  { id: 'attp', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;
@@ -1762,10 +1762,12 @@ const Account: React.FC = () => {
             <div className={`mt-auto border-t border-gray-100 transition-all duration-300 ${!isExpanded ? 'p-3 flex justify-center' : 'p-6'}`}>
               {!isExpanded ? (
                 <div 
-                  title="FAST Compliance Portal"
+                  title="FAST SERVICE Portal"
                   className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-[#007c76] text-white"
                 >
-                  <span className="text-base">🛡️</span>
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
                 </div>
               ) : (
                 <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
@@ -1832,8 +1834,16 @@ const Account: React.FC = () => {
                           onClick={() => handleSelectClient(client)}
                           className="w-full text-left p-4 hover:bg-slate-50 transition-colors flex items-start gap-3.5 cursor-pointer"
                         >
-                          <div className="w-9 h-9 rounded-xl bg-[#007c76]/10 text-[#007c76] flex items-center justify-center font-bold text-lg shrink-0">
-                            {client.module === 'attp' ? '🛡️' : '💼'}
+                          <div className="w-9 h-9 rounded-xl bg-[#007c76]/10 text-[#007c76] flex items-center justify-center font-bold shrink-0">
+                            {client.module === 'attp' ? (
+                              <svg className="w-4 h-4 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
@@ -1844,11 +1854,28 @@ const Account: React.FC = () => {
                             </div>
                             <p className="text-xs text-gray-500 font-semibold mt-0.5 truncate">{client.location || 'Chưa cập nhật địa chỉ'}</p>
                             <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400 font-bold">
-                              {client.phone && <span>📞 {client.phone}</span>}
-                              {client.fastStaff && <span>👤 Phụ trách: {client.fastStaff}</span>}
+                              {client.phone && (
+                                <span className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                  </svg>
+                                  {client.phone}
+                                </span>
+                              )}
+                              {client.fastStaff && (
+                                <span className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                  Phụ trách: {client.fastStaff}
+                                </span>
+                              )}
                               {client.status && (
-                                <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
-                                  ⏱️ {client.status}
+                                <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  {client.status}
                                 </span>
                               )}
                             </div>

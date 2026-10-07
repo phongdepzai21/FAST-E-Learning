@@ -573,8 +573,7 @@ async function startServer() {
           hostname.includes(".run.app") ||
           hostname.includes("ais-dev") ||
           hostname.includes("ais-pre") ||
-          process.env.NODE_ENV !== "production" ||
-          process.env.RECAPTCHA_BYPASS_DEV === "true";
+          process.env.NODE_ENV !== "production";
 
         if (isLocalOrPreview) {
           console.log("[reCAPTCHA Backend] [DEV ONLY MODE] Bypassing reCAPTCHA check to avoid blocking on preview/local domain:", hostname);
@@ -592,7 +591,7 @@ async function startServer() {
       console.error("[reCAPTCHA Backend] Verification error:", err);
 
       // Fallback for system offline/internal network error in dev environments
-      if (process.env.NODE_ENV !== "production" || process.env.RECAPTCHA_BYPASS_DEV === "true") {
+      if (process.env.NODE_ENV !== "production") {
         console.log("[reCAPTCHA Backend] [DEV ONLY MODE] Bypassing reCAPTCHA due to backend exception in dev/preview environment.");
         return res.json({
           success: true,

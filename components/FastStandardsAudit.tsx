@@ -769,7 +769,7 @@ export const FastStandardsAudit: React.FC = () => {
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-              Hệ Thống Thư Viện &amp; Đánh Giá Tiêu Chuẩn FAST
+              FAST SERVICE
             </h1>
             <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
               Đánh giá toàn diện 8 trụ cột Vận hành &amp; An toàn thực phẩm (265 tiêu chuẩn chuẩn hóa ISO &amp; HACCP Codex).
@@ -793,13 +793,15 @@ export const FastStandardsAudit: React.FC = () => {
           { id: 'report', label: 'Báo Cáo & CAPA', icon: FileText, count: null, highlight: true, activeGradient: 'bg-amber-600', textColor: 'text-amber-800' },
           { id: 'database', label: 'Cơ Sở Dữ Liệu', icon: Database, count: null, activeGradient: 'bg-teal-900', textColor: 'text-teal-950' }
         ].map(tab => {
-          const Icon = tab.icon;
+          const Icon = 'icon' in tab ? tab.icon : undefined;
           const isActive = activeSubTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
+                tab.id === 'database' ? 'min-w-[180px] justify-center px-6 border-2 border-teal-800' : ''
+              } ${
                 isActive
                   ? `${tab.activeGradient} text-white shadow-md shadow-teal-900/10 ring-1 ring-[#005c56] scale-[1.02]`
                   : tab.highlight
@@ -807,7 +809,7 @@ export const FastStandardsAudit: React.FC = () => {
                     : 'bg-gray-50/80 text-gray-700 hover:bg-teal-50/80 hover:text-[#005c56] border border-gray-100'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+              {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-400'}`} />}
               <span>{tab.label}</span>
               {tab.count !== null && (
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isActive ? 'bg-white/25 text-white' : 'bg-gray-200/80 text-gray-700'}`}>
@@ -1521,15 +1523,15 @@ export const FastStandardsAudit: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200">
+                      <tr className="bg-gray-50 text-gray-700 font-bold border-b border-gray-200 whitespace-nowrap">
                         <th className="p-4 w-12 text-center">STT</th>
-                        <th className="p-4 min-w-[200px]">Đơn vị được đánh giá (Auditee)</th>
-                        <th className="p-4">Chuyên gia đánh giá</th>
-                        <th className="p-4">Quản lý cơ sở</th>
-                        <th className="p-4 text-center">Ngày đánh giá</th>
-                        <th className="p-4 text-center">Mức lỗi (NCs)</th>
-                        <th className="p-4 text-center">Điểm số</th>
-                        <th className="p-4 text-center w-36">Thao tác</th>
+                        <th className="p-4 min-w-[220px]">Đơn vị được đánh giá (Auditee)</th>
+                        <th className="p-4 min-w-[150px]">Chuyên gia đánh giá</th>
+                        <th className="p-4 min-w-[150px]">Quản lý cơ sở</th>
+                        <th className="p-4 text-center min-w-[120px]">Ngày đánh giá</th>
+                        <th className="p-4 text-center min-w-[150px]">Mức lỗi (NCs)</th>
+                        <th className="p-4 text-center min-w-[100px]">Điểm số</th>
+                        <th className="p-4 text-center w-40">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
