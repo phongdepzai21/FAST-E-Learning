@@ -755,7 +755,7 @@ const Classroom: React.FC = () => {
       )}
 
       {/* MAIN WORKSPACE GRID */}
-      <main className={`relative z-10 flex-1 max-w-[1720px] w-full mx-auto p-4 md:p-6 lg:p-8 ${isFocusMode ? 'flex flex-col' : 'grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8'} transition-all duration-500`}>
+      <main className={`relative z-10 flex-1 max-w-full w-full mx-auto p-4 md:p-6 lg:p-8 ${isFocusMode ? 'flex flex-col' : 'grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8'} transition-all duration-500`}>
         
         {/* LEFT COLUMN: THEATER PLAYER & DETAILS (8 COLS) */}
         <div className={`${isFocusMode ? 'w-full max-w-6xl mx-auto' : 'lg:col-span-8'} flex flex-col space-y-6 transition-all duration-500`}>

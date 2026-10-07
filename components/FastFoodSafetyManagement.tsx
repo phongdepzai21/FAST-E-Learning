@@ -764,7 +764,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           <div className="bg-gradient-to-b from-purple-50/60 to-white p-4 rounded-2xl border border-purple-400/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-purple-800">ĐANG THẨM ĐỊNH TẠI BẾP</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-purple-800">ĐÃ THẨM ĐỊNH</div>
             <div className="text-3xl font-black text-purple-700 my-1">{inspectCount}</div>
             <div className="text-[11px] font-semibold text-purple-700/80">Đoàn kiểm tra chuẩn bị</div>
           </div>
@@ -961,7 +961,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ &amp; Cơ sở</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
-                  <option value="Đang thẩm định thực tế">🟣 Đang thẩm định thực tế tại bếp</option>
+                  <option value="Đang thẩm định thực tế">🟣 Đã thẩm định</option>
                   <option value="Đã thẩm định đạt - Chờ cấp">🟢 Đã thẩm định đạt - Chờ ký cấp Giấy</option>
                   <option value="Đã cấp Giấy chứng nhận ATTP">✅ Đã cấp Giấy chứng nhận ATTP</option>
                   <option value="Cần khắc phục cơ sở">🔴 Cần bổ sung / Khắc phục cơ sở</option>
