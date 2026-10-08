@@ -157,7 +157,7 @@ export const COURSES: Course[] = [
     price: '499.000đ',
     image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&q=80&w=800',
     category: 'QA/QC',
-    description: 'Đào tạo kỹ năng kiểm soát chất lượng thực tế dành cho nhân viên QA/QC tại các nhà máy.'
+    description: 'Chuẩn hóa kỹ năng kiểm soát chất lượng thực tế dành cho nhân viên QA/QC tại các nhà máy.'
   },
   {
     id: 'quan-tri-san-xuat',

@@ -206,7 +206,7 @@ const About: React.FC = () => {
                 Cam Kết Mang Lại Giá Trị Bền Vững Cho Khách Hàng
               </h2>
               <p className="text-slate-500 font-medium text-sm md:text-base leading-relaxed">
-                Chúng tôi không chỉ đồng hành để doanh nghiệp lấy chứng chỉ, mà còn xây dựng một "hệ điều hành" doanh nghiệp vững chắc, nơi văn hóa cải tiến liên tục thấm sâu vào từng nhân sự.
+                Chúng tôi không chỉ đồng hành để doanh nghiệp đạt chuẩn thẩm định chất lượng, mà còn xây dựng một "hệ điều hành" doanh nghiệp vững chắc, nơi văn hóa cải tiến liên tục thấm sâu vào từng nhân sự.
               </p>
 
               <div className="space-y-4">

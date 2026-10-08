@@ -1719,16 +1719,16 @@ const Account: React.FC = () => {
               ) : (
                 <div className="mb-10 block">
                   <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
-                    FAST SERVICE
+                    QUẢN TRỊ DỊCH VỤ
                   </span>
                 </div>
               )}
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: 'FSA-Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-                  { id: 'attp', label: 'Hồ sơ ATTP', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-                  { id: 'hsqc', label: 'Hồ sơ Quảng cáo / QC', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+                  { id: 'fsa', label: 'Thẩm Định Chuẩn FSA', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+                  { id: 'attp', label: 'An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'hsqc', label: 'Quảng Cáo / Băng-Rôn', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;
@@ -1762,7 +1762,7 @@ const Account: React.FC = () => {
             <div className={`mt-auto border-t border-gray-100 transition-all duration-300 ${!isExpanded ? 'p-3 flex justify-center' : 'p-6'}`}>
               {!isExpanded ? (
                 <div 
-                  title="FAST SERVICE Portal"
+                  title="Quản Trị Portal"
                   className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-[#007c76] text-white"
                 >
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1771,115 +1771,16 @@ const Account: React.FC = () => {
                 </div>
               ) : (
                 <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
-                  <p className="text-xs font-black uppercase tracking-widest mb-1">FAST Admin</p>
-                  <p className="text-[10px] opacity-90">Các loại dịch vụ</p>
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">Hệ Thống Quản Trị</p>
+                  <p className="text-[10px] opacity-90">Theo dõi toàn trình</p>
                 </div>
               )}
             </div>
           </aside>
 
           {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto custom-scrollbar bg-gradient-to-br from-[#005c56] to-[#007c76] print:bg-white print:overflow-visible print:p-0 print:m-0">
-            <div className="p-4 md:p-8 lg:p-10 space-y-8 max-w-full w-full">
-              {/* Removed redundant FAST & Hồ Sơ header as requested */}
-
-              {/* Customer Database Master Search Bar */}
-              <div className="relative w-full max-w-4xl">
-                <div className="flex items-center bg-white border border-gray-250 rounded-2xl px-4 py-3.5 shadow-sm focus-within:ring-2 focus-within:ring-[#007c76]/25 focus-within:border-[#007c76] transition-all">
-                  <svg className="w-5 h-5 text-gray-400 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input 
-                    type="text" 
-                    value={masterSearch}
-                    onChange={(e) => setMasterSearch(e.target.value)}
-                    placeholder="Tìm kiếm cơ sở dữ liệu khách hàng (Tên, SĐT, Địa chỉ, Người phụ trách...)" 
-                    className="bg-transparent border-none outline-none text-sm font-semibold w-full text-gray-800 placeholder-gray-400" 
-                  />
-                  {masterSearch && (
-                    <button 
-                      onClick={() => setMasterSearch('')}
-                      className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer shrink-0"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-
-                {/* Search Results Dropdown */}
-                {masterSearch && (
-                  <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-150 max-h-96 overflow-y-auto z-50 divide-y divide-gray-100 animate-in slide-in-from-top-3 duration-200">
-                    <div className="p-3 bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-wider flex justify-between items-center">
-                      <span>Kết quả từ cơ sở dữ liệu khách hàng</span>
-                      <span className="bg-teal-50 text-[#007c76] px-2 py-0.5 rounded font-bold">{filteredClients.length} khách hàng</span>
-                    </div>
-
-                    {filteredClients.length === 0 ? (
-                      <div className="p-8 text-center text-gray-400 font-bold text-sm">
-                        😞 Không tìm thấy khách hàng nào khớp với từ khóa.
-                      </div>
-                    ) : (
-                      filteredClients.map((client) => (
-                        <button
-                          key={client.id}
-                          onClick={() => handleSelectClient(client)}
-                          className="w-full text-left p-4 hover:bg-slate-50 transition-colors flex items-start gap-3.5 cursor-pointer"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-[#007c76]/10 text-[#007c76] flex items-center justify-center font-bold shrink-0">
-                            {client.module === 'attp' ? (
-                              <svg className="w-4 h-4 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-4 h-4 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                              </svg>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-extrabold text-sm text-gray-800 truncate">{client.name}</p>
-                              <span className="text-[9px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-150 shrink-0">
-                                {client.moduleLabel}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-500 font-semibold mt-0.5 truncate">{client.location || 'Chưa cập nhật địa chỉ'}</p>
-                            <div className="flex items-center gap-4 mt-2 text-[10px] text-gray-400 font-bold">
-                              {client.phone && (
-                                <span className="flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                  </svg>
-                                  {client.phone}
-                                </span>
-                              )}
-                              {client.fastStaff && (
-                                <span className="flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                  Phụ trách: {client.fastStaff}
-                                </span>
-                              )}
-                              {client.status && (
-                                <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  {client.status}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
+          <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#005c56] print:bg-white print:overflow-visible print:p-0 print:m-0">
+            <div className="p-4 md:p-8 lg:p-10 space-y-6 max-w-full w-full">
               {/* Mobile selector */}
               <div className="flex items-center gap-4 lg:hidden print:hidden mb-4">
                 <select 
@@ -1891,25 +1792,25 @@ const Account: React.FC = () => {
                       setAdminViewMode(e.target.value as any);
                     }
                   }}
-                  className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
+                  className="bg-white border border-gray-300 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-3 shadow-md outline-none"
                 >
-                  <option value="fsa">FSA-Checklist</option>
-                  <option value="attp">Hồ sơ ATTP</option>
-                  <option value="hsqc">Hồ sơ Quảng cáo / QC</option>
+                  <option value="fsa">Thẩm Định Chuẩn FSA</option>
+                  <option value="attp">Thủ Tục An Toàn Thực Phẩm</option>
+                  <option value="hsqc">Thủ Tục Quảng Cáo / Băng-Rôn</option>
                   <option value="student">Quay lại Học viên</option>
                 </select>
               </div>
 
-              {/* Display area */}
-              <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] border border-teal-600/20 text-slate-800 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
+              {/* Display area - Nền ngoài #005c56, khung bảng bên trong màu trắng như cũ */}
+              <div className="bg-white text-slate-800 rounded-[32px] md:rounded-[40px] p-5 md:p-8 lg:p-10 shadow-2xl border border-teal-900/10 min-h-[600px] w-full">
                 {adminViewMode === 'fsa' && (
                   <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide">Fast Standards Audit (FSA)</h4>
-                        <p className="text-xs text-emerald-600 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP.</p>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hệ Thống Thẩm Định &amp; Đánh Giá Tiêu Chuẩn FSA</h4>
+                        <p className="text-xs text-gray-500 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP Codex.</p>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200">System Ready</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                     </div>
                     <FastStandardsAudit />
                   </div>
@@ -1917,12 +1818,12 @@ const Account: React.FC = () => {
 
                 {adminViewMode === 'attp' && (
                   <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wide">Hồ sơ ATTP (An Toàn Thực Phẩm)</h4>
-                        <p className="text-xs text-amber-600 font-medium">Cập nhật, phê duyệt và xử lý hồ sơ pháp lý, giấy phép ATTP cho cơ sở.</p>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Thủ Tục Cấp Giấy Phép An Toàn Thực Phẩm</h4>
+                        <p className="text-xs text-gray-500 font-medium">Cập nhật, thẩm định và xử lý quy trình pháp lý, giấy phép ATTP cho cơ sở.</p>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-200">System Ready</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                     </div>
                     <FastFoodSafetyManagement />
                   </div>
@@ -1930,12 +1831,12 @@ const Account: React.FC = () => {
 
                 {adminViewMode === 'hsqc' && (
                   <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-cyan-50 rounded-2xl border border-cyan-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-cyan-800 uppercase tracking-wide">Hồ sơ Quảng cáo / QC</h4>
-                        <p className="text-xs text-cyan-600 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Thủ Tục Thông Báo Quảng Cáo / Băng-Rôn</h4>
+                        <p className="text-xs text-gray-500 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl border border-cyan-200">System Ready</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                     </div>
                     <AdProfileManagement />
                   </div>

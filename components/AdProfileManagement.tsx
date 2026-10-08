@@ -480,11 +480,15 @@ export const AdProfileManagement: React.FC = () => {
 
     setCurrentId(recId);
 
-    const idx = database.findIndex(c => c.id === recId);
+    const idx = database.findIndex(c => 
+      c.id === recId || 
+      (c.name && newRecord.name && c.name.trim().toLowerCase() === newRecord.name.trim().toLowerCase())
+    );
     let newDb: CustomerRecord[];
     if (idx >= 0) {
       newDb = [...database];
-      newDb[idx] = newRecord;
+      newDb[idx] = { ...newRecord, id: newDb[idx].id };
+      setCurrentId(newDb[idx].id);
     } else {
       newDb = [newRecord, ...database];
     }
@@ -548,15 +552,16 @@ export const AdProfileManagement: React.FC = () => {
 
   // New Customer creation
   const handleNewCustomer = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Tạo khách hàng mới",
-      message: "Tạo một hồ sơ khách hàng mới? Dữ liệu trên form hiện tại sẽ được đặt lại.",
-      onConfirm: () => {
-        clearForm();
-        showSuccessToast("Đã khởi tạo biểu mẫu mới.");
-      }
-    });
+    clearForm();
+    const freshId = 'cust_' + Date.now();
+    setCurrentId(freshId);
+    showSuccessToast("Đã khởi tạo biểu mẫu mới.");
+    const formEl = document.getElementById('ad-customer-form');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const firstInput = formEl.querySelector('input') as HTMLInputElement;
+      if (firstInput) setTimeout(() => firstInput.focus(), 300);
+    }
   };
 
   // Load customer into form
@@ -574,7 +579,8 @@ export const AdProfileManagement: React.FC = () => {
     setCustReceipt(c.receipt || '');
     setChecklist(c.checklist || {});
     saveActiveDraft();
-    window.scrollTo({ top: 300, behavior: 'smooth' });
+    const formEl = document.getElementById('ad-customer-form');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Delete customer
@@ -608,25 +614,41 @@ export const AdProfileManagement: React.FC = () => {
     }, 150);
   };
 
+  const uniqueDatabase = useMemo(() => {
+    const seen = new Set<string>();
+    const result: typeof database = [];
+    for (const item of database) {
+      if (!item) continue;
+      const key = item.id || (item.name ? item.name.trim().toLowerCase() : Math.random().toString());
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+    return result;
+  }, [database]);
+
   // KPI Calculations
   const stats = useMemo(() => {
-    const total = database.length;
+    const total = uniqueDatabase.length;
     let draft = 0;
     let submitted = 0;
+    let audited = 0;
     let completed = 0;
 
-    database.forEach(c => {
-      const s = c.status || '';
+    uniqueDatabase.forEach(c => {
+      const s = (c.status || '').toLowerCase();
       if (s.includes('chuẩn bị')) draft++;
-      else if (s.includes('Đã nộp')) submitted++;
-      else if (s.includes('hoàn thành')) completed++;
+      else if (s.includes('đã nộp') || s.includes('nộp sở')) submitted++;
+      else if (s.includes('thẩm định') || s.includes('kiểm tra')) audited++;
+      else if (s.includes('hoàn thành') || s.includes('hiệu lực')) completed++;
       else draft++;
     });
 
-    const slaRate = total > 0 ? Math.round(((completed + submitted) / total) * 100) : 100;
+    const slaRate = total > 0 ? Math.round(((completed + submitted + audited) / total) * 100) : 100;
 
-    return { total, draft, submitted, completed, slaRate };
-  }, [database]);
+    return { total, draft, submitted, audited, completed, slaRate };
+  }, [uniqueDatabase]);
 
   // Checklist completion count
   const checkedDocsCount = useMemo(() => {
@@ -761,10 +783,10 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-                Quản Lý Toàn Trình Hồ Sơ Quảng Cáo Bảng &amp; Băng-Rôn
+                Quản Lý Toàn Trình Quảng Cáo Bảng &amp; Băng-Rôn
               </h1>
               <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
-                Hệ thống quản trị hồ sơ, đếm ngược thời hạn thụ lý 05 ngày làm việc và giám sát cơ sở dữ liệu khách hàng FAST CONSULTING.
+                Hệ thống quản trị đếm ngược thời hạn thụ lý 05 ngày làm việc và giám sát cơ sở dữ liệu khách hàng.
               </p>
             </div>
 
@@ -798,7 +820,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 
         <div className="p-3.5 bg-gradient-to-br from-amber-50/80 to-orange-50/40 border-l-4 border-l-amber-500 rounded-r-xl shadow-xs">
           <div className="font-bold text-amber-950/70 uppercase text-[10px] tracking-wider">Thời hạn giải quyết</div>
-          <div className="font-black text-amber-900 text-sm mt-0.5">05 ngày làm việc (SLA FAST)</div>
+          <div className="font-black text-amber-900 text-sm mt-0.5">05 ngày làm việc (SLA)</div>
         </div>
 
         <div className="p-3.5 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border-l-4 border-l-emerald-500 rounded-r-xl shadow-xs">
@@ -812,36 +834,42 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
         </div>
       </div>
 
-      {/* CRM Dashboard KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-gradient-to-b from-teal-50/60 to-white p-4 rounded-2xl border-2 border-teal-500/40 shadow-sm transition-transform hover:scale-[1.02]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-teal-800">TỔNG KHÁCH HÀNG / ORDER</div>
-          <div className="text-3xl font-black text-teal-900 my-1">{stats.total}</div>
-          <div className="text-[11px] font-semibold text-teal-700/80">Hồ sơ trong hệ thống</div>
+      {/* CRM Dashboard KPI Cards - 6 Ô với Ô ĐÃ THẨM ĐỊNH */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div className="bg-gradient-to-b from-teal-50/60 to-white p-4 rounded-2xl border border-teal-500/40 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-teal-800">TỔNG KHÁCH HÀNG</div>
+          <div className="text-2xl sm:text-3xl font-black text-teal-900 my-1">{stats.total}</div>
+          <div className="text-[11px] font-semibold text-teal-700/80">Trong hệ thống</div>
         </div>
 
-        <div className="bg-gradient-to-b from-amber-50/60 to-white p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-[1.02]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-amber-800">ĐANG CHUẨN BỊ HỒ SƠ</div>
-          <div className="text-3xl font-black text-amber-700 my-1">{stats.draft}</div>
+        <div className="bg-gradient-to-b from-amber-50/60 to-white p-4 rounded-2xl border border-amber-400 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-amber-800">ĐANG CHUẨN BỊ</div>
+          <div className="text-2xl sm:text-3xl font-black text-amber-700 my-1">{stats.draft}</div>
           <div className="text-[11px] font-semibold text-amber-700/80">Chưa nộp Sở</div>
         </div>
 
-        <div className="bg-gradient-to-b from-sky-50/60 to-white p-4 rounded-2xl border-2 border-blue-400 shadow-sm transition-transform hover:scale-[1.02]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (ĐẾM NGƯỢC 5N)</div>
-          <div className="text-3xl font-black text-blue-700 my-1">{stats.submitted}</div>
-          <div className="text-[11px] font-semibold text-blue-700/80">Đang trong thời hạn thụ lý</div>
+        <div className="bg-gradient-to-b from-sky-50/60 to-white p-4 rounded-2xl border border-blue-400 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (05N)</div>
+          <div className="text-2xl sm:text-3xl font-black text-blue-700 my-1">{stats.submitted}</div>
+          <div className="text-[11px] font-semibold text-blue-700/80">Đang thụ lý hồ sơ</div>
         </div>
 
-        <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border-2 border-emerald-500 shadow-sm transition-transform hover:scale-[1.02]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-emerald-800">HOÀN THÀNH / HIỆU LỰC</div>
-          <div className="text-3xl font-black text-emerald-700 my-1">{stats.completed}</div>
-          <div className="text-[11px] font-semibold text-emerald-700/80">Mặc nhiên được phép treo</div>
+        <div className="bg-gradient-to-b from-indigo-50/70 to-white p-4 rounded-2xl border-2 border-indigo-400/50 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-indigo-900">ĐÃ THẨM ĐỊNH</div>
+          <div className="text-2xl sm:text-3xl font-black text-indigo-700 my-1">{stats.audited}</div>
+          <div className="text-[11px] font-semibold text-indigo-700/80">Kiểm tra &amp; phê duyệt</div>
+        </div>
+
+        <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border border-emerald-500 shadow-sm transition-transform hover:scale-[1.02]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800">HOÀN THÀNH</div>
+          <div className="text-2xl sm:text-3xl font-black text-emerald-700 my-1">{stats.completed}</div>
+          <div className="text-[11px] font-semibold text-emerald-700/80">Mặc nhiên hiệu lực</div>
         </div>
 
         <div className="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-4 rounded-2xl shadow-md shadow-teal-700/20 transition-transform hover:scale-[1.02]">
-          <div className="text-[10.5px] font-black uppercase tracking-wider text-emerald-100">TỶ LỆ ĐÚNG HẠN SLA</div>
-          <div className="text-3xl font-black text-white my-1 drop-shadow-sm">{stats.slaRate}%</div>
-          <div className="text-[11px] font-medium text-emerald-100">Chỉ số cam kết FAST</div>
+          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-100">ĐÚNG HẠN SLA</div>
+          <div className="text-2xl sm:text-3xl font-black text-white my-1 drop-shadow-sm">{stats.slaRate}%</div>
+          <div className="text-[11px] font-medium text-emerald-100">Chỉ số cam kết</div>
         </div>
       </div>
 
@@ -851,7 +879,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-[#005c56]" />
             <h2 className="text-xs font-black uppercase text-gray-800 tracking-wider">
-              Cơ Sở Dữ Liệu Theo Dõi Toàn Trình (FAST CRM)
+              Cơ Sở Dữ Liệu Theo Dõi Toàn Trình
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -867,7 +895,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
               className="px-3 py-1.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
-              + Tạo Hồ Sơ Khách Mới
+              + Tạo Khách Mới
             </button>
           </div>
         </div>
@@ -877,7 +905,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             <thead className="sticky top-0 bg-teal-50/90 text-[#005c56] font-bold z-10 border-b border-teal-200">
               <tr className="whitespace-nowrap">
                 <th className="p-2.5 text-center w-12">STT</th>
-                <th className="p-2.5 w-32">Nhân Viên FAST</th>
+                <th className="p-2.5 w-32">Nhân Viên Phụ Trách</th>
                 <th className="p-2.5 w-48">Tên Khách Hàng / Đơn Vị</th>
                 <th className="p-2.5 w-28">Số Điện Thoại</th>
                 <th className="p-2.5">Địa Điểm / Vị Trí</th>
@@ -891,17 +919,18 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {database.length === 0 ? (
+              {uniqueDatabase.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="p-6 text-center text-gray-400 font-medium italic">
-                    Chưa có hồ sơ nào. Nhập thông tin phía dưới và nhấn "Lưu Vào Thống Kê" để tạo mới.
+                    Chưa có khách hàng nào. Nhập thông tin phía dưới và nhấn "Lưu Vào Thống Kê" để tạo mới.
                   </td>
                 </tr>
               ) : (
-                database.map((c, idx) => {
+                uniqueDatabase.map((c, idx) => {
                   const isCurrent = c.id === currentId;
                   let pillClass = 'bg-amber-100 text-amber-800 border-amber-300';
                   if (c.status.includes('Đã nộp')) pillClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                  else if (c.status.includes('thẩm định')) pillClass = 'bg-indigo-100 text-indigo-800 border-indigo-300';
                   else if (c.status.includes('hoàn thành')) pillClass = 'bg-green-100 text-green-800 border-green-300';
                   else if (c.status.includes('Chậm') || c.status.includes('bổ sung')) pillClass = 'bg-red-100 text-red-800 border-red-300';
 
@@ -935,14 +964,14 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => loadCustomer(c)}
-                            className="p-1 text-gray-500 hover:text-teal-700 hover:bg-teal-50 rounded"
+                            className="p-1 text-gray-500 hover:text-teal-700 hover:bg-teal-50 rounded cursor-pointer"
                             title="Sửa / Xem chi tiết"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => deleteCustomer(c.id, c.name)}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
                             title="Xóa hồ sơ"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -959,12 +988,12 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Customer Record Edit Form */}
-      <div className="bg-white p-6 rounded-2xl border-2 border-[#005c56]/40 shadow-sm space-y-4">
+      <div id="ad-customer-form" className="bg-white p-6 rounded-2xl border-2 border-[#005c56]/40 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between border-b border-dashed border-gray-200 pb-3 gap-2">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-[#005c56]" />
             <h2 className="text-sm font-black uppercase text-gray-800 tracking-wide">
-              Quản Lý Toàn Trình Hồ Sơ Khách Hàng
+              Cập Nhật Thông Tin Khách Hàng
             </h2>
           </div>
           <span className="text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 flex items-center gap-1">
@@ -1115,6 +1144,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             >
               <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ (Drafting)</option>
               <option value="Đã nộp Sở - Chờ 5 ngày">🔵 Đã nộp Sở - Chờ 5 ngày làm việc</option>
+              <option value="Đã thẩm định">🟣 Đã thẩm định / Đã kiểm tra đạt</option>
               <option value="Đã hoàn thành đúng hạn">🟢 Đã hoàn thành / Mặc nhiên hiệu lực</option>
               <option value="Chậm trễ / Cần bổ sung">🔴 Chậm trễ / Cần bổ sung giải trình</option>
             </select>
@@ -1174,7 +1204,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Toolbar & Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-3 print:hidden no-print">
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input

@@ -23,7 +23,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
     { id: 'security', label: '7. Chính sách bảo mật', category: 'Quyền riêng tư' },
     { id: 'intellectual-property', label: '8. Sở hữu trí tuệ', category: 'Bản quyền' },
     { id: 'complaints', label: '9. Giải quyết khiếu nại', category: 'Hỗ trợ' },
-    { id: 'certificate', label: '10. Quy định về chứng nhận', category: 'Đào tạo' },
+    { id: 'certificate', label: '10. Quy định về chứng nhận', category: 'Học tập & Tiêu chuẩn' },
   ];
 
   const currentDateStr = "04/10/2026";
@@ -101,7 +101,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                     <p><strong>Tên website:</strong> FAST Elearning</p>
                     <p><strong>Tên miền:</strong> fastelearning.com.vn</p>
                     <p><strong>Loại website:</strong> Website thương mại điện tử cung ứng dịch vụ học tập trực tuyến</p>
-                    <p><strong>Lĩnh vực hoạt động:</strong> Đào tạo trực tuyến, tư vấn tiêu chuẩn ISO, HACCP, an toàn thực phẩm và hỗ trợ doanh nghiệp kiểm toán chất lượng dịch vụ.</p>
+                    <p><strong>Lĩnh vực hoạt động:</strong> Học trực tuyến, tư vấn tiêu chuẩn ISO, HACCP, an toàn thực phẩm và hỗ trợ doanh nghiệp kiểm toán chất lượng dịch vụ.</p>
                   </div>
 
                   <div className="space-y-2 pt-2">
@@ -151,7 +151,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                     <ul className="list-disc pl-5 space-y-1.5">
                       <li>Tài khoản cấp cho cá nhân học viên đăng ký, tuyệt đối không được chuyển nhượng, chia sẻ thông tin đăng nhập cho người khác sử dụng chung.</li>
                       <li>Nghiêm cấm hành vi bán lại quyền truy cập hoặc cấu hình một tài khoản dùng chung cho tập thể.</li>
-                      <li><strong>FAST Elearning sử dụng cơ chế bảo mật quét phiên đồng thời</strong>. Tài khoản phát hiện đăng nhập song song bất thường từ nhiều vị trí IP địa lý khác nhau sẽ bị hệ thống tự động khóa tạm thời để bảo vệ nội dung đào tạo.</li>
+                      <li><strong>FAST Elearning sử dụng cơ chế bảo mật quét phiên đồng thời</strong>. Tài khoản phát hiện đăng nhập song song bất thường từ nhiều vị trí IP địa lý khác nhau sẽ bị hệ thống tự động khóa tạm thời để bảo vệ nội dung bài giảng & học liệu.</li>
                     </ul>
                   </section>
 
@@ -187,7 +187,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                       FAST Elearning bán <strong>quyền truy cập trực tuyến không giới hạn thời gian (hoặc có giới hạn theo gói) vào nội dung bài giảng video và biểu mẫu chuẩn tương ứng</strong>.
                     </p>
                     <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl text-[#007c76] font-bold text-xs">
-                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa đào tạo kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Giấy chứng nhận". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
+                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa học kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Giấy chứng nhận". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
                     </div>
                   </section>
 
@@ -389,7 +389,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
 
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">8.2. Giới hạn quyền sử dụng</h3>
-                    <p>Học viên chỉ được quyền sử dụng các tài nguyên đào tạo này phục vụ cho việc tự ôn tập, nghiên cứu và học tập cá nhân. Nghiêm cấm sử dụng để thương mại hóa hoặc nhượng lại cho bên thứ ba khi chưa có sự đồng ý chính thức từ phía FAST Consulting.</p>
+                    <p>Học viên chỉ được quyền sử dụng các tài nguyên học liệu này phục vụ cho việc tự ôn tập, nghiên cứu và học tập cá nhân. Nghiêm cấm sử dụng để thương mại hóa hoặc nhượng lại cho bên thứ ba khi chưa có sự đồng ý chính thức từ phía FAST Consulting.</p>
                   </section>
                 </div>
               </div>

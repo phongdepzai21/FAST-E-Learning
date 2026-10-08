@@ -281,7 +281,7 @@ const VipUpgrade: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#007c76]/30 bg-[#007c76]/10 backdrop-blur-md">
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span className="text-xs md:text-sm font-black text-emerald-300 uppercase tracking-widest">
-              Gói Combo Đào Tạo Toàn Diện
+              Gói Combo Chuẩn Hóa Toàn Diện
             </span>
           </div>
 

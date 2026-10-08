@@ -129,6 +129,8 @@
   footer,
   select,
   input,
+  input[type="text"],
+  input[type="search"],
   button,
   .no-print,
   .screen-only,

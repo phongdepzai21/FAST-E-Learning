@@ -484,7 +484,7 @@ export const ComboManagement: React.FC = () => {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
               <Layers className="w-8 h-8 text-[#007c76] shrink-0" />
-              Hệ thống Quản lý Gói Combo Đào Tạo
+              Hệ thống Quản lý Gói Combo Học Liệu
             </h1>
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-extrabold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -828,7 +828,7 @@ export const ComboManagement: React.FC = () => {
                 </button>
                 <div>
                   <h2 className="text-lg sm:text-xl font-black text-gray-800 uppercase tracking-tight">
-                    {activeTab === 'add' ? 'Tạo Gói Combo Đào Tạo Mới' : `Chỉnh sửa Gói: ${title || 'Chưa đặt tên'}`}
+                    {activeTab === 'add' ? 'Tạo Gói Combo Chuyên Sâu Mới' : `Chỉnh sửa Gói: ${title || 'Chưa đặt tên'}`}
                   </h2>
                   <p className="text-gray-500 text-xs font-medium">
                     Điền các thông tin chi tiết, liên kết khóa học và cấu hình quyền lợi bên dưới

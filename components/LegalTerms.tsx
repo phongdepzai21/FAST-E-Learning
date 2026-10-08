@@ -24,7 +24,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
     { id: 'security', label: '7. Chính sách bảo mật', category: 'Riêng tư', keywords: 'https ssl mã hóa phiên đăng nhập rò rỉ cơ sở dữ liệu' },
     { id: 'intellectual-property', label: '8. Sở hữu trí tuệ', category: 'Bản quyền', keywords: 'video slide bài giảng câu hỏi test bản quyền logo fast' },
     { id: 'complaints', label: '9. Giải quyết khiếu nại', category: 'Hỗ trợ', keywords: 'khiếu nại quy trình email phản hồi bồi thường 12 giờ' },
-    { id: 'certificate', label: '10. Quy định về chứng nhận', category: 'Đào tạo', keywords: 'chứng nhận hoàn thành tốt nghiệp trắc nghiệm 80% văn bằng' },
+    { id: 'certificate', label: '10. Quy định về chứng nhận', category: 'Học tập & Tiêu chuẩn', keywords: 'chứng nhận hoàn thành tốt nghiệp trắc nghiệm 80% văn bằng' },
   ];
 
   const filteredSections = sections.filter(sec => 
@@ -125,7 +125,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">1.1. Thông tin pháp lý website</h3>
                     <p><strong>Tên website thương mại:</strong> FAST Elearning</p>
                     <p><strong>Địa chỉ tên miền:</strong> fastelearning.com.vn</p>
-                    <p><strong>Loại hình:</strong> Website thương mại điện tử cung ứng dịch vụ đào tạo & tư vấn trực tuyến</p>
+                    <p><strong>Loại hình:</strong> Website thương mại điện tử cung ứng dịch vụ học liệu & tư vấn trực tuyến</p>
                   </div>
 
                   <div className="space-y-2 pt-2">
@@ -166,7 +166,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <ul className="list-disc pl-5 space-y-1">
                       <li>Tài khoản cấp cho cá nhân học viên đăng ký, tuyệt đối không được chuyển nhượng, chia sẻ thông tin đăng nhập cho người khác sử dụng chung.</li>
                       <li>Nghiêm cấm hành vi bán lại quyền truy cập hoặc cấu hình một tài khoản dùng chung cho tập thể.</li>
-                      <li><strong>FAST Elearning sử dụng cơ chế bảo mật quét phiên đồng thời</strong>. Tài khoản phát hiện đăng nhập song song bất thường từ nhiều vị trí IP địa lý khác nhau sẽ bị hệ thống tự động khóa tạm thời để bảo vệ nội dung đào tạo.</li>
+                      <li><strong>FAST Elearning sử dụng cơ chế bảo mật quét phiên đồng thời</strong>. Tài khoản phát hiện đăng nhập song song bất thường từ nhiều vị trí IP địa lý khác nhau sẽ bị hệ thống tự động khóa tạm thời để bảo vệ nội dung bài giảng & học liệu.</li>
                     </ul>
                   </section>
 
@@ -202,7 +202,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                       FAST Elearning bán <strong>quyền truy cập trực tuyến không giới hạn thời gian (hoặc có giới hạn theo gói) vào nội dung bài giảng video và biểu mẫu chuẩn tương ứng</strong>.
                     </p>
                     <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl text-[#007c76] font-bold text-xs">
-                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa đào tạo kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Giấy chứng nhận". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
+                      ⚠️ LƯU Ý QUAN TRỌNG: Học phí 599.000 VNĐ (Ví dụ: Khóa HACCP TCVN) là để mua quyền tham gia khóa học kiến thức trực tuyến, KHÔNG bao gồm mua "bán sẵn Giấy chứng nhận". Học viên bắt buộc phải trải qua quá trình làm bài kiểm tra trắc nghiệm nghiêm túc đạt điều kiện tiêu chuẩn mới được cấp Giấy chứng nhận hoàn thành tương thích.
                     </div>
                   </section>
 
@@ -392,7 +392,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
 
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">8.2. Giới hạn quyền sử dụng</h3>
-                    <p>Học viên chỉ được quyền sử dụng các tài nguyên đào tạo này phục vụ cho việc tự ôn tập, nghiên cứu và học tập cá nhân. Nghiêm cấm sử dụng để thương mại hóa hoặc nhượng lại cho bên thứ ba khi chưa có sự đồng ý chính thức từ phía FAST Consulting.</p>
+                    <p>Học viên chỉ được quyền sử dụng các tài nguyên học liệu này phục vụ cho việc tự ôn tập, nghiên cứu và học tập cá nhân. Nghiêm cấm sử dụng để thương mại hóa hoặc nhượng lại cho bên thứ ba khi chưa có sự đồng ý chính thức từ phía FAST Consulting.</p>
                   </section>
                 </div>
               </div>

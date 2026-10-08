@@ -25,13 +25,13 @@ export const VAL_METHODS_LIST = [
   "Phỏng vấn & đánh giá nhận thức (Interview)",
   "Kiểm tra hình ảnh / video khắc phục (Photo/Video)",
   "Lấy mẫu test nhanh / kiểm nghiệm (Sampling/Test)",
-  "Kiểm tra tem / chứng chỉ hiệu chuẩn (Calibration)",
+  "Kiểm tra tem / giấy chứng nhận hiệu chuẩn (Calibration)",
   "Tái đánh giá tại cơ sở (Follow-up Audit)",
   "Khác"
 ];
 
 export const IMP_METHODS_LIST = [
-  "Đào tạo lại & Đánh giá năng lực nhân sự (Re-training & Competency)",
+  "Huấn luyện nghiệp vụ & Đánh giá năng lực nhân sự (Re-training & Competency)",
   "Cập nhật & chuẩn hóa lại SOP/SSOP (Update Standard Operating Procedures)",
   "Bảo dưỡng phòng ngừa / Nâng cấp thiết bị (Preventive Maintenance / Upgrade)",
   "Tăng tần suất tự kiểm tra & giám sát nội bộ (Increase Inspection Frequency)",
@@ -297,8 +297,8 @@ export const ALL_AUDIT_ITEMS: AuditItem[] = [
   {"id": "PE05", "pillar": "FAST People", "group": "01 Con người", "std": "Nhà hàng có đủ nhân viên để đáp ứng nhu cầu phục vụ", "defect": "Nhân viên trong ca không đủ để đáp ứng nhu cầu phục vụ", "pts": 3, "type": "Minor", "ref": "Sys: 1"},
   {"id": "PE06", "pillar": "FAST People", "group": "01 Con người", "std": "Có người phụ trách được huấn luyện LAS đầy đủ và được phân công chính thức", "defect": "Không phân công người phụ trách hoặc người phụ trách không được huấn luyện LAS", "pts": 3, "type": "Minor", "ref": "Std"},
   {"id": "PE07", "pillar": "FAST People", "group": "01 Con người", "std": "Người phụ trách điều hành các hoạt động đáp ứng yêu cầu khách hàng", "defect": "Người phụ trách không điều hành các hoạt động để đáp ứng yêu cầu khách hàng", "pts": 3, "type": "Minor", "ref": "Std"},
-  {"id": "PE08", "pillar": "FAST People", "group": "01 Con người", "std": "Nhân viên điều phối chuyên biệt, đã qua đào tạo được xếp lịch trong suốt thời gian cao điểm", "defect": "Nhân viên điều phối chuyên biệt, đã qua đào tạo không được xếp lịch trong suốt thời gian cao điểm", "pts": 1, "type": "Observation", "ref": "Std"},
-  {"id": "PE09", "pillar": "FAST People", "group": "01 Con người", "std": "Có nhân viên phụ trách chuyên biệt, đã qua đào tạo được xếp lịch làm việc trong suốt thời gian đông khách?", "defect": "Không có nhân viên phụ trách chuyên biệt, đã qua đào tạo được xếp lịch làm việc trong suốt thời gian đông khách?", "pts": 1, "type": "Observation", "ref": "Std"},
+  {"id": "PE08", "pillar": "FAST People", "group": "01 Con người", "std": "Nhân viên điều phối chuyên biệt, đã qua huấn luyện được xếp lịch trong suốt thời gian cao điểm", "defect": "Nhân viên điều phối chuyên biệt, đã qua huấn luyện không được xếp lịch trong suốt thời gian cao điểm", "pts": 1, "type": "Observation", "ref": "Std"},
+  {"id": "PE09", "pillar": "FAST People", "group": "01 Con người", "std": "Có nhân viên phụ trách chuyên biệt, đã qua huấn luyện được xếp lịch làm việc trong suốt thời gian đông khách?", "defect": "Không có nhân viên phụ trách chuyên biệt, đã qua huấn luyện được xếp lịch làm việc trong suốt thời gian đông khách?", "pts": 1, "type": "Observation", "ref": "Std"},
   {"id": "PE10", "pillar": "FAST People", "group": "01 Con người", "std": "Lịch làm việc hàng tuần được thông báo", "defect": "Lịch làm việc hàng tuần không được thông báo", "pts": 1, "type": "Observation", "ref": "Std"},
 
   // Safety
@@ -309,9 +309,9 @@ export const ALL_AUDIT_ITEMS: AuditItem[] = [
   {"id": "S05", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Luôn thực hiện đúng quy định rửa tay(2.4)", "defect": "Không thực hiện đúng quy định rửa tay(2.4)", "pts": 3, "type": "Minor", "ref": "FSI: 2.4"},
   {"id": "S06", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Chỉ sử dụng bồn rửa tay để rửa tay (2.5)", "defect": "Sử dụng bồn rửa tay cho các mục đích khác (2.5)", "pts": 3, "type": "Minor", "ref": "FSI: 2.5"},
   {"id": "S07", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Thực hiện và lưu đầy đủ Food Safety Checklist theo yêu cầu (1.3)", "defect": "Không thực hiện và lưu Food Safety Checklist theo yêu cầu (1.3)", "pts": 3, "type": "Minor", "ref": "FSI: 1.3 | Sys: 1"},
-  {"id": "S08", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Quản lý và nhân viên phải có đủ chứng chỉ tập huấn vệ sinh an toàn thực phẩm, được lưu trữ đầy đủ và đáp ứng yêu cầu pháp luật (nếu có) (1.2)", "defect": "Quản lý hoặc nhân viên không có giấy chứng nhận tập huấn vệ sinh an toàn thực phẩm (1.2)", "pts": 1, "type": "Observation", "ref": "FSI: 1.2"},
+  {"id": "S08", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Quản lý và nhân viên phải có đủ giấy xác nhận tập huấn vệ sinh an toàn thực phẩm, được lưu trữ đầy đủ và đáp ứng yêu cầu pháp luật (nếu có) (1.2)", "defect": "Quản lý hoặc nhân viên không có giấy xác nhận tập huấn vệ sinh an toàn thực phẩm (1.2)", "pts": 1, "type": "Observation", "ref": "FSI: 1.2"},
   {"id": "S09", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Có quy định về sức khỏe của nhân viên và quản lý thông báo đầy đủ cho nhân viên hiểu quy định về sức khỏe (1.6)", "defect": "Không có quy định về sức khỏe của nhân viên hoặc quản lý không thông báo cho nhân viên hiểu quy định về sức khỏe (1.6)", "pts": 1, "type": "Observation", "ref": "FSI: 1.6"},
-  {"id": "S10", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Có tài liệu huấn luyện/chứng chỉ huấn luyện an toàn thực phẩm cho nhân viên, các tài liệu và chứng chỉ đều được cập nhật (1.5)", "defect": "Không có tài liệu huấn luyện an toàn thực phẩm cho nhân viên hoặc không có chứng chỉ/chứng chỉ không được cập nhật (1.5)", "pts": 1, "type": "Observation", "ref": "FSI: 1.5"},
+  {"id": "S10", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Có tài liệu huấn luyện/giấy xác nhận huấn luyện an toàn thực phẩm cho nhân viên, các tài liệu và xác nhận đều được cập nhật (1.5)", "defect": "Không có tài liệu huấn luyện an toàn thực phẩm cho nhân viên hoặc không có xác nhận/xác nhận không được cập nhật (1.5)", "pts": 1, "type": "Observation", "ref": "FSI: 1.5"},
   {"id": "S11", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Duy trì và thực hiện việc kiểm tra pest control hàng tuần Weekly Pest Walks theo yêu cầu (1.4)", "defect": "Không duy trì và thực hiện việc kiểm tra pest control hàng tuần Weekly Pest Walks theo yêu cầu (1.4)", "pts": 3, "type": "Minor", "ref": "FSI: 1.4"},
   {"id": "S12", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Lưu đầy đủ biên bản kiểm tra của cơ quan y tế theo quy định và báo cáo đầy đủ cho QA (1.1)", "defect": "Không lưu biên bản kiểm tra của cơ quan y tế theo quy định hoặc không báo cáo cho QA (1.1)", "pts": 1, "type": "Observation", "ref": "FSI: 1.1"},
   {"id": "S13", "pillar": "FAST Safety", "group": "01 An toàn", "std": "Thuốc có đầy đủ tem nhãn và được bảo quản đúng cách (4.1)", "defect": "Thuốc có không đầy đủ tem nhãn hoặc không được bảo quản đúng cách (4.1)", "pts": 1, "type": "Observation", "ref": "FSI: 4.1"},

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Search, Clipboard, FileText, Database, Plus, Trash2, Edit } from 'lucide-react';
 import { db as firestoreDb, auth } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -109,7 +109,7 @@ const CHECKLIST_DOCS: ChecklistDoc[] = [
     id: 'doc-5',
     stt: '05',
     name: 'Danh sách người sản xuất, kinh doanh đã được tập huấn kiến thức an toàn thực phẩm',
-    guidance: 'Danh sách trích ngang các nhân sự đã hoàn thành khóa đào tạo, kiểm tra kiến thức về an toàn vệ sinh thực phẩm có ký tên và xác nhận của chủ cơ sở.',
+    guidance: 'Danh sách trích ngang các nhân sự đã hoàn thành khóa tập huấn, kiểm tra kiến thức về an toàn vệ sinh thực phẩm có ký tên và xác nhận của chủ cơ sở.',
     badgeCount: '01 Bản chính',
     badgeType: 'original',
     statusText: 'Bắt buộc',
@@ -451,11 +451,16 @@ export const FastFoodSafetyManagement: React.FC = () => {
     };
 
     let updatedDb = [...db];
-    const existingIndex = updatedDb.findIndex(c => c.id === customerRecord.id);
+    const existingIndex = updatedDb.findIndex(c => 
+      c.id === customerRecord.id || 
+      (c.name && customerRecord.name && c.name.trim().toLowerCase() === customerRecord.name.trim().toLowerCase())
+    );
     if (existingIndex >= 0) {
-      updatedDb[existingIndex] = customerRecord;
+      updatedDb[existingIndex] = { ...customerRecord, id: updatedDb[existingIndex].id };
+      setCurrentCustomerId(updatedDb[existingIndex].id);
     } else {
       updatedDb.unshift(customerRecord);
+      setCurrentCustomerId(customerRecord.id);
     }
 
     persistDatabase(updatedDb);
@@ -466,21 +471,22 @@ export const FastFoodSafetyManagement: React.FC = () => {
     triggerGlobalSaveReset();
     
     setTimeout(() => {
-      showSuccessToast(`Đã lưu thành công hồ sơ toàn trình "${savedName}"!`, 5000, "Thành công");
+      showSuccessToast(`Đã lưu thành công hồ sơ "${savedName}"!`, 5000, "Thành công");
     }, 150);
   };
 
   const handleCreateNewCustomer = () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Tạo khách hàng mới",
-      message: "Tạo hồ sơ khách hàng mới? Form nhập và checklist sẽ được làm mới hoàn toàn.",
-      onConfirm: () => {
-        resetForm();
-        setSyncStatus('Đã tạo mới');
-        showSuccessToast("Đã khởi tạo biểu mẫu mới.");
-      }
-    });
+    resetForm();
+    const freshId = 'cust_' + Date.now();
+    setCurrentCustomerId(freshId);
+    setSyncStatus('Đã tạo mới');
+    showSuccessToast("Đã làm mới biểu mẫu, sẵn sàng nhập hồ sơ mới!", 3500);
+    const formEl = document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const firstInput = formEl.querySelector('input') as HTMLInputElement;
+      if (firstInput) setTimeout(() => firstInput.focus(), 300);
+    }
   };
 
   const handleLoadCustomerToActive = (id: string) => {
@@ -504,8 +510,8 @@ export const FastFoodSafetyManagement: React.FC = () => {
     setChecklist(found.checklist || {});
 
     setSyncStatus('Đang xem: ' + found.name);
-    const formEl = document.querySelector('.customer-profile-card');
-    if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+    const formEl = document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleDeleteCustomerRecord = (id: string) => {
@@ -613,7 +619,7 @@ FAST CONSULTING trân trọng gửi Quý khách Danh mục hồ sơ pháp lý c�
 
 5. DANH SÁCH NHÂN SỰ ĐÃ TẬP HUẤN KIẾN THỨC AN TOÀN THỰC PHẨM
    • Số lượng: 01 bản chính (Có chữ ký và đóng dấu của chủ cơ sở).
-   • Yêu cầu: FAST hỗ trợ tài liệu đào tạo, bộ đề kiểm tra và biểu mẫu chuẩn theo quy định.
+   • Yêu cầu: FAST hỗ trợ tài liệu tập huấn, bộ đề kiểm tra và biểu mẫu chuẩn theo quy định.
 
 LƯU Ý NGHIỆP VỤ TỪ FAST CONSULTING:
 - Quý khách chỉ cần chuẩn bị 01 bộ hồ sơ giấy tờ.
@@ -655,12 +661,34 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
     setOpenSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
-  // KPI Calculations
-  const totalCount = db.length;
-  const draftCount = db.filter(c => c.status === 'Đang chuẩn bị hồ sơ' || (c.status || '').includes('chuẩn bị')).length;
-  const submittedCount = db.filter(c => c.status === 'Đã nộp Sở - Chờ thẩm định').length;
-  const inspectCount = db.filter(c => c.status === 'Khác').length;
-  const completedCount = db.filter(c => c.status === 'Đã cấp Giấy chứng nhận ATTP' || (c.status || '').includes('Đã cấp') || (c.status || '').includes('hoàn thành')).length;
+  // Deduplicate records to strictly prevent double counting or duplicate display
+  const uniqueDb = useMemo(() => {
+    const seen = new Set<string>();
+    const result: typeof db = [];
+    for (const item of db) {
+      if (!item) continue;
+      const key = item.id || (item.name ? item.name.trim().toLowerCase() : Math.random().toString());
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    }
+    return result;
+  }, [db]);
+
+  // KPI Calculations - Strictly mutually exclusive based on unique records
+  const totalCount = uniqueDb.length;
+  const draftCount = uniqueDb.filter(c => c.status === 'Đang chuẩn bị hồ sơ').length;
+  const submittedCount = uniqueDb.filter(c => c.status === 'Đã nộp Sở - Chờ thẩm định').length;
+  const auditedCount = uniqueDb.filter(c => c.status === 'Đã thẩm định' || c.status === 'Đã thẩm định đạt').length;
+  const completedCount = uniqueDb.filter(c => c.status === 'Đã cấp Giấy chứng nhận ATTP').length;
+  const inspectCount = uniqueDb.filter(c => 
+    c.status !== 'Đang chuẩn bị hồ sơ' && 
+    c.status !== 'Đã nộp Sở - Chờ thẩm định' && 
+    c.status !== 'Đã thẩm định' && 
+    c.status !== 'Đã thẩm định đạt' && 
+    c.status !== 'Đã cấp Giấy chứng nhận ATTP'
+  ).length;
 
   const checkedCount = Object.values(checklist).filter(Boolean).length;
   const percentComplete = Math.round((checkedCount / 5) * 100);
@@ -743,36 +771,42 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
         </div>
 
-        {/* CRM Dashboard KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* CRM Dashboard KPI Cards - 6 Column Grid With ĐÃ THẨM ĐỊNH */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           <div className="bg-gradient-to-b from-teal-50/60 to-white p-4 rounded-2xl border border-teal-500/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-teal-800">TỔNG KHÁCH HÀNG / ORDER</div>
-            <div className="text-3xl font-black text-teal-900 my-1">{totalCount}</div>
-            <div className="text-[11px] font-semibold text-teal-700/80">Hồ sơ trong hệ thống</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-teal-800">TỔNG KHÁCH HÀNG</div>
+            <div className="text-2xl sm:text-3xl font-black text-teal-900 my-1">{totalCount}</div>
+            <div className="text-[11px] font-semibold text-teal-700/80">Toàn bộ hồ sơ CRM</div>
           </div>
 
           <div className="bg-gradient-to-b from-amber-50/60 to-white p-4 rounded-2xl border border-amber-400/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-amber-800">ĐANG CHUẨN BỊ HỒ SƠ</div>
-            <div className="text-3xl font-black text-amber-700 my-1">{draftCount}</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-amber-800">ĐANG CHUẨN BỊ</div>
+            <div className="text-2xl sm:text-3xl font-black text-amber-700 my-1">{draftCount}</div>
             <div className="text-[11px] font-semibold text-amber-700/80">Chưa nộp Sở</div>
           </div>
 
           <div className="bg-gradient-to-b from-sky-50/60 to-white p-4 rounded-2xl border border-blue-400/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (ĐẾM NGƯỢC 20N)</div>
-            <div className="text-3xl font-black text-blue-700 my-1">{submittedCount}</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-blue-800">ĐÃ NỘP SỞ (20N)</div>
+            <div className="text-2xl sm:text-3xl font-black text-blue-700 my-1">{submittedCount}</div>
             <div className="text-[11px] font-semibold text-blue-700/80">Đang thụ lý hồ sơ</div>
+          </div>
+
+          <div className="bg-gradient-to-b from-indigo-50/70 to-white p-4 rounded-2xl border-2 border-indigo-400/50 shadow-sm transition-transform hover:scale-[1.02]">
+            <div className="text-[10px] font-black uppercase tracking-wider text-indigo-900">ĐÃ THẨM ĐỊNH</div>
+            <div className="text-2xl sm:text-3xl font-black text-indigo-700 my-1">{auditedCount}</div>
+            <div className="text-[11px] font-semibold text-indigo-700/80">Đã qua đoàn thẩm định</div>
+          </div>
+
+          <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm transition-transform hover:scale-[1.02]">
+            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800">ĐÃ CẤP GCN</div>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-700 my-1">{completedCount}</div>
+            <div className="text-[11px] font-semibold text-emerald-700/80">Cơ sở hợp pháp đạt chuẩn</div>
           </div>
 
           <div className="bg-gradient-to-b from-purple-50/60 to-white p-4 rounded-2xl border border-purple-400/30 shadow-sm transition-transform hover:scale-[1.02]">
             <div className="text-[10px] font-black uppercase tracking-wider text-purple-800">HỒ SƠ KHÁC</div>
-            <div className="text-3xl font-black text-purple-700 my-1">{inspectCount}</div>
-            <div className="text-[11px] font-semibold text-purple-700/80">Các hồ sơ bổ sung khác</div>
-          </div>
-
-          <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-800">ĐÃ CẤP GIẤY CHỨNG NHẬN</div>
-            <div className="text-3xl font-black text-emerald-700 my-1">{completedCount}</div>
-            <div className="text-[11px] font-semibold text-emerald-700/80">Cơ sở hợp pháp đạt chuẩn</div>
+            <div className="text-2xl sm:text-3xl font-black text-purple-700 my-1">{inspectCount}</div>
+            <div className="text-[11px] font-semibold text-purple-700/80">Cần bổ sung / Khác</div>
           </div>
         </div>
 
@@ -781,7 +815,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           <div className="p-4 bg-gray-50 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
             <div className="flex items-center gap-2 font-bold text-sm text-[#005c56] uppercase tracking-wide">
               <Database className="w-4 h-4 text-[#005c56]" />
-              Cơ sở dữ liệu theo dõi toàn trình (FAST CRM - ATTP)
+              Cơ Sở Dữ Liệu Theo Dõi Toàn Trình (ATTP)
             </div>
             <div className="flex gap-2">
               <button onClick={handleExportToExcel} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1">
@@ -791,7 +825,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 Sao Lưu JSON
               </button>
               <button onClick={handleCreateNewCustomer} className="px-3.5 py-1.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" /> Tạo Hồ Sơ Khách Mới
+                <Plus className="w-3.5 h-3.5" /> Tạo Khách Mới
               </button>
             </div>
           </div>
@@ -819,14 +853,14 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {db.length === 0 ? (
+                {uniqueDb.length === 0 ? (
                   <tr>
                     <td colSpan={16} className="p-8 text-center text-gray-400 font-medium">
-                      Chưa có dữ liệu khách hàng nào trong FAST CRM. Hãy điền thông tin và nhấn "Lưu Vào Thống Kê" ở form dưới.
+                      Chưa có dữ liệu khách hàng nào trong hệ thống. Hãy điền thông tin và nhấn "Lưu Vào Thống Kê" ở form dưới.
                     </td>
                   </tr>
                 ) : (
-                  db.map((c, index) => {
+                  uniqueDb.map((c, index) => {
                     const isActive = c.id === currentCustomerId;
                     let pillBg = 'bg-amber-50 text-amber-700 border-amber-200';
                     if ((c.status || '').includes('Đã nộp')) pillBg = 'bg-blue-50 text-blue-700 border-blue-200';
@@ -879,12 +913,12 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
         </div>
 
         {/* Form nhập liệu & Hồ sơ chi tiết */}
-        <div className="bg-white p-6 rounded-2xl border-2 border-[#005c56]/30 shadow-xs space-y-4">
+        <div id="attp-customer-form" className="customer-profile-card bg-white p-6 rounded-2xl border-2 border-[#005c56]/30 shadow-xs space-y-4">
           <div className="flex flex-wrap items-center justify-between border-b border-dashed border-gray-200 pb-3 gap-2">
             <div className="flex items-center gap-2">
               <Clipboard className="w-5 h-5 text-[#005c56]" />
               <h2 className="text-sm font-black uppercase text-[#005c56] tracking-wide">
-                Cập Nhật Hồ Sơ Khách Hàng (FAST CRM - ATTP)
+                Cập Nhật Thông Tin Khách Hàng (ATTP)
               </h2>
             </div>
             <span className="text-[11.5px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 flex items-center gap-1">
@@ -961,9 +995,10 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
-                  <option value="Khác">🟣 Khác</option>
+                  <option value="Đã thẩm định">🟣 Đã thẩm định (Đạt kiểm tra thực tế)</option>
                   <option value="Đã cấp Giấy chứng nhận ATTP">✅ Đã cấp Giấy chứng nhận ATTP</option>
                   <option value="Cần khắc phục cơ sở">🔴 Cần bổ sung / Khắc phục cơ sở</option>
+                  <option value="Khác">⚪ Khác</option>
                 </select>
               </div>
             </div>
@@ -1036,7 +1071,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
         </div>
 
         {/* Global Toolbar */}
-        <div className="bg-[#fafcfc] p-4 rounded-2xl border border-gray-200 flex flex-wrap justify-between items-center gap-4">
+        <div className="bg-[#fafcfc] p-4 rounded-2xl border border-gray-200 flex flex-wrap justify-between items-center gap-4 print:hidden no-print">
           <div className="relative flex-1 min-w-[260px] max-w-md">
             <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
             <input
@@ -1488,6 +1523,38 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </tr>
         </tbody>
       </table>
+
+      {/* Confirmation Dialog Modal */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 print:hidden">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#005c56] flex items-center justify-center mx-auto text-xl font-bold">
+              ?
+            </div>
+            <h3 className="text-base font-black uppercase tracking-tight text-gray-900">{confirmDialog.title}</h3>
+            <p className="text-xs text-gray-600 font-semibold leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="flex-1 py-2.5 px-4 bg-[#005c56] hover:bg-[#00423e] text-white font-bold rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

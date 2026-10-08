@@ -716,7 +716,7 @@ export const FastStandardsAudit: React.FC = () => {
                         value={st.note} 
                         onCommit={(val) => handleNoteChange(item.id, val, item.type)}
                         placeholder={item.type === 'Observation' ? 'Ghi chú / nhận xét...' : 'Nhập bằng chứng (tự động ghi Lỗi)...'} 
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white text-gray-900 font-medium"
                       />
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <button 
@@ -765,11 +765,11 @@ export const FastStandardsAudit: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
                 <ShieldCheck className="w-4 h-4 text-white/80" />
-                FAST CONSULTING &bull; DÀNH RIÊNG QUẢN TRỊ VIÊN
+                QUẢN TRỊ VIÊN &bull; CHUYÊN GIA ĐÁNH GIÁ
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-              FAST SERVICE
+              Đánh Giá &amp; Thẩm Định Tiêu Chuẩn FSA
             </h1>
             <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
               Đánh giá toàn diện 8 trụ cột Vận hành &amp; An toàn thực phẩm (265 tiêu chuẩn chuẩn hóa ISO &amp; HACCP Codex).
@@ -1295,7 +1295,7 @@ export const FastStandardsAudit: React.FC = () => {
           )}
 
           {/* Findings Filter Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-4 print:hidden no-print">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-gray-400" />
               <span className="text-xs font-black uppercase text-gray-800 tracking-wider">Danh Sách Điểm Không Phù Hợp &amp; CAPA</span>

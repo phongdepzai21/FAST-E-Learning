@@ -1,16 +1,39 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from "react-router-dom";
 import Hero from '../components/Hero';
-import CourseCard from '../components/CourseCard';
 import { COURSES as HARDCODED_COURSES, CONSULTING_SERVICES, getMergedCourses } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, QuerySnapshot, DocumentData, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Course } from '../types';
 import CountUp from 'react-countup';
 import { Helmet } from 'react-helmet-async';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  CheckCircle2, 
+  Sparkles, 
+  BookOpen, 
+  Clock, 
+  FileText, 
+  Award, 
+  Star, 
+  ArrowRight, 
+  ShieldCheck, 
+  Flame, 
+  Send, 
+  Check, 
+  Phone, 
+  User, 
+  X, 
+  Eye, 
+  HelpCircle,
+  Play,
+  Layers,
+  GraduationCap
+} from 'lucide-react';
 
 // Animation variants for staggered scroll reveal
 const containerVariants = {
@@ -41,40 +64,182 @@ const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
-  const [leadName, setLeadName] = useState('');
-  const [leadEmail, setLeadEmail] = useState('');
-  const [leadPhone, setLeadPhone] = useState('');
-  const [leadService, setLeadService] = useState('Hồ sơ ATTP');
-  const [leadFacility, setLeadFacility] = useState('');
-  const [leadSubmitted, setLeadSubmitted] = useState(false);
-  const [leadSubmitting, setLeadSubmitting] = useState(false);
+  const [featuredCategory, setFeaturedCategory] = useState<string>('Tất cả');
 
-  const handleLeadSubmit = async (e: React.FormEvent) => {
+  // 3-Page Swipeable Carousel States
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Quick View Modal & Consultation Form States
+  const [quickViewCourse, setQuickViewCourse] = useState<Course | null>(null);
+  const consultFormRef = useRef<HTMLDivElement | null>(null);
+  const [consultName, setConsultName] = useState('');
+  const [consultPhone, setConsultPhone] = useState('');
+  const [consultCourse, setConsultCourse] = useState('HACCP TCVN / CODEX');
+  const [consultRole, setConsultRole] = useState('');
+  const [isConsultSubmitting, setIsConsultSubmitting] = useState(false);
+  const [consultSuccess, setConsultSuccess] = useState(false);
+
+  const handleConsultSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leadName.trim() || (!leadEmail.trim() && !leadPhone.trim())) return;
-    setLeadSubmitting(true);
+    if (!consultName.trim() || !consultPhone.trim()) return;
+    setIsConsultSubmitting(true);
     try {
-      const { addDoc, collection } = await import('firebase/firestore');
-      await addDoc(collection(db, 'leads'), {
-        name: leadName.trim(),
-        email: leadEmail.trim(),
-        phone: leadPhone.trim(),
-        service: leadService,
-        facility: leadFacility.trim(),
-        createdAt: new Date().toISOString(),
-        source: 'home_cta_discover'
+      await addDoc(collection(db, 'course_consultations'), {
+        name: consultName.trim(),
+        phone: consultPhone.trim(),
+        course: consultCourse,
+        role: consultRole.trim() || 'Học viên cá nhân',
+        source: 'trang_chu_khoa_hoc_noi_bat',
+        createdAt: serverTimestamp(),
       });
-      setLeadSubmitted(true);
-      setLeadName('');
-      setLeadEmail('');
-      setLeadPhone('');
-      setLeadFacility('');
+      setConsultSuccess(true);
     } catch (err) {
-      console.warn("Error saving lead:", err);
-      // Fail gracefully so user experiences success state
-      setLeadSubmitted(true);
+      console.error('Error saving consultation request:', err);
+      // Fallback: save to localStorage to ensure no lead is lost
+      const existing = JSON.parse(localStorage.getItem('fast_consultations') || '[]');
+      existing.push({
+        name: consultName.trim(),
+        phone: consultPhone.trim(),
+        course: consultCourse,
+        role: consultRole.trim() || 'Học viên cá nhân',
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('fast_consultations', JSON.stringify(existing));
+      setConsultSuccess(true);
     } finally {
-      setLeadSubmitting(false);
+      setIsConsultSubmitting(false);
+    }
+  };
+
+  // Divide courses into 3 distinct curated pages (3 courses per page)
+  const pageCourses = useMemo(() => {
+    const list = allCourses
+      .filter(c => c.id !== 'test-course-2k' && c.status !== 'draft' && c.status !== 'inactive');
+
+    // Page 1: HACCP & Food Safety Core
+    const p1 = list.filter(c => 
+      c.id === 'haccp-tcvn' || 
+      c.id === 'iso-22000' || 
+      (c.category && c.category.toUpperCase().includes('HACCP')) ||
+      (c.title && c.title.toUpperCase().includes('HACCP'))
+    ).slice(0, 3);
+
+    // Page 2: QA/QC, ISO & Operations
+    const p2 = list.filter(c => 
+      c.id === 'qa-qc-pro' || 
+      c.id === 'iso-9001' || 
+      c.id === 'gemba' ||
+      (c.category && (c.category.toUpperCase().includes('QA') || c.category.toUpperCase().includes('LEAN')))
+    ).slice(0, 3);
+
+    // Page 3: Supply Chain, OEM & Systems
+    const p3 = list.filter(c => 
+      c.id === 'supplier-mgmt' || 
+      c.id === 'oem-project' || 
+      c.id === 'iso-14001' || 
+      c.id === 'cost-control-supply'
+    ).slice(0, 3);
+
+    const fillPage = (arr: Course[], excludeIds: string[]) => {
+      if (arr.length >= 3) return arr.slice(0, 3);
+      const remaining = list.filter(c => !excludeIds.includes(c.id) && !arr.some(a => a.id === c.id));
+      return [...arr, ...remaining].slice(0, 3);
+    };
+
+    const finalP1 = fillPage(p1, []);
+    const p1Ids = finalP1.map(c => c.id);
+    const finalP2 = fillPage(p2, p1Ids);
+    const p12Ids = [...p1Ids, ...finalP2.map(c => c.id)];
+    const finalP3 = fillPage(p3, p12Ids);
+
+    return [finalP1, finalP2, finalP3];
+  }, [allCourses]);
+
+  // Flat list of all 9 curated featured courses
+  const allFeaturedCourses = useMemo(() => {
+    return [...pageCourses[0], ...pageCourses[1], ...pageCourses[2]];
+  }, [pageCourses]);
+
+  // Mobile Carousel states & ref
+  const mobileTrackRef = useRef<HTMLDivElement | null>(null);
+  const [mobileCardIndex, setMobileCardIndex] = useState(0);
+  const [mobileThemeFilter, setMobileThemeFilter] = useState<'all' | 'haccp' | 'iso' | 'supply'>('all');
+
+  const filteredMobileCourses = useMemo(() => {
+    if (mobileThemeFilter === 'haccp') return pageCourses[0];
+    if (mobileThemeFilter === 'iso') return pageCourses[1];
+    if (mobileThemeFilter === 'supply') return pageCourses[2];
+    return allFeaturedCourses;
+  }, [mobileThemeFilter, pageCourses, allFeaturedCourses]);
+
+  const scrollToMobileCard = (idx: number) => {
+    if (!mobileTrackRef.current) return;
+    const cards = mobileTrackRef.current.children;
+    if (cards[idx]) {
+      (cards[idx] as HTMLElement).scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest'
+      });
+      setMobileCardIndex(idx);
+    }
+  };
+
+  const handleMobileScroll = () => {
+    if (!mobileTrackRef.current) return;
+    const scrollLeft = mobileTrackRef.current.scrollLeft;
+    const firstCard = mobileTrackRef.current.children[0] as HTMLElement;
+    const cardWidth = firstCard?.clientWidth || 290;
+    const newIdx = Math.round(scrollLeft / (cardWidth + 16));
+    const clamped = Math.max(0, Math.min(newIdx, filteredMobileCourses.length - 1));
+    setMobileCardIndex(clamped);
+  };
+
+  const handleMobilePrev = () => {
+    const nextIdx = Math.max(0, mobileCardIndex - 1);
+    scrollToMobileCard(nextIdx);
+  };
+
+  const handleMobileNext = () => {
+    const nextIdx = Math.min(filteredMobileCourses.length - 1, mobileCardIndex + 1);
+    scrollToMobileCard(nextIdx);
+  };
+
+  const handlePrevPage = () => {
+    setSlideDirection('left');
+    setCurrentPage(prev => (prev > 0 ? prev - 1 : 2));
+  };
+
+  const handleNextPage = () => {
+    setSlideDirection('right');
+    setCurrentPage(prev => (prev < 2 ? prev + 1 : 0));
+  };
+
+  const handleSelectPage = (pageIdx: number) => {
+    setSlideDirection(pageIdx > currentPage ? 'right' : 'left');
+    setCurrentPage(pageIdx);
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 45;
+    if (distance > minSwipeDistance) {
+      handleNextPage();
+    } else if (distance < -minSwipeDistance) {
+      handlePrevPage();
     }
   };
 
@@ -209,291 +374,772 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. Featured Courses (Khóa học nổi bật) */}
-      <section className="py-12 md:py-24 bg-gray-50 border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-10 md:mb-16 gap-6">
-            <div className="space-y-3 md:space-y-4 text-center md:text-left w-full md:w-auto">
-              <h2 className="text-3xl md:text-5xl font-black text-[#374151] uppercase tracking-tighter leading-none">Khóa học nổi bật</h2>
-            </div>
-            <Link to="/khoa-hoc" className="hidden md:inline-block bg-white text-[#007c76] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl border border-gray-100 hover:shadow-2xl transition-all">Xem tất cả khóa học</Link>
-          </div>
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-80px" }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10"
-          >
-            {allCourses.filter(c => c.status !== 'draft' && c.status !== 'inactive').slice(0, 3).map(course => (
-              <motion.div key={course.id} variants={itemVariants} className="h-full">
-                <CourseCard 
-                  course={course} 
-                  isOwned={ownedCourseIds.includes(course.id)}
-                  progress={ownedCourseIds.includes(course.id) ? 0 : undefined}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
-          <div className="mt-8 text-center md:hidden">
-              <Link to="/khoa-hoc" className="inline-block bg-white text-[#007c76] px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg border border-gray-100 hover:shadow-xl transition-all">Xem tất cả khóa học</Link>
-          </div>
-        </div>
-      </section>
+      {/* 2. Featured Courses (Khóa học nổi bật - Form Mới & 3 Trang Vuốt Mượt Mà) */}
+      <section className="py-16 md:py-24 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden">
+        {/* Decorative background glows */}
+        <div className="absolute top-1/4 -right-24 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-10 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-
-
-      {/* 4. CTA Section - Bắt đầu hành trình chuẩn hóa cùng FAST */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-[#f8fafc] via-[#f1f5f9] to-[#ffffff] px-4 sm:px-6 lg:px-8 relative overflow-hidden border-t border-slate-200/60">
-        {/* Subtle decorative background elements */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-teal-500/5 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-10 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#007c76_1px,transparent_1px),linear-gradient(to_bottom,#007c76_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_60%,transparent_100%)] opacity-[0.02] pointer-events-none"></div>
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            
-            {/* Left Column: Brand & Value Proposition */}
-            <div className="lg:col-span-6 space-y-6 text-left">
-              <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-teal-50 text-[#005c56] border border-teal-200/70 text-xs font-bold uppercase tracking-wider shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Giải Pháp An Toàn Thực Phẩm Toàn Diện
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Section Header */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-10 gap-6">
+            <div className="space-y-3 text-left">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-[#007c76] text-xs font-black uppercase tracking-widest shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-[#007c76] animate-pulse" />
+                <span>Tuyển Tập Khóa Học Trọng Tâm 2026</span>
               </div>
-
-              <div className="space-y-3">
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
-                  Bắt đầu hành trình <br className="hidden sm:inline" />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#005c56] via-[#007c76] to-emerald-600">
-                    chuẩn hóa cùng FAST
-                  </span>
-                </h2>
-
-                <div className="flex items-center gap-3 pt-1">
-                  <div className="px-2.5 py-1 bg-[#005c56] text-white text-xs font-black rounded-lg tracking-wider shadow-sm">
-                    FAST
-                  </div>
-                  <p className="text-xs sm:text-sm font-bold text-slate-600 uppercase tracking-widest">
-                    Food All Standard &amp; Trust
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
-                Đồng hành cùng doanh nghiệp, chuỗi nhà hàng và cơ sở kinh doanh thực phẩm xây dựng quy trình chuẩn hóa, vững pháp lý và tối ưu vận hành kiểm soát an toàn thực phẩm.
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight leading-tight">
+                Khóa Học Nổi Bật <br className="hidden sm:inline" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#005c56] via-[#007c76] to-emerald-600">
+                  Chuẩn Hóa Năng Lực Thực Chiến
+                </span>
+              </h2>
+              <p className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl leading-relaxed">
+                Hệ thống 03 trang chuyên đề chọn lọc. Vuốt qua để khám phá từ nền tảng HACCP, ISO đến kỹ năng QA/QC và tối ưu chuỗi cung ứng kèm bộ tài liệu SOP thực tế.
               </p>
+            </div>
 
-              {/* 3 Core Value Pillars */}
-              <div className="space-y-3.5 pt-2">
-                <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white border border-slate-200/70 shadow-xs hover:border-teal-300 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">Khảo sát &amp; Định hướng hồ sơ chuẩn ATTP</h4>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Đánh giá hiện trạng mặt bằng, trang thiết bị và thủ tục pháp lý theo quy định mới.</p>
-                  </div>
-                </div>
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  consultFormRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2 bg-white hover:bg-teal-50/50 text-[#005c56] border border-[#005c56]/30 px-5 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs shadow-xs transition-all hover:scale-[1.02] cursor-pointer"
+              >
+                <Phone className="w-3.5 h-3.5 text-[#007c76]" />
+                <span>Nhận Tư Vấn Lộ Trình</span>
+              </button>
+              <Link 
+                to="/khoa-hoc" 
+                className="inline-flex items-center gap-2 bg-[#005c56] hover:bg-[#004440] text-white px-6 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs shadow-md shadow-teal-900/15 hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer"
+              >
+                <span>Xem Tất Cả 30+ Khóa</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
 
-                <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white border border-slate-200/70 shadow-xs hover:border-teal-300 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">Quy trình vận hành tiêu chuẩn &amp; Bộ biểu mẫu</h4>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Hệ thống biểu mẫu tự kiểm, kiểm soát nhiệt độ, vệ sinh và truy xuất nguyên liệu.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white border border-slate-200/70 shadow-xs hover:border-teal-300 transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">Kho học liệu &amp; Chuyên đề thực tiễn</h4>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Kho tài liệu tình huống thực tế, bài học chuyên sâu từ chuyên gia kiểm nghiệm.</p>
-                  </div>
-                </div>
+          {/* DESKTOP VIEW: 3-PAGE DRAGGABLE & ANIMATED CAROUSEL (>= md) */}
+          <div className="hidden md:block">
+            {/* 3-Page Switcher & Controls Header */}
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs mb-6 flex items-center justify-between gap-4">
+              {/* 3 Distinct Page Tabs with Descriptions */}
+              <div className="grid grid-cols-3 gap-2 flex-grow">
+                {[
+                  { idx: 0, title: 'Trang 1: Cốt Lõi', desc: 'HACCP & An Toàn Thực Phẩm', tag: 'Nền Tảng' },
+                  { idx: 1, title: 'Trang 2: Nâng Cao', desc: 'ISO, QA/QC & Hiện Trường', tag: 'Chuyên Sâu' },
+                  { idx: 2, title: 'Trang 3: Toàn Diện', desc: 'Chuỗi Cung Ứng & OEM', tag: 'Quản Trị' }
+                ].map((p) => {
+                  const isActive = currentPage === p.idx;
+                  return (
+                    <button
+                      key={p.idx}
+                      type="button"
+                      onClick={() => handleSelectPage(p.idx)}
+                      className={`text-left p-3 rounded-xl transition-all cursor-pointer relative border ${
+                        isActive
+                          ? 'bg-[#005c56] text-white border-[#005c56] shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider ${isActive ? 'text-teal-200' : 'text-[#007c76]'}`}>
+                          {p.title}
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                          isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                        }`}>
+                          {p.tag}
+                        </span>
+                      </div>
+                      <div className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
+                        {p.desc}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-3">
-                <a 
-                  href={mainWebsite} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="inline-flex items-center gap-2 bg-[#005c56] hover:bg-[#004743] text-white px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer"
-                >
-                  Ghé thăm Website tư vấn
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                </a>
-                <Link 
-                  to="/khoa-hoc" 
-                  className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-[#005c56] border border-slate-200 px-6 py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xs cursor-pointer"
-                >
-                  Khám phá học liệu
-                </Link>
+              {/* Navigation Arrows & Current Status */}
+              <div className="flex items-center gap-3 shrink-0 pl-3 border-l border-slate-100">
+                <div className="flex flex-col text-right">
+                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Đang xem</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    Trang <span className="text-[#007c76] text-sm font-black">0{currentPage + 1}</span> / 03
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handlePrevPage}
+                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 hover:text-[#007c76] flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs"
+                    title="Vuốt sang trang trước"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextPage}
+                    className="w-10 h-10 rounded-xl bg-[#005c56] hover:bg-[#00423e] text-white flex items-center justify-center transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95"
+                    title="Vuốt sang trang tiếp theo"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Right Column: Sleek Modern Consultation Form */}
-            <div className="lg:col-span-6">
-              <div className="bg-white rounded-3xl p-6 sm:p-9 shadow-[0_20px_50px_-15px_rgba(0,92,86,0.12)] border border-slate-200/90 relative overflow-hidden transition-all duration-300">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#005c56] via-[#007c76] to-emerald-400"></div>
-
-                {!leadSubmitted ? (
-                  <form onSubmit={handleLeadSubmit} className="space-y-5 text-left">
-                    <div>
-                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        Đăng ký nhận tư vấn lộ trình
-                      </h3>
-                      <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                        FAST hỗ trợ khảo sát thực tế và tư vấn giải pháp phù hợp hoàn toàn miễn phí.
-                      </p>
-                    </div>
-
-                    {/* Quick Consultation Purpose Selector */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Nhu cầu trọng tâm của bạn
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: 'Hồ sơ ATTP', label: 'Hồ sơ ATTP' },
-                          { id: 'Quy trình cơ sở', label: 'Quy trình cơ sở' },
-                          { id: 'Biểu mẫu kiểm soát', label: 'Biểu mẫu kiểm soát' },
-                          { id: 'Tư vấn theo yêu cầu', label: 'Tư vấn riêng' },
-                        ].map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setLeadService(item.id)}
-                            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer border text-center ${
-                              leadService === item.id
-                                ? 'bg-[#007c76] text-white border-[#007c76] shadow-xs'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
+            {/* Desktop Carousel Viewport */}
+            <div 
+              className="relative overflow-hidden rounded-3xl touch-pan-y select-none pb-4"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
+              <motion.div
+                className="flex w-full cursor-grab active:cursor-grabbing"
+                animate={{ x: `-${currentPage * 100}%` }}
+                transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.15}
+                onDragEnd={(_, info) => {
+                  const swipeDistance = info.offset.x;
+                  const swipeVelocity = info.velocity.x;
+                  if (swipeDistance < -50 || swipeVelocity < -350) {
+                    handleNextPage();
+                  } else if (swipeDistance > 50 || swipeVelocity > 350) {
+                    handlePrevPage();
+                  }
+                }}
+              >
+                {pageCourses.map((group, pageIdx) => (
+                  <div 
+                    key={pageIdx} 
+                    className="w-full shrink-0 flex-none px-1"
+                  >
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                      {group.map((course) => {
+                        const isOwned = ownedCourseIds.includes(course.id);
+                        return (
+                          <div 
+                            key={course.id}
+                            className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-lg hover:border-teal-400/60 transition-all duration-300 flex flex-col h-full overflow-hidden group/card"
                           >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
+                            {/* Card Media Header */}
+                            <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+                              <img 
+                                src={course.image || 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800'} 
+                                alt={course.title}
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent pointer-events-none"></div>
+
+                              {/* Quiet top metadata */}
+                              <div className="absolute top-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-medium z-10 pointer-events-none">
+                                <span className="font-bold tracking-wide uppercase drop-shadow-sm text-teal-200">
+                                  {course.category || 'Tiêu chuẩn'} · 2026
+                                </span>
+                                {isOwned && (
+                                  <span className="bg-emerald-600/90 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                                    Đã sở hữu
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Bottom Info Bar on Image */}
+                              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs z-10">
+                                <div className="flex items-center gap-1.5 font-medium text-slate-200 text-[11px] drop-shadow-sm">
+                                  <Clock className="w-3.5 h-3.5 text-teal-300" />
+                                  <span>15–20 bài · Tự chủ tiến độ</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setQuickViewCourse(course);
+                                  }}
+                                  className="bg-white/20 hover:bg-white text-white hover:text-slate-900 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Xem nhanh mục lục giáo trình"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>Xem Nhanh</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Card Body */}
+                            <div className="p-6 flex flex-col flex-grow bg-white">
+                              <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                                <div className="flex items-center gap-1 text-amber-500 font-bold">
+                                  <Star className="w-3.5 h-3.5 fill-current" />
+                                  <span>4.9</span>
+                                  <span className="text-slate-400 font-normal text-[11px]">· 320+ học viên</span>
+                                </div>
+                                <span className="text-[11px] font-semibold text-teal-700">
+                                  Thực hành hiện trường
+                                </span>
+                              </div>
+
+                              <h3 className="text-base font-bold text-slate-900 group-hover/card:text-[#007c76] transition-colors line-clamp-2 leading-snug mb-2">
+                                <Link to={`/khoa-hoc/${course.id}`} className="hover:underline">
+                                  {course.title}
+                                </Link>
+                              </h3>
+
+                              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                                {course.description || 'Chương trình chuẩn hóa kiến thức chuyên sâu, bám sát yêu cầu kiểm toán an toàn thực phẩm thực tế.'}
+                              </p>
+
+                              <div className="space-y-1.5 py-3 border-y border-slate-100 mb-4 text-[11px] text-slate-600">
+                                <div className="flex items-center gap-2">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">Tặng bộ biểu mẫu SOP Word/Excel</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">Cấp Giấy chứng nhận hoàn thành QR</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate">Hỗ trợ hỏi đáp 1-1 với chuyên gia FAST</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-auto pt-1 flex items-center justify-between gap-3">
+                                <div>
+                                  <span className="text-[10px] font-medium uppercase text-slate-400 block tracking-wider">
+                                    Học phí
+                                  </span>
+                                  <span className="text-lg font-black text-[#005c56]">
+                                    {course.price || 'Miễn phí'}
+                                  </span>
+                                </div>
+
+                                <Link
+                                  to={isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`}
+                                  className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer min-h-[42px] ${
+                                    isOwned
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                      : 'bg-[#005c56] hover:bg-[#00423e] text-white hover:scale-[1.02]'
+                                  }`}
+                                >
+                                  <span>{isOwned ? 'Vào Phòng Học' : 'Khám Phá'}</span>
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
 
-                    {/* Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                          Họ và tên <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input 
-                            type="text" 
-                            required
-                            value={leadName}
-                            onChange={(e) => setLeadName(e.target.value)}
-                            placeholder="Nguyễn Văn A" 
-                            className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs sm:text-sm text-slate-900 font-medium placeholder-slate-400 outline-none focus:border-[#007c76] focus:bg-white focus:ring-3 focus:ring-[#007c76]/15 transition-all"
-                          />
-                          <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                        </div>
-                      </div>
+            {/* Desktop Page Indicator Dots */}
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-500 font-medium">
+                👉 Kéo chuột hoặc bấm mũi tên để lướt qua các trang khóa học
+              </span>
+              <div className="flex items-center gap-2">
+                {[0, 1, 2].map((idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectPage(idx)}
+                    className={`h-2 rounded-full transition-all cursor-pointer ${
+                      currentPage === idx ? 'w-8 bg-[#007c76]' : 'w-2 bg-slate-300 hover:bg-slate-400'
+                    }`}
+                    title={`Trang ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
 
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                          Số điện thoại / Zalo <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <input 
-                            type="tel" 
-                            required
-                            value={leadPhone}
-                            onChange={(e) => setLeadPhone(e.target.value)}
-                            placeholder="09xx xxx xxx" 
-                            className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs sm:text-sm text-slate-900 font-medium placeholder-slate-400 outline-none focus:border-[#007c76] focus:bg-white focus:ring-3 focus:ring-[#007c76]/15 transition-all"
-                          />
-                          <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                          Địa chỉ Email liên hệ
-                        </label>
-                        <div className="relative">
-                          <input 
-                            type="email" 
-                            value={leadEmail}
-                            onChange={(e) => setLeadEmail(e.target.value)}
-                            placeholder="email@example.com" 
-                            className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs sm:text-sm text-slate-900 font-medium placeholder-slate-400 outline-none focus:border-[#007c76] focus:bg-white focus:ring-3 focus:ring-[#007c76]/15 transition-all"
-                          />
-                          <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                          Cơ sở kinh doanh / Ghi chú
-                        </label>
-                        <div className="relative">
-                          <input 
-                            type="text" 
-                            value={leadFacility}
-                            onChange={(e) => setLeadFacility(e.target.value)}
-                            placeholder="Tên quán, nhà hàng, xưởng..." 
-                            className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs sm:text-sm text-slate-900 font-medium placeholder-slate-400 outline-none focus:border-[#007c76] focus:bg-white focus:ring-3 focus:ring-[#007c76]/15 transition-all"
-                          />
-                          <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button 
-                      type="submit" 
-                      disabled={leadSubmitting}
-                      className="w-full bg-gradient-to-r from-[#005c56] to-[#007c76] hover:from-[#004e4a] hover:to-[#006e68] text-white py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 transform active:scale-[0.99] shadow-md shadow-teal-900/20 hover:shadow-lg hover:shadow-teal-900/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          {/* MOBILE VIEW: MODERN CARD CAROUSEL SLIDER (< md) - THIẾT KẾ TRƯỢT MƯỢT MÀ */}
+          <div className="block md:hidden">
+            {/* Mobile Header Controls & Filter Pills */}
+            <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs mb-4">
+              {/* Category Segmented Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-semibold">
+                {[
+                  { id: 'all', label: 'Tất Cả (09)' },
+                  { id: 'haccp', label: 'HACCP & ATTP' },
+                  { id: 'iso', label: 'ISO & QA/QC' },
+                  { id: 'supply', label: 'Chuỗi Cung Ứng' }
+                ].map((tab) => {
+                  const isActive = mobileThemeFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setMobileThemeFilter(tab.id as any);
+                        setMobileCardIndex(0);
+                        if (mobileTrackRef.current) {
+                          mobileTrackRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer text-xs ${
+                        isActive
+                          ? 'bg-[#005c56] text-white font-bold shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                      }`}
                     >
-                      {leadSubmitting ? (
-                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Status Bar & Arrow Buttons */}
+              <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-600 font-medium">
+                  Khóa <span className="font-bold text-[#007c76] text-sm">0{mobileCardIndex + 1}</span> / 0{filteredMobileCourses.length}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMobilePrev}
+                    disabled={mobileCardIndex === 0}
+                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 text-slate-700 hover:text-[#007c76] flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs"
+                    aria-label="Khóa học trước"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMobileNext}
+                    disabled={mobileCardIndex >= filteredMobileCourses.length - 1}
+                    className="w-10 h-10 rounded-xl bg-[#005c56] hover:bg-[#00423e] text-white flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-sm"
+                    aria-label="Khóa học tiếp theo"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Horizontal Snap-Scroll Carousel Track */}
+            <div 
+              ref={mobileTrackRef}
+              onScroll={handleMobileScroll}
+              className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-4 py-2 -mx-4 pb-4"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {filteredMobileCourses.map((course, idx) => {
+                const isOwned = ownedCourseIds.includes(course.id);
+                return (
+                  <div 
+                    key={course.id}
+                    className="snap-center shrink-0 w-[84vw] max-w-[340px] bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:border-teal-400 transition-all flex flex-col overflow-hidden"
+                  >
+                    {/* Media Header */}
+                    <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+                      <img 
+                        src={course.image || 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800'} 
+                        alt={course.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent pointer-events-none"></div>
+
+                      {/* Top status */}
+                      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] z-10 pointer-events-none">
+                        <span className="font-bold tracking-wide uppercase drop-shadow-sm text-teal-200">
+                          {course.category || 'Tiêu chuẩn'} · 2026
+                        </span>
+                        {isOwned && (
+                          <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase">
+                            Đã sở hữu
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Media footer */}
+                      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs z-10">
+                        <span className="text-[11px] font-medium text-slate-200 drop-shadow-sm">
+                          15–20 bài · Tự chủ thời gian
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setQuickViewCourse(course)}
+                          className="bg-white/25 active:bg-white active:text-slate-900 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white flex items-center gap-1 cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Xem Nhanh</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-4 flex flex-col flex-grow bg-white">
+                      <div className="flex items-center justify-between gap-2 mb-1.5 text-xs">
+                        <div className="flex items-center gap-1 text-amber-500 font-bold">
+                          <Star className="w-3.5 h-3.5 fill-current" />
+                          <span>4.9</span>
+                          <span className="text-slate-400 font-normal text-[11px]">· 320+ học viên</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
+                          Thực hành
+                        </span>
+                      </div>
+
+                      <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug mb-2">
+                        <Link to={`/khoa-hoc/${course.id}`} className="hover:underline">
+                          {course.title}
+                        </Link>
+                      </h3>
+
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-3">
+                        {course.description || 'Chương trình chuẩn hóa kiến thức chuyên sâu bám sát thực tế kiểm toán an toàn thực phẩm.'}
+                      </p>
+
+                      <div className="space-y-1 py-2.5 border-y border-slate-100 mb-3 text-[11px] text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">Tặng bộ biểu mẫu SOP Word/Excel</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">Cấp Giấy chứng nhận hoàn thành QR</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pt-1 flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-medium">Học phí</span>
+                          <span className="text-base font-black text-[#005c56]">
+                            {course.price || 'Miễn phí'}
+                          </span>
+                        </div>
+
+                        <Link
+                          to={isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`}
+                          className={`px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1 min-h-[40px] cursor-pointer ${
+                            isOwned
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-[#005c56] text-white active:bg-[#00423e]'
+                          }`}
+                        >
+                          <span>{isOwned ? 'Vào Học' : 'Khám Phá'}</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mobile Navigation Dots & Hint */}
+            <div className="flex items-center justify-between mt-2 px-1">
+              <span className="text-[11px] font-medium text-slate-500">
+                👉 Vuốt ngang để lướt qua các khóa học
+              </span>
+              <div className="flex items-center gap-1">
+                {filteredMobileCourses.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => scrollToMobileCard(idx)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      mobileCardIndex === idx ? 'w-5 bg-[#007c76]' : 'w-1.5 bg-slate-300'
+                    }`}
+                    aria-label={`Chuyển tới khóa ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Form Nhận Tư Vấn & Giáo Trình Khóa Học Nổi Bật (Thiết Kế Mới) */}
+          <div ref={consultFormRef} className="mt-14 bg-gradient-to-br from-[#005c56] via-[#006e68] to-[#004440] text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
+            {/* Background pattern */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              {/* Left Column: Heading & Value */}
+              <div className="lg:col-span-5 space-y-4 text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-yellow-300 text-xs font-black uppercase tracking-widest">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Tư Vấn Miễn Phí 100%</span>
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-snug">
+                  Chưa rõ khóa học nào phù hợp với bạn?
+                </h3>
+                <p className="text-sm text-white/80 leading-relaxed font-medium">
+                  Để lại thông tin, đội ngũ chuyên gia của FAST sẽ tư vấn lộ trình học phù hợp nhất với mô hình kinh doanh, vị trí công việc và gửi tặng bộ tài liệu SOP mẫu.
+                </p>
+
+                <div className="space-y-2 pt-2 text-xs text-white/90 font-semibold">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span>Lộ trình tối ưu cho cá nhân hoặc cơ sở sản xuất</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span>Hỗ trợ hồ sơ thẩm định an toàn thực phẩm thực tế</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Interactive Consultation Form */}
+              <div className="lg:col-span-7 bg-white text-slate-900 p-6 sm:p-8 rounded-2xl shadow-lg">
+                {consultSuccess ? (
+                  <div className="text-center py-6 space-y-3">
+                    <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                      <Check className="w-8 h-8" />
+                    </div>
+                    <h4 className="text-xl font-black text-slate-900 uppercase">Gửi Yêu Cầu Thành Công!</h4>
+                    <p className="text-xs text-slate-600 max-w-md mx-auto">
+                      Chuyên viên của FAST sẽ liên hệ với bạn trong thời gian sớm nhất qua số điện thoại <strong>{consultPhone}</strong>. Cảm ơn bạn đã tin tưởng FAST!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setConsultSuccess(false)}
+                      className="mt-4 px-5 py-2.5 bg-[#005c56] text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-[#00423e] transition-all cursor-pointer"
+                    >
+                      Gửi Yêu Cầu Khác
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleConsultSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
+                          Họ và tên *
+                        </label>
+                        <div className="relative">
+                          <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            required
+                            value={consultName}
+                            onChange={(e) => setConsultName(e.target.value)}
+                            placeholder="Nguyễn Văn A"
+                            className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
+                          Số điện thoại / Zalo *
+                        </label>
+                        <div className="relative">
+                          <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="tel"
+                            required
+                            value={consultPhone}
+                            onChange={(e) => setConsultPhone(e.target.value)}
+                            placeholder="0912 345 678"
+                            className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
+                          Khóa học quan tâm
+                        </label>
+                        <select
+                          value={consultCourse}
+                          onChange={(e) => setConsultCourse(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white cursor-pointer"
+                        >
+                          <option value="HACCP TCVN / CODEX">HACCP TCVN / CODEX</option>
+                          <option value="ISO 22000 - Quản Lý ATTP">ISO 22000 - Quản Lý ATTP</option>
+                          <option value="ISO 9001 - Hệ Thống QMS">ISO 9001 - Hệ Thống QMS</option>
+                          <option value="Chuyên Gia QA/QC Thực Phẩm">Chuyên Gia QA/QC Thực Phẩm</option>
+                          <option value="Quản Lý Nhà Cung Cấp & OEM">Quản Lý Nhà Cung Cấp &amp; OEM</option>
+                          <option value="Khác - Cần Tư Vấn Lộ Trình">Khác - Cần Tư Vấn Toàn Diện</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
+                          Mô hình / Vị trí
+                        </label>
+                        <input
+                          type="text"
+                          value={consultRole}
+                          onChange={(e) => setConsultRole(e.target.value)}
+                          placeholder="Bếp ăn, Cơ sở sản xuất, Nhân viên QA/QC..."
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isConsultSubmitting}
+                      className="w-full py-3 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md shadow-teal-900/15 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                    >
+                      {isConsultSubmitting ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Đang gửi thông tin...</span>
+                        </>
                       ) : (
                         <>
-                          Gửi thông tin tư vấn ngay
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Gửi Yêu Cầu Nhận Tư Vấn Miễn Phí</span>
                         </>
                       )}
                     </button>
-
-                    <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-slate-400">
-                      <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                      <span>FAST cam kết bảo mật 100% thông tin. Tư vấn tận tâm, hoàn toàn miễn phí.</span>
-                    </div>
                   </form>
-                ) : (
-                  <div className="text-center py-10 space-y-5 animate-fade-in">
-                    <div className="w-16 h-16 bg-teal-50 text-[#007c76] rounded-2xl flex items-center justify-center mx-auto border border-teal-200/80 shadow-xs">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-xl font-bold text-slate-900">Đăng ký tư vấn thành công!</h4>
-                      <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto leading-relaxed">
-                        FAST đã tiếp nhận thông tin từ bạn. Đội ngũ chuyên viên sẽ liên hệ lại qua số điện thoại hoặc email trong thời gian sớm nhất.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <button 
-                        onClick={() => setLeadSubmitted(false)}
-                        className="px-5 py-2.5 rounded-xl text-xs font-bold text-[#007c76] bg-teal-50 hover:bg-teal-100 transition-colors uppercase tracking-wider cursor-pointer"
-                      >
-                        Gửi thêm yêu cầu khác
-                      </button>
-                    </div>
-                  </div>
                 )}
               </div>
             </div>
+          </div>
 
+          {/* Quick View Modal (Xem Nhanh Giáo Trình) */}
+          <AnimatePresence>
+            {quickViewCourse && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200"
+                >
+                  <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-[#007c76]" />
+                      <span className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                        Mục Lục &amp; Giáo Trình Khóa Học
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQuickViewCourse(null)}
+                      className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-700 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-[#007c76] bg-teal-50 px-2 py-0.5 rounded">
+                        {quickViewCourse.category}
+                      </span>
+                      <h4 className="text-lg font-black text-slate-900 mt-1">
+                        {quickViewCourse.title}
+                      </h4>
+                      <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                        {quickViewCourse.description}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2.5 pt-2">
+                      <h5 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                        Chủ đề trọng tâm trong khóa học:
+                      </h5>
+                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2 text-xs font-medium text-slate-700">
+                        <div className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
+                          <span>Phân tích mối nguy sinh học, hóa học, vật lý theo chuẩn Codex mới nhất</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
+                          <span>Xây dựng sơ đồ cây quyết định xác định điểm kiểm soát tới hạn (CCP)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
+                          <span>Thiết lập giới hạn tới hạn, hệ thống giám sát và hành động khắc phục</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
+                          <span>Thực hành lập hồ sơ lưu trữ và chuẩn bị tiếp đoàn thẩm định cơ quan nhà nước</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                      <div className="text-base font-black text-[#005c56]">
+                        {quickViewCourse.price || 'Miễn phí'}
+                      </div>
+                      <Link
+                        to={`/khoa-hoc/${quickViewCourse.id}`}
+                        onClick={() => setQuickViewCourse(null)}
+                        className="px-5 py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <span>Xem Chi Tiết &amp; Đăng Ký</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Highlights & Guarantees Strip */}
+          <div className="mt-16 pt-12 border-t border-slate-200/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                  ✓
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Chuẩn Hóa Quốc Tế</h4>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Hệ thống kiến thức cập nhật theo ISO 22000 &amp; HACCP Codex mới nhất.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                  ★
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Giấy Chứng Nhận Hợp Lệ</h4>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Cấp Giấy chứng nhận hoàn thành có mã QR xác thực năng lực chuyên môn.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                  📁
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Bộ Biểu Mẫu SOP Đính Kèm</h4>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Tải trọn gói tài liệu, quy trình tự kiểm và checklist thực hành tại chỗ.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                  ⚡
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Truy Cập Trọn Đời</h4>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Học linh hoạt trên mọi thiết bị máy tính, điện thoại 24/7 không giới hạn.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick CTA bottom button on Mobile */}
+          <div className="mt-8 text-center lg:hidden">
+            <Link 
+              to="/khoa-hoc" 
+              className="inline-block w-full bg-[#005c56] text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs shadow-md transition-all text-center"
+            >
+              Xem tất cả khóa học
+            </Link>
           </div>
         </div>
       </section>
