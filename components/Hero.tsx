@@ -19,7 +19,7 @@ const Hero: React.FC = () => {
         src={`${heroBaseUrl}?fm=webp&fit=crop&q=50&w=1920`}
         srcSet={srcSet}
         sizes="100vw"
-        alt="Đào tạo An toàn thực phẩm chuyên nghiệp"
+        alt="Chuẩn hóa An toàn thực phẩm chuyên nghiệp"
         className="absolute inset-0 w-full h-full object-cover opacity-80"
         // OPTIMIZATION: Critical LCP element must be eager loaded
         loading="eager"
@@ -43,7 +43,7 @@ const Hero: React.FC = () => {
                 Nền Tảng
               </span>
               <span className="text-primary leading-none">
-                Đào Tạo
+                Vận Hành
               </span>
               <span className="text-white leading-none">
                 Chuyên Nghiệp

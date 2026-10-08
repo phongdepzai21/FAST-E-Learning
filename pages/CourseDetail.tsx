@@ -743,7 +743,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     <main className="min-h-screen bg-background pb-20 relative">
       <Helmet>
         <title>{course.title} | Học Viện FAST</title>
-        <meta name="description" content={course.description || "Tham gia khóa học đào tạo tiêu chuẩn ISO, HACCP chuyên sâu tại FAST Elearning để nâng tầm kiến thức và cải thiện kỹ năng chuyên môn."} />
+        <meta name="description" content={course.description || "Tham gia khóa học tiêu chuẩn ISO, HACCP chuyên sâu tại FAST Elearning để nâng tầm kiến thức và cải thiện kỹ năng chuyên môn."} />
         
         {/* OpenGraph Social sharing cards */}
         <meta property="og:type" content="website" />
@@ -765,7 +765,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             "@context": "https://schema.org",
             "@type": "Course",
             "name": course.title,
-            "description": course.description || "Khóa học đào tạo chất lượng cao của FAST Consulting.",
+            "description": course.description || "Khóa học chất lượng cao của FAST Consulting.",
             "provider": {
               "@type": "Organization",
               "name": "FAST Consulting",

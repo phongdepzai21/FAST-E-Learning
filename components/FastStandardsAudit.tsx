@@ -758,7 +758,7 @@ export const FastStandardsAudit: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner (Screen Only) */}
-      <div className="fast-audit-screen-only bg-gradient-to-r from-[#005c56] to-[#005c56] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+      <div className="fast-audit-screen-only bg-gradient-to-br from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
@@ -921,7 +921,7 @@ export const FastStandardsAudit: React.FC = () => {
               { id: 'cleanliness', title: 'FAST Cleanliness', count: 55, desc: 'Vệ sinh cơ sở, thiết bị & SSOP', gradient: 'from-teal-600 to-teal-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
               { id: 'hospitality', title: 'FAST Hospitality', count: 21, desc: 'Dịch vụ, văn hóa & trải nghiệm khách hàng', gradient: 'from-[#005c56] to-teal-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
               { id: 'maintenance', title: 'FAST Maintenance', count: 54, desc: 'Bảo trì thiết bị, cơ sở hạ tầng & kiểm định', gradient: 'from-teal-600 to-emerald-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
-              { id: 'people', title: 'FAST People', count: 10, desc: 'Đào tạo, nhân sự & phân công', gradient: 'from-emerald-500 to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
+              { id: 'people', title: 'FAST People', count: 10, desc: 'Huấn luyện, nhân sự & phân công', gradient: 'from-emerald-500 to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
               { id: 'product', title: 'FAST Product', count: 61, desc: 'Chất lượng, nhiệt độ, bảo quản & HSD', gradient: 'from-teal-600 to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
               { id: 'safety', title: 'FAST Safety', count: 19, desc: 'An toàn thực phẩm, CCP, bồn rửa tay & y tế', gradient: 'from-[#005c56] to-teal-700', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
               { id: 'speed', title: 'FAST Speed', count: 25, desc: 'Tốc độ phục vụ, điều phối & quản trị thời gian', gradient: 'from-teal-700 to-emerald-800', lightBg: 'bg-teal-50 border-teal-200', textAccent: 'text-[#005c56]', btnHover: 'hover:bg-[#005c56]' },
@@ -1076,7 +1076,7 @@ export const FastStandardsAudit: React.FC = () => {
           <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight">Trụ cột: FAST People</h2>
-              <p className="text-xs text-gray-500">10 tiêu chuẩn về đào tạo nhân viên, phân công ca làm việc, cẩm nang SOP</p>
+              <p className="text-xs text-gray-500">10 tiêu chuẩn về hướng dẫn nhân viên, phân công ca làm việc, cẩm nang SOP</p>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-xs font-bold text-gray-600">Lọc nhóm:</label>
@@ -1210,7 +1210,7 @@ export const FastStandardsAudit: React.FC = () => {
                 BÁO CÁO KẾT QUẢ ĐÁNH GIÁ HỆ THỐNG AN TOÀN THỰC PHẨM &amp; VẬN HÀNH
               </h2>
               <p className="text-xs text-gray-500 font-medium italic mt-1">
-                Bản quyền FAST CONSULTING - Food All Standards &amp; Training | Chuyên gia Đánh giá Trưởng: Dung Trần
+                Bản quyền FAST CONSULTING - Food All Standards &amp; Trust | Chuyên gia Đánh giá Trưởng: Dung Trần
               </p>
             </div>
 
@@ -1475,7 +1475,7 @@ export const FastStandardsAudit: React.FC = () => {
           {/* Chân trang thương hiệu theo ảnh đính kèm */}
           <div className="mt-12 pt-6 border-t border-gray-300 page-break-inside-avoid text-center space-y-1">
             <div className="text-[#005c56] font-black text-xs uppercase tracking-wider">
-              FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
+              FAST CONSULTING • FOOD ALL STANDARD &amp; TRUST
             </div>
             <div className="text-gray-700 text-[11px]">
               Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng

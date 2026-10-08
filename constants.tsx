@@ -43,7 +43,7 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
     icon: 'shield',
     features: [
       'Hồ sơ cấp Giấy chứng nhận cơ sở đủ điều kiện An toàn thực phẩm',
-      'Đào tạo kiến thức An toàn thực phẩm cho nhân viên',
+      'Chuẩn hóa kiến thức An toàn thực phẩm cho nhân sự',
       'Tư vấn thiết kế bếp ăn một chiều chuẩn quy định',
       'Kiểm soát nguồn gốc nguyên liệu đầu vào'
     ]
@@ -57,7 +57,7 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
       'Phân tích mối nguy và điểm kiểm soát tới hạn',
       'Xây dựng kế hoạch HACCP chi tiết',
       'Chuẩn hóa quy trình vận hành tiêu chuẩn (SOP)',
-      'Hỗ trợ đánh giá và cấp chứng chỉ quốc tế'
+      'Hỗ trợ đánh giá và công nhận đạt chuẩn quốc tế'
     ]
   }
 ];

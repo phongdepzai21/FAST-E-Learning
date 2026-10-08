@@ -572,14 +572,14 @@ export const FastFoodSafetyManagement: React.FC = () => {
     const originalTitle = document.title;
     const safeName = custName ? custName.replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_') : 'KhachHang';
     document.title = 'FAST_Danh_Muc_Ho_So_ATTP_' + safeName;
-    document.body.classList.add('print-client-checklist-only');
+    document.body.classList.add('printing-ad-checklist');
     
     setOpenSections(prev => ({ ...prev, 'sec-checklist': true }));
 
     window.print();
 
     setTimeout(() => {
-      document.body.classList.remove('print-client-checklist-only');
+      document.body.classList.remove('printing-ad-checklist');
       document.title = originalTitle;
     }, 1000);
   };
@@ -659,7 +659,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
   const totalCount = db.length;
   const draftCount = db.filter(c => c.status === 'Đang chuẩn bị hồ sơ' || (c.status || '').includes('chuẩn bị')).length;
   const submittedCount = db.filter(c => c.status === 'Đã nộp Sở - Chờ thẩm định').length;
-  const inspectCount = db.filter(c => c.status === 'Đã thẩm định' || c.status === 'Đã thẩm định đạt - Chờ cấp').length;
+  const inspectCount = db.filter(c => c.status === 'Khác').length;
   const completedCount = db.filter(c => c.status === 'Đã cấp Giấy chứng nhận ATTP' || (c.status || '').includes('Đã cấp') || (c.status || '').includes('hoàn thành')).length;
 
   const checkedCount = Object.values(checklist).filter(Boolean).length;
@@ -679,7 +679,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
       <div className="ad-profile-screen-only space-y-6">
         
         {/* Header Banner */}
-        <div className="bg-gradient-to-r from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
@@ -764,9 +764,9 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           <div className="bg-gradient-to-b from-purple-50/60 to-white p-4 rounded-2xl border border-purple-400/30 shadow-sm transition-transform hover:scale-[1.02]">
-            <div className="text-[10px] font-black uppercase tracking-wider text-purple-800">ĐÃ THẨM ĐỊNH</div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-purple-800">HỒ SƠ KHÁC</div>
             <div className="text-3xl font-black text-purple-700 my-1">{inspectCount}</div>
-            <div className="text-[11px] font-semibold text-purple-700/80">Đoàn kiểm tra chuẩn bị</div>
+            <div className="text-[11px] font-semibold text-purple-700/80">Các hồ sơ bổ sung khác</div>
           </div>
 
           <div className="bg-gradient-to-b from-emerald-50/60 to-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm transition-transform hover:scale-[1.02]">
@@ -962,7 +962,6 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
                   <option value="Khác">🟣 Khác</option>
-                  <option value="Đã thẩm định đạt - Chờ cấp">🟢 Đã thẩm định đạt - Chờ ký cấp Giấy</option>
                   <option value="Đã cấp Giấy chứng nhận ATTP">✅ Đã cấp Giấy chứng nhận ATTP</option>
                   <option value="Cần khắc phục cơ sở">🔴 Cần bổ sung / Khắc phục cơ sở</option>
                 </select>
@@ -1468,10 +1467,10 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 </div>
 
                 {/* Print Footer on Last Page Only */}
-                <div id="attp-print-footer" className="pt-3 border-t border-gray-300 mt-10 page-break-inside-avoid">
+                <div id="ad-print-footer" className="pt-3 border-t border-gray-300 mt-10 page-break-inside-avoid">
                   <div className="text-center space-y-1">
                     <div className="text-[#005c56] font-black text-[11px] uppercase tracking-wider">
-                      FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
+                      FAST CONSULTING • FOOD ALL STANDARD &amp; TRUST
                     </div>
                     <div className="text-gray-700 text-[10.5px]">
                       Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng

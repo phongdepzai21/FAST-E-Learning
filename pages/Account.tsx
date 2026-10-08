@@ -211,7 +211,7 @@ const BuyCoursesView: React.FC<{
         <div>
           <h3 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
             <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
-            Mua khóa học / Danh mục đào tạo
+            Mua khóa học / Danh mục học tập
           </h3>
           <p className="text-gray-500 text-sm font-medium mt-1">
             Chọn khóa học phù hợp với định hướng nghề nghiệp và chuẩn hóa kỹ năng của bạn.
@@ -1781,14 +1781,7 @@ const Account: React.FC = () => {
           {/* Main Content Area */}
           <main className="flex-1 overflow-y-auto custom-scrollbar bg-gradient-to-br from-[#005c56] to-[#007c76] print:bg-white print:overflow-visible print:p-0 print:m-0">
             <div className="p-4 md:p-8 lg:p-10 space-y-8 max-w-full w-full">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-white/10">
-                <div className="space-y-1">
-                  <h1 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tight">FAST &amp; Hồ Sơ</h1>
-                  <p className="text-xs md:text-sm text-teal-100/90 font-semibold leading-relaxed">
-                    Hồ sơ An toàn thực phẩm (ATTP), biểu mẫu đánh giá tự động (FSA), và kiểm soát chất lượng QC độc lập.
-                  </p>
-                </div>
-              </div>
+              {/* Removed redundant FAST & Hồ Sơ header as requested */}
 
               {/* Customer Database Master Search Bar */}
               <div className="relative w-full max-w-4xl">
@@ -1908,7 +1901,7 @@ const Account: React.FC = () => {
               </div>
 
               {/* Display area */}
-              <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] border border-teal-600/20 text-white rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
+              <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] border border-teal-600/20 text-slate-800 rounded-[40px] p-6 md:p-10 shadow-sm min-h-[500px] w-full">
                 {adminViewMode === 'fsa' && (
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">

@@ -679,7 +679,7 @@ LƯU Ý TỪ FAST CONSULTING:
 --------------------------------------------------
 THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 - Hotline FAST: 0927 002 668
-- FAST CONSULTING • Food All Standard & Training`;
+- FAST CONSULTING • Food All Standard & Trust`;
 
     navigator.clipboard.writeText(msg).then(() => {
       alert('Đã sao chép thành công tin nhắn danh mục hồ sơ! Bạn có thể dán (Paste) vào Zalo / Email để gửi ngay cho khách hàng.');
@@ -748,7 +748,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       {/* SCREEN VIEW (Hidden when printing checklist) */}
       <div className="ad-profile-screen-only space-y-6">
         {/* Header Banner */}
-        <div className="bg-gradient-to-r from-[#005c56] to-[#00423e] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#005c56] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
@@ -1529,7 +1529,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
               <div className="border-b-2 border-[#005c56] pb-3 mb-4 flex justify-between items-center">
               <div>
                 <div className="text-[11px] font-black uppercase text-[#005c56] tracking-wider">
-                  FAST CONSULTING &bull; FOOD ALL STANDARD & TRAINING
+                  FAST CONSULTING &bull; FOOD ALL STANDARD & TRUST
                 </div>
                 <h1 className="text-xl font-black text-gray-900 uppercase mt-0.5 tracking-tight">
                   BẢNG CHECKLIST HỒ SƠ THÔNG BÁO SẢN PHẨM QUẢNG CÁO
@@ -1657,7 +1657,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
               <footer id="ad-print-footer" className="pt-3 border-t border-gray-300">
                 <div className="text-center space-y-1">
                   <div className="text-[#005c56] font-black text-[11px] uppercase tracking-wider">
-                    FAST CONSULTING • FOOD ALL STANDARD &amp; TRAINING
+                    FAST CONSULTING • FOOD ALL STANDARD &amp; TRUST
                   </div>
                   <div className="text-gray-700 text-[10.5px]">
                     Dịch vụ tư vấn Doanh nghiệp và Tư vấn hệ thống Quản lý chất lượng
