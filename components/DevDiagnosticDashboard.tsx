@@ -33,7 +33,11 @@ import {
   Bell,
   Wifi,
   WifiOff,
-  HelpCircle
+  HelpCircle,
+  Upload,
+  Code,
+  Database,
+  Plus
 } from 'lucide-react';
 import { authDebugger, DiagnosticState, DiagnosticLogEntry, PromiseRecord } from '../utils/authDebugger';
 import { auth, db } from '../firebase';
@@ -47,7 +51,7 @@ const REQUIRED_DEV_PASSWORD = 'Family2515@';
 export const DevDiagnosticDashboard: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'sync' | 'control' | 'raw'>('stream');
+  const [activeTab, setActiveTab] = useState<'stream' | 'auth' | 'modals' | 'emailjs' | 'tester' | 'sync' | 'control' | 'raw' | 'html_import'>('stream');
   const [state, setState] = useState<DiagnosticState>(authDebugger.getState());
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -67,6 +71,387 @@ export const DevDiagnosticDashboard: React.FC = () => {
   const [notifType, setNotifType] = useState<'new' | 'updated' | 'approval'>('new');
   const [notifCourseTitle, setNotifCourseTitle] = useState<string>('Khóa học Quảng cáo Facebook Ads đỉnh cao');
   const [notifMessage, setNotifMessage] = useState<string>('Bài giảng số 5 vừa được cập nhật thêm tài liệu đính kèm.');
+
+  // Fast Dev: HACCP HTML Importer States
+  const [haccpHtmlInput, setHaccpHtmlInput] = useState<string>('');
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importedPreview, setImportedPreview] = useState<any[]>([]);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importMode, setImportMode] = useState<'append' | 'replace'>('append');
+
+  // Fast Dev: HACCP HTML Importer Helper
+  const parseHaccpHtmlHelper = (htmlString: string) => {
+    try {
+      const parser = new DOMParser();
+      const docParsed = parser.parseFromString(htmlString, 'text/html');
+
+      const extractedItems: any[] = [];
+      const extractedStates: Record<string, any> = {};
+
+      // 1. Try finding table rows <tr>
+      const rows = docParsed.querySelectorAll('tr');
+      if (rows && rows.length > 0) {
+        let counter = 1;
+        let currentCategory = 'Tiêu chuẩn từ Fast Dev';
+
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll('td, th');
+
+          // Section header detection with colspan
+          if (cells.length === 1 && (cells[0].getAttribute('colspan') || cells[0].tagName.toLowerCase() === 'th')) {
+            const headerText = cells[0].textContent?.trim() || '';
+            if (headerText.length > 3 && headerText.length < 120) {
+              currentCategory = headerText;
+              return;
+            }
+          }
+
+          if (cells.length >= 2) {
+            const firstText = cells[0].textContent?.trim() || '';
+            const secondText = cells[1].textContent?.trim() || '';
+            const thirdText = cells.length > 2 ? cells[2].textContent?.trim() || '' : '';
+
+            // Skip table header rows
+            const rowText = (row.textContent || '').toLowerCase();
+            if (
+              (rowText.includes('stt') && (rowText.includes('tiêu chuẩn') || rowText.includes('nội dung') || rowText.includes('yêu cầu'))) ||
+              (firstText.toLowerCase() === 'stt' || firstText.toLowerCase() === 'mã')
+            ) {
+              return;
+            }
+
+            let standard = '';
+            let code = '';
+            let category = currentCategory;
+            let isCcp = false;
+            let severity: 'Critical' | 'Major' | 'Minor' = 'Major';
+
+            // Detect Critical CCP
+            if (rowText.includes('ccp') || rowText.includes('điểm kiểm soát tới hạn') || rowText.includes('tới hạn')) {
+              isCcp = true;
+              severity = 'Critical';
+            }
+
+            if (cells.length >= 3 && secondText.length > 4) {
+              code = firstText && firstText.length < 15 ? firstText : (isCcp ? `CCP-${String(counter).padStart(2, '0')}` : `DEV-${String(counter).padStart(2, '0')}`);
+              standard = secondText;
+              if (thirdText && thirdText.length < 60 && !thirdText.toLowerCase().includes('đạt') && !thirdText.toLowerCase().includes('pass')) {
+                category = thirdText;
+              }
+            } else if (secondText.length > 3) {
+              code = firstText && firstText.length < 15 ? firstText : (isCcp ? `CCP-${String(counter).padStart(2, '0')}` : `DEV-${String(counter).padStart(2, '0')}`);
+              standard = secondText;
+            } else if (firstText.length > 5) {
+              code = isCcp ? `CCP-${String(counter).padStart(2, '0')}` : `DEV-${String(counter).padStart(2, '0')}`;
+              standard = firstText;
+            }
+
+            if (standard.length > 3) {
+              const checkbox = row.querySelector('input[type="checkbox"]');
+              const isChecked = checkbox
+                ? ((checkbox as HTMLInputElement).checked || checkbox.hasAttribute('checked'))
+                : (rowText.includes('đã đạt') || rowText.includes('đạt') || rowText.includes('pass') || rowText.includes('✓') || rowText.includes('[x]'));
+
+              if (!code || code.length > 15 || /^\d+$/.test(code)) {
+                code = isCcp ? `CCP-${String(counter).padStart(2, '0')}` : `DEV-${String(counter).padStart(2, '0')}`;
+              }
+
+              const itemId = `H-DEV-${counter}-${Date.now()}`;
+              extractedItems.push({
+                id: itemId,
+                code,
+                group: 'custom',
+                groupLabel: 'Danh mục nạp từ Fast Dev',
+                category: category.slice(0, 60),
+                standard: standard.replace(/\s+/g, ' ').trim(),
+                defectDesc: 'Không tuân thủ yêu cầu kiểm soát theo tiêu chuẩn HTML đã nạp từ Fast Dev.',
+                isCcp,
+                severity,
+                legalRef: isCcp ? 'TCVN/Codex CCP' : 'Biểu mẫu Fast Dev'
+              });
+
+              if (isChecked) {
+                extractedStates[itemId] = {
+                  status: 'pass',
+                  note: 'Đã tích chọn trong file HTML gốc',
+                  capa: ''
+                };
+              }
+
+              counter++;
+            }
+          }
+        });
+      }
+
+      // 2. If no table rows, check list items <li> or divs with checkboxes
+      if (extractedItems.length === 0) {
+        const listItems = docParsed.querySelectorAll('li, div.checklist-item, div.item, label');
+        let counter = 1;
+        listItems.forEach((el) => {
+          const text = el.textContent?.trim() || '';
+          if (text.length > 8 && text.length < 500) {
+            const checkbox = el.querySelector('input[type="checkbox"]');
+            const isChecked = checkbox ? ((checkbox as HTMLInputElement).checked || checkbox.hasAttribute('checked')) : false;
+            const isCcp = text.toLowerCase().includes('ccp') || text.toLowerCase().includes('tới hạn');
+            const code = isCcp ? `CCP-${String(counter).padStart(2, '0')}` : `IMP-${String(counter).padStart(2, '0')}`;
+            const itemId = `H-DEV-${counter}-${Date.now()}`;
+
+            extractedItems.push({
+              id: itemId,
+              code,
+              group: 'custom',
+              groupLabel: 'Danh mục nạp từ Fast Dev',
+              category: 'Mục kiểm tra từ HTML',
+              standard: text.replace(/\s+/g, ' ').trim(),
+              defectDesc: 'Chưa đạt yêu cầu theo danh mục kiểm tra từ Fast Dev.',
+              isCcp,
+              severity: isCcp ? 'Critical' : 'Major',
+              legalRef: 'File HTML đính kèm'
+            });
+
+            if (isChecked) {
+              extractedStates[itemId] = {
+                status: 'pass',
+                note: 'Tích chọn trong file',
+                capa: ''
+              };
+            }
+
+            counter++;
+          }
+        });
+      }
+
+      return { extractedItems, extractedStates };
+    } catch (e) {
+      console.error('[FastDev] Parse error:', e);
+      return { extractedItems: [], extractedStates: {} };
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setHaccpHtmlInput(content);
+        setImportStatus(`Đã đọc tệp "${file.name}" (${(file.size / 1024).toFixed(1)} KB). Hệ thống đang phân tích cấu trúc...`);
+        const { extractedItems } = parseHaccpHtmlHelper(content);
+        if (extractedItems.length > 0) {
+          setImportedPreview(extractedItems);
+          setImportStatus(`Đã đọc tệp "${file.name}" và bóc tách thành công ${extractedItems.length} mục kiểm tra. Hãy bấm "Đồng Bộ Vào FAST Service" để lưu.`);
+        }
+      }
+    };
+    reader.onerror = () => {
+      setImportStatus('Lỗi đọc tệp tin. Vui lòng thử lại hoặc mở file copy nội dung.');
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleLoadSampleHaccp = () => {
+    const sampleHtml = `<table border="1" style="width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr style="background: #007c76; color: white;">
+      <th>STT</th>
+      <th>Mã Tiêu Chuẩn</th>
+      <th>Nội Dung Kiểm Tra HACCP</th>
+      <th>Phân Loại / Công Đoạn</th>
+      <th>Kiểm Soát Tới Hạn (CCP)</th>
+      <th>Kết Quả Hiện Trường</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>CCP-01</td>
+      <td>Kiểm soát nhiệt độ gia nhiệt và thanh trùng tâm sản phẩm đạt tối thiểu 72°C trong 15 giây liên tục</td>
+      <td>Công đoạn gia nhiệt / Nấu chín</td>
+      <td>CCP (Điểm tới hạn)</td>
+      <td><input type="checkbox" checked /> Đạt</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>CCP-02</td>
+      <td>Kiểm tra thiết bị dò kim loại (Fe 1.5mm, Non-Fe 2.0mm, SUS 2.5mm) trước và sau mỗi ca sản xuất</td>
+      <td>Đóng gói & Rà kim loại</td>
+      <td>CCP (Điểm tới hạn)</td>
+      <td><input type="checkbox" checked /> Đạt</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>DEV-03</td>
+      <td>Nhiệt độ kho bảo quản đông duy trì liên tục ở mức &le; -18°C và có thiết bị ghi nhiệt độ tự động</td>
+      <td>Bảo quản lạnh & Đông</td>
+      <td>PRP / Tiêu chuẩn</td>
+      <td><input type="checkbox" /> Đang theo dõi</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>DEV-04</td>
+      <td>Nguồn nước sản xuất đạt quy chuẩn QCVN 01-1:2018/BYT, kiểm nghiệm định kỳ 6 tháng/lần đầy đủ chỉ tiêu</td>
+      <td>Cung cấp nước & Năng lượng</td>
+      <td>PRP / Vệ sinh</td>
+      <td><input type="checkbox" checked /> Đạt</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>DEV-05</td>
+      <td>Hồ sơ khám sức khỏe định kỳ và tập huấn kiến thức ATTP của 100% nhân viên trực tiếp tham gia sản xuất</td>
+      <td>Nhân sự & Sức khỏe</td>
+      <td>Tiêu chuẩn nhân sự</td>
+      <td><input type="checkbox" checked /> Đạt</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>CCP-03</td>
+      <td>Kiểm soát nồng độ Clo dư trong nước rửa rau củ quả duy trì ở ngưỡng 50 - 100 ppm</td>
+      <td>Sơ chế & Rửa nguyên liệu</td>
+      <td>CCP (Điểm tới hạn)</td>
+      <td><input type="checkbox" /> Chưa kiểm tra</td>
+    </tr>
+  </tbody>
+</table>`;
+    setHaccpHtmlInput(sampleHtml);
+    const { extractedItems } = parseHaccpHtmlHelper(sampleHtml);
+    setImportedPreview(extractedItems);
+    setImportStatus('Đã nạp mẫu HTML tiêu chuẩn HACCP Codex & TCVN (6 tiêu chuẩn, 3 điểm CCP tới hạn). Bấm "Đồng Bộ Vào FAST Service" để kích hoạt.');
+  };
+
+  const handlePreviewParse = () => {
+    if (!haccpHtmlInput.trim()) {
+      alert('Vui lòng dán mã HTML hoặc chọn tệp .html trước khi phân tích.');
+      return;
+    }
+    const { extractedItems } = parseHaccpHtmlHelper(haccpHtmlInput);
+    if (extractedItems.length === 0) {
+      setImportStatus('Không tìm thấy cấu trúc bảng <tr> hoặc danh sách <li> nào trong đoạn mã HTML này.');
+      return;
+    }
+    setImportedPreview(extractedItems);
+    setImportStatus(`Đã phân tích thành công ${extractedItems.length} mục kiểm tra. Hãy xem trước bảng bên dưới và bấm "Đồng Bộ Vào FAST Service" để lưu.`);
+  };
+
+  const handleClearCustomItems = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa toàn bộ danh mục tiêu chuẩn tùy chỉnh đã nạp từ HTML không? Bảng HACCP sẽ quay về trạng thái mặc định.')) {
+      return;
+    }
+    localStorage.removeItem('FAST_HACCP_CUSTOM_ITEMS_V1');
+    try {
+      const rawSession = localStorage.getItem('FAST_HACCP_ACTIVE_SESSION_V1');
+      const parsedSession = rawSession ? JSON.parse(rawSession) : {};
+      parsedSession.customItems = [];
+      localStorage.setItem('FAST_HACCP_ACTIVE_SESSION_V1', JSON.stringify(parsedSession));
+    } catch {}
+
+    try {
+      await setDoc(doc(db, 'fast_haccp_crm', 'active_session'), {
+        customItems: [],
+        active: { customItems: [] },
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {}
+
+    window.dispatchEvent(new CustomEvent('haccp_items_updated', {
+      detail: { items: [] }
+    }));
+
+    setImportedPreview([]);
+    setImportStatus('Đã xóa sạch danh mục tùy chỉnh. Hệ thống FAST Service đã trở về trạng thái tiêu chuẩn mặc định.');
+    authDebugger.addLog({
+      category: 'system',
+      level: 'info',
+      title: 'Fast Dev: Đã Xóa Danh Mục Tùy Chỉnh',
+      details: 'Đã xóa toàn bộ tiêu chuẩn nạp từ HTML và đồng bộ về Cloud Firestore.'
+    });
+  };
+
+  const handleParseAndImportHaccpHtml = async (mode: 'append' | 'replace' = 'append') => {
+    if (!haccpHtmlInput.trim()) {
+      alert('Vui lòng dán mã HTML hoặc chọn tệp .html trước khi thực hiện.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportStatus('Đang phân tích cú pháp HTML và chuẩn bị đồng bộ...');
+
+    try {
+      const { extractedItems, extractedStates } = parseHaccpHtmlHelper(haccpHtmlInput);
+
+      if (extractedItems.length === 0) {
+        setImportStatus('Không tìm thấy cấu trúc bảng/danh sách nào trong đoạn mã HTML này. Vui lòng kiểm tra thẻ <table>, <tr>, <td> hoặc <li>.');
+        setIsImporting(false);
+        return;
+      }
+
+      setImportedPreview(extractedItems);
+
+      // Determine final items to save
+      let finalCustomItems: any[] = [];
+      if (mode === 'append') {
+        let existing: any[] = [];
+        try {
+          const raw = localStorage.getItem('FAST_HACCP_CUSTOM_ITEMS_V1');
+          if (raw) existing = JSON.parse(raw);
+        } catch {}
+        finalCustomItems = [...existing, ...extractedItems];
+      } else {
+        finalCustomItems = extractedItems;
+      }
+
+      // 1. Save to LocalStorage
+      localStorage.setItem('FAST_HACCP_CUSTOM_ITEMS_V1', JSON.stringify(finalCustomItems));
+
+      // 2. Merge into active session
+      try {
+        const rawSession = localStorage.getItem('FAST_HACCP_ACTIVE_SESSION_V1');
+        const parsedSession = rawSession ? JSON.parse(rawSession) : {};
+        parsedSession.customItems = finalCustomItems;
+        parsedSession.itemsState = { ...(parsedSession.itemsState || {}), ...extractedStates };
+        localStorage.setItem('FAST_HACCP_ACTIVE_SESSION_V1', JSON.stringify(parsedSession));
+      } catch {}
+
+      // 3. Save to Cloud Firestore
+      try {
+        await setDoc(doc(db, 'fast_haccp_crm', 'active_session'), {
+          customItems: finalCustomItems,
+          itemsState: extractedStates,
+          active: {
+            customItems: finalCustomItems,
+            updatedAt: new Date().toISOString()
+          },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[FastDev] Firestore sync error:', err);
+      }
+
+      // 4. Dispatch event to FAST SERVICE
+      window.dispatchEvent(new CustomEvent('haccp_items_updated', {
+        detail: { items: finalCustomItems }
+      }));
+
+      authDebugger.addLog({
+        category: 'system',
+        level: 'success',
+        title: 'Fast Dev: Nạp Mã HTML HACCP Checklist',
+        details: `Đã bóc tách thành công ${extractedItems.length} mục tiêu chuẩn từ HTML và đồng bộ lên Cloud Firestore & FAST Service (${mode === 'append' ? 'Gộp thêm' : 'Thay thế'}).`,
+        payload: { count: extractedItems.length, mode, totalCustom: finalCustomItems.length }
+      });
+
+      setImportStatus(`Thành công! Đã nạp ${extractedItems.length} mục kiểm tra và đồng bộ thời gian thực lên Cloud Firestore & FAST Service.`);
+    } catch (err: any) {
+      console.error('[FastDev] HTML parsing error:', err);
+      setImportStatus(`Lỗi phân tích: ${err?.message || 'Không thể bóc tách HTML'}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const refreshUnlockedCourses = () => {
     const unlocked: string[] = [];
@@ -268,7 +653,18 @@ export const DevDiagnosticDashboard: React.FC = () => {
     if (e) e.preventDefault();
     if (passwordInput === REQUIRED_DEV_PASSWORD) {
       setPasswordError(null);
-      setDevUnlockStep('otp_choice');
+      setIsUnlocked(true);
+      setDevUnlockStep('password');
+      setPasswordInput('');
+      try {
+        sessionStorage.setItem('fast_dev_diag_unlocked', 'true');
+      } catch (err) {}
+      authDebugger.addLog({
+        category: 'system',
+        level: 'success',
+        title: 'Mở khóa Fast Dev',
+        details: 'Đã xác thực thành công quyền truy cập Fast Dev & Diagnostic Hub.'
+      });
     } else {
       setPasswordError('Mật khẩu không chính xác! Vui lòng thử lại.');
     }
@@ -364,6 +760,19 @@ export const DevDiagnosticDashboard: React.FC = () => {
     // Expose global console helper for convenience
     (window as any).openDevDiagnostic = () => setIsOpen(true);
     (window as any).closeDevDiagnostic = () => setIsOpen(false);
+    (window as any).openFastDevHtmlImport = () => {
+      setIsOpen(true);
+      setActiveTab('html_import');
+    };
+
+    const handleOpenFastDev = () => setIsOpen(true);
+    const handleOpenFastDevHtml = () => {
+      setIsOpen(true);
+      setActiveTab('html_import');
+    };
+
+    window.addEventListener('open_fast_dev', handleOpenFastDev);
+    window.addEventListener('open_fast_dev_html_import', handleOpenFastDevHtml);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for modifier (Ctrl/Meta + Shift)
@@ -413,10 +822,28 @@ export const DevDiagnosticDashboard: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('open_fast_dev', handleOpenFastDev);
+      window.removeEventListener('open_fast_dev_html_import', handleOpenFastDevHtml);
       delete (window as any).openDevDiagnostic;
       delete (window as any).closeDevDiagnostic;
+      delete (window as any).openFastDevHtmlImport;
     };
   }, []);
+
+  // Pre-load custom items from localStorage when tab is switched to html_import
+  useEffect(() => {
+    if (activeTab === 'html_import') {
+      try {
+        const raw = localStorage.getItem('FAST_HACCP_CUSTOM_ITEMS_V1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setImportedPreview(parsed);
+          }
+        }
+      } catch {}
+    }
+  }, [activeTab]);
 
   // Monitor network online/offline state
   useEffect(() => {
@@ -1180,6 +1607,23 @@ export const DevDiagnosticDashboard: React.FC = () => {
                     >
                       <Sliders className="w-3.5 h-3.5 text-amber-400" />
                       <span>Bảng Điều Khiển Dev</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('html_import')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        activeTab === 'html_import'
+                          ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <Code className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Nạp Mã HTML HACCP</span>
+                      {importedPreview.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-teal-900 text-teal-200 font-mono">
+                          {importedPreview.length}
+                        </span>
+                      )}
                     </button>
 
                     <button
@@ -2203,11 +2647,299 @@ export const DevDiagnosticDashboard: React.FC = () => {
                     </pre>
                   </div>
                 )}
+
+                {/* TAB 7: FAST DEV - NẠP MÃ HTML HACCP CHECKLIST & ĐỒNG BỘ FAST SERVICE */}
+                {activeTab === 'html_import' && (
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-100">
+                    {/* Header banner */}
+                    <div className="bg-gradient-to-r from-teal-950/60 via-slate-900/80 to-slate-950 border border-teal-500/30 rounded-2xl p-5 shadow-lg">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0 shadow-inner">
+                            <Code className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-black uppercase tracking-wider text-teal-200 font-mono">
+                                Fast Dev: Nạp Mã HTML HACCP Checklist & Đồng Bộ Dịch Vụ FAST
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-teal-500/20 text-teal-300 border border-teal-500/40 font-mono">
+                                LIVE SYNC
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                              Nhập mã nguồn HTML (dán trực tiếp hoặc tải tệp <code className="text-teal-300 font-mono">.html</code>). Hệ thống tự động bóc tách các dòng bảng biểu <code className="text-cyan-300 font-mono">&lt;tr&gt; &lt;td&gt;</code>, thẻ danh sách <code className="text-cyan-300 font-mono">&lt;li&gt;</code>, các điểm kiểm soát tới hạn <strong>CCP</strong> và trạng thái tích chọn ban đầu, sau đó đồng bộ thời gian thực vào <strong>FAST Service (HACCP Checklist)</strong> mà không làm thay đổi cấu trúc mã nguồn hay giao diện gốc.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                          <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 flex items-center gap-1.5">
+                            <Database className="w-3.5 h-3.5 text-teal-400" />
+                            <span>Đã lưu: </span>
+                            <strong className="text-teal-300">{importedPreview.length} mục</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Input card */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-cyan-400" />
+                          <label className="text-xs font-black uppercase tracking-wider text-slate-200 font-mono">
+                            Khung Nhập Mã HTML (HTML Source Code Input)
+                          </label>
+                        </div>
+
+                        {/* Quick action buttons */}
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {/* File input */}
+                          <label className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-teal-600/20 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Chọn Tệp .HTML Từ Máy</span>
+                            <input
+                              type="file"
+                              accept=".html,.htm,.txt"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={handleLoadSampleHaccp}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            title="Tải cấu trúc HTML mẫu chuẩn Codex & TCVN"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Mẫu HTML HACCP</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handlePreviewParse}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            title="Phân tích cú pháp trước khi đồng bộ"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Phân Tích Trước (Preview)</span>
+                          </button>
+
+                          {haccpHtmlInput && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHaccpHtmlInput('');
+                                setImportStatus(null);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-950 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 border border-slate-800 transition-all flex items-center gap-1 cursor-pointer"
+                              title="Xóa trắng mã HTML"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Xóa Trắng</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Textarea */}
+                      <div className="relative">
+                        <textarea
+                          value={haccpHtmlInput}
+                          onChange={(e) => setHaccpHtmlInput(e.target.value)}
+                          placeholder={`<!-- Dán toàn bộ mã nguồn HTML của biểu mẫu HACCP vào đây -->\n<!-- Ví dụ: <table border="1"> <tr> <th>STT</th> <th>Nội dung</th> </tr> <tr> <td>1</td> <td>Kiểm soát nhiệt độ gia nhiệt CCP-01</td> </tr> </table> -->\n<!-- Hoặc bấm nút 'Chọn Tệp .HTML Từ Máy' ở góc trên để nạp trực tiếp file haccp checklist.html -->`}
+                          rows={10}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-teal-400 rounded-xl p-3.5 font-mono text-xs text-teal-200/90 placeholder-slate-600 focus:outline-none transition-all leading-relaxed"
+                          spellCheck={false}
+                        />
+                        <div className="absolute right-3 bottom-3 text-[10px] text-slate-500 font-mono pointer-events-none bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+                          {haccpHtmlInput.length > 0 ? `${haccpHtmlInput.length.toLocaleString()} ký tự | ${haccpHtmlInput.split('\n').length} dòng` : 'Trống'}
+                        </div>
+                      </div>
+
+                      {/* Action Bar & Mode Selection */}
+                      <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-800/80">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">Chế độ nạp:</span>
+                          <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setImportMode('append')}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                importMode === 'append'
+                                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Gộp Thêm (Append)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setImportMode('replace')}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                importMode === 'replace'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              Thay Thế Toàn Bộ (Replace)
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {importedPreview.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleClearCustomItems}
+                              className="px-3 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                              title="Xóa toàn bộ các mục tiêu chuẩn đã nạp"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Xóa Danh Mục Tùy Chỉnh</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleParseAndImportHaccpHtml(importMode)}
+                            disabled={isImporting || !haccpHtmlInput.trim()}
+                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-mono"
+                          >
+                            {isImporting ? (
+                              <>
+                                <RotateCw className="w-4 h-4 animate-spin" />
+                                <span>Đang Đồng Bộ...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Database className="w-4 h-4" />
+                                <span>Đồng Bộ Vào FAST Service ({importMode === 'append' ? 'Append' : 'Replace'})</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Status feedback message */}
+                      {importStatus && (
+                        <div
+                          className={`p-3.5 rounded-xl border text-xs font-medium flex items-center gap-2.5 leading-relaxed ${
+                            importStatus.toLowerCase().includes('lỗi') || importStatus.toLowerCase().includes('không tìm thấy')
+                              ? 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                              : 'bg-teal-950/40 border-teal-500/40 text-teal-200'
+                          }`}
+                        >
+                          {importStatus.toLowerCase().includes('lỗi') || importStatus.toLowerCase().includes('không tìm thấy') ? (
+                            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
+                          )}
+                          <span>{importStatus}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Preview Table Section */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <Sliders className="w-4 h-4 text-teal-400" />
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-200 font-mono">
+                            Danh Sách Tiêu Chuẩn Nạp Từ HTML (Preview / Hiện Hữu)
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-teal-900/60 text-teal-300 border border-teal-700/50 font-mono font-bold">
+                            {importedPreview.length} mục
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-400 flex items-center gap-3 font-mono">
+                          <span className="flex items-center gap-1 text-red-400 font-bold">
+                            CCP Tới Hạn: {importedPreview.filter(it => it.isCcp || it.severity === 'Critical').length}
+                          </span>
+                          <span className="text-slate-600">|</span>
+                          <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                            Đã Tích Sẵn: {importedPreview.filter(it => it.defectDesc && it.defectDesc.includes('gốc') || it.code.startsWith('H-DEV-')).length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {importedPreview.length === 0 ? (
+                        <div className="py-12 px-4 rounded-xl border border-dashed border-slate-800 text-center space-y-3">
+                          <Code className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p className="text-xs text-slate-400">
+                            Chưa có dữ liệu nào được bóc tách. Hãy dán mã HTML vào khung phía trên hoặc chọn tệp <code className="text-teal-400">.html</code> từ máy tính, sau đó nhấn nút <strong>Phân Tích Trước</strong> hoặc <strong>Đồng Bộ Vào FAST Service</strong>.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-800">
+                          <table className="w-full text-left border-collapse text-xs font-mono whitespace-normal">
+                            <thead>
+                              <tr className="bg-slate-950 text-slate-400 text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
+                                <th className="py-3 px-3 w-14 text-center">STT</th>
+                                <th className="py-3 px-3 w-24">Mã</th>
+                                <th className="py-3 px-4 min-w-[280px]">Nội Dung Tiêu Chuẩn Kiểm Tra</th>
+                                <th className="py-3 px-3 w-40">Danh Mục / Công Đoạn</th>
+                                <th className="py-3 px-3 w-28 text-center">Mức Độ</th>
+                                <th className="py-3 px-3 w-32 text-center">Tham Chiếu</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800 text-slate-300">
+                              {importedPreview.map((item, idx) => (
+                                <tr key={item.id || idx} className="hover:bg-slate-900/40">
+                                  <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
+                                  <td className="py-2.5 px-3 font-bold text-teal-300">{item.code}</td>
+                                  <td className="py-2.5 px-4 font-sans text-slate-200 leading-relaxed">
+                                    <div className="font-medium">{item.standard}</div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-400 text-[11px] truncate max-w-[160px]" title={item.category}>
+                                    {item.category}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                                        item.isCcp || item.severity === 'Critical'
+                                          ? 'bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse'
+                                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                      }`}
+                                    >
+                                      {item.isCcp ? 'CCP Tới Hạn' : item.severity}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center text-slate-500 text-[10px]">
+                                    {item.legalRef || 'Fast Dev'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Floating Fast Dev Quick Trigger (Bottom-Right, subtle & non-intrusive) */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-4 right-4 z-[9990] px-3 py-1.5 rounded-full bg-slate-900/85 hover:bg-slate-850 text-cyan-400 border border-cyan-500/30 hover:border-cyan-400/60 shadow-xl backdrop-blur-md text-[11px] font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer opacity-70 hover:opacity-100 group"
+          title="Mở Bảng Điều Khiển Fast Dev (Nhấn Ctrl+Shift+X hoặc click tại đây)"
+        >
+          <Code className="w-3.5 h-3.5 text-teal-400 group-hover:rotate-12 transition-transform" />
+          <span className="text-slate-300">Fast Dev</span>
+          <span className="hidden sm:inline text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            Ctrl+Shift+X
+          </span>
+        </button>
+      )}
     </>
   );
 };

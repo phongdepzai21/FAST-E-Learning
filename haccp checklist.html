@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist đánh giá HACCP CODEX 2022</title>
+    <style>
+        :root {
+            --primary: #007c76;
+            --primary-dark: #005a56;
+            --primary-light: #e6f2f1;
+            --bg-color: #f4f8f8;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --border-color: #cccccc;
+            --accent-red: #d9534f;
+            --accent-green: #5cb85c;
+            --accent-blue: #0275d8;
+            --accent-orange: #f0ad4e;
+            --white: #ffffff;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --radius: 8px;
+            --font-family: 'Segoe UI', -apple-system, Roboto, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font-family); background-color: var(--bg-color); color: var(--text-main); line-height: 1.6; }
+
+        /* Header */
+        header { background-color: var(--primary); color: var(--white); padding: 20px; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
+        .header-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .brand-info h1 { font-size: 24px; margin-bottom: 5px; }
+        .brand-info p { font-size: 14px; opacity: 0.9; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hotline { background-color: var(--accent-red); color: var(--white); padding: 10px 20px; border-radius: 50px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; transition: background 0.3s; }
+        .hotline:hover { background-color: #c9302c; }
+
+        /* Container & Action Bar */
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .action-bar { background: var(--white); padding: 15px 20px; border-radius: var(--radius); box-shadow: var(--shadow); display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .search-box { flex: 1; min-width: 250px; }
+        .search-box input { width: 100%; padding: 10px 15px; border: 1px solid var(--border-color); border-radius: var(--radius); font-size: 15px; outline: none; transition: border-color 0.2s; }
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        
+        button { padding: 10px 15px; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: var(--white); }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: var(--white); color: var(--primary); border: 1px solid var(--primary); }
+        .btn-outline:hover { background: var(--primary-light); }
+        .btn-danger { background: var(--accent-red); color: var(--white); }
+        .btn-danger:hover { background: #c9302c; }
+        .btn-info { background: var(--accent-blue); color: var(--white); }
+        .btn-info:hover { background: #025aa5; }
+        .btn-warning { background: var(--accent-orange); color: var(--white); }
+        .btn-warning:hover { background: #ec971f; }
+
+        /* Progress Tracker */
+        .progress-container { background: var(--white); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 25px; }
+        .progress-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        .progress-bar-bg { background: var(--border-color); height: 12px; border-radius: 10px; overflow: hidden; }
+        .progress-bar-fill { background: var(--accent-green); height: 100%; width: 0%; transition: width 0.4s ease; }
+
+        /* Audit Info Form */
+        .client-section { background: var(--white); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 25px; }
+        .client-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;}
+        .client-header h2 { font-size: 18px; color: var(--primary-dark); }
+        .audit-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-weight: 600; font-size: 14px; color: var(--text-main); }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; font-family: inherit; background-color: #fff; }
+        .form-group select:focus, .form-group input:focus { outline: none; border-color: var(--primary); }
+
+        /* Checklist Sections */
+        details { background: var(--white); margin-bottom: 15px; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+        summary { padding: 15px 20px; background: var(--primary-light); font-weight: bold; font-size: 16px; cursor: pointer; list-style: none; display: flex; align-items: center; color: var(--primary-dark); user-select: none; }
+        summary::-webkit-details-marker { display: none; }
+        summary::before { content: '▶'; display: inline-block; margin-right: 10px; transition: transform 0.3s; font-size: 12px; }
+        details[open] summary::before { transform: rotate(90deg); }
+
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px 15px; border: 1px solid var(--border-color); text-align: left; vertical-align: top; }
+        th { background: var(--bg-color); font-weight: bold; text-align: center; }
+        .col-req { width: 45%; } .col-comp { width: 20%; text-align: center; } .col-ev { width: 35%; }
+
+        .radio-group { display: flex; justify-content: center; gap: 15px; }
+        .radio-label { display: flex; flex-direction: column; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .radio-label input { width: 18px; height: 18px; margin-bottom: 4px; cursor: pointer; accent-color: var(--primary); }
+        
+        .severity-select { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-family: inherit; background-color: #fff; }
+        textarea { width: 100%; min-height: 60px; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical; font-family: inherit; }
+        textarea:focus, .severity-select:focus { outline: none; border-color: var(--primary); }
+
+        /* CRM Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 900px; border-radius: var(--radius); }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        .crm-table th, .crm-table td { text-align: center; }
+
+        /* Print CSS */
+        @media print {
+            body { background: #fff; color: #000; font-size: 12pt; }
+            header, .action-bar, .progress-container, .client-header .btn-group { display: none !important; }
+            .container { margin: 0; padding: 0; max-width: 100%; }
+            .client-section, details { box-shadow: none; border: none; margin-bottom: 10px; }
+            details[open] summary { border-bottom: 2px solid #000; background: #eee !important; -webkit-print-color-adjust: exact; color: #000; }
+            summary::before { display: none; }
+            table { page-break-inside: avoid; border: 1px solid #000; margin-bottom: 15px; }
+            th, td { border: 1px solid #000; }
+            th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
+            textarea, .severity-select { border: none; border-bottom: 1px dotted #ccc; resize: none; min-height: auto; padding: 2px; }
+            .severity-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+            .radio-label input { display: none; }
+            .radio-label { flex-direction: row; font-size: 14px; }
+            .radio-label input:checked + span { font-weight: bold; text-decoration: underline; }
+            .radio-label input:not(:checked) + span { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-container">
+            <div class="brand-info">
+                <h1>FAST CONSULTING</h1>
+                <p>Checklist đánh giá HACCP CODEX 2022</p>
+            </div>
+            <a href="tel:0927002668" class="hotline">📞 0927 002 668</a>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <div class="action-bar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Tìm kiếm tiêu chuẩn, quy trình, từ khóa..." onkeyup="filterChecklist()">
+            </div>
+            <div class="btn-group">
+                <button class="btn-outline" onclick="toggleAll(true)">Mở rộng tất cả</button>
+                <button class="btn-outline" onclick="toggleAll(false)">Thu gọn tất cả</button>
+                <button class="btn-primary" onclick="window.print()">🖨 In Checklist</button>
+                <button class="btn-warning" onclick="generateReport()">📄 Xuất Báo Cáo Lỗi</button>
+            </div>
+        </div>
+
+        <!-- Progress Tracker -->
+        <div class="progress-container">
+            <div class="progress-header">
+                <span>Tiến độ đánh giá:</span>
+                <span id="progressText">0 / 0 (0%)</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+        </div>
+
+        <!-- Client & CRM Info -->
+        <div class="client-section">
+            <div class="client-header">
+                <h2>Thông Tin Khách Hàng</h2>
+                <div class="btn-group">
+                    <button class="btn-danger" onclick="newClient()">➕ Tạo mới</button>
+                    <button class="btn-primary" onclick="saveToCRM()">💾 Lưu CRM</button>
+                    <button class="btn-info" onclick="openCRM()">📊 Dữ liệu CRM</button>
+                </div>
+            </div>
+            <div class="audit-info">
+                <div class="form-group">
+                    <label for="clientName">Tên Khách Hàng:</label>
+                    <input type="text" id="clientName" class="save-state" oninput="saveState()">
+                </div>
+                <div class="form-group">
+                    <label for="auditType">Loại đánh giá:</label>
+                    <select id="auditType" class="save-state" onchange="saveState()">
+                        <option value="">-- Chọn Loại Đánh Giá --</option>
+                        <option value="Đánh giá Khảo sát">Đánh giá Khảo sát</option>
+                        <option value="Đánh giá nội bộ">Đánh giá nội bộ</option>
+                        <option value="Đánh giá Chứng Nhận">Đánh giá Chứng Nhận</option>
+                        <option value="Đánh giá giám sát">Đánh giá giám sát</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="auditAddress">Địa chỉ đánh giá:</label>
+                    <input type="text" id="auditAddress" class="save-state" oninput="saveState()">
+                </div>
+                <div class="form-group">
+                    <label for="fsmsScope">Phạm vi FSMS (Audit Scope):</label>
+                    <input type="text" id="fsmsScope" class="save-state" oninput="saveState()">
+                </div>
+                <div class="form-group">
+                    <label for="contactPhone">Số điện thoại liên hệ:</label>
+                    <input type="text" id="contactPhone" class="save-state" oninput="saveState()">
+                </div>
+                <div class="form-group">
+                    <label for="auditDate">Ngày đánh giá:</label>
+                    <input type="date" id="auditDate" class="save-state" oninput="saveState()">
+                </div>
+                <div class="form-group">
+                    <label for="reportNo">Report (Số báo cáo):</label>
+                    <input type="text" id="reportNo" class="save-state" oninput="saveState()">
+                </div>
+            </div>
+        </div>
+
+        <div id="checklistContainer">
+            <!-- Dữ liệu Checklist sẽ được render qua JavaScript -->
+        </div>
+
+    </div>
+
+    <!-- CRM Modal -->
+    <div id="crmModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCRM()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: var(--primary-dark);">Thống Kê Khách Hàng (CRM)</h2>
+            <div class="table-responsive">
+                <table class="crm-table" id="crmTable">
+                    <thead>
+                        <tr>
+                            <th>Ngày đánh giá</th>
+                            <th>Tên Khách Hàng</th>
+                            <th>Loại đánh giá</th>
+                            <th>Tiến độ</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dữ liệu CRM render tại đây -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Checklist Data Structure
+        const checklistData = [
+            {
+                section: "I. THIẾT KẾ CƠ SỞ VẬT CHẤT VÀ THIẾT BỊ (DESIGN OF FACILITIES AND EQUIPMENT)",
+                items: [
+                    { id: "I.1", text: "Cơ sở sản xuất thực phẩm không được đặt ở nơi có mối đe dọa đến an toàn thực phẩm hoặc sự phù hợp mà không thể kiểm soát được bằng các biện pháp hợp lý." },
+                    { id: "I.2", text: "Nằm cách xa các khu vực ô nhiễm môi trường và hoạt động công nghiệp, khu vực dễ bị ngập lụt, khu vực dễ bị côn trùng và động vật gây hại xâm nhập." },
+                    { id: "I.3", text: "Thiết kế và bố trí phải cho phép bảo trì và làm sạch đầy đủ, giảm thiểu hoặc ngăn ngừa lây nhiễm chéo thông qua luồng di chuyển của nhân sự và nguyên vật liệu." },
+                    { id: "I.4", text: "Bề mặt tường, vách ngăn và sàn phải làm bằng vật liệu không thấm nước, dễ làm sạch và khử trùng. Tường và vách ngăn phải nhẵn đến độ cao phù hợp." },
+                    { id: "I.5", text: "Hệ thống thoát nước và xử lý chất thải phải đầy đủ, được bảo trì tốt, thiết kế để tránh làm ô nhiễm thực phẩm hoặc nguồn cung cấp nước." },
+                    { id: "I.6", text: "Nhà vệ sinh và khu vực rửa tay phải đầy đủ, thiết kế hợp vệ sinh, lý tưởng nhất là vòi nước không vận hành bằng tay. Không dùng bồn rửa tay để rửa thực phẩm hoặc dụng cụ." }
+                ]
+            },
+            {
+                section: "II. ĐÀO TẠO VÀ NĂNG LỰC (TRAINING AND COMPETENCE)",
+                items: [
+                    { id: "II.1", text: "Tất cả nhân sự phải nhận thức được vai trò và trách nhiệm của họ trong việc bảo vệ thực phẩm khỏi ô nhiễm hoặc hư hỏng." },
+                    { id: "II.2", text: "Chương trình đào tạo phải bao gồm: bản chất các mối nguy, cách thức sản xuất, xử lý và đóng gói, điều kiện bảo quản." },
+                    { id: "II.3", text: "Hồ sơ đào tạo (Refresher training) phải được duy trì. Các chương trình đào tạo cần được xem xét và cập nhật định kỳ." }
+                ]
+            },
+            {
+                section: "III. BẢO TRÌ, LÀM SẠCH VÀ KIỂM SOÁT ĐỘNG VẬT GÂY HẠI (MAINTENANCE, CLEANING AND PEST CONTROL)",
+                items: [
+                    { id: "III.1", text: "Cơ sở và thiết bị phải được bảo trì để tạo điều kiện thuận lợi cho các quy trình làm sạch/khử trùng và ngăn ngừa ô nhiễm." },
+                    { id: "III.2", text: "Hóa chất làm sạch và khử trùng phải được lưu trữ cẩn thận, tránh xa thực phẩm, đựng trong các vật chứa có nhận dạng rõ ràng để tránh ô nhiễm." },
+                    { id: "III.3", text: "Các lỗ hổng, cống rãnh và những nơi động vật gây hại dễ xâm nhập phải được che chắn (ví dụ: màn lưới chống côn trùng)." },
+                    { id: "III.4", text: "Chất thải phải được thu gom, lưu trữ trong các thùng có nắp đậy, chống động vật gây hại và không được để tích tụ tràn lan trong khu vực xử lý thực phẩm." }
+                ]
+            },
+            {
+                section: "IV. VỆ SINH CÁ NHÂN (PERSONAL HYGIENE)",
+                items: [
+                    { id: "IV.1", text: "Nhân sự mắc bệnh hoặc nghi ngờ mang mầm bệnh có khả năng lây truyền qua thực phẩm không được vào khu vực xử lý thực phẩm." },
+                    { id: "IV.2", text: "Các vết xước và vết thương phải được băng kín bằng băng chống thấm nước và nếu cần thiết phải đeo găng tay." },
+                    { id: "IV.3", text: "Cấm hút thuốc, khạc nhổ, nhai, ăn, uống, hắt hơi hoặc ho trên thực phẩm không được bảo vệ. Không mang trang sức, móng tay giả/lông mi giả vào khu sản xuất." }
+                ]
+            },
+            {
+                section: "V. KIỂM SOÁT VẬN HÀNH (CONTROL OF OPERATION)",
+                items: [
+                    { id: "V.1", text: "Lập Lưu đồ quy trình (Flow diagram) thể hiện trình tự và sự tương tác của tất cả các bước trong quá trình vận hành, và phải được xác nhận thực tế tại hiện trường." },
+                    { id: "V.2", text: "Thực phẩm sống, chưa chế biến phải được tách biệt với thực phẩm ăn liền (bằng vật lý hoặc thời gian), kết hợp làm sạch và khử trùng hiệu quả ở giữa các bước." },
+                    { id: "V.3", text: "Có hệ thống kiểm soát vật liệu ngoại lai (kính, kim loại, nhựa, xương, gỗ). Sử dụng máy dò kim loại, tia X (nếu cần)." },
+                    { id: "V.4", text: "Hệ thống quản lý chất gây dị ứng (Allergen management) phải được áp dụng từ khâu tiếp nhận, chế biến đến bảo quản để tránh lây nhiễm chéo." },
+                    { id: "V.5", text: "Thủ tục thu hồi (Recall procedures): Phải có quy trình thu hồi sản phẩm lỗi, không an toàn khỏi thị trường một cách nhanh chóng và hiệu quả." }
+                ]
+            },
+            {
+                section: "VI. CODEX - HACCP (CÁC BƯỚC HACCP)",
+                items: [
+                    { id: "VI.1", text: "Thành lập đội HACCP đa ngành và xác định phạm vi (Bước 1)." },
+                    { id: "VI.2", text: "Mô tả đầy đủ về sản phẩm (thành phần, aw, pH, đóng gói, thời hạn sử dụng) (Bước 2)." },
+                    { id: "VI.3", text: "Tiến hành phân tích mối nguy (Hazard Analysis) để xác định các mối nguy đáng kể và biện pháp kiểm soát (Bước 6/Nguyên tắc 1)." },
+                    { id: "VI.4", text: "Xác định các Điểm kiểm soát tới hạn - CCPs (Bước 7/Nguyên tắc 2). Có thể sử dụng Cây quyết định (Decision tree)." },
+                    { id: "VI.5", text: "Thiết lập các Giới hạn tới hạn (Critical limits) đã được xác nhận giá trị sử dụng cho mỗi CCP (Bước 8/Nguyên tắc 3)." },
+                    { id: "VI.6", text: "Thiết lập hệ thống Giám sát (Monitoring system) cho từng CCP (Bước 9/Nguyên tắc 4)." },
+                    { id: "VI.7", text: "Thiết lập Hành động khắc phục (Corrective actions) bằng văn bản để xử lý khi có sự sai lệch tại CCP (Bước 10/Nguyên tắc 5)." },
+                    { id: "VI.8", text: "Thẩm định kế hoạch HACCP và quy trình Kiểm tra xác nhận (Verification procedures) (Bước 11/Nguyên tắc 6)." },
+                    { id: "VI.9", text: "Thiết lập hệ thống tài liệu và lưu trữ hồ sơ HACCP phù hợp (Bước 12/Nguyên tắc 7)." }
+                ]
+            }
+        ];
+
+        // Initialization
+        document.addEventListener("DOMContentLoaded", () => {
+            renderChecklist();
+            loadState();
+            updateProgress();
+        });
+
+        function renderChecklist() {
+            const container = document.getElementById('checklistContainer');
+            container.innerHTML = '';
+
+            checklistData.forEach((section, sIndex) => {
+                const details = document.createElement('details');
+                details.open = true;
+                details.classList.add('checklist-section');
+                details.innerHTML = `
+                    <summary>${section.section}</summary>
+                    <div class="table-responsive">
+                        <table data-section="${sIndex}">
+                            <thead>
+                                <tr>
+                                    <th class="col-req">Yêu cầu & Hướng dẫn<br><small>(Requirements & Guidelines)</small></th>
+                                    <th class="col-comp">Tuân thủ<br><small>(Y / N / NI / N/A)</small></th>
+                                    <th class="col-ev">Phân loại & Ghi chú<br><small>(Severity & Comments)</small></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${section.items.map(item => `
+                                    <tr class="check-item" data-id="${item.id}" data-text="${item.text}">
+                                        <td class="req-text"><strong>${item.id}.</strong>${item.text}</td>
+                                        <td>
+                                            <div class="radio-group">
+                                                <label class="radio-label">
+                                                    <input type="radio" name="comp_${item.id}" value="Y" class="save-state radio-req" onchange="updateProgress(); saveState()">
+                                                    <span>Y</span>
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="comp_${item.id}" value="N" class="save-state radio-req" onchange="updateProgress(); saveState()">
+                                                    <span>N</span>
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="comp_${item.id}" value="NI" class="save-state radio-req" onchange="updateProgress(); saveState()">
+                                                    <span>NI</span>
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="comp_${item.id}" value="NA" class="save-state radio-req" onchange="updateProgress(); saveState()">
+                                                    <span>N/A</span>
+                                                </label>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <select class="save-state severity-select" name="sev_${item.id}" onchange="saveState()">
+                                                <option value="">-- Chọn Phân loại lỗi --</option>
+                                                <option value="Major">Major (Lỗi Nặng)</option>
+                                                <option value="Minor">Minor (Lỗi Nhẹ)</option>
+                                                <option value="Observation">Observation (Quan sát)</option>
+                                            </select>
+                                            <textarea class="save-state" name="cmt_${item.id}" placeholder="Nhập bằng chứng / ghi chú..." oninput="saveState()"></textarea>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.appendChild(details);
+            });
+        }
+
+        // --- Core Current State Functions ---
+        function saveState() {
+            const data = {};
+            document.querySelectorAll('.save-state').forEach(el => {
+                if(el.type === 'radio') {
+                    if(el.checked) data[el.name] = el.value;
+                } else {
+                    data[el.id || el.name] = el.value;
+                }
+            });
+            localStorage.setItem('fast_haccp_current', JSON.stringify(data));
+        }
+
+        function loadState(specificData = null) {
+            const data = specificData || JSON.parse(localStorage.getItem('fast_haccp_current'));
+            if(!data) return;
+
+            document.querySelectorAll('.save-state').forEach(el => {
+                if(el.type === 'radio') {
+                    el.checked = (data[el.name] === el.value);
+                } else {
+                    el.value = data[el.id || el.name] || '';
+                }
+            });
+            updateProgress();
+        }
+
+        function newClient() {
+            if(confirm("Tạo mới sẽ xóa form hiện tại (hãy chắc chắn bạn đã nhấn 'Lưu CRM'). Tiếp tục?")) {
+                localStorage.removeItem('fast_haccp_current');
+                document.querySelectorAll('.save-state').forEach(el => {
+                    if(el.type === 'radio') el.checked = false;
+                    else el.value = '';
+                });
+                updateProgress();
+            }
+        }
+
+        // --- Progress Tracker ---
+        function updateProgress() {
+            const totalItems = document.querySelectorAll('tbody tr').length;
+            const uniqueNames = new Set();
+            document.querySelectorAll('.radio-req:checked').forEach(radio => uniqueNames.add(radio.name));
+            const completedItems = uniqueNames.size;
+            const percentage = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+            
+            const progressText = document.getElementById('progressText');
+            progressText.innerText = `Đã hoàn thành: ${completedItems} / ${totalItems} mục (${percentage}%)`;
+            document.getElementById('progressBar').style.width = percentage + '%';
+        }
+
+        // --- Generate Defect Report (Báo Cáo Lỗi) ---
+        function generateReport() {
+            saveState();
+            const data = JSON.parse(localStorage.getItem('fast_haccp_current')) || {};
+            
+            let majorCount = 0, minorCount = 0, obsCount = 0;
+            let reportRows = '';
+
+            document.querySelectorAll('.check-item').forEach(row => {
+                const id = row.getAttribute('data-id');
+                const text = row.getAttribute('data-text');
+                const severity = data[`sev_${id}`];
+                const notes = data[`cmt_${id}`] || '';
+                const status = data[`comp_${id}`] || 'Chưa đánh giá';
+
+                if (severity === 'Major' || severity === 'Minor' || severity === 'Observation') {
+                    if(severity === 'Major') majorCount++;
+                    if(severity === 'Minor') minorCount++;
+                    if(severity === 'Observation') obsCount++;
+
+                    let badgeColor = severity === 'Major' ? '#d9534f' : (severity === 'Minor' ? '#f0ad4e' : '#0275d8');
+                    
+                    reportRows += `
+                        <tr>
+                            <td style="text-align:center;"><strong>${id}</strong></td>
+                            <td>${text}</td>
+                            <td style="text-align:center;"><strong>${status}</strong></td>
+                            <td style="text-align:center; color:${badgeColor}; font-weight:bold;">${severity}</td>
+                            <td>${notes}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            if(reportRows === '') {
+                alert("Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo!");
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Báo Cáo Lỗi Đánh Giá - FAST CONSULTING</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; line-height: 1.5; }
+                        h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; }
+                        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f4f8f8; padding: 15px; border-radius: 8px; border: 1px solid #ccc; }
+                        .info-grid div { margin-bottom: 5px; }
+                        .summary { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; font-weight: bold; background: #fff; }
+                        .badge-major { color: #d9534f; } .badge-minor { color: #f0ad4e; } .badge-obs { color: #0275d8; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #000; padding: 10px; text-align: left; }
+                        th { background-color: #007c76; color: white; text-align: center; }
+                        @media print { body { padding: 0; } .info-grid { background: transparent; border: none; padding: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ (NON-CONFORMITY REPORT)</h1>
+                    <div class="info-grid">
+                        <div><strong>Khách hàng:</strong> ${data.clientName || '...........................................'}</div>
+                        <div><strong>Loại đánh giá:</strong> ${data.auditType || '...........................................'}</div>
+                        <div><strong>Ngày đánh giá:</strong> ${data.auditDate || '...........................................'}</div>
+                        <div><strong>Địa chỉ:</strong> ${data.auditAddress || '...........................................'}</div>
+                        <div><strong>Phạm vi:</strong> ${data.fsmsScope || '...........................................'}</div>
+                        <div><strong>Số Report:</strong> ${data.reportNo || '...........................................'}</div>
+                    </div>
+
+                    <div class="summary">
+                        <span>Tổng số lỗi phát hiện: ${majorCount + minorCount + obsCount}</span>
+                        <span class="badge-major">Major: ${majorCount}</span>
+                        <span class="badge-minor">Minor: ${minorCount}</span>
+                        <span class="badge-obs">Observation: ${obsCount}</span>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 8%;">Điều khoản</th>
+                                <th style="width: 35%;">Yêu cầu & Hướng dẫn</th>
+                                <th style="width: 10%;">Đánh giá</th>
+                                <th style="width: 15%;">Phân loại</th>
+                                <th style="width: 32%;">Bằng chứng & Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reportRows}
+                        </tbody>
+                    </table>
+                    
+                    <div style="margin-top: 50px; display: flex; justify-content: space-around;">
+                        <div style="text-align: center;">
+                            <strong>Đại diện Khách Hàng</strong><br><br><br><br>
+                            .......................................
+                        </div>
+                        <div style="text-align: center;">
+                            <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br><br><br><br>
+                            .......................................
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); }, 500);
+        }
+
+        // --- CRM Functions ---
+        function saveToCRM() {
+            saveState();
+            const currentData = JSON.parse(localStorage.getItem('fast_haccp_current'));
+            if(!currentData || !currentData.clientName) {
+                alert("Vui lòng điền 'Tên Khách Hàng' trước khi lưu CRM!");
+                return;
+            }
+
+            let crmRecords = JSON.parse(localStorage.getItem('fast_haccp_crm')) || {};
+            const recordId = currentData.clientName + "_" + (currentData.auditDate || "nodate");
+            
+            const totalItems = document.querySelectorAll('tbody tr').length;
+            const uniqueNames = new Set();
+            Object.keys(currentData).forEach(key => { if(key.startsWith('comp_')) uniqueNames.add(key); });
+            currentData._progress = Math.round((uniqueNames.size / totalItems) * 100) + "%";
+
+            crmRecords[recordId] = currentData;
+            localStorage.setItem('fast_haccp_crm', JSON.stringify(crmRecords));
+            alert("Đã lưu thông tin khách hàng vào CRM thành công!");
+        }
+
+        function openCRM() {
+            const modal = document.getElementById("crmModal");
+            const tbody = document.querySelector("#crmTable tbody");
+            tbody.innerHTML = '';
+
+            const crmRecords = JSON.parse(localStorage.getItem('fast_haccp_crm')) || {};
+            if(Object.keys(crmRecords).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">Chưa có dữ liệu khách hàng nào.</td></tr>';
+            } else {
+                Object.keys(crmRecords).forEach(id => {
+                    const record = crmRecords[id];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${record.auditDate || 'N/A'}</td>
+                            <td><strong>${record.clientName}</strong></td>
+                            <td>${record.auditType || 'N/A'}</td>
+                            <td>${record._progress || '0%'}</td>
+                            <td>
+                                <button class="btn-outline" style="padding: 5px 10px; font-size: 12px;" onclick="loadRecord('${id}')">Tải</button>
+                                <button class="btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteRecord('${id}')">Xóa</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            modal.style.display = "block";
+        }
+
+        function closeCRM() { document.getElementById("crmModal").style.display = "none"; }
+        window.onclick = function(event) { if (event.target == document.getElementById("crmModal")) closeCRM(); }
+
+        function loadRecord(id) {
+            if(confirm("Tải dữ liệu này sẽ ghi đè lên form hiện tại. Tiếp tục?")) {
+                const crmRecords = JSON.parse(localStorage.getItem('fast_haccp_crm')) || {};
+                loadState(crmRecords[id]);
+                saveState();
+                closeCRM();
+            }
+        }
+
+        function deleteRecord(id) {
+            if(confirm("Xóa khách hàng này khỏi CRM?")) {
+                let crmRecords = JSON.parse(localStorage.getItem('fast_haccp_crm')) || {};
+                delete crmRecords[id];
+                localStorage.setItem('fast_haccp_crm', JSON.stringify(crmRecords));
+                openCRM();
+            }
+        }
+
+        // --- UI Utilities ---
+        function toggleAll(isOpen) { document.querySelectorAll('details').forEach(detail => detail.open = isOpen); }
+        function filterChecklist() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            document.querySelectorAll('.checklist-section').forEach(section => {
+                let hasVisibleRow = false;
+                section.querySelectorAll('.check-item').forEach(row => {
+                    if(row.querySelector('.req-text').innerText.toLowerCase().includes(query)) {
+                        row.style.display = ''; hasVisibleRow = true;
+                    } else { row.style.display = 'none'; }
+                });
+                section.style.display = (query !== '' && !hasVisibleRow) ? 'none' : '';
+                if(query !== '' && hasVisibleRow) section.open = true;
+            });
+        }
+    </script>
+</body>
+</html>

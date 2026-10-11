@@ -1,1523 +1,1332 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { db, auth } from '../firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { useCloudSync } from '../utils/cloudSyncUtility';
-import { useToast } from '../contexts/ToastContext';
-import { 
-  Building2, 
-  FileText, 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Search, 
-  Printer, 
-  Download, 
-  Copy, 
-  RotateCcw, 
-  ChevronDown, 
-  ChevronUp, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  Check, 
-  FileSpreadsheet, 
-  Send,
-  Calendar,
-  Layers,
-  Shield,
-  HelpCircle,
-  MapPin,
-  User,
-  Share2,
-  Cloud,
-  Database,
-  Upload,
-  AlertTriangle,
-  XCircle,
-  ShieldCheck,
-  ShieldAlert,
-  Sliders,
-  Code
-} from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { db } from '../firebase';
+import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 
-interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
-  value: string;
-  onCommit: (val: string) => void;
-  className?: string;
-}
-
-const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, className, ...props }) => {
-  const [localVal, setLocalVal] = useState(value);
-  const isFocused = useRef(false);
-
-  useEffect(() => {
-    if (!isFocused.current) {
-      setLocalVal(value);
-    }
-  }, [value]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      onCommit(localVal);
-    }
-  };
-
-  const handleFocus = () => {
-    isFocused.current = true;
-  };
-
-  const handleBlur = () => {
-    isFocused.current = false;
-    onCommit(localVal);
-  };
-
-  return (
-    <input
-      {...props}
-      value={localVal}
-      onChange={(e) => setLocalVal(e.target.value)}
-      onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      className={className}
-    />
-  );
-};
-
-export interface HaccpChecklistItem {
-  id: string;
-  code: string;
-  group: 'preliminary' | 'principles' | 'prp' | 'custom';
-  groupLabel: string;
-  category: string;
-  standard: string;
-  defectDesc: string;
-  isCcp?: boolean;
-  severity: 'Critical' | 'Major' | 'Minor';
-  legalRef?: string;
-}
-
-export interface HaccpItemState {
-  status: 'pass' | 'fail' | 'na' | 'pending';
-  note: string;
-  capa: string;
-  deadline?: string;
-  personInCharge?: string;
-}
-
-export interface SavedHaccpRecord {
-  id: string;
-  facilityName: string;
-  teamLeader: string;
-  auditorName: string;
-  auditDate: string;
-  productScope: string;
-  contactPhone: string;
-  facilityAddress: string;
-  itemsState: Record<string, HaccpItemState>;
-  customItems?: HaccpChecklistItem[];
-  totalScore: number;
-  passCount: number;
-  failCount: number;
-  criticalFailCount: number;
-  status: 'Đạt chuẩn HACCP' | 'Cần hành động khắc phục (CAPA)' | 'Đang đánh giá';
-  updatedAt: string;
-}
-
-// 12 Bước & 7 Nguyên tắc HACCP Codex & TCVN chuẩn mực
-const DEFAULT_HACCP_ITEMS: HaccpChecklistItem[] = [
-  // 5 BƯỚC SƠ BỘ (PRELIMINARY STEPS)
+// Checklist Data Structure from user's exact specification
+export const CHECKLIST_DATA = [
   {
-    id: 'H-STEP1',
-    code: 'B01',
-    group: 'preliminary',
-    groupLabel: '5 Bước Sơ Bộ HACCP',
-    category: '1. Thành lập Đội HACCP',
-    standard: 'Đội HACCP được thành lập bằng văn bản quyết định, bao gồm đủ các thành viên đa chức năng (Sản xuất, QA/QC, Bảo trì, Kho, Vệ sinh) và có chứng chỉ đào tạo HACCP.',
-    defectDesc: 'Không có quyết định thành lập đội HACCP, thiếu thành phần chuyên môn hoặc thành viên chưa qua đào tạo nhận thức & đánh giá HACCP.',
-    severity: 'Major',
-    legalRef: 'Codex HACCP Step 1 / TCVN 5603'
+    section: "I. THIẾT KẾ CƠ SỞ VẬT CHẤT VÀ THIẾT BỊ (DESIGN OF FACILITIES AND EQUIPMENT)",
+    items: [
+      { id: "I.1", text: "Cơ sở sản xuất thực phẩm không được đặt ở nơi có mối đe dọa đến an toàn thực phẩm hoặc sự phù hợp mà không thể kiểm soát được bằng các biện pháp hợp lý." },
+      { id: "I.2", text: "Nằm cách xa các khu vực ô nhiễm môi trường và hoạt động công nghiệp, khu vực dễ bị ngập lụt, khu vực dễ bị côn trùng và động vật gây hại xâm nhập." },
+      { id: "I.3", text: "Thiết kế và bố trí phải cho phép bảo trì và làm sạch đầy đủ, giảm thiểu hoặc ngăn ngừa lây nhiễm chéo thông qua luồng di chuyển của nhân sự và nguyên vật liệu." },
+      { id: "I.4", text: "Bề mặt tường, vách ngăn và sàn phải làm bằng vật liệu không thấm nước, dễ làm sạch và khử trùng. Tường và vách ngăn phải nhẵn đến độ cao phù hợp." },
+      { id: "I.5", text: "Hệ thống thoát nước và xử lý chất thải phải đầy đủ, được bảo trì tốt, thiết kế để tránh làm ô nhiễm thực phẩm hoặc nguồn cung cấp nước." },
+      { id: "I.6", text: "Nhà vệ sinh và khu vực rửa tay phải đầy đủ, thiết kế hợp vệ sinh, lý tưởng nhất là vòi nước không vận hành bằng tay. Không dùng bồn rửa tay để rửa thực phẩm hoặc dụng cụ." }
+    ]
   },
   {
-    id: 'H-STEP2',
-    code: 'B02',
-    group: 'preliminary',
-    groupLabel: '5 Bước Sơ Bộ HACCP',
-    category: '2. Mô tả sản phẩm',
-    standard: 'Bản mô tả sản phẩm đầy đủ thành phần nguyên liệu, tính chất lý hóa (pH, aw, độ ẩm), quy cách bao gói, điều kiện bảo quản, hạn sử dụng và phương thức phân phối.',
-    defectDesc: 'Bản mô tả sản phẩm sơ sài, thiếu các thông số an toàn thực phẩm trọng yếu hoặc không cập nhật khi thay đổi công thức/nguyên liệu.',
-    severity: 'Major',
-    legalRef: 'Codex HACCP Step 2'
+    section: "II. ĐÀO TẠO VÀ NĂNG LỰC (TRAINING AND COMPETENCE)",
+    items: [
+      { id: "II.1", text: "Tất cả nhân sự phải nhận thức được vai trò và trách nhiệm của họ trong việc bảo vệ thực phẩm khỏi ô nhiễm hoặc hư hỏng." },
+      { id: "II.2", text: "Chương trình đào tạo phải bao gồm: bản chất các mối nguy, cách thức sản xuất, xử lý và đóng gói, điều kiện bảo quản." },
+      { id: "II.3", text: "Hồ sơ đào tạo (Refresher training) phải được duy trì. Các chương trình đào tạo cần được xem xét và cập nhật định kỳ." }
+    ]
   },
   {
-    id: 'H-STEP3',
-    code: 'B03',
-    group: 'preliminary',
-    groupLabel: '5 Bước Sơ Bộ HACCP',
-    category: '3. Xác định mục đích sử dụng',
-    standard: 'Xác định rõ mục đích sử dụng sản phẩm (dùng ngay, qua nấu chín...) và đối tượng người tiêu dùng dự kiến, đặc biệt các nhóm nhạy cảm (trẻ em, người già, người dị ứng).',
-    defectDesc: 'Không xác định đối tượng người tiêu dùng hoặc không cảnh báo thành phần gây dị ứng trên nhãn mác sản phẩm.',
-    severity: 'Major',
-    legalRef: 'Codex HACCP Step 3'
+    section: "III. BẢO TRÌ, LÀM SẠCH VÀ KIỂM SOÁT ĐỘNG VẬT GÂY HẠI (MAINTENANCE, CLEANING AND PEST CONTROL)",
+    items: [
+      { id: "III.1", text: "Cơ sở và thiết bị phải được bảo trì để tạo điều kiện thuận lợi cho các quy trình làm sạch/khử trùng và ngăn ngừa ô nhiễm." },
+      { id: "III.2", text: "Hóa chất làm sạch và khử trùng phải được lưu trữ cẩn thận, tránh xa thực phẩm, đựng trong các vật chứa có nhận dạng rõ ràng để tránh ô nhiễm." },
+      { id: "III.3", text: "Các lỗ hổng, cống rãnh và những nơi động vật gây hại dễ xâm nhập phải được che chắn (ví dụ: màn lưới chống côn trùng)." },
+      { id: "III.4", text: "Chất thải phải được thu gom, lưu trữ trong các thùng có nắp đậy, chống động vật gây hại và không được để tích tụ tràn lan trong khu vực xử lý thực phẩm." }
+    ]
   },
   {
-    id: 'H-STEP4',
-    code: 'B04',
-    group: 'preliminary',
-    groupLabel: '5 Bước Sơ Bộ HACCP',
-    category: '4. Thiết lập sơ đồ quy trình',
-    standard: 'Sơ đồ lưu trình công nghệ bao quát toàn bộ các bước từ tiếp nhận nguyên liệu, sơ chế, chế biến, đóng gói, bảo quản đến xuất xưởng, bao gồm dòng vào và dòng thải.',
-    defectDesc: 'Sơ đồ công nghệ thiếu bước gia công, bỏ sót đường hồi lưu nguyên liệu hoặc không thể hiện các điểm kiểm soát chất lượng.',
-    severity: 'Major',
-    legalRef: 'Codex HACCP Step 4'
+    section: "IV. VỆ SINH CÁ NHÂN (PERSONAL HYGIENE)",
+    items: [
+      { id: "IV.1", text: "Nhân sự mắc bệnh hoặc nghi ngờ mang mầm bệnh có khả năng lây truyền qua thực phẩm không được vào khu vực xử lý thực phẩm." },
+      { id: "IV.2", text: "Các vết xước và vết thương phải được băng kín bằng băng chống thấm nước và nếu cần thiết phải đeo găng tay." },
+      { id: "IV.3", text: "Cấm hút thuốc, khạc nhổ, nhai, ăn, uống, hắt hơi hoặc ho trên thực phẩm không được bảo vệ. Không mang trang sức, móng tay giả/lông mi giả vào khu sản xuất." }
+    ]
   },
   {
-    id: 'H-STEP5',
-    code: 'B05',
-    group: 'preliminary',
-    groupLabel: '5 Bước Sơ Bộ HACCP',
-    category: '5. Thẩm tra sơ đồ tại hiện trường',
-    standard: 'Đội HACCP đã kiểm tra, đối chiếu và thẩm tra thực địa sơ đồ lưu trình tại từng công đoạn trong mọi ca sản xuất, có biên bản xác nhận ký duyệt.',
-    defectDesc: 'Sơ đồ trên giấy không khớp với mặt bằng thực tế hoặc chưa thẩm tra thực địa khi có sự cải tiến thiết bị.',
-    severity: 'Major',
-    legalRef: 'Codex HACCP Step 5'
-  },
-
-  // 7 NGUYÊN TẮC HACCP (HACCP PRINCIPLES)
-  {
-    id: 'H-PRIN1',
-    code: 'NT01',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 1: Phân tích mối nguy',
-    standard: 'Bảng phân tích mối nguy liệt kê toàn diện các mối nguy Sinh học (B), Hóa học (C), Vật lý (P), Dị ứng (A) ở từng bước, đánh giá mức độ nghiêm trọng & khả năng xảy ra.',
-    defectDesc: 'Bỏ sót mối nguy vi sinh vật gây bệnh, tồn dư hóa chất BVTV/kim loại nặng hoặc thiếu biện pháp kiểm soát tương ứng.',
-    severity: 'Critical',
-    legalRef: 'Codex Principle 1'
+    section: "V. KIỂM SOÁT VẬN HÀNH (CONTROL OF OPERATION)",
+    items: [
+      { id: "V.1", text: "Lập Lưu đồ quy trình (Flow diagram) thể hiện trình tự và sự tương tác của tất cả các bước trong quá trình vận hành, và phải được xác nhận thực tế tại hiện trường." },
+      { id: "V.2", text: "Thực phẩm sống, chưa chế biến phải được tách biệt với thực phẩm ăn liền (bằng vật lý hoặc thời gian), kết hợp làm sạch và khử trùng hiệu quả ở giữa các bước." },
+      { id: "V.3", text: "Có hệ thống kiểm soát vật liệu ngoại lai (kính, kim loại, nhựa, xương, gỗ). Sử dụng máy dò kim loại, tia X (nếu cần)." },
+      { id: "V.4", text: "Hệ thống quản lý chất gây dị ứng (Allergen management) phải được áp dụng từ khâu tiếp nhận, chế biến đến bảo quản để tránh lây nhiễm chéo." },
+      { id: "V.5", text: "Thủ tục thu hồi (Recall procedures): Phải có quy trình thu hồi sản phẩm lỗi, không an toàn khỏi thị trường một cách nhanh chóng và hiệu quả." }
+    ]
   },
   {
-    id: 'H-PRIN2',
-    code: 'NT02',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 2: Xác định điểm CCP',
-    standard: 'Sử dụng Cây quyết định CCP (CCP Decision Tree) để xác định chuẩn xác các Điểm kiểm soát tới hạn. Hồ sơ thể hiện rõ lý do chọn hoặc không chọn CCP.',
-    defectDesc: 'Xác định sai điểm CCP (thiếu điểm tới hạn diệt khuẩn hoặc lạm dụng quá nhiều điểm không kiểm soát nổi).',
-    isCcp: true,
-    severity: 'Critical',
-    legalRef: 'Codex Principle 2'
-  },
-  {
-    id: 'H-PRIN3',
-    code: 'NT03',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 3: Thiết lập Giới hạn tới hạn',
-    standard: 'Mỗi CCP có các Giới hạn tới hạn (Critical Limits) định lượng rõ ràng (Nhiệt độ tâm >= 75°C, Thời gian >= 3 phút, Nhiệt độ kho lạnh <= 4°C, v.v.) có căn cứ khoa học/pháp lý.',
-    defectDesc: 'Giới hạn tới hạn định tính mơ hồ, không đo lường được hoặc không đủ cơ sở chứng minh tiêu diệt được mối nguy.',
-    isCcp: true,
-    severity: 'Critical',
-    legalRef: 'Codex Principle 3'
-  },
-  {
-    id: 'H-PRIN4',
-    code: 'NT04',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 4: Hệ thống giám sát CCP',
-    standard: 'Quy định cụ thể: Giám sát cái gì (What), bằng cách nào (How), tần suất bao lâu (Frequency), và ai là người chịu trách nhiệm giám sát ký xác nhận (Who).',
-    defectDesc: 'Nhật ký giám sát CCP bị bỏ trống, tần suất giám sát gián đoạn hoặc người giám sát chưa được huấn luyện vận hành thiết bị đo.',
-    isCcp: true,
-    severity: 'Critical',
-    legalRef: 'Codex Principle 4'
-  },
-  {
-    id: 'H-PRIN5',
-    code: 'NT05',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 5: Hành động khắc phục (CAPA)',
-    standard: 'Quy trình CAPA quy định rõ hành động xử lý tức thời khi CCP vượt ngưỡng: cô lập lô hàng không phù hợp, hiệu chỉnh thiết bị, xác định nguyên nhân gốc rễ và phê duyệt xuất hủy/tái chế.',
-    defectDesc: 'Khi xảy ra sự cố vượt ngưỡng an toàn, cơ sở không cô lập sản phẩm hoặc để lọt sản phẩm lỗi ra thị trường mà không ghi chép.',
-    isCcp: true,
-    severity: 'Critical',
-    legalRef: 'Codex Principle 5'
-  },
-  {
-    id: 'H-PRIN6',
-    code: 'NT06',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 6: Thủ tục thẩm tra (Verification)',
-    standard: 'Có lịch thẩm tra định kỳ: hiệu chuẩn nhiệt kế/áp kế/cân điện tử, gửi mẫu kiểm nghiệm vi sinh phòng Lab đạt chuẩn ISO 17025, và tổ chức đánh giá nội bộ tối thiểu 1 lần/năm.',
-    defectDesc: 'Thiết bị đo CCP không có tem hiệu chuẩn, không có kết quả xét nghiệm định kỳ hoặc không thực hiện đánh giá nội bộ.',
-    severity: 'Major',
-    legalRef: 'Codex Principle 6'
-  },
-  {
-    id: 'H-PRIN7',
-    code: 'NT07',
-    group: 'principles',
-    groupLabel: '7 Nguyên Tắc Cốt Lõi',
-    category: 'Nguyên tắc 7: Thiết lập hồ sơ & tài liệu',
-    standard: 'Toàn bộ kế hoạch HACCP, SOP, SSOP, biểu mẫu giám sát CCP, báo cáo thẩm tra và hồ sơ đào tạo được lưu trữ ngăn nắp, dễ truy xuất và bảo lưu tối thiểu 2 năm.',
-    defectDesc: 'Hồ sơ ghi chép hồi tố (chép bù số liệu), thất lạc nhật ký giám sát CCP hoặc không có người có thẩm quyền ký soát xét.',
-    severity: 'Major',
-    legalRef: 'Codex Principle 7'
-  },
-
-  // CHƯƠNG TRÌNH TIÊN QUYẾT PRP & VỆ SINH SSOP (PRE-REQUISITE PROGRAMS)
-  {
-    id: 'H-PRP1',
-    code: 'PRP01',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'An toàn nguồn nước & Nước đá',
-    standard: 'Nguồn nước tiếp xúc trực tiếp với thực phẩm và làm đá viên đạt chuẩn QCVN 01-1:2018/BYT, có kết quả xét nghiệm hóa lý & vi sinh định kỳ 6 tháng/lần.',
-    defectDesc: 'Không có phiếu kiểm nghiệm nước định kỳ hoặc hệ thống lọc nước/bồn chứa không được súc rửa bảo dưỡng theo lịch.',
-    severity: 'Critical',
-    legalRef: 'QCVN 01-1:2018/BYT'
-  },
-  {
-    id: 'H-PRP2',
-    code: 'PRP02',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'Vệ sinh bề mặt tiếp xúc & Dụng cụ',
-    standard: 'Các bề mặt tiếp xúc trực tiếp thực phẩm (thớt, bàn inox, dao kéo, băng tải) làm từ vật liệu an toàn, không rỉ sét, được vệ sinh và khử trùng đúng nồng độ trước và sau ca.',
-    defectDesc: 'Thớt gỗ mục nát, bàn chế biến bám cặn hữu cơ tích tụ hoặc không có quy trình khử trùng dụng cụ giữa các công đoạn chín - sống.',
-    severity: 'Major',
-    legalRef: 'SSOP 2 / Luật ATTP'
-  },
-  {
-    id: 'H-PRP3',
-    code: 'PRP03',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'Ngăn ngừa nhiễm chéo',
-    standard: 'Bố trí mặt bằng nguyên tắc một chiều: phân chia tách biệt tuyệt đối giữa khu sơ chế sống, chế biến nhiệt, làm nguội và đóng gói thành phẩm. Luồng khí sạch và thoát nước phù hợp.',
-    defectDesc: 'Đường đi của nguyên liệu sống cắt ngang thành phẩm chín, nhân viên khu bẩn tự do đi vào khu sạch gây nhiễm chéo vi sinh.',
-    severity: 'Critical',
-    legalRef: 'SSOP 3'
-  },
-  {
-    id: 'H-PRP4',
-    code: 'PRP04',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'Vệ sinh cá nhân & Sức khỏe nhân sự',
-    standard: 'Nhân viên mặc đầy đủ BHLĐ (nón trùm tóc, khẩu trang, tạp dề, găng tay khi tiếp xúc trực tiếp thực phẩm ăn ngay), rửa tay đúng quy trình, có thẻ xanh khám sức khỏe còn hạn.',
-    defectDesc: 'Nhân viên đeo trang sức khi chế biến, không đeo khẩu trang/trùm tóc hoặc có vết thương hở tiếp xúc với thực phẩm.',
-    severity: 'Major',
-    legalRef: 'SSOP 4'
-  },
-  {
-    id: 'H-PRP5',
-    code: 'PRP05',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'Kiểm soát côn trùng & Động vật gây hại (Pest Control)',
-    standard: 'Cơ sở có hợp đồng kiểm soát côn trùng hoặc quy trình bẫy đèn diệt ruồi muỗi, bẫy chuột, lưới chắn côn trùng tại cửa sổ/lỗ thông gió, sơ đồ bẫy và nhật ký theo dõi.',
-    defectDesc: 'Phát hiện phân chuột, gián hoặc xác côn trùng trong khu vực chế biến; cửa thông gió không có lưới chắn côn trùng.',
-    severity: 'Critical',
-    legalRef: 'SSOP 8 / Codex'
-  },
-  {
-    id: 'H-PRP6',
-    code: 'PRP06',
-    group: 'prp',
-    groupLabel: 'Chương Trình Tiên Quyết (PRP/SSOP)',
-    category: 'Kiểm soát nguyên liệu đầu vào & Truy xuất',
-    standard: 'Nguyên liệu thực phẩm có hóa đơn chứng từ chứng minh nguồn gốc rõ ràng, kiểm tra cảm quan & nhiệt độ tiếp nhận, nhãn mác đầy đủ và mã lô truy xuất ngược được trong 24 giờ.',
-    defectDesc: 'Nguyên liệu không rõ nguồn gốc, hết hạn sử dụng hoặc không thể truy xuất nguồn gốc nhà cung cấp khi xảy ra sự cố.',
-    severity: 'Critical',
-    legalRef: 'Nghị định 15/2018/NĐ-CP'
+    section: "VI. CODEX - HACCP (CÁC BƯỚC HACCP)",
+    items: [
+      { id: "VI.1", text: "Thành lập đội HACCP đa ngành và xác định phạm vi (Bước 1)." },
+      { id: "VI.2", text: "Mô tả đầy đủ về sản phẩm (thành phần, aw, pH, đóng gói, thời hạn sử dụng) (Bước 2)." },
+      { id: "VI.3", text: "Tiến hành phân tích mối nguy (Hazard Analysis) để xác định các mối nguy đáng kể và biện pháp kiểm soát (Bước 6/Nguyên tắc 1)." },
+      { id: "VI.4", text: "Xác định các Điểm kiểm soát tới hạn - CCPs (Bước 7/Nguyên tắc 2). Có thể sử dụng Cây quyết định (Decision tree)." },
+      { id: "VI.5", text: "Thiết lập các Giới hạn tới hạn (Critical limits) đã được xác nhận giá trị sử dụng cho mỗi CCP (Bước 8/Nguyên tắc 3)." },
+      { id: "VI.6", text: "Thiết lập hệ thống Giám sát (Monitoring system) cho từng CCP (Bước 9/Nguyên tắc 4)." },
+      { id: "VI.7", text: "Thiết lập Hành động khắc phục (Corrective actions) bằng văn bản để xử lý khi có sự sai lệch tại CCP (Bước 10/Nguyên tắc 5)." },
+      { id: "VI.8", text: "Thẩm định kế hoạch HACCP và quy trình Kiểm tra xác nhận (Verification procedures) (Bước 11/Nguyên tắc 6)." },
+      { id: "VI.9", text: "Thiết lập hệ thống tài liệu và lưu trữ hồ sơ HACCP phù hợp (Bước 12/Nguyên tắc 7)." }
+    ]
   }
 ];
 
-const getTodayDateString = () => {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, '0');
-  const d = String(today.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
 export const FastHaccpChecklist: React.FC = () => {
-  const { success: showSuccessToast, error: showErrorToast, warning: showWarningToast } = useToast();
+  // Client Form State
+  const [clientName, setClientName] = useState<string>('');
+  const [auditType, setAuditType] = useState<string>('');
+  const [auditAddress, setAuditAddress] = useState<string>('');
+  const [fsmsScope, setFsmsScope] = useState<string>('');
+  const [contactPhone, setContactPhone] = useState<string>('');
+  const [auditDate, setAuditDate] = useState<string>('');
+  const [reportNo, setReportNo] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<'audit' | 'database' | 'report'>('audit');
-  const [activeGroupFilter, setActiveGroupFilter] = useState<'all' | 'preliminary' | 'principles' | 'prp' | 'custom'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pass' | 'fail' | 'na' | 'pending'>('all');
-  
-  // HTML Code Importer Modal State
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [htmlInputCode, setHtmlInputCode] = useState('');
-  const [importSummary, setImportSummary] = useState<string | null>(null);
+  // Checklist Item States: key is item.id (e.g. 'I.1')
+  const [compliance, setCompliance] = useState<Record<string, string>>({});
+  const [severities, setSeverities] = useState<Record<string, string>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
 
-  // Facility Metadata
-  const [facilityName, setFacilityName] = useState('Nhà máy / Cơ sở Chế biến Thực phẩm FAST');
-  const [teamLeader, setTeamLeader] = useState('');
-  const [auditorName, setAuditorName] = useState('Chuyên gia HACCP FAST');
-  const [auditDate, setAuditDate] = useState(getTodayDateString());
-  const [productScope, setProductScope] = useState('Sản xuất & Chế biến Thực phẩm ăn ngay / Đóng gói');
-  const [contactPhone, setContactPhone] = useState('');
-  const [facilityAddress, setFacilityAddress] = useState('');
+  // Custom Items imported via Fast Dev
+  const [customSections, setCustomSections] = useState<any[]>([]);
 
-  // Item states: record of itemId -> state
-  const [itemsState, setItemsState] = useState<Record<string, HaccpItemState>>({});
-  const [customItems, setCustomItems] = useState<HaccpChecklistItem[]>([]);
+  // Search filter
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Cloud Sync for Database (Saved Audits History)
-  const [database, setDatabase, isDbSaving, dbSyncStatus] = useCloudSync<SavedHaccpRecord[]>(
-    'fast_haccp_crm',
-    'database',
-    'FAST_HACCP_DATABASE_HISTORY_V1',
-    []
-  );
+  // CRM Modal State
+  const [isCrmOpen, setIsCrmOpen] = useState<boolean>(false);
+  const [crmRecords, setCrmRecords] = useState<Record<string, any>>({});
 
-  // Cloud Sync for Active Form Session
-  const [activeSession, setActiveSession, isSessionSaving, sessionSyncStatus] = useCloudSync<{
-    facilityName: string;
-    teamLeader: string;
-    auditorName: string;
-    auditDate: string;
-    productScope: string;
-    contactPhone: string;
-    facilityAddress: string;
-    itemsState: Record<string, HaccpItemState>;
-    customItems: HaccpChecklistItem[];
-  }>(
-    'fast_haccp_crm',
-    'active_session',
-    'FAST_HACCP_ACTIVE_SESSION_V1',
-    {
-      facilityName: 'Nhà máy / Cơ sở Chế biến Thực phẩm FAST',
-      teamLeader: '',
-      auditorName: 'Chuyên gia HACCP FAST',
-      auditDate: getTodayDateString(),
-      productScope: 'Sản xuất & Chế biến Thực phẩm ăn ngay / Đóng gói',
-      contactPhone: '',
-      facilityAddress: '',
-      itemsState: {},
-      customItems: []
-    }
-  );
+  // Sync state debounce ref
+  const saveTimeoutRef = useRef<any>(null);
 
-  // Sync back from activeSession on initial load
-  useEffect(() => {
-    if (activeSession) {
-      if (activeSession.facilityName) setFacilityName(activeSession.facilityName);
-      if (activeSession.teamLeader) setTeamLeader(activeSession.teamLeader);
-      if (activeSession.auditorName) setAuditorName(activeSession.auditorName);
-      if (activeSession.auditDate) setAuditDate(activeSession.auditDate);
-      if (activeSession.productScope) setProductScope(activeSession.productScope);
-      if (activeSession.contactPhone) setContactPhone(activeSession.contactPhone);
-      if (activeSession.facilityAddress) setFacilityAddress(activeSession.facilityAddress);
-      if (activeSession.itemsState) setItemsState(activeSession.itemsState);
-      if (activeSession.customItems && Array.isArray(activeSession.customItems)) {
-        setCustomItems(activeSession.customItems);
-      }
-    }
-  }, [activeSession]);
-
-  // Save changes to activeSession debounced
-  const triggerActiveSessionSave = () => {
-    setActiveSession({
-      facilityName,
-      teamLeader,
-      auditorName,
-      auditDate,
-      productScope,
-      contactPhone,
-      facilityAddress,
-      itemsState,
-      customItems
-    });
-  };
-
-  // Combined Items
-  const allItems = useMemo(() => {
-    return [...DEFAULT_HACCP_ITEMS, ...customItems];
-  }, [customItems]);
-
-  // Statistics calculation
-  const stats = useMemo(() => {
-    let pass = 0;
-    let fail = 0;
-    let criticalFail = 0;
-    let na = 0;
-    let pending = 0;
-
-    allItems.forEach(item => {
-      const state = itemsState[item.id];
-      if (!state || state.status === 'pending') {
-        pending++;
-      } else if (state.status === 'pass') {
-        pass++;
-      } else if (state.status === 'fail') {
-        fail++;
-        if (item.severity === 'Critical') criticalFail++;
-      } else if (state.status === 'na') {
-        na++;
-      }
-    });
-
-    const evaluated = pass + fail;
-    const score = evaluated > 0 ? Math.round((pass / evaluated) * 100) : 100;
-    const isPassed = criticalFail === 0 && score >= 85;
-
-    return {
-      total: allItems.length,
-      pass,
-      fail,
-      criticalFail,
-      na,
-      pending,
-      score,
-      isPassed
-    };
-  }, [allItems, itemsState]);
-
-  // Handlers for Checklist State
-  const setItemStatus = (itemId: string, status: 'pass' | 'fail' | 'na' | 'pending') => {
-    setItemsState(prev => {
-      const updated = {
-        ...prev,
-        [itemId]: {
-          ...(prev[itemId] || { note: '', capa: '' }),
-          status
+  // Combine default checklist with any custom items from Fast Dev
+  const allSections = useMemo(() => {
+    if (customSections.length > 0) {
+      return [
+        ...CHECKLIST_DATA,
+        {
+          section: "VII. TIÊU CHUẨN BỔ SUNG TỪ FAST DEV (CUSTOM REQUIREMENTS)",
+          items: customSections.map((item, idx) => ({
+            id: item.code || `DEV.${idx + 1}`,
+            text: item.standard || item.text || ''
+          }))
         }
-      };
-      return updated;
-    });
-    setTimeout(triggerActiveSessionSave, 100);
-  };
+      ];
+    }
+    return CHECKLIST_DATA;
+  }, [customSections]);
 
-  const setItemNote = (itemId: string, note: string) => {
-    setItemsState(prev => ({
-      ...prev,
-      [itemId]: {
-        ...(prev[itemId] || { status: 'pending', capa: '' }),
-        note
+  // Total items count
+  const totalItemsCount = useMemo(() => {
+    return allSections.reduce((acc, sec) => acc + sec.items.length, 0);
+  }, [allSections]);
+
+  // Completed items count
+  const completedItemsCount = useMemo(() => {
+    return Object.keys(compliance).filter(k => compliance[k]).length;
+  }, [compliance]);
+
+  // Percentage
+  const progressPercentage = useMemo(() => {
+    if (totalItemsCount === 0) return 0;
+    return Math.round((completedItemsCount / totalItemsCount) * 100);
+  }, [completedItemsCount, totalItemsCount]);
+
+  // 1. Initial Load & Listen to LocalStorage + Firestore Sync
+  useEffect(() => {
+    // A. Load local state
+    try {
+      const savedLocal = localStorage.getItem('fast_haccp_current');
+      if (savedLocal) {
+        const parsed = JSON.parse(savedLocal);
+        applyStateData(parsed);
       }
-    }));
-    setTimeout(triggerActiveSessionSave, 300);
-  };
-
-  const setItemCapa = (itemId: string, capa: string) => {
-    setItemsState(prev => ({
-      ...prev,
-      [itemId]: {
-        ...(prev[itemId] || { status: 'pending', note: '' }),
-        capa
-      }
-    }));
-    setTimeout(triggerActiveSessionSave, 300);
-  };
-
-  // Quick Action: Mark all filtered as Pass
-  const handleMarkAllFilteredPass = () => {
-    setItemsState(prev => {
-      const next = { ...prev };
-      filteredItems.forEach(item => {
-        next[item.id] = {
-          ...(next[item.id] || { note: '', capa: '' }),
-          status: 'pass'
-        };
-      });
-      return next;
-    });
-    showSuccessToast('Đã đánh dấu Đạt cho toàn bộ mục đang hiển thị');
-    setTimeout(triggerActiveSessionSave, 100);
-  };
-
-  // Reset form
-  const handleResetForm = () => {
-    if (window.confirm('Bạn có chắc chắn muốn làm mới toàn bộ bảng đánh giá HACCP này không?')) {
-      setItemsState({});
-      setFacilityName('Nhà máy / Cơ sở Chế biến Thực phẩm FAST');
-      setTeamLeader('');
-      setProductScope('Sản xuất & Chế biến Thực phẩm ăn ngay / Đóng gói');
-      setContactPhone('');
-      setFacilityAddress('');
-      triggerActiveSessionSave();
-      showSuccessToast('Đã làm mới form đánh giá HACCP');
-    }
-  };
-
-  // Save to Database History
-  const handleSaveToDatabase = () => {
-    if (!facilityName.trim()) {
-      showErrorToast('Vui lòng nhập tên cơ sở đánh giá');
-      return;
-    }
-
-    const newRecord: SavedHaccpRecord = {
-      id: `HACCP-${Date.now()}`,
-      facilityName,
-      teamLeader,
-      auditorName,
-      auditDate,
-      productScope,
-      contactPhone,
-      facilityAddress,
-      itemsState,
-      customItems,
-      totalScore: stats.score,
-      passCount: stats.pass,
-      failCount: stats.fail,
-      criticalFailCount: stats.criticalFail,
-      status: stats.criticalFail > 0 
-        ? 'Cần hành động khắc phục (CAPA)' 
-        : (stats.score >= 85 ? 'Đạt chuẩn HACCP' : 'Cần hành động khắc phục (CAPA)'),
-      updatedAt: new Date().toLocaleString('vi-VN')
-    };
-
-    setDatabase(prev => [newRecord, ...(prev || [])]);
-    showSuccessToast(`Đã lưu kết quả kiểm toán HACCP cho cơ sở: ${facilityName}`);
-    setActiveTab('database');
-  };
-
-  // Load Record from Database
-  const handleLoadRecord = (record: SavedHaccpRecord) => {
-    setFacilityName(record.facilityName || '');
-    setTeamLeader(record.teamLeader || '');
-    setAuditorName(record.auditorName || '');
-    setAuditDate(record.auditDate || getTodayDateString());
-    setProductScope(record.productScope || '');
-    setContactPhone(record.contactPhone || '');
-    setFacilityAddress(record.facilityAddress || '');
-    setItemsState(record.itemsState || {});
-    if (record.customItems) {
-      setCustomItems(record.customItems);
-    }
-    showSuccessToast(`Đã tải hồ sơ: ${record.facilityName}`);
-    setActiveTab('audit');
-    setTimeout(triggerActiveSessionSave, 200);
-  };
-
-  // Delete Record from Database
-  const handleDeleteRecord = (id: string) => {
-    if (window.confirm('Xóa bản lưu kiểm toán này khỏi cơ sở dữ liệu?')) {
-      setDatabase(prev => (prev || []).filter(item => item.id !== id));
-      showSuccessToast('Đã xóa bản ghi kiểm toán');
-    }
-  };
-
-  // Print view
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Intelligent HTML Checklist Importer Parser
-  const handleImportHtml = () => {
-    if (!htmlInputCode.trim()) {
-      showErrorToast('Vui lòng dán mã HTML checklist vào khung bên dưới');
-      return;
+    } catch (e) {
+      console.warn('[FastHaccp] Local load error:', e);
     }
 
     try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlInputCode, 'text/html');
+      const savedCrm = localStorage.getItem('fast_haccp_crm');
+      if (savedCrm) {
+        setCrmRecords(JSON.parse(savedCrm));
+      }
+    } catch (e) {}
 
-      const extractedItems: HaccpChecklistItem[] = [];
-      const extractedStates: Record<string, HaccpItemState> = {};
+    // B. Check custom items from Fast Dev
+    try {
+      const rawCustom = localStorage.getItem('FAST_HACCP_CUSTOM_ITEMS_V1');
+      if (rawCustom) {
+        const parsedCustom = JSON.parse(rawCustom);
+        if (Array.isArray(parsedCustom) && parsedCustom.length > 0) {
+          setCustomSections(parsedCustom);
+        }
+      }
+    } catch {}
 
-      // 1. Try finding table rows <tr>
-      const rows = doc.querySelectorAll('tr');
-      if (rows && rows.length > 0) {
-        let counter = 1;
-        rows.forEach(row => {
-          const cells = row.querySelectorAll('td, th');
-          if (cells.length >= 2) {
-            const firstText = cells[0].textContent?.trim() || '';
-            const secondText = cells[1].textContent?.trim() || '';
-            const thirdText = cells.length > 2 ? cells[2].textContent?.trim() : '';
+    // C. Listen to Fast Dev updates
+    const handleFastDevUpdate = (e: any) => {
+      const items = e?.detail?.items;
+      if (Array.isArray(items)) {
+        setCustomSections(items);
+      }
+    };
+    window.addEventListener('haccp_items_updated', handleFastDevUpdate);
 
-            // Skip obvious headers
-            if (firstText.toLowerCase().includes('stt') || firstText.toLowerCase().includes('tiêu chuẩn') || firstText.toLowerCase().includes('nội dung')) {
-              return;
-            }
-
-            if (secondText.length > 3 || firstText.length > 3) {
-              const code = `CUSTOM-${String(counter).padStart(2, '0')}`;
-              const standard = secondText.length > 3 ? secondText : firstText;
-              const category = cells.length > 2 && thirdText ? thirdText : 'Tiêu chuẩn từ HTML';
-
-              // Check if checkbox exists in row
-              const checkbox = row.querySelector('input[type="checkbox"]');
-              const isChecked = checkbox ? (checkbox as HTMLInputElement).checked : false;
-
-              extractedItems.push({
-                id: `H-IMPORT-${counter}-${Date.now()}`,
-                code,
-                group: 'custom',
-                groupLabel: 'Danh mục nhập từ HTML',
-                category: category.slice(0, 50),
-                standard,
-                defectDesc: 'Không tuân thủ yêu cầu kiểm soát theo biểu mẫu checklist nhập.',
-                severity: 'Major',
-                legalRef: 'Biểu mẫu nhập người dùng'
-              });
-
-              if (isChecked) {
-                extractedStates[`H-IMPORT-${counter}-${Date.now()}`] = {
-                  status: 'pass',
-                  note: 'Đã tích chọn trong file HTML gốc',
-                  capa: ''
-                };
-              }
-
-              counter++;
-            }
+    // D. Firestore Real-time Listeners (for multi-user / multi-tab cloud sync)
+    const unsubSession = onSnapshot(doc(db, 'fast_haccp_crm', 'current_session'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && data._lastUpdated) {
+          // If remote update is newer than local, merge
+          const localTimestamp = localStorage.getItem('fast_haccp_current_ts');
+          if (!localTimestamp || Number(data._lastUpdated) > Number(localTimestamp)) {
+            applyStateData(data);
+            localStorage.setItem('fast_haccp_current', JSON.stringify(data));
+            localStorage.setItem('fast_haccp_current_ts', String(data._lastUpdated));
           }
+        }
+      }
+    }, (err) => console.warn('[FastHaccp] Session listener error:', err));
+
+    const unsubCrm = onSnapshot(doc(db, 'fast_haccp_crm', 'database'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && data.records) {
+          setCrmRecords(data.records);
+          localStorage.setItem('fast_haccp_crm', JSON.stringify(data.records));
+        }
+      }
+    }, (err) => console.warn('[FastHaccp] CRM listener error:', err));
+
+    return () => {
+      window.removeEventListener('haccp_items_updated', handleFastDevUpdate);
+      unsubSession();
+      unsubCrm();
+    };
+  }, []);
+
+  // Helper to apply state data object into React state
+  const applyStateData = (data: Record<string, any>) => {
+    if (!data) return;
+    if (data.clientName !== undefined) setClientName(data.clientName || '');
+    if (data.auditType !== undefined) setAuditType(data.auditType || '');
+    if (data.auditAddress !== undefined) setAuditAddress(data.auditAddress || '');
+    if (data.fsmsScope !== undefined) setFsmsScope(data.fsmsScope || '');
+    if (data.contactPhone !== undefined) setContactPhone(data.contactPhone || '');
+    if (data.auditDate !== undefined) setAuditDate(data.auditDate || '');
+    if (data.reportNo !== undefined) setReportNo(data.reportNo || '');
+
+    const newComp: Record<string, string> = {};
+    const newSev: Record<string, string> = {};
+    const newCmt: Record<string, string> = {};
+
+    Object.keys(data).forEach((key) => {
+      if (key.startsWith('comp_')) {
+        const id = key.replace('comp_', '');
+        newComp[id] = data[key];
+      } else if (key.startsWith('sev_')) {
+        const id = key.replace('sev_', '');
+        newSev[id] = data[key];
+      } else if (key.startsWith('cmt_')) {
+        const id = key.replace('cmt_', '');
+        newCmt[id] = data[key];
+      }
+    });
+
+    setCompliance(newComp);
+    setSeverities(newSev);
+    setComments(newCmt);
+  };
+
+  // Compile current state data into object
+  const getCurrentStateDataObject = () => {
+    const data: Record<string, any> = {
+      clientName,
+      auditType,
+      auditAddress,
+      fsmsScope,
+      contactPhone,
+      auditDate,
+      reportNo,
+      _progress: `${progressPercentage}%`,
+      _completed: completedItemsCount,
+      _total: totalItemsCount,
+      _lastUpdated: Date.now()
+    };
+
+    Object.keys(compliance).forEach((id) => {
+      if (compliance[id]) data[`comp_${id}`] = compliance[id];
+    });
+    Object.keys(severities).forEach((id) => {
+      if (severities[id]) data[`sev_${id}`] = severities[id];
+    });
+    Object.keys(comments).forEach((id) => {
+      if (comments[id]) data[`cmt_${id}`] = comments[id];
+    });
+
+    return data;
+  };
+
+  // Save state debounced
+  const triggerSaveState = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(async () => {
+      const data = getCurrentStateDataObject();
+      // 1. LocalStorage
+      localStorage.setItem('fast_haccp_current', JSON.stringify(data));
+      localStorage.setItem('fast_haccp_current_ts', String(data._lastUpdated));
+
+      // 2. Cloud Firestore Sync
+      try {
+        await setDoc(doc(db, 'fast_haccp_crm', 'current_session'), data, { merge: true });
+      } catch (err) {
+        console.warn('[FastHaccp] Cloud save error:', err);
+      }
+    }, 400);
+  };
+
+  // New Client Action
+  const newClient = () => {
+    if (window.confirm("Tạo mới sẽ xóa form hiện tại (hãy chắc chắn bạn đã nhấn 'Lưu CRM'). Tiếp tục?")) {
+      localStorage.removeItem('fast_haccp_current');
+      localStorage.removeItem('fast_haccp_current_ts');
+      setClientName('');
+      setAuditType('');
+      setAuditAddress('');
+      setFsmsScope('');
+      setContactPhone('');
+      setAuditDate('');
+      setReportNo('');
+      setCompliance({});
+      setSeverities({});
+      setComments({});
+
+      // Reset Cloud Session
+      try {
+        setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
+          clientName: '',
+          auditType: '',
+          auditAddress: '',
+          fsmsScope: '',
+          contactPhone: '',
+          auditDate: '',
+          reportNo: '',
+          _progress: '0%',
+          _lastUpdated: Date.now()
         });
-      }
-
-      // 2. If table rows yielded few items, try list items <li> or elements with checkboxes
-      if (extractedItems.length === 0) {
-        const listItems = doc.querySelectorAll('li, div.item, div.checklist-item, label');
-        let counter = 1;
-        listItems.forEach(el => {
-          const text = el.textContent?.trim() || '';
-          if (text.length > 10 && text.length < 300) {
-            const code = `IMP-${String(counter).padStart(2, '0')}`;
-            const checkbox = el.querySelector('input[type="checkbox"]');
-            const isChecked = checkbox ? (checkbox as HTMLInputElement).checked : false;
-            const itemId = `H-IMPORT-${counter}-${Date.now()}`;
-
-            extractedItems.push({
-              id: itemId,
-              code,
-              group: 'custom',
-              groupLabel: 'Danh mục nhập từ HTML',
-              category: 'Mục kiểm tra nhập từ HTML',
-              standard: text,
-              defectDesc: 'Chưa đạt yêu cầu theo danh mục kiểm tra đính kèm.',
-              severity: 'Major',
-              legalRef: 'File HTML đính kèm'
-            });
-
-            if (isChecked) {
-              extractedStates[itemId] = {
-                status: 'pass',
-                note: 'Tích chọn trong file',
-                capa: ''
-              };
-            }
-
-            counter++;
-          }
-        });
-      }
-
-      if (extractedItems.length === 0) {
-        showWarningToast('Không tìm thấy cấu trúc bảng/danh sách chuẩn trong đoạn HTML. Đã chuyển sang thêm nội dung mẫu.');
-        return;
-      }
-
-      // Merge into customItems and itemsState
-      setCustomItems(prev => [...prev, ...extractedItems]);
-      setItemsState(prev => ({ ...prev, ...extractedStates }));
-      setImportSummary(`Đã nạp thành công ${extractedItems.length} tiêu chuẩn kiểm tra từ file HTML vào hệ thống!`);
-      showSuccessToast(`Đã nạp ${extractedItems.length} mục kiểm tra từ HTML`);
-      setShowImportModal(false);
-      setHtmlInputCode('');
-      setTimeout(triggerActiveSessionSave, 200);
-    } catch (err) {
-      console.error('Lỗi khi phân tích mã HTML:', err);
-      showErrorToast('Lỗi phân tích mã HTML. Vui lòng kiểm tra lại định dạng tệp.');
+      } catch (e) {}
     }
   };
 
-  // Filtered items
-  const filteredItems = useMemo(() => {
-    return allItems.filter(item => {
-      // Group filter
-      if (activeGroupFilter !== 'all' && item.group !== activeGroupFilter) {
-        return false;
-      }
+  // Save to CRM Action
+  const saveToCRM = async () => {
+    const currentData = getCurrentStateDataObject();
+    if (!currentData || !currentData.clientName || !currentData.clientName.trim()) {
+      alert("Vui lòng điền 'Tên Khách Hàng' trước khi lưu CRM!");
+      return;
+    }
 
-      // Status filter
-      if (statusFilter !== 'all') {
-        const itemState = itemsState[item.id];
-        const currentStatus = itemState?.status || 'pending';
-        if (currentStatus !== statusFilter) return false;
-      }
+    const recordId = `${currentData.clientName.trim()}_${currentData.auditDate || 'nodate'}`;
+    currentData._progress = `${progressPercentage}%`;
 
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchCode = item.code.toLowerCase().includes(q);
-        const matchCategory = item.category.toLowerCase().includes(q);
-        const matchStd = item.standard.toLowerCase().includes(q);
-        const matchLegal = item.legalRef ? item.legalRef.toLowerCase().includes(q) : false;
-        if (!matchCode && !matchCategory && !matchStd && !matchLegal) return false;
-      }
+    const updatedCrm = {
+      ...crmRecords,
+      [recordId]: currentData
+    };
 
-      return true;
+    setCrmRecords(updatedCrm);
+    localStorage.setItem('fast_haccp_crm', JSON.stringify(updatedCrm));
+
+    // Sync to Cloud Firestore
+    try {
+      await setDoc(doc(db, 'fast_haccp_crm', 'database'), {
+        records: updatedCrm,
+        _lastUpdated: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.warn('[FastHaccp] CRM Cloud sync error:', e);
+    }
+
+    alert("Đã lưu thông tin khách hàng vào CRM thành công!");
+  };
+
+  // Open CRM Modal
+  const openCRM = () => {
+    setIsCrmOpen(true);
+  };
+
+  // Close CRM Modal
+  const closeCRM = () => {
+    setIsCrmOpen(false);
+  };
+
+  // Load Record from CRM
+  const loadRecord = (id: string) => {
+    if (window.confirm("Tải dữ liệu này sẽ ghi đè lên form hiện tại. Tiếp tục?")) {
+      const rec = crmRecords[id];
+      if (rec) {
+        applyStateData(rec);
+        localStorage.setItem('fast_haccp_current', JSON.stringify(rec));
+        localStorage.setItem('fast_haccp_current_ts', String(Date.now()));
+        try {
+          setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
+            ...rec,
+            _lastUpdated: Date.now()
+          }, { merge: true });
+        } catch (e) {}
+        closeCRM();
+      }
+    }
+  };
+
+  // Delete Record from CRM
+  const deleteRecord = async (id: string) => {
+    if (window.confirm("Xóa khách hàng này khỏi CRM?")) {
+      const updated = { ...crmRecords };
+      delete updated[id];
+      setCrmRecords(updated);
+      localStorage.setItem('fast_haccp_crm', JSON.stringify(updated));
+
+      // Sync to Cloud Firestore
+      try {
+        await setDoc(doc(db, 'fast_haccp_crm', 'database'), {
+          records: updated,
+          _lastUpdated: Date.now()
+        });
+      } catch (e) {}
+    }
+  };
+
+  // Toggle All Sections Open / Closed
+  const toggleAll = (isOpen: boolean) => {
+    const detailsList = document.querySelectorAll('.fast-haccp-wrapper details');
+    detailsList.forEach((d) => {
+      (d as HTMLDetailsElement).open = isOpen;
     });
-  }, [allItems, activeGroupFilter, statusFilter, searchQuery, itemsState]);
+  };
+
+  // Generate Defect Report Window (Non-Conformity Report)
+  const generateReport = () => {
+    const data = getCurrentStateDataObject();
+
+    let majorCount = 0;
+    let minorCount = 0;
+    let obsCount = 0;
+    let reportRows = '';
+
+    allSections.forEach((section) => {
+      section.items.forEach((item) => {
+        const severity = data[`sev_${item.id}`];
+        const notes = data[`cmt_${item.id}`] || '';
+        const status = data[`comp_${item.id}`] || 'Chưa đánh giá';
+
+        if (severity === 'Major' || severity === 'Minor' || severity === 'Observation') {
+          if (severity === 'Major') majorCount++;
+          if (severity === 'Minor') minorCount++;
+          if (severity === 'Observation') obsCount++;
+
+          const badgeColor = severity === 'Major' ? '#d9534f' : (severity === 'Minor' ? '#f0ad4e' : '#0275d8');
+
+          reportRows += `
+            <tr>
+                <td style="text-align:center;"><strong>${item.id}</strong></td>
+                <td>${item.text}</td>
+                <td style="text-align:center;"><strong>${status}</strong></td>
+                <td style="text-align:center; color:${badgeColor}; font-weight:bold;">${severity}</td>
+                <td>${notes}</td>
+            </tr>
+          `;
+        }
+      });
+    });
+
+    if (!reportRows) {
+      alert("Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo!");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Vui lòng cho phép mở cửa sổ popup để xuất báo cáo in!");
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="UTF-8">
+          <title>Báo Cáo Lỗi Đánh Giá - FAST CONSULTING</title>
+          <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; line-height: 1.5; }
+              h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; font-size: 20px; }
+              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f4f8f8; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; }
+              .info-grid div { margin-bottom: 5px; }
+              .summary { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-weight: bold; background: #fff; }
+              .badge-major { color: #d9534f; } .badge-minor { color: #f0ad4e; } .badge-obs { color: #0275d8; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+              th, td { border: 1px solid #000; padding: 10px; text-align: left; }
+              th { background-color: #007c76; color: white; text-align: center; }
+              @media print { body { padding: 0; } .info-grid { background: transparent; border: none; padding: 0; } }
+          </style>
+      </head>
+      <body>
+          <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ (NON-CONFORMITY REPORT)</h1>
+          <div class="info-grid">
+              <div><strong>Khách hàng:</strong> ${data.clientName || '...........................................'}</div>
+              <div><strong>Loại đánh giá:</strong> ${data.auditType || '...........................................'}</div>
+              <div><strong>Ngày đánh giá:</strong> ${data.auditDate || '...........................................'}</div>
+              <div><strong>Địa chỉ:</strong> ${data.auditAddress || '...........................................'}</div>
+              <div><strong>Phạm vi:</strong> ${data.fsmsScope || '...........................................'}</div>
+              <div><strong>Số Report:</strong> ${data.reportNo || '...........................................'}</div>
+          </div>
+
+          <div class="summary">
+              <span>Tổng số lỗi phát hiện: ${majorCount + minorCount + obsCount}</span>
+              <span class="badge-major">Major: ${majorCount}</span>
+              <span class="badge-minor">Minor: ${minorCount}</span>
+              <span class="badge-obs">Observation: ${obsCount}</span>
+          </div>
+
+          <table>
+              <thead>
+                  <tr>
+                      <th style="width: 8%;">Điều khoản</th>
+                      <th style="width: 35%;">Yêu cầu & Hướng dẫn</th>
+                      <th style="width: 10%;">Đánh giá</th>
+                      <th style="width: 15%;">Phân loại</th>
+                      <th style="width: 32%;">Bằng chứng & Ghi chú</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${reportRows}
+              </tbody>
+          </table>
+          
+          <div style="margin-top: 50px; display: flex; justify-content: space-around;">
+              <div style="text-align: center;">
+                  <strong>Đại diện Khách Hàng</strong><br><br><br><br>
+                  .......................................
+              </div>
+              <div style="text-align: center;">
+                  <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br><br><br><br>
+                  .......................................
+              </div>
+          </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
+  // Filtered Checklist Sections
+  const filteredSections = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return allSections.map(sec => ({ ...sec, visible: true, matchedItemIds: new Set(sec.items.map(it => it.id)) }));
+    }
+    const q = searchQuery.toLowerCase().trim();
+    return allSections.map(sec => {
+      const matched = new Set<string>();
+      sec.items.forEach(it => {
+        if (it.id.toLowerCase().includes(q) || it.text.toLowerCase().includes(q)) {
+          matched.add(it.id);
+        }
+      });
+      return {
+        ...sec,
+        visible: matched.size > 0,
+        matchedItemIds: matched
+      };
+    });
+  }, [allSections, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* 1. Header Hero Banner (Screen Only) */}
-      <div className="fast-audit-screen-only bg-gradient-to-br from-[#005c56] via-[#006e66] to-[#007c76] rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden border border-teal-500/20">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-teal-400/20 border border-teal-300/30 text-teal-200 text-xs font-black uppercase tracking-wider shadow-xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-teal-300" />
-              <span>Tiêu Chuẩn Quốc Tế Codex & TCVN</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-white/80">{sessionSyncStatus}</span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-3">
-              HACCP Checklist & Thẩm Tra An Toàn
-            </h1>
-            <p className="text-teal-100/90 text-xs md:text-sm font-medium max-w-2xl leading-relaxed">
-              Hệ thống thẩm tra toàn diện 12 bước & 7 nguyên tắc cốt lõi, xác định điểm kiểm soát tới hạn (CCP) và giám sát chương trình tiên quyết (PRP / SSOP).
-            </p>
+    <div className="fast-haccp-wrapper">
+      {/* Scoped CSS matching user's exact specification */}
+      <style>{`
+        .fast-haccp-wrapper {
+          --primary: #007c76;
+          --primary-dark: #005a56;
+          --primary-light: #e6f2f1;
+          --bg-color: #f4f8f8;
+          --text-main: #333333;
+          --text-muted: #666666;
+          --border-color: #cccccc;
+          --accent-red: #d9534f;
+          --accent-green: #5cb85c;
+          --accent-blue: #0275d8;
+          --accent-orange: #f0ad4e;
+          --white: #ffffff;
+          --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+          --radius: 8px;
+          --font-family: 'Segoe UI', -apple-system, Roboto, sans-serif;
+          font-family: var(--font-family);
+          background-color: var(--bg-color);
+          color: var(--text-main);
+          line-height: 1.6;
+          border-radius: var(--radius);
+          overflow: hidden;
+        }
+
+        .fast-haccp-wrapper * {
+          box-sizing: border-box;
+        }
+
+        /* Header */
+        .fast-haccp-wrapper header {
+          background-color: var(--primary);
+          color: var(--white);
+          padding: 20px;
+          box-shadow: var(--shadow);
+          position: sticky;
+          top: 0;
+          z-index: 50;
+        }
+
+        .fast-haccp-wrapper .header-container {
+          max-width: 1200px;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 15px;
+        }
+
+        .fast-haccp-wrapper .brand-info h1 {
+          font-size: 24px;
+          margin-bottom: 5px;
+          font-weight: bold;
+          color: #ffffff;
+        }
+
+        .fast-haccp-wrapper .brand-info p {
+          font-size: 14px;
+          opacity: 0.9;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #ffffff;
+        }
+
+        .fast-haccp-wrapper .hotline {
+          background-color: var(--accent-red);
+          color: var(--white) !important;
+          padding: 10px 20px;
+          border-radius: 50px;
+          text-decoration: none;
+          font-weight: bold;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          transition: background 0.3s;
+        }
+
+        .fast-haccp-wrapper .hotline:hover {
+          background-color: #c9302c;
+        }
+
+        /* Container & Action Bar */
+        .fast-haccp-wrapper .container {
+          max-width: 1200px;
+          margin: 30px auto;
+          padding: 0 20px;
+        }
+
+        .fast-haccp-wrapper .action-bar {
+          background: var(--white);
+          padding: 15px 20px;
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          display: flex;
+          gap: 15px;
+          margin-bottom: 25px;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .fast-haccp-wrapper .search-box {
+          flex: 1;
+          min-width: 250px;
+        }
+
+        .fast-haccp-wrapper .search-box input {
+          width: 100%;
+          padding: 10px 15px;
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius);
+          font-size: 15px;
+          outline: none;
+          transition: border-color 0.2s;
+          background-color: #fff;
+          color: #333;
+        }
+
+        .fast-haccp-wrapper .search-box input:focus {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 2px var(--primary-light);
+        }
+
+        .fast-haccp-wrapper .btn-group {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .fast-haccp-wrapper button {
+          padding: 10px 15px;
+          border: none;
+          border-radius: var(--radius);
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .fast-haccp-wrapper .btn-primary {
+          background: var(--primary);
+          color: var(--white);
+        }
+
+        .fast-haccp-wrapper .btn-primary:hover {
+          background: var(--primary-dark);
+        }
+
+        .fast-haccp-wrapper .btn-outline {
+          background: var(--white);
+          color: var(--primary);
+          border: 1px solid var(--primary);
+        }
+
+        .fast-haccp-wrapper .btn-outline:hover {
+          background: var(--primary-light);
+        }
+
+        .fast-haccp-wrapper .btn-danger {
+          background: var(--accent-red);
+          color: var(--white);
+        }
+
+        .fast-haccp-wrapper .btn-danger:hover {
+          background: #c9302c;
+        }
+
+        .fast-haccp-wrapper .btn-info {
+          background: var(--accent-blue);
+          color: var(--white);
+        }
+
+        .fast-haccp-wrapper .btn-info:hover {
+          background: #025aa5;
+        }
+
+        .fast-haccp-wrapper .btn-warning {
+          background: var(--accent-orange);
+          color: var(--white);
+        }
+
+        .fast-haccp-wrapper .btn-warning:hover {
+          background: #ec971f;
+        }
+
+        /* Progress Tracker */
+        .fast-haccp-wrapper .progress-container {
+          background: var(--white);
+          padding: 20px;
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          margin-bottom: 25px;
+        }
+
+        .fast-haccp-wrapper .progress-header {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          font-weight: bold;
+        }
+
+        .fast-haccp-wrapper .progress-bar-bg {
+          background: var(--border-color);
+          height: 12px;
+          border-radius: 10px;
+          overflow: hidden;
+        }
+
+        .fast-haccp-wrapper .progress-bar-fill {
+          background: var(--accent-green);
+          height: 100%;
+          transition: width 0.4s ease;
+        }
+
+        /* Audit Info Form */
+        .fast-haccp-wrapper .client-section {
+          background: var(--white);
+          padding: 20px;
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          margin-bottom: 25px;
+        }
+
+        .fast-haccp-wrapper .client-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .fast-haccp-wrapper .client-header h2 {
+          font-size: 18px;
+          color: var(--primary-dark);
+          font-weight: bold;
+        }
+
+        .fast-haccp-wrapper .audit-info {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 15px;
+        }
+
+        .fast-haccp-wrapper .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .fast-haccp-wrapper .form-group label {
+          font-weight: 600;
+          font-size: 14px;
+          color: var(--text-main);
+        }
+
+        .fast-haccp-wrapper .form-group input,
+        .fast-haccp-wrapper .form-group select {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          font-family: inherit;
+          background-color: #fff;
+          color: #333;
+        }
+
+        .fast-haccp-wrapper .form-group select:focus,
+        .fast-haccp-wrapper .form-group input:focus {
+          outline: none;
+          border-color: var(--primary);
+        }
+
+        /* Checklist Sections */
+        .fast-haccp-wrapper details {
+          background: var(--white);
+          margin-bottom: 15px;
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          overflow: hidden;
+        }
+
+        .fast-haccp-wrapper summary {
+          padding: 15px 20px;
+          background: var(--primary-light);
+          font-weight: bold;
+          font-size: 16px;
+          cursor: pointer;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          color: var(--primary-dark);
+          user-select: none;
+        }
+
+        .fast-haccp-wrapper summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .fast-haccp-wrapper summary::before {
+          content: '▶';
+          display: inline-block;
+          margin-right: 10px;
+          transition: transform 0.3s;
+          font-size: 12px;
+        }
+
+        .fast-haccp-wrapper details[open] summary::before {
+          transform: rotate(90deg);
+        }
+
+        .fast-haccp-wrapper .table-responsive {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .fast-haccp-wrapper table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 800px;
+        }
+
+        .fast-haccp-wrapper th,
+        .fast-haccp-wrapper td {
+          padding: 12px 15px;
+          border: 1px solid var(--border-color);
+          text-align: left;
+          vertical-align: top;
+        }
+
+        .fast-haccp-wrapper th {
+          background: var(--bg-color);
+          font-weight: bold;
+          text-align: center;
+        }
+
+        .fast-haccp-wrapper .col-req { width: 45%; }
+        .fast-haccp-wrapper .col-comp { width: 20%; text-align: center; }
+        .fast-haccp-wrapper .col-ev { width: 35%; }
+
+        .fast-haccp-wrapper .radio-group {
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+        }
+
+        .fast-haccp-wrapper .radio-label {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+        }
+
+        .fast-haccp-wrapper .radio-label input {
+          width: 18px;
+          height: 18px;
+          margin-bottom: 4px;
+          cursor: pointer;
+          accent-color: var(--primary);
+        }
+
+        .fast-haccp-wrapper .severity-select {
+          width: 100%;
+          padding: 8px;
+          margin-bottom: 8px;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          font-family: inherit;
+          background-color: #fff;
+          color: #333;
+        }
+
+        .fast-haccp-wrapper textarea {
+          width: 100%;
+          min-height: 60px;
+          padding: 10px;
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          resize: vertical;
+          font-family: inherit;
+          background-color: #fff;
+          color: #333;
+        }
+
+        .fast-haccp-wrapper textarea:focus,
+        .fast-haccp-wrapper .severity-select:focus {
+          outline: none;
+          border-color: var(--primary);
+        }
+
+        /* CRM Modal */
+        .fast-haccp-wrapper .modal {
+          display: flex;
+          position: fixed;
+          z-index: 10000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          overflow: auto;
+          background-color: rgba(0,0,0,0.6);
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .fast-haccp-wrapper .modal-content {
+          background-color: #fefefe;
+          padding: 24px;
+          border: 1px solid #888;
+          width: 100%;
+          max-width: 900px;
+          border-radius: var(--radius);
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        .fast-haccp-wrapper .close {
+          color: #aaa;
+          float: right;
+          font-size: 28px;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        .fast-haccp-wrapper .close:hover {
+          color: black;
+        }
+
+        .fast-haccp-wrapper .crm-table th,
+        .fast-haccp-wrapper .crm-table td {
+          text-align: center;
+        }
+
+        /* Print CSS */
+        @media print {
+          body { background: #fff !important; color: #000 !important; font-size: 12pt !important; }
+          .fast-haccp-wrapper header,
+          .fast-haccp-wrapper .action-bar,
+          .fast-haccp-wrapper .progress-container,
+          .fast-haccp-wrapper .client-header .btn-group {
+            display: none !important;
+          }
+          .fast-haccp-wrapper .container { margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+          .fast-haccp-wrapper .client-section,
+          .fast-haccp-wrapper details { box-shadow: none !important; border: none !important; margin-bottom: 10px !important; }
+          .fast-haccp-wrapper details[open] summary { border-bottom: 2px solid #000 !important; background: #eee !important; -webkit-print-color-adjust: exact !important; color: #000 !important; }
+          .fast-haccp-wrapper summary::before { display: none !important; }
+          .fast-haccp-wrapper table { page-break-inside: avoid !important; border: 1px solid #000 !important; margin-bottom: 15px !important; }
+          .fast-haccp-wrapper th,
+          .fast-haccp-wrapper td { border: 1px solid #000 !important; }
+          .fast-haccp-wrapper th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact !important; }
+          .fast-haccp-wrapper textarea,
+          .fast-haccp-wrapper .severity-select { border: none !important; border-bottom: 1px dotted #ccc !important; resize: none !important; min-height: auto !important; padding: 2px !important; }
+          .fast-haccp-wrapper .severity-select { -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important; }
+          .fast-haccp-wrapper .radio-label input { display: none !important; }
+          .fast-haccp-wrapper .radio-label { flex-direction: row !important; font-size: 14px !important; }
+          .fast-haccp-wrapper .radio-label input:checked + span { font-weight: bold !important; text-decoration: underline !important; }
+          .fast-haccp-wrapper .radio-label input:not(:checked) + span { display: none !important; }
+        }
+      `}</style>
+
+      {/* Header */}
+      <header>
+        <div className="header-container">
+          <div className="brand-info">
+            <h1>FAST CONSULTING</h1>
+            <p>Checklist đánh giá HACCP CODEX 2022</p>
           </div>
+          <a href="tel:0927002668" className="hotline">📞 0927 002 668</a>
+        </div>
+      </header>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
-              title="Nhập dữ liệu bảng kiểm từ file HTML"
-            >
-              <Code className="w-4 h-4 text-teal-300" />
-              <span>Nhập Mã HTML</span>
-            </button>
-
-            <button
-              onClick={handleSaveToDatabase}
-              className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-teal-950 font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-teal-950/20 active:scale-95 cursor-pointer"
-            >
-              <Database className="w-4 h-4" />
-              <span>Lưu Cơ Sở Dữ Liệu</span>
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              title="In phiếu thẩm tra"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">In Phiếu</span>
-            </button>
+      <div className="container">
+        {/* Action Bar */}
+        <div className="action-bar">
+          <div className="search-box">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Tìm kiếm tiêu chuẩn, quy trình, từ khóa..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="btn-group">
+            <button className="btn-outline" onClick={() => toggleAll(true)}>Mở rộng tất cả</button>
+            <button className="btn-outline" onClick={() => toggleAll(false)}>Thu gọn tất cả</button>
+            <button className="btn-primary" onClick={() => window.print()}>🖨 In Checklist</button>
+            <button className="btn-warning" onClick={generateReport}>📄 Xuất Báo Cáo Lỗi</button>
           </div>
         </div>
 
-        {/* Real-time KPI Stats Bar */}
-        <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-center">
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Điểm Tuân Thủ</span>
-            <span className={`text-xl sm:text-2xl font-black ${stats.score >= 85 ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {stats.score}%
+        {/* Progress Tracker */}
+        <div className="progress-container">
+          <div className="progress-header">
+            <span>Tiến độ đánh giá:</span>
+            <span id="progressText">
+              Đã hoàn thành: {completedItemsCount} / {totalItemsCount} mục ({progressPercentage}%)
             </span>
           </div>
-
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Đạt Chuẩn</span>
-            <span className="text-xl sm:text-2xl font-black text-emerald-300">
-              {stats.pass} <span className="text-xs font-normal text-white/60">/{stats.total}</span>
-            </span>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Lỗi Cần CAPA</span>
-            <span className={`text-xl sm:text-2xl font-black ${stats.fail > 0 ? 'text-rose-300' : 'text-white'}`}>
-              {stats.fail}
-            </span>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Lỗi Trọng Yếu CCP</span>
-            <span className={`text-xl sm:text-2xl font-black ${stats.criticalFail > 0 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
-              {stats.criticalFail}
-            </span>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Chưa Đánh Giá</span>
-            <span className="text-xl sm:text-2xl font-black text-white/90">
-              {stats.pending}
-            </span>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs rounded-2xl p-3 border border-white/10 col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-bold text-teal-200 uppercase tracking-wider block">Kết Luận</span>
-            <span className={`text-xs sm:text-sm font-black block mt-1 ${stats.isPassed ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {stats.isPassed ? 'ĐẠT CHUẨN HACCP' : 'CẦN KHẮC PHỤC'}
-            </span>
+          <div className="progress-bar-bg">
+            <div
+              className="progress-bar-fill"
+              id="progressBar"
+              style={{ width: `${progressPercentage}%` }}
+            />
           </div>
         </div>
-      </div>
 
-      {/* 2. Navigation Tabs (Screen Only) */}
-      <div className="fast-audit-screen-only bg-white p-2 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar">
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'audit'
-                ? 'bg-[#007c76] text-white shadow-md shadow-teal-700/20'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Bảng Kiểm Toán ({allItems.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('database')}
-            className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'database'
-                ? 'bg-[#007c76] text-white shadow-md shadow-teal-700/20'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Database className="w-4 h-4" />
-            <span>Lịch Sử Hồ Sơ ({database?.length || 0})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('report')}
-            className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'report'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
-                : 'text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Báo Cáo Thẩm Tra & CAPA</span>
-          </button>
-        </div>
-
-        {/* Global Reset Button */}
-        <button
-          onClick={handleResetForm}
-          className="px-3 py-2 rounded-xl text-gray-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-          title="Làm mới phiếu đánh giá hiện tại"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Làm mới form</span>
-        </button>
-      </div>
-
-      {/* TAB 1: BẢNG KIỂM TOÁN CHÍNH */}
-      {activeTab === 'audit' && (
-        <div className="space-y-6">
-          {/* Facility Info Card */}
-          <div className="fast-audit-screen-only bg-white p-5 md:p-6 rounded-3xl border border-gray-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-sm font-black text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-[#007c76]" />
-                <span>Thông Tin Cơ Sở & Phạm Vi Đánh Giá HACCP</span>
-              </h3>
-              <span className="text-[11px] font-bold text-gray-400">Tự động đồng bộ đám mây</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Tên Doanh Nghiệp / Cơ Sở
-                </label>
-                <LocalSyncInput
-                  value={facilityName}
-                  onCommit={(val) => {
-                    setFacilityName(val);
-                    triggerActiveSessionSave();
-                  }}
-                  placeholder="Ví dụ: Công ty TNHH Chế biến Thực phẩm FAST"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Đội Trưởng HACCP / Người Phụ Trách
-                </label>
-                <LocalSyncInput
-                  value={teamLeader}
-                  onCommit={(val) => {
-                    setTeamLeader(val);
-                    triggerActiveSessionSave();
-                  }}
-                  placeholder="Họ và tên người phụ trách an toàn"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Chuyên Viên / Đánh Giá Viên
-                </label>
-                <LocalSyncInput
-                  value={auditorName}
-                  onCommit={(val) => {
-                    setAuditorName(val);
-                    triggerActiveSessionSave();
-                  }}
-                  placeholder="Tên chuyên viên đánh giá"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Ngày Thực Hiện Đánh Giá
-                </label>
-                <input
-                  type="date"
-                  value={auditDate}
-                  onChange={(e) => {
-                    setAuditDate(e.target.value);
-                    triggerActiveSessionSave();
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Số Điện Thoại Liên Hệ
-                </label>
-                <LocalSyncInput
-                  value={contactPhone}
-                  onCommit={(val) => {
-                    setContactPhone(val);
-                    triggerActiveSessionSave();
-                  }}
-                  placeholder="09xx xxx xxx"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                  Phạm Vi Sản Phẩm Áp Dụng
-                </label>
-                <LocalSyncInput
-                  value={productScope}
-                  onCommit={(val) => {
-                    setProductScope(val);
-                    triggerActiveSessionSave();
-                  }}
-                  placeholder="Dây chuyền chế biến, nhóm sản phẩm..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 focus:bg-white focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/20 outline-none transition-all"
-                />
-              </div>
+        {/* Client & CRM Info */}
+        <div className="client-section">
+          <div className="client-header">
+            <h2>Thông Tin Khách Hàng</h2>
+            <div className="btn-group">
+              <button className="btn-danger" onClick={newClient}>➕ Tạo mới</button>
+              <button className="btn-primary" onClick={saveToCRM}>💾 Lưu CRM</button>
+              <button className="btn-info" onClick={openCRM}>📊 Dữ liệu CRM</button>
             </div>
           </div>
-
-          {/* Filter Bar & Search */}
-          <div className="fast-audit-screen-only bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Search Box */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className="audit-info">
+            <div className="form-group">
+              <label htmlFor="clientName">Tên Khách Hàng:</label>
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm theo mã (B01, NT02...), từ khóa tiêu chuẩn, CCP..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 focus:bg-white focus:border-[#007c76] outline-none transition-all"
+                id="clientName"
+                className="save-state"
+                value={clientName}
+                onChange={(e) => {
+                  setClientName(e.target.value);
+                  triggerSaveState();
+                }}
               />
             </div>
-
-            {/* Filter Buttons */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Nhóm:</span>
-              {[
-                { id: 'all', label: 'Tất cả' },
-                { id: 'preliminary', label: '5 Bước Sơ Bộ' },
-                { id: 'principles', label: '7 Nguyên Tắc' },
-                { id: 'prp', label: 'PRP & SSOP' },
-                ...(customItems.length > 0 ? [{ id: 'custom', label: `Nhập HTML (${customItems.length})` }] : [])
-              ].map(grp => (
-                <button
-                  key={grp.id}
-                  onClick={() => setActiveGroupFilter(grp.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeGroupFilter === grp.id
-                      ? 'bg-[#007c76] text-white shadow-2xs'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {grp.label}
-                </button>
-              ))}
-
-              <button
-                onClick={handleMarkAllFilteredPass}
-                className="ml-2 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
-                title="Đánh dấu toàn bộ mục đang lọc là Đạt"
+            <div className="form-group">
+              <label htmlFor="auditType">Loại đánh giá:</label>
+              <select
+                id="auditType"
+                className="save-state"
+                value={auditType}
+                onChange={(e) => {
+                  setAuditType(e.target.value);
+                  triggerSaveState();
+                }}
               >
-                <Check className="w-3.5 h-3.5" />
-                <span>Đạt Tất Cả</span>
-              </button>
+                <option value="">-- Chọn Loại Đánh Giá --</option>
+                <option value="Đánh giá Khảo sát">Đánh giá Khảo sát</option>
+                <option value="Đánh giá nội bộ">Đánh giá nội bộ</option>
+                <option value="Đánh giá Chứng Nhận">Đánh giá Chứng Nhận</option>
+                <option value="Đánh giá giám sát">Đánh giá giám sát</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="auditAddress">Địa chỉ đánh giá:</label>
+              <input
+                type="text"
+                id="auditAddress"
+                className="save-state"
+                value={auditAddress}
+                onChange={(e) => {
+                  setAuditAddress(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="fsmsScope">Phạm vi FSMS (Audit Scope):</label>
+              <input
+                type="text"
+                id="fsmsScope"
+                className="save-state"
+                value={fsmsScope}
+                onChange={(e) => {
+                  setFsmsScope(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="contactPhone">Số điện thoại liên hệ:</label>
+              <input
+                type="text"
+                id="contactPhone"
+                className="save-state"
+                value={contactPhone}
+                onChange={(e) => {
+                  setContactPhone(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="auditDate">Ngày đánh giá:</label>
+              <input
+                type="date"
+                id="auditDate"
+                className="save-state"
+                value={auditDate}
+                onChange={(e) => {
+                  setAuditDate(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="reportNo">Report (Số báo cáo):</label>
+              <input
+                type="text"
+                id="reportNo"
+                className="save-state"
+                value={reportNo}
+                onChange={(e) => {
+                  setReportNo(e.target.value);
+                  triggerSaveState();
+                }}
+              />
             </div>
           </div>
+        </div>
 
-          {/* Main Checklist Items Table */}
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+        {/* Checklist Container */}
+        <div id="checklistContainer">
+          {filteredSections.map((section, sIndex) => {
+            if (!section.visible) return null;
+            return (
+              <details key={sIndex} open className="checklist-section">
+                <summary>{section.section}</summary>
+                <div className="table-responsive">
+                  <table data-section={sIndex}>
+                    <thead>
+                      <tr>
+                        <th className="col-req">
+                          Yêu cầu & Hướng dẫn<br />
+                          <small>(Requirements & Guidelines)</small>
+                        </th>
+                        <th className="col-comp">
+                          Tuân thủ<br />
+                          <small>(Y / N / NI / N/A)</small>
+                        </th>
+                        <th className="col-ev">
+                          Phân loại & Ghi chú<br />
+                          <small>(Severity & Comments)</small>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.items.map((item: any) => {
+                        if (section.matchedItemIds && !section.matchedItemIds.has(item.id)) {
+                          return null;
+                        }
+                        const currentComp = compliance[item.id] || '';
+                        const currentSev = severities[item.id] || '';
+                        const currentCmt = comments[item.id] || '';
+
+                        return (
+                          <tr key={item.id} className="check-item" data-id={item.id} data-text={item.text}>
+                            <td className="req-text">
+                              <strong>{item.id}. </strong>
+                              {item.text}
+                            </td>
+                            <td>
+                              <div className="radio-group">
+                                {(['Y', 'N', 'NI', 'NA'] as const).map((opt) => (
+                                  <label key={opt} className="radio-label">
+                                    <input
+                                      type="radio"
+                                      name={`comp_${item.id}`}
+                                      value={opt}
+                                      className="save-state radio-req"
+                                      checked={currentComp === opt}
+                                      onChange={() => {
+                                        setCompliance(prev => ({ ...prev, [item.id]: opt }));
+                                        triggerSaveState();
+                                      }}
+                                    />
+                                    <span>{opt === 'NA' ? 'N/A' : opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </td>
+                            <td>
+                              <select
+                                className="save-state severity-select"
+                                name={`sev_${item.id}`}
+                                value={currentSev}
+                                onChange={(e) => {
+                                  setSeverities(prev => ({ ...prev, [item.id]: e.target.value }));
+                                  triggerSaveState();
+                                }}
+                              >
+                                <option value="">-- Chọn Phân loại lỗi --</option>
+                                <option value="Major">Major (Lỗi Nặng)</option>
+                                <option value="Minor">Minor (Lỗi Nhẹ)</option>
+                                <option value="Observation">Observation (Quan sát)</option>
+                              </select>
+                              <textarea
+                                className="save-state"
+                                name={`cmt_${item.id}`}
+                                placeholder="Nhập bằng chứng / ghi chú..."
+                                value={currentCmt}
+                                onChange={(e) => {
+                                  setComments(prev => ({ ...prev, [item.id]: e.target.value }));
+                                  triggerSaveState();
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* CRM Modal */}
+      {isCrmOpen && (
+        <div id="crmModal" className="modal" onClick={(e) => {
+          if ((e.target as HTMLElement).id === 'crmModal') {
+            closeCRM();
+          }
+        }}>
+          <div className="modal-content">
+            <span className="close" onClick={closeCRM}>&times;</span>
+            <h2 style={{ marginBottom: '20px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>
+              Thống Kê Khách Hàng (CRM)
+            </h2>
+            <div className="table-responsive">
+              <table className="crm-table" id="crmTable">
                 <thead>
-                  <tr className="bg-gray-50/90 border-b border-gray-200 text-[11px] font-black text-gray-600 uppercase tracking-wider">
-                    <th className="py-3.5 px-4 w-16 text-center">Mã</th>
-                    <th className="py-3.5 px-4 w-44">Hạng Mục & Nhóm</th>
-                    <th className="py-3.5 px-4 min-w-[280px]">Yêu Cầu Tiêu Chuẩn Chuẩn Mực</th>
-                    <th className="py-3.5 px-4 w-28 text-center">Phân Loại</th>
-                    <th className="py-3.5 px-4 w-52 text-center">Đánh Giá Hiện Trường</th>
-                    <th className="py-3.5 px-4 min-w-[220px]">Ghi Chú & Khắc Phục (CAPA)</th>
+                  <tr>
+                    <th>Ngày đánh giá</th>
+                    <th>Tên Khách Hàng</th>
+                    <th>Loại đánh giá</th>
+                    <th>Tiến độ</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-150 text-xs">
-                  {filteredItems.map((item, idx) => {
-                    const state = itemsState[item.id] || { status: 'pending', note: '', capa: '' };
-                    const isPassed = state.status === 'pass';
-                    const isFailed = state.status === 'fail';
-                    const isNa = state.status === 'na';
-
-                    return (
-                      <tr 
-                        key={item.id} 
-                        className={`transition-colors ${
-                          isFailed 
-                            ? 'bg-rose-50/40 hover:bg-rose-50/70' 
-                            : isPassed 
-                              ? 'bg-emerald-50/20 hover:bg-emerald-50/40' 
-                              : 'hover:bg-gray-50/70'
-                        }`}
-                      >
-                        {/* 1. Code Badge */}
-                        <td className="py-4 px-3 text-center align-top">
-                          <span className={`inline-block px-2 py-1 rounded-md font-black text-[11px] tracking-wide ${
-                            item.isCcp 
-                              ? 'bg-red-100 text-red-800 border border-red-300 ring-1 ring-red-400' 
-                              : 'bg-teal-50 text-[#007c76] border border-teal-200'
-                          }`}>
-                            {item.code}
-                          </span>
-                          {item.isCcp && (
-                            <span className="block mt-1 text-[9px] font-black text-red-600 uppercase tracking-tight">
-                              CCP ⚠️
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 2. Group & Category */}
-                        <td className="py-4 px-4 align-top">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                            {item.groupLabel}
-                          </span>
-                          <span className="font-black text-gray-900 block leading-snug">
-                            {item.category}
-                          </span>
-                          {item.legalRef && (
-                            <span className="text-[10px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded mt-1 inline-block font-semibold">
-                              {item.legalRef}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 3. Standard Description */}
-                        <td className="py-4 px-4 align-top space-y-1.5">
-                          <p className="font-bold text-gray-800 leading-relaxed">
-                            {item.standard}
-                          </p>
-                          <div className="p-2 rounded-xl bg-gray-50 border border-gray-200/80 text-[11px] text-gray-500 leading-normal">
-                            <span className="font-bold text-rose-700">Dấu hiệu lỗi: </span>
-                            {item.defectDesc}
-                          </div>
-                        </td>
-
-                        {/* 4. Severity Badge */}
-                        <td className="py-4 px-4 align-top text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            item.severity === 'Critical'
-                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                              : item.severity === 'Major'
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                : 'bg-blue-100 text-blue-800 border border-blue-200'
-                          }`}>
-                            {item.severity === 'Critical' && <AlertTriangle className="w-3 h-3 text-rose-600" />}
-                            {item.severity}
-                          </span>
-                        </td>
-
-                        {/* 5. Evaluation Buttons */}
-                        <td className="py-4 px-4 align-top text-center">
-                          <div className="grid grid-cols-3 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setItemStatus(item.id, 'pass')}
-                              className={`py-2 px-1 rounded-xl font-black text-[11px] transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                                isPassed
-                                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-500'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-emerald-50 hover:text-emerald-700'
-                              }`}
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>Đạt</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setItemStatus(item.id, 'fail')}
-                              className={`py-2 px-1 rounded-xl font-black text-[11px] transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                                isFailed
-                                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-500'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-rose-50 hover:text-rose-700'
-                              }`}
-                            >
-                              <XCircle className="w-4 h-4" />
-                              <span>Lỗi</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setItemStatus(item.id, 'na')}
-                              className={`py-2 px-1 rounded-xl font-black text-[11px] transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                                isNa
-                                  ? 'bg-gray-700 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700'
-                              }`}
-                            >
-                              <span className="text-xs">N/A</span>
-                              <span className="text-[9px]">K/A</span>
-                            </button>
-                          </div>
-                        </td>
-
-                        {/* 6. Notes & CAPA */}
-                        <td className="py-4 px-4 align-top space-y-2">
-                          <div>
-                            <input
-                              type="text"
-                              value={state.note}
-                              onChange={(e) => setItemNote(item.id, e.target.value)}
-                              placeholder="Ghi chú hiện trường, bằng chứng..."
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-700 focus:bg-white focus:border-[#007c76] outline-none"
-                            />
-                          </div>
-
-                          {(isFailed || state.capa) && (
-                            <div className="animate-fade-in">
-                              <input
-                                type="text"
-                                value={state.capa}
-                                onChange={(e) => setItemCapa(item.id, e.target.value)}
-                                placeholder="Hành động khắc phục (CAPA) & Thời hạn..."
-                                className="w-full px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-900 font-bold focus:bg-white focus:border-rose-400 outline-none placeholder-rose-300"
-                              />
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredItems.length === 0 && (
-              <div className="p-12 text-center text-gray-400 font-medium space-y-2">
-                <Search className="w-8 h-8 mx-auto text-gray-300" />
-                <p>Không tìm thấy mục kiểm tra nào phù hợp với bộ lọc</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: LỊCH SỬ CƠ SỞ DỮ LIỆU ĐÃ LƯU */}
-      {activeTab === 'database' && (
-        <div className="space-y-4">
-          <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-black text-gray-800 uppercase tracking-wide">
-                Hồ Sơ Kiểm Toán HACCP Đã Lưu ({database?.length || 0})
-              </h3>
-              <p className="text-xs text-gray-500 font-medium">
-                Toàn bộ lịch sử các đợt kiểm tra, audit cơ sở được đồng bộ đám mây Firestore thời gian thực.
-              </p>
-            </div>
-            <span className="text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-xl border border-teal-200">
-              {dbSyncStatus}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(database || []).map(record => (
-              <div 
-                key={record.id}
-                className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs hover:border-[#007c76] hover:shadow-lg transition-all space-y-4 relative overflow-hidden"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                      {record.auditDate}
-                    </span>
-                    <h4 className="text-base font-black text-gray-900 line-clamp-1">
-                      {record.facilityName}
-                    </h4>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
-                    record.status === 'Đạt chuẩn HACCP'
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-100 text-rose-800 border border-rose-200'
-                  }`}>
-                    {record.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 py-2 border-y border-gray-100 text-center">
-                  <div>
-                    <span className="text-[10px] text-gray-400 block font-bold">Điểm</span>
-                    <span className="text-lg font-black text-[#007c76]">{record.totalScore}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 block font-bold">Đạt</span>
-                    <span className="text-lg font-black text-emerald-600">{record.passCount}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 block font-bold">Lỗi CCP</span>
-                    <span className={`text-lg font-black ${record.criticalFailCount > 0 ? 'text-rose-600' : 'text-gray-400'}`}>
-                      {record.criticalFailCount}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-xs text-gray-500 space-y-1">
-                  <p><span className="font-bold text-gray-700">Đội trưởng:</span> {record.teamLeader || 'Chưa cập nhật'}</p>
-                  <p><span className="font-bold text-gray-700">Đánh giá viên:</span> {record.auditorName}</p>
-                  <p className="line-clamp-1"><span className="font-bold text-gray-700">Phạm vi:</span> {record.productScope}</p>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    onClick={() => handleLoadRecord(record)}
-                    className="px-4 py-2 rounded-xl bg-teal-50 hover:bg-[#007c76] text-[#007c76] hover:text-white font-black text-xs transition-all cursor-pointer"
-                  >
-                    Xem & Chỉnh Sửa
-                  </button>
-
-                  <button
-                    onClick={() => handleDeleteRecord(record.id)}
-                    className="p-2 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-                    title="Xóa bản ghi"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {(!database || database.length === 0) && (
-            <div className="bg-white p-16 rounded-3xl border border-gray-200 text-center space-y-3">
-              <Database className="w-12 h-12 mx-auto text-gray-300" />
-              <h4 className="text-base font-black text-gray-700">Chưa có bản ghi lưu trữ nào</h4>
-              <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                Sau khi kiểm tra cơ sở, bấm nút "Lưu Cơ Sở Dữ Liệu" ở thanh trên cùng để lưu trữ lịch sử đánh giá vào đám mây.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: BÁO CÁO THẨM TRA & CAPA (XUẤT IN ẤN CHUẨN MỰC) */}
-      {activeTab === 'report' && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-200 shadow-sm space-y-6 print:border-none print:shadow-none">
-            {/* Header Report */}
-            <div className="text-center pb-6 border-b border-gray-200">
-              <span className="text-xs font-black text-[#007c76] uppercase tracking-[0.2em] block mb-1">
-                FAST E-LEARNING & CONSULTING QUALITY MANAGEMENT
-              </span>
-              <h2 className="text-2xl font-black text-gray-900 uppercase">
-                Biên Bản Đánh Giá & Thẩm Tra Hệ Thống HACCP
-              </h2>
-              <p className="text-xs text-gray-500 font-medium mt-1">
-                Tiêu chuẩn đối sánh: TCVN 5603:2023 / Codex Alimentarius HACCP System
-              </p>
-            </div>
-
-            {/* Info Table */}
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="space-y-1.5 p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                <p><span className="font-bold text-gray-700">Cơ sở được đánh giá:</span> {facilityName}</p>
-                <p><span className="font-bold text-gray-700">Người đại diện / Đội trưởng:</span> {teamLeader || 'Chưa cập nhật'}</p>
-                <p><span className="font-bold text-gray-700">Địa chỉ:</span> {facilityAddress || 'Chưa cập nhật'}</p>
-                <p><span className="font-bold text-gray-700">Số điện thoại:</span> {contactPhone || 'Chưa cập nhật'}</p>
-              </div>
-
-              <div className="space-y-1.5 p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                <p><span className="font-bold text-gray-700">Ngày đánh giá:</span> {auditDate}</p>
-                <p><span className="font-bold text-gray-700">Đánh giá viên FAST:</span> {auditorName}</p>
-                <p><span className="font-bold text-gray-700">Phạm vi công nhận:</span> {productScope}</p>
-                <p><span className="font-bold text-gray-700">Tổng điểm tuân thủ:</span> <strong className="text-[#007c76]">{stats.score}%</strong></p>
-              </div>
-            </div>
-
-            {/* Executive Summary */}
-            <div className={`p-4 rounded-2xl border ${stats.isPassed ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-              <h4 className="font-black text-sm uppercase mb-1">
-                Kết Luận Chung: {stats.isPassed ? 'ĐẠT ĐIỀU KIỆN CHUẨN HÓA HACCP' : 'CHƯA ĐẠT - YÊU CẦU HOÀN THIỆN CAPA'}
-              </h4>
-              <p className="text-xs font-medium leading-relaxed">
-                {stats.isPassed
-                  ? `Cơ sở đáp ứng đầy đủ ${stats.pass}/${stats.total} tiêu chuẩn kiểm soát. Không phát hiện điểm không phù hợp trọng yếu tại các điểm kiểm soát tới hạn (CCP). Hệ thống đủ điều kiện xem xét cấp Giấy chứng nhận.`
-                  : `Phát hiện ${stats.fail} điểm không phù hợp, trong đó có ${stats.criticalFail} điểm trọng yếu cần xử lý ngay lập tức theo phiếu hành động khắc phục đính kèm.`}
-              </p>
-            </div>
-
-            {/* CAPA Table */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-black text-gray-900 uppercase">
-                Danh Sách Điểm Không Phù Hợp & Kế Hoạch Khắc Phục (CAPA)
-              </h4>
-
-              <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100 text-gray-700 font-bold uppercase text-[10px]">
-                      <th className="p-3 w-16 text-center">Mã</th>
-                      <th className="p-3 w-48">Hạng mục kiểm tra</th>
-                      <th className="p-3">Thực trạng hiện trường (Defect)</th>
-                      <th className="p-3">Hành động khắc phục (CAPA)</th>
-                      <th className="p-3 w-28 text-center">Mức độ</th>
+                <tbody>
+                  {Object.keys(crmRecords).length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>Chưa có dữ liệu khách hàng nào.</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-150">
-                    {allItems
-                      .filter(it => itemsState[it.id]?.status === 'fail')
-                      .map(item => (
-                        <tr key={item.id} className="bg-rose-50/20">
-                          <td className="p-3 text-center font-bold text-rose-700">{item.code}</td>
-                          <td className="p-3 font-bold text-gray-800">{item.category}</td>
-                          <td className="p-3 text-gray-600">{itemsState[item.id]?.note || item.defectDesc}</td>
-                          <td className="p-3 font-semibold text-rose-900">{itemsState[item.id]?.capa || 'Cần lập phương án khắc phục chi tiết'}</td>
-                          <td className="p-3 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-100 text-rose-800">
-                              {item.severity}
-                            </span>
+                  ) : (
+                    Object.keys(crmRecords).map((id) => {
+                      const record = crmRecords[id];
+                      return (
+                        <tr key={id}>
+                          <td>{record.auditDate || 'N/A'}</td>
+                          <td><strong>{record.clientName}</strong></td>
+                          <td>{record.auditType || 'N/A'}</td>
+                          <td>{record._progress || '0%'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                              <button
+                                className="btn-outline"
+                                style={{ padding: '5px 10px', fontSize: '12px' }}
+                                onClick={() => loadRecord(id)}
+                              >
+                                Tải
+                              </button>
+                              <button
+                                className="btn-danger"
+                                style={{ padding: '5px 10px', fontSize: '12px' }}
+                                onClick={() => deleteRecord(id)}
+                              >
+                                Xóa
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
-                    {allItems.filter(it => itemsState[it.id]?.status === 'fail').length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-8 text-center text-gray-400 font-medium">
-                          Tuyệt vời! Không có điểm không phù hợp nào cần khắc phục.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Signatures */}
-            <div className="pt-8 grid grid-cols-2 text-center text-xs">
-              <div className="space-y-16">
-                <p className="font-bold text-gray-700 uppercase">Đại Diện Cơ Sở / Đội Trưởng HACCP</p>
-                <p className="text-gray-400 italic">(Ký và ghi rõ họ tên)</p>
-              </div>
-
-              <div className="space-y-16">
-                <p className="font-bold text-gray-700 uppercase">Chuyên Viên Đánh Giá FAST</p>
-                <p className="text-gray-400 italic">(Ký và ghi rõ họ tên)</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. HTML Code Importer Modal (Screen Only) */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2 text-[#007c76]">
-                <Code className="w-5 h-5" />
-                <h3 className="text-base font-black uppercase tracking-tight text-gray-900">
-                  Nhập Mã Từ File "haccp checklist.html"
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowImportModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-500 font-medium leading-relaxed">
-              Dán nội dung mã nguồn HTML từ tệp <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-teal-800">haccp checklist.html</code> hoặc chọn tệp từ máy tính của bạn. Hệ thống sẽ tự động bóc tách các mục kiểm tra, bảng tiêu chuẩn và đồng bộ lên đám mây.
-            </p>
-
-            {/* File Input Option */}
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-teal-50 hover:text-[#007c76] text-xs font-bold cursor-pointer border border-gray-200 transition-all">
-                <Upload className="w-4 h-4" />
-                <span>Chọn file .html từ máy</span>
-                <input
-                  type="file"
-                  accept=".html,.htm"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (evt) => {
-                        const content = evt.target?.result as string;
-                        if (content) {
-                          setHtmlInputCode(content);
-                          showSuccessToast(`Đã đọc nội dung từ file: ${file.name}`);
-                        }
-                      };
-                      reader.readAsText(file);
-                    }
-                  }}
-                />
-              </label>
-              <span className="text-xs text-gray-400">hoặc dán trực tiếp đoạn mã vào ô dưới:</span>
-            </div>
-
-            {/* Textarea */}
-            <div className="flex-1 min-h-[220px]">
-              <textarea
-                value={htmlInputCode}
-                onChange={(e) => setHtmlInputCode(e.target.value)}
-                placeholder="Dán mã <table>...</table> hoặc toàn bộ nội dung file HTML vào đây..."
-                className="w-full h-full min-h-[200px] p-4 rounded-2xl bg-gray-50 border border-gray-200 font-mono text-xs text-gray-800 focus:bg-white focus:border-[#007c76] outline-none custom-scrollbar"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setShowImportModal(false)}
-                className="px-4 py-2.5 rounded-xl text-gray-500 hover:bg-gray-100 font-bold text-xs"
-              >
-                Hủy bỏ
-              </button>
-
-              <button
-                type="button"
-                onClick={handleImportHtml}
-                className="px-5 py-2.5 rounded-xl bg-[#007c76] hover:bg-[#005c56] text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-teal-700/20 active:scale-95"
-              >
-                <Check className="w-4 h-4" />
-                <span>Phân Tích & Bổ Sung Tiêu Chuẩn</span>
-              </button>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
