@@ -403,8 +403,8 @@ const VipUpgrade: React.FC = () => {
                           </p>
                         </div>
                       ) : (
-                        linkedCourses.map((c) => (
-                          <div key={c.id} className="flex items-center gap-2">
+                        linkedCourses.map((c, cIdx) => (
+                          <div key={`vip-c-${c.id}-${cIdx}`} className="flex items-center gap-2">
                             <Check className="w-4 h-4 text-emerald-500 shrink-0" />
                             <span className="text-xs text-gray-300 font-extrabold truncate">
                               {c.title}
@@ -427,7 +427,7 @@ const VipUpgrade: React.FC = () => {
                         <>
                           <div className="flex items-center gap-2">
                             <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span className="text-xs text-gray-300 font-bold">Tài liệu biểu mẫu SOP đính kèm</span>
+                            <span className="text-xs text-gray-300 font-bold">Tài liệu hướng dẫn chuyên sâu đính kèm</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Check className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -491,8 +491,8 @@ const VipUpgrade: React.FC = () => {
               icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             },
             {
-              title: "Tài liệu SOP độc quyền",
-              desc: "Sở hữu toàn bộ tài liệu quy trình, biểu mẫu tiêu chuẩn ISO/HACCP cực kỳ giá trị để ứng dụng ngay vào doanh nghiệp.",
+              title: "Tài liệu học tập độc quyền",
+              desc: "Sở hữu toàn bộ tài liệu hướng dẫn quy trình tiêu chuẩn ISO/HACCP cực kỳ giá trị để ứng dụng ngay vào doanh nghiệp.",
               icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253"
             }
           ].map((item, idx) => (

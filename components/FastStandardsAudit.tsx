@@ -762,14 +762,8 @@ export const FastStandardsAudit: React.FC = () => {
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-teal-200 text-xs font-bold uppercase tracking-wider">
-                <ShieldCheck className="w-4 h-4 text-white/80" />
-                QUẢN TRỊ VIÊN &bull; CHUYÊN GIA ĐÁNH GIÁ
-              </div>
-            </div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-              Đánh Giá &amp; Thẩm Định Tiêu Chuẩn FSA
+              FSA Checklist
             </h1>
             <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
               Đánh giá toàn diện 8 trụ cột Vận hành &amp; An toàn thực phẩm (265 tiêu chuẩn chuẩn hóa ISO &amp; HACCP Codex).

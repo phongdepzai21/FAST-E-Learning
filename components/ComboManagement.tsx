@@ -53,7 +53,7 @@ const DEFAULT_COMBOS: ComboItem[] = [
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
     courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành'],
     status: 'active'
   },
   {
@@ -63,13 +63,13 @@ const DEFAULT_COMBOS: ComboItem[] = [
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành'],
     status: 'active'
   }
 ];
 
 const PRESET_BENEFITS = [
-  'Tài liệu biểu mẫu SOP đính kèm',
+  'Tài liệu hướng dẫn chuyên sâu đính kèm',
   'Cấp chứng nhận hoàn thành',
   'Hỗ trợ giải đáp chuyên gia 24/7',
   'Truy cập khóa học trọn đời',
@@ -253,7 +253,7 @@ export const ComboManagement: React.FC = () => {
     setDescription('');
     setStatus('active');
     setSelectedCourseIds([]);
-    setBenefits(['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']);
+    setBenefits(['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']);
     setBenefitInput('');
     setCourseSearchFilter('');
     setActiveTab('add');
@@ -269,7 +269,7 @@ export const ComboManagement: React.FC = () => {
     setDescription(combo.description || '');
     setStatus(combo.status || 'active');
     setSelectedCourseIds(combo.courseIds || []);
-    setBenefits(combo.benefits || ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']);
+    setBenefits(combo.benefits || ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']);
     setBenefitInput('');
     setCourseSearchFilter('');
     setActiveTab('edit');

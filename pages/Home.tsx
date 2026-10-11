@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from "react-router-dom";
 import Hero from '../components/Hero';
-import { COURSES as HARDCODED_COURSES, CONSULTING_SERVICES, getMergedCourses } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, extractLessonsFlat } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { Course } from '../types';
 import CountUp from 'react-countup';
 import { Helmet } from 'react-helmet-async';
@@ -13,235 +13,121 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronLeft, 
   ChevronRight, 
+  ChevronUp,
   CheckCircle2, 
   Sparkles, 
   BookOpen, 
   Clock, 
-  FileText, 
-  Award, 
-  Star, 
   ArrowRight, 
+  ArrowDown,
   ShieldCheck, 
-  Flame, 
-  Send, 
   Check, 
-  Phone, 
-  User, 
   X, 
   Eye, 
-  HelpCircle,
-  Play,
+  Compass,
+  Laptop,
+  FileCheck,
+  Award,
   Layers,
-  GraduationCap
+  GraduationCap,
+  Zap,
+  ArrowUpRight,
+  FileText,
+  Users,
+  Target
 } from 'lucide-react';
 
-// Animation variants for staggered scroll reveal
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.18,
-      delayChildren: 0.1
-    }
+const getOptimizedCourseImage = (url?: string, width = 720) => {
+  if (!url) return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=720';
+  if (url.includes('images.unsplash.com')) {
+    const baseUrl = url.split('?')[0];
+    return `${baseUrl}?auto=format&fit=crop&q=80&w=${width}`;
   }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 48 },
-  show: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      type: "spring" as const, 
-      stiffness: 85, 
-      damping: 18 
-    } 
-  }
+  return url;
 };
 
 const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
-  const [featuredCategory, setFeaturedCategory] = useState<string>('Tất cả');
+  const [activeHoverCard, setActiveHoverCard] = useState<string | null>(null);
 
-  // 3-Page Swipeable Carousel States
-  const [currentPage, setCurrentPage] = useState<number>(0);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-
-  // Quick View Modal & Consultation Form States
-  const [quickViewCourse, setQuickViewCourse] = useState<Course | null>(null);
-  const consultFormRef = useRef<HTMLDivElement | null>(null);
-  const [consultName, setConsultName] = useState('');
-  const [consultPhone, setConsultPhone] = useState('');
-  const [consultCourse, setConsultCourse] = useState('HACCP TCVN / CODEX');
-  const [consultRole, setConsultRole] = useState('');
-  const [isConsultSubmitting, setIsConsultSubmitting] = useState(false);
-  const [consultSuccess, setConsultSuccess] = useState(false);
-
-  const handleConsultSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!consultName.trim() || !consultPhone.trim()) return;
-    setIsConsultSubmitting(true);
-    try {
-      await addDoc(collection(db, 'course_consultations'), {
-        name: consultName.trim(),
-        phone: consultPhone.trim(),
-        course: consultCourse,
-        role: consultRole.trim() || 'Học viên cá nhân',
-        source: 'trang_chu_khoa_hoc_noi_bat',
-        createdAt: serverTimestamp(),
-      });
-      setConsultSuccess(true);
-    } catch (err) {
-      console.error('Error saving consultation request:', err);
-      // Fallback: save to localStorage to ensure no lead is lost
-      const existing = JSON.parse(localStorage.getItem('fast_consultations') || '[]');
-      existing.push({
-        name: consultName.trim(),
-        phone: consultPhone.trim(),
-        course: consultCourse,
-        role: consultRole.trim() || 'Học viên cá nhân',
-        createdAt: new Date().toISOString()
-      });
-      localStorage.setItem('fast_consultations', JSON.stringify(existing));
-      setConsultSuccess(true);
-    } finally {
-      setIsConsultSubmitting(false);
+  // Curated list of featured courses for carousel (deduplicated & active)
+  const featuredCourses = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Course[] = [];
+    for (const c of allCourses) {
+      if (!c || !c.id || c.id === 'test-course-2k' || c.status === 'draft' || c.status === 'inactive') continue;
+      if (!seen.has(c.id)) {
+        seen.add(c.id);
+        list.push(c);
+      }
     }
-  };
-
-  // Divide courses into 3 distinct curated pages (3 courses per page)
-  const pageCourses = useMemo(() => {
-    const list = allCourses
-      .filter(c => c.id !== 'test-course-2k' && c.status !== 'draft' && c.status !== 'inactive');
-
-    // Page 1: HACCP & Food Safety Core
-    const p1 = list.filter(c => 
-      c.id === 'haccp-tcvn' || 
-      c.id === 'iso-22000' || 
-      (c.category && c.category.toUpperCase().includes('HACCP')) ||
-      (c.title && c.title.toUpperCase().includes('HACCP'))
-    ).slice(0, 3);
-
-    // Page 2: QA/QC, ISO & Operations
-    const p2 = list.filter(c => 
-      c.id === 'qa-qc-pro' || 
-      c.id === 'iso-9001' || 
-      c.id === 'gemba' ||
-      (c.category && (c.category.toUpperCase().includes('QA') || c.category.toUpperCase().includes('LEAN')))
-    ).slice(0, 3);
-
-    // Page 3: Supply Chain, OEM & Systems
-    const p3 = list.filter(c => 
-      c.id === 'supplier-mgmt' || 
-      c.id === 'oem-project' || 
-      c.id === 'iso-14001' || 
-      c.id === 'cost-control-supply'
-    ).slice(0, 3);
-
-    const fillPage = (arr: Course[], excludeIds: string[]) => {
-      if (arr.length >= 3) return arr.slice(0, 3);
-      const remaining = list.filter(c => !excludeIds.includes(c.id) && !arr.some(a => a.id === c.id));
-      return [...arr, ...remaining].slice(0, 3);
-    };
-
-    const finalP1 = fillPage(p1, []);
-    const p1Ids = finalP1.map(c => c.id);
-    const finalP2 = fillPage(p2, p1Ids);
-    const p12Ids = [...p1Ids, ...finalP2.map(c => c.id)];
-    const finalP3 = fillPage(p3, p12Ids);
-
-    return [finalP1, finalP2, finalP3];
+    return list;
   }, [allCourses]);
 
-  // Flat list of all 9 curated featured courses
-  const allFeaturedCourses = useMemo(() => {
-    return [...pageCourses[0], ...pageCourses[1], ...pageCourses[2]];
-  }, [pageCourses]);
+  // Top 5 Featured Prominent Courses (Tăng thêm 2 khóa nổi bật: HACCP, ISO 22000, ISO 9001, ISO 14001, VietGAP)
+  const top5Courses = useMemo(() => {
+    const famousCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
+    const list: Course[] = [];
 
-  // Mobile Carousel states & ref
-  const mobileTrackRef = useRef<HTMLDivElement | null>(null);
-  const [mobileCardIndex, setMobileCardIndex] = useState(0);
-  const [mobileThemeFilter, setMobileThemeFilter] = useState<'all' | 'haccp' | 'iso' | 'supply'>('all');
-
-  const filteredMobileCourses = useMemo(() => {
-    if (mobileThemeFilter === 'haccp') return pageCourses[0];
-    if (mobileThemeFilter === 'iso') return pageCourses[1];
-    if (mobileThemeFilter === 'supply') return pageCourses[2];
-    return allFeaturedCourses;
-  }, [mobileThemeFilter, pageCourses, allFeaturedCourses]);
-
-  const scrollToMobileCard = (idx: number) => {
-    if (!mobileTrackRef.current) return;
-    const cards = mobileTrackRef.current.children;
-    if (cards[idx]) {
-      (cards[idx] as HTMLElement).scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest'
-      });
-      setMobileCardIndex(idx);
+    // 1. Lấy từ allCourses theo thứ tự ưu tiên
+    for (const id of famousCourseIds) {
+      const found = allCourses.find(c => c.id === id && c.status !== 'draft' && c.status !== 'inactive');
+      if (found && !list.some(item => item.id === found.id)) {
+        list.push(found);
+      }
     }
-  };
 
-  const handleMobileScroll = () => {
-    if (!mobileTrackRef.current) return;
-    const scrollLeft = mobileTrackRef.current.scrollLeft;
-    const firstCard = mobileTrackRef.current.children[0] as HTMLElement;
-    const cardWidth = firstCard?.clientWidth || 290;
-    const newIdx = Math.round(scrollLeft / (cardWidth + 16));
-    const clamped = Math.max(0, Math.min(newIdx, filteredMobileCourses.length - 1));
-    setMobileCardIndex(clamped);
-  };
-
-  const handleMobilePrev = () => {
-    const nextIdx = Math.max(0, mobileCardIndex - 1);
-    scrollToMobileCard(nextIdx);
-  };
-
-  const handleMobileNext = () => {
-    const nextIdx = Math.min(filteredMobileCourses.length - 1, mobileCardIndex + 1);
-    scrollToMobileCard(nextIdx);
-  };
-
-  const handlePrevPage = () => {
-    setSlideDirection('left');
-    setCurrentPage(prev => (prev > 0 ? prev - 1 : 2));
-  };
-
-  const handleNextPage = () => {
-    setSlideDirection('right');
-    setCurrentPage(prev => (prev < 2 ? prev + 1 : 0));
-  };
-
-  const handleSelectPage = (pageIdx: number) => {
-    setSlideDirection(pageIdx > currentPage ? 'right' : 'left');
-    setCurrentPage(pageIdx);
-  };
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const minSwipeDistance = 45;
-    if (distance > minSwipeDistance) {
-      handleNextPage();
-    } else if (distance < -minSwipeDistance) {
-      handlePrevPage();
+    // 2. Bổ sung từ HARDCODED_COURSES nếu chưa có
+    for (const id of famousCourseIds) {
+      if (!list.some(c => c.id === id)) {
+        const foundHc = HARDCODED_COURSES.find(c => c.id === id);
+        if (foundHc) list.push(foundHc);
+      }
     }
-  };
+
+    // 3. Nếu vẫn thiếu 5 khóa, bù từ danh sách featuredCourses
+    for (const c of featuredCourses) {
+      if (!list.some(item => item.id === c.id)) {
+        list.push(c);
+      }
+      if (list.length >= 5) break;
+    }
+
+    return list.slice(0, 5);
+  }, [allCourses, featuredCourses]);
+
+  const marqueeContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    const el = marqueeContainerRef.current;
+    if (!el) return;
+    const updateSize = () => {
+      if (el) {
+        const w = el.clientWidth || el.getBoundingClientRect().width;
+        if (w > 0) setContainerWidth(w);
+      }
+    };
+    updateSize();
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const marqueeGap = containerWidth < 640 ? 14 : 20;
+  // Trên desktop hiển thị 3 trang/lượt nhìn, trên màn hình nhỏ điều chỉnh kích thước vừa vặn dễ đọc
+  const cardWidth = containerWidth >= 768 
+    ? Math.floor((containerWidth - 2 * marqueeGap) / 3) 
+    : Math.max(270, Math.min(330, containerWidth - 40));
+  const groupWidth = 5 * cardWidth + 5 * marqueeGap;
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
@@ -325,821 +211,503 @@ const Home: React.FC = () => {
       </Helmet>
       <Hero />
       
-      {/* 0. Statistics (Thống kê) */}
-      <section className="py-12 md:py-20 bg-[#007c76] text-white">
+      {/* 0. Core Pillars (Cam kết thực chiến & Giá trị cốt lõi - Trung thực, chuẩn hóa, không số liệu ảo) */}
+      <section className="py-10 md:py-16 bg-[#007c76] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-white/20">
-            <div className="py-4 md:py-0 group">
-              <div className="text-4xl md:text-6xl font-black mb-2 tracking-tighter group-hover:scale-110 transition-transform">
-                <CountUp end={30} duration={2.5} enableScrollSpy scrollSpyOnce />+
+            <div className="py-4 md:py-0 group flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <BookOpen className="w-6 h-6 text-teal-200" />
               </div>
-              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Khóa học chuyên sâu</p>
-            </div>
-            <div className="py-6 md:py-0 group">
-              <div className="text-4xl md:text-6xl font-black mb-2 tracking-tighter group-hover:scale-110 transition-transform">
-                <CountUp end={265} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
-              </div>
-              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Tiêu chuẩn kiểm toán</p>
-            </div>
-            <div className="py-6 md:py-0 group">
-              <div className="text-4xl md:text-6xl font-black mb-2 tracking-tighter group-hover:scale-110 transition-transform">
-                <CountUp end={500} duration={2.5} separator="," enableScrollSpy scrollSpyOnce />+
-              </div>
-              <p className="text-white/80 font-bold uppercase tracking-widest text-sm md:text-base">Doanh nghiệp đồng hành</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
-      {/* 1. Consulting Services (Giải pháp doanh nghiệp) */}
-      <section className="py-12 md:py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-10 md:mb-16 space-y-3 md:space-y-4">
-            <span className="text-[#007c76] font-black uppercase tracking-[0.3em] text-[10px] md:text-xs">Giải pháp doanh nghiệp</span>
-            <h2 className="text-3xl md:text-5xl font-black text-[#374151] uppercase tracking-tighter leading-none">Dịch vụ Tư vấn Chuyên sâu</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-            {CONSULTING_SERVICES.map((service) => (
-              <div key={service.id} className="bg-gray-50 p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-gray-100 group hover-lift">
-                <div className="w-14 h-14 md:w-16 md:h-16 bg-[#007c76] text-white rounded-2xl flex items-center justify-center mb-6 shadow-xl group-hover:scale-110 transition-transform">
-                  <svg className="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                </div>
-                <h3 className="text-xl md:text-2xl font-black text-[#374151] mb-3 md:mb-4 uppercase">{service.title}</h3>
-                <p className="text-sm md:text-base text-gray-500 font-bold mb-6 md:mb-8 leading-relaxed">{service.description}</p>
-                <Link to="/tu-van" className="text-[#007c76] font-black text-xs md:text-sm uppercase tracking-widest hover:underline flex items-center gap-2">Tìm hiểu thêm <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg></Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 2. Featured Courses (Khóa học nổi bật - Form Mới & 3 Trang Vuốt Mượt Mà) */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden">
-        {/* Decorative background glows */}
-        <div className="absolute top-1/4 -right-24 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-10 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Section Header */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-10 gap-6">
-            <div className="space-y-3 text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-[#007c76] text-xs font-black uppercase tracking-widest shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-[#007c76] animate-pulse" />
-                <span>Tuyển Tập Khóa Học Trọng Tâm 2026</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight leading-tight">
-                Khóa Học Nổi Bật <br className="hidden sm:inline" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#005c56] via-[#007c76] to-emerald-600">
-                  Chuẩn Hóa Năng Lực Thực Chiến
-                </span>
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl leading-relaxed">
-                Hệ thống 03 trang chuyên đề chọn lọc. Vuốt qua để khám phá từ nền tảng HACCP, ISO đến kỹ năng QA/QC và tối ưu chuỗi cung ứng kèm bộ tài liệu SOP thực tế.
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Chuẩn Hóa Quốc Tế</h3>
+              <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
+                Chương trình bám sát tiêu chuẩn ISO 22000 &amp; Codex của Bộ Y Tế
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  consultFormRef.current?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="inline-flex items-center gap-2 bg-white hover:bg-teal-50/50 text-[#005c56] border border-[#005c56]/30 px-5 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs shadow-xs transition-all hover:scale-[1.02] cursor-pointer"
-              >
-                <Phone className="w-3.5 h-3.5 text-[#007c76]" />
-                <span>Nhận Tư Vấn Lộ Trình</span>
-              </button>
-              <Link 
-                to="/khoa-hoc" 
-                className="inline-flex items-center gap-2 bg-[#005c56] hover:bg-[#004440] text-white px-6 py-3.5 rounded-2xl font-bold uppercase tracking-wider text-xs shadow-md shadow-teal-900/15 hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer"
-              >
-                <span>Xem Tất Cả 30+ Khóa</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+            <div className="py-4 md:py-0 group flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Laptop className="w-6 h-6 text-teal-200" />
+              </div>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Học E-Learning 24/7</h3>
+              <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
+                Video bài giảng 15-20 phút cô đọng, tự do học mọi lúc mọi nơi
+              </p>
+            </div>
+            <div className="py-4 md:py-0 group flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Award className="w-6 h-6 text-teal-200" />
+              </div>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Chứng Nhận QR Số Hóa</h3>
+              <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
+                Mã QR định danh cá nhân xác thực năng lực chuyên môn toàn quốc
+              </p>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* DESKTOP VIEW: 3-PAGE DRAGGABLE & ANIMATED CAROUSEL (>= md) */}
-          <div className="hidden md:block">
-            {/* 3-Page Switcher & Controls Header */}
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs mb-6 flex items-center justify-between gap-4">
-              {/* 3 Distinct Page Tabs with Descriptions */}
-              <div className="grid grid-cols-3 gap-2 flex-grow">
-                {[
-                  { idx: 0, title: 'Trang 1: Cốt Lõi', desc: 'HACCP & An Toàn Thực Phẩm', tag: 'Nền Tảng' },
-                  { idx: 1, title: 'Trang 2: Nâng Cao', desc: 'ISO, QA/QC & Hiện Trường', tag: 'Chuyên Sâu' },
-                  { idx: 2, title: 'Trang 3: Toàn Diện', desc: 'Chuỗi Cung Ứng & OEM', tag: 'Quản Trị' }
-                ].map((p) => {
-                  const isActive = currentPage === p.idx;
-                  return (
-                    <button
-                      key={p.idx}
-                      type="button"
-                      onClick={() => handleSelectPage(p.idx)}
-                      className={`text-left p-3 rounded-xl transition-all cursor-pointer relative border ${
-                        isActive
-                          ? 'bg-[#005c56] text-white border-[#005c56] shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/70'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className={`text-[11px] font-bold uppercase tracking-wider ${isActive ? 'text-teal-200' : 'text-[#007c76]'}`}>
-                          {p.title}
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
-                        }`}>
-                          {p.tag}
-                        </span>
-                      </div>
-                      <div className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
-                        {p.desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
 
-              {/* Navigation Arrows & Current Status */}
-              <div className="flex items-center gap-3 shrink-0 pl-3 border-l border-slate-100">
-                <div className="flex flex-col text-right">
-                  <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Đang xem</span>
-                  <span className="text-xs font-bold text-slate-800">
-                    Trang <span className="text-[#007c76] text-sm font-black">0{currentPage + 1}</span> / 03
-                  </span>
-                </div>
+      {/* 2. Featured Courses (5 Khóa học nổi bật, Dạng 2D, Trôi Chậm, Nội Dung Trực Tiếp Trên Từng Card) */}
+      <section 
+        className="py-12 md:py-16 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Header - Nổi bật, sang trọng, đẳng cấp */}
+          <div className="text-center mb-8 md:mb-10">
+            <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-800 text-xs font-black uppercase tracking-widest shadow-2xs mb-2.5">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+              Chương trình đào tạo trọng tâm
+            </span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 uppercase tracking-tight">
+              Khóa Học <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800">Nổi Bật</span>
+            </h2>
+            <p className="text-slate-500 font-medium text-xs sm:text-sm md:text-base max-w-xl mx-auto mt-2">
+              Chương trình chuẩn hóa ISO, HACCP & VietGAP dành cho doanh nghiệp và chuyên gia
+            </p>
+          </div>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handlePrevPage}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 hover:text-[#007c76] flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs"
-                    title="Vuốt sang trang trước"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextPage}
-                    className="w-10 h-10 rounded-xl bg-[#005c56] hover:bg-[#00423e] text-white flex items-center justify-center transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95"
-                    title="Vuốt sang trang tiếp theo"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Desktop Carousel Viewport */}
+          {/* 2D Horizontal Moving Stage - Trôi chậm từ trái sang phải, hiển thị 5 khóa học nổi bật */}
+          <div 
+            ref={marqueeContainerRef}
+            className="course-marquee-viewport w-full select-none"
+          >
             <div 
-              className="relative overflow-hidden rounded-3xl touch-pan-y select-none pb-4"
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
+              className="course-marquee-track flex"
+              style={{ width: `${groupWidth * 4}px` }}
             >
-              <motion.div
-                className="flex w-full cursor-grab active:cursor-grabbing"
-                animate={{ x: `-${currentPage * 100}%` }}
-                transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.15}
-                onDragEnd={(_, info) => {
-                  const swipeDistance = info.offset.x;
-                  const swipeVelocity = info.velocity.x;
-                  if (swipeDistance < -50 || swipeVelocity < -350) {
-                    handleNextPage();
-                  } else if (swipeDistance > 50 || swipeVelocity > 350) {
-                    handlePrevPage();
-                  }
-                }}
-              >
-                {pageCourses.map((group, pageIdx) => (
-                  <div 
-                    key={pageIdx} 
-                    className="w-full shrink-0 flex-none px-1"
-                  >
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-                      {group.map((course) => {
-                        const isOwned = ownedCourseIds.includes(course.id);
-                        return (
-                          <div 
-                            key={course.id}
-                            className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-lg hover:border-teal-400/60 transition-all duration-300 flex flex-col h-full overflow-hidden group/card"
-                          >
-                            {/* Card Media Header */}
-                            <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-                              <img 
-                                src={course.image || 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800'} 
-                                alt={course.title}
-                                loading="lazy"
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent pointer-events-none"></div>
+              {[0, 1, 2, 3].map((groupIndex) => (
+                <div 
+                  key={`marquee-group-${groupIndex}`}
+                  className="flex shrink-0"
+                  style={{ 
+                    width: `${groupWidth}px`, 
+                    gap: `${marqueeGap}px`, 
+                    paddingRight: `${marqueeGap}px` 
+                  }}
+                >
+                  {top5Courses.map((c, idx) => {
+                    const cLessons = extractLessonsFlat(c.curriculum);
+                    const cardKey = `${groupIndex}-${c.id}-${idx}`;
+                    const isHoveredOrActive = activeHoverCard === cardKey;
 
-                              {/* Quiet top metadata */}
-                              <div className="absolute top-3 left-3 right-3 flex items-center justify-between text-white text-[11px] font-medium z-10 pointer-events-none">
-                                <span className="font-bold tracking-wide uppercase drop-shadow-sm text-teal-200">
-                                  {course.category || 'Tiêu chuẩn'} · 2026
+                    return (
+                      <div 
+                        key={`card-${cardKey}`}
+                        style={{ width: `${cardWidth}px` }}
+                        className="shrink-0 select-none group course-card-wrapper"
+                        onMouseEnter={() => setActiveHoverCard(cardKey)}
+                        onMouseLeave={() => setActiveHoverCard(null)}
+                        onClick={() => {
+                          // Hỗ trợ chạm/bật trên thiết bị di động
+                          setActiveHoverCard(prev => prev === cardKey ? null : cardKey);
+                        }}
+                      >
+                        <div className="course-card-inner relative bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[360px] sm:h-[385px] overflow-hidden transition-all duration-300">
+                          {/* Shimmer sweep effect layer on hover */}
+                          <div className="course-shimmer-layer pointer-events-none" />
+
+                          {/* ======================================================== */}
+                          {/* 1. MẶC ĐỊNH (LÚC ĐẦU): HIỆN TÊN VÀ ẢNH KHÓA HỌC          */}
+                          {/* ======================================================== */}
+                          <div className="flex flex-col h-full w-full">
+                            {/* 1.1 Ảnh khóa học */}
+                            <div 
+                              className="relative w-full overflow-hidden bg-slate-100 shrink-0 h-[215px] sm:h-[235px]"
+                            >
+                              <img 
+                                src={getOptimizedCourseImage(c.image, 480)}
+                                alt={c.title}
+                                width={480}
+                                height={270}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.src = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=480';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+                              
+                              {/* Category badge */}
+                              <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+                                <span className="bg-slate-900/85 backdrop-blur-xs text-teal-200 font-bold px-2.5 py-0.5 rounded text-[11px] uppercase tracking-wider shadow-sm border border-teal-500/20">
+                                  {c.category || 'Tiêu chuẩn'}
                                 </span>
-                                {isOwned && (
-                                  <span className="bg-emerald-600/90 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                                    Đã sở hữu
-                                  </span>
-                                )}
                               </div>
 
-                              {/* Bottom Info Bar on Image */}
-                              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs z-10">
-                                <div className="flex items-center gap-1.5 font-medium text-slate-200 text-[11px] drop-shadow-sm">
-                                  <Clock className="w-3.5 h-3.5 text-teal-300" />
-                                  <span>15–20 bài · Tự chủ tiến độ</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setQuickViewCourse(course);
-                                  }}
-                                  className="bg-white/20 hover:bg-white text-white hover:text-slate-900 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                                  title="Xem nhanh mục lục giáo trình"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  <span>Xem Nhanh</span>
-                                </button>
+                              {/* Price badge */}
+                              <div className="absolute bottom-2.5 right-2.5 z-10 pointer-events-none">
+                                <span className="bg-emerald-500/95 text-slate-950 font-black px-2.5 py-0.5 rounded-md text-xs shadow-md border border-emerald-300/40">
+                                  {c.price || 'Miễn phí'}
+                                </span>
                               </div>
                             </div>
 
-                            {/* Card Body */}
-                            <div className="p-6 flex flex-col flex-grow bg-white">
-                              <div className="flex items-center justify-between gap-2 mb-2 text-xs">
-                                <div className="flex items-center gap-1 text-amber-500 font-bold">
-                                  <Star className="w-3.5 h-3.5 fill-current" />
-                                  <span>4.9</span>
-                                  <span className="text-slate-400 font-normal text-[11px]">· 320+ học viên</span>
-                                </div>
-                                <span className="text-[11px] font-semibold text-teal-700">
-                                  Thực hành hiện trường
-                                </span>
-                              </div>
-
-                              <h3 className="text-base font-bold text-slate-900 group-hover/card:text-[#007c76] transition-colors line-clamp-2 leading-snug mb-2">
-                                <Link to={`/khoa-hoc/${course.id}`} className="hover:underline">
-                                  {course.title}
-                                </Link>
-                              </h3>
-
-                              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
-                                {course.description || 'Chương trình chuẩn hóa kiến thức chuyên sâu, bám sát yêu cầu kiểm toán an toàn thực phẩm thực tế.'}
-                              </p>
-
-                              <div className="space-y-1.5 py-3 border-y border-slate-100 mb-4 text-[11px] text-slate-600">
-                                <div className="flex items-center gap-2">
-                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  <span className="truncate">Tặng bộ biểu mẫu SOP Word/Excel</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  <span className="truncate">Cấp Giấy chứng nhận hoàn thành QR</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                  <span className="truncate">Hỗ trợ hỏi đáp 1-1 với chuyên gia FAST</span>
-                                </div>
-                              </div>
-
-                              <div className="mt-auto pt-1 flex items-center justify-between gap-3">
-                                <div>
-                                  <span className="text-[10px] font-medium uppercase text-slate-400 block tracking-wider">
-                                    Học phí
-                                  </span>
-                                  <span className="text-lg font-black text-[#005c56]">
-                                    {course.price || 'Miễn phí'}
-                                  </span>
-                                </div>
-
-                                <Link
-                                  to={isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`}
-                                  className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer min-h-[42px] ${
-                                    isOwned
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                      : 'bg-[#005c56] hover:bg-[#00423e] text-white hover:scale-[1.02]'
-                                  }`}
+                            {/* 1.2 Tên khóa học */}
+                            <div className="p-4 sm:p-5 flex flex-col flex-grow justify-center bg-white">
+                              <div>
+                                <Link 
+                                  to={`/khoa-hoc/${c.id}`}
+                                  className="block"
                                 >
-                                  <span>{isOwned ? 'Vào Phòng Học' : 'Khám Phá'}</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
+                                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 group-hover:text-[#007c76] transition-colors line-clamp-2 leading-snug">
+                                    {c.title}
+                                  </h3>
                                 </Link>
+                                {c.description && (
+                                  <p className="text-slate-500 text-xs line-clamp-2 mt-1.5 font-medium leading-relaxed">
+                                    {c.description}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            </div>
 
-            {/* Desktop Page Indicator Dots */}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-xs text-slate-500 font-medium">
-                👉 Kéo chuột hoặc bấm mũi tên để lướt qua các trang khóa học
-              </span>
-              <div className="flex items-center gap-2">
-                {[0, 1, 2].map((idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectPage(idx)}
-                    className={`h-2 rounded-full transition-all cursor-pointer ${
-                      currentPage === idx ? 'w-8 bg-[#007c76]' : 'w-2 bg-slate-300 hover:bg-slate-400'
-                    }`}
-                    title={`Trang ${idx + 1}`}
-                  />
-                ))}
-              </div>
+                          {/* ======================================================== */}
+                          {/* 2. CHUỘT CHỈA VÔ: HIỆN NỘI DUNG NGAY TRÊN CARD            */}
+                          {/*    CHUỘT CHỈ RA: ĐÓNG NỘI DUNG                            */}
+                          {/* ======================================================== */}
+                          <div 
+                            className={`course-hover-content-panel absolute inset-0 z-20 bg-white flex flex-col transition-all duration-300 ease-out ${
+                              isHoveredOrActive
+                                ? 'translate-y-0 opacity-100 pointer-events-auto' 
+                                : 'translate-y-full opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto'
+                            }`}
+                          >
+                            {/* 2.1 Header nội dung khóa học */}
+                            <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white p-3.5 sm:p-4 shrink-0 border-b border-teal-800/40">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 bg-teal-500/20 border border-teal-400/30 px-2 py-0.5 rounded">
+                                  {c.category || 'Tiêu chuẩn'}
+                                </span>
+                                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                  <BookOpen className="w-3 h-3 text-emerald-400" />
+                                  {cLessons.length} bài thực chiến
+                                </span>
+                              </div>
+                              <Link to={`/khoa-hoc/${c.id}`} className="block">
+                                <h4 className="text-xs sm:text-sm font-black text-white hover:text-teal-200 transition-colors line-clamp-1 leading-snug">
+                                  {c.title}
+                                </h4>
+                              </Link>
+                            </div>
+
+                            {/* 2.2 Danh sách bài học trực tiếp trên card (Cuộn mượt mà) */}
+                            <div className="p-3 sm:p-3.5 flex-1 min-h-0 flex flex-col bg-slate-50/80">
+                              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200/80">
+                                <span className="text-[11px] font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                                  Nội Dung Đào Tạo Trọng Tâm
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  Cuộn để xem
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5 overflow-y-auto custom-scrollbar flex-1 pr-1">
+                                {cLessons.map((lesson, lIdx) => (
+                                  <Link
+                                    key={lIdx}
+                                    to={`/khoa-hoc/${c.id}`}
+                                    className="flex items-start gap-2 p-2 rounded-lg bg-white hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 transition-all text-left group/item"
+                                  >
+                                    <div className="w-5 h-5 rounded-md bg-teal-100/90 text-teal-800 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5 group-hover/item:bg-teal-600 group-hover/item:text-white transition-colors">
+                                      {String(lIdx + 1).padStart(2, '0')}
+                                    </div>
+                                    <div className="min-w-0 flex-grow">
+                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-1 group-hover/item:text-teal-900 transition-colors">
+                                        {lesson.title}
+                                      </p>
+                                      {lesson.content && (
+                                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5 font-medium">
+                                          {lesson.content}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* 2.3 Nút Vào Học Ngay */}
+                            <div className="p-3 bg-white rounded-b-2xl border-t border-slate-100 shrink-0">
+                              <Link
+                                to={`/khoa-hoc/${c.id}`}
+                                className="w-full py-2.5 px-4 bg-[#007c76] hover:bg-[#005c56] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
+                              >
+                                <span>Vào Học Ngay</span>
+                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* MOBILE VIEW: MODERN CARD CAROUSEL SLIDER (< md) - THIẾT KẾ TRƯỢT MƯỢT MÀ */}
-          <div className="block md:hidden">
-            {/* Mobile Header Controls & Filter Pills */}
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs mb-4">
-              {/* Category Segmented Tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-semibold">
-                {[
-                  { id: 'all', label: 'Tất Cả (09)' },
-                  { id: 'haccp', label: 'HACCP & ATTP' },
-                  { id: 'iso', label: 'ISO & QA/QC' },
-                  { id: 'supply', label: 'Chuỗi Cung Ứng' }
-                ].map((tab) => {
-                  const isActive = mobileThemeFilter === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        setMobileThemeFilter(tab.id as any);
-                        setMobileCardIndex(0);
-                        if (mobileTrackRef.current) {
-                          mobileTrackRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer text-xs ${
-                        isActive
-                          ? 'bg-[#005c56] text-white font-bold shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+      {/* 3. BẮT ĐẦU CÙNG FAST (Rút ngắn tinh gọn, lộ trình 4 bước chuẩn hóa thực chiến) */}
+      <section className="py-12 md:py-16 bg-white overflow-hidden relative border-t border-slate-200/80">
+        {/* Soft background ambient gradient */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-teal-50/40 rounded-full blur-3xl -mr-40 -mt-40 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-50/30 rounded-full blur-3xl -ml-40 -mb-40 pointer-events-none"></div>
 
-              {/* Status Bar & Arrow Buttons */}
-              <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100">
-                <div className="text-xs text-slate-600 font-medium">
-                  Khóa <span className="font-bold text-[#007c76] text-sm">0{mobileCardIndex + 1}</span> / 0{filteredMobileCourses.length}
-                </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Header */}
+          <div className="text-center mb-10 sm:mb-12">
+            <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200/70 text-teal-700 text-xs font-bold uppercase tracking-wider mb-2.5 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              Lộ trình 4 bước chuẩn hóa
+            </span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight uppercase">
+              Bắt Đầu Cùng <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-emerald-600">FAST</span>
+            </h2>
+            <p className="text-slate-500 font-medium text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+              Quy trình 4 bước tinh gọn từ khảo sát nhu cầu đến vận hành đạt chuẩn và cấp chứng nhận QR số hóa.
+            </p>
+          </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleMobilePrev}
-                    disabled={mobileCardIndex === 0}
-                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-teal-50 border border-slate-200 text-slate-700 hover:text-[#007c76] flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-xs"
-                    aria-label="Khóa học trước"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleMobileNext}
-                    disabled={mobileCardIndex >= filteredMobileCourses.length - 1}
-                    className="w-10 h-10 rounded-xl bg-[#005c56] hover:bg-[#00423e] text-white flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-sm"
-                    aria-label="Khóa học tiếp theo"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+          {/* 4-Step Connected Roadmap - Tinh gọn, rút ngắn khoảng cách */}
+          <div className="relative">
+            {/* Center Gradient Spine with Animated Glowing Light Beam for Desktop */}
+            <div className="hidden md:block absolute left-1/2 top-6 bottom-6 w-1.5 -translate-x-1/2 bg-gradient-to-b from-teal-200 via-teal-300 to-emerald-200 rounded-full pointer-events-none overflow-hidden">
+              <div className="w-full h-24 bg-gradient-to-b from-transparent via-teal-600 to-transparent spine-beam-light rounded-full opacity-90" />
+            </div>
+            
+            {/* Left Gradient Spine for Mobile */}
+            <div className="md:hidden absolute left-6 top-6 bottom-6 w-1.5 bg-gradient-to-b from-teal-200 via-teal-300 to-emerald-200 rounded-full pointer-events-none overflow-hidden">
+              <div className="w-full h-20 bg-gradient-to-b from-transparent via-teal-600 to-transparent spine-beam-light rounded-full opacity-90" />
             </div>
 
-            {/* Mobile Horizontal Snap-Scroll Carousel Track */}
-            <div 
-              ref={mobileTrackRef}
-              onScroll={handleMobileScroll}
-              className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar px-4 py-2 -mx-4 pb-4"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              {filteredMobileCourses.map((course, idx) => {
-                const isOwned = ownedCourseIds.includes(course.id);
+            <div className="space-y-6 md:space-y-8">
+              {[
+                {
+                  step: '01',
+                  phase: 'Khảo sát & Định hướng',
+                  icon: Compass,
+                  label: 'Giới thiệu chung về tiêu chuẩn',
+                  desc: 'Khảo sát nhanh nhu cầu và đặc thù cơ sở để xác định đúng tiêu chuẩn mục tiêu: HACCP Codex, ISO 22000 hay QA/QC chuyên sâu, tránh học dàn trải lãng phí chi phí.',
+                  tags: ['Khảo sát nhu cầu 1-1', 'Đúng mục tiêu cơ sở'],
+                  accentGradient: 'from-teal-500 to-emerald-500'
+                },
+                {
+                  step: '02',
+                  phase: 'Học tập & Thực hành',
+                  icon: GraduationCap,
+                  label: 'Lập phương án & Hướng dẫn thực hành',
+                  desc: 'Học qua video bài giảng cô đọng 15-20 phút linh hoạt mọi lúc mọi nơi; hệ thống hóa toàn bộ biểu mẫu SOP, quy trình vệ sinh và biểu mẫu kiểm soát an toàn thực tế.',
+                  tags: ['Video bài giảng 15-20p', 'Trọn bộ biểu mẫu SOP'],
+                  accentGradient: 'from-emerald-500 to-teal-600'
+                },
+                {
+                  step: '03',
+                  phase: 'Thực địa & Cố vấn',
+                  icon: ShieldCheck,
+                  label: 'Áp dụng thực địa & Cố vấn 1-1',
+                  desc: 'Đưa kiến thức vào dây chuyền vận hành thực tế, thiết lập các điểm kiểm soát tới hạn (CCP) và kết nối trao đổi 1-1 với chuyên gia FAST để khắc phục điểm yếu thanh tra.',
+                  tags: ['Thiết lập điểm CCP', 'Chuyên gia FAST kèm 1-1'],
+                  accentGradient: 'from-teal-600 to-cyan-600'
+                },
+                {
+                  step: '04',
+                  phase: 'Đánh giá & Chứng nhận',
+                  icon: Award,
+                  label: 'Đánh giá & Nhận chứng nhận QR',
+                  desc: 'Hoàn thành bài kiểm tra trắc nghiệm năng lực, nhận ngay Giấy chứng nhận hoàn thành có mã QR số hóa định danh tra cứu năng lực toàn quốc.',
+                  tags: ['Kiểm tra năng lực online', 'Mã QR số hóa định danh'],
+                  accentGradient: 'from-amber-500 to-teal-600'
+                }
+              ].map((item, idx) => {
+                const isEven = idx % 2 === 0;
+                const IconComponent = item.icon;
                 return (
                   <div 
-                    key={course.id}
-                    className="snap-center shrink-0 w-[84vw] max-w-[340px] bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:border-teal-400 transition-all flex flex-col overflow-hidden"
+                    key={idx} 
+                    className={`relative flex flex-col md:flex-row items-center ${isEven ? 'md:flex-row-reverse' : ''} group`}
                   >
-                    {/* Media Header */}
-                    <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-                      <img 
-                        src={course.image || 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800'} 
-                        alt={course.title}
-                        loading="lazy"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-transparent pointer-events-none"></div>
+                    {/* Horizontal Connector Arm for Desktop */}
+                    <div 
+                      className={`hidden md:block absolute top-1/2 -translate-y-1/2 h-0.5 ${
+                        isEven ? 'right-1/2 w-12 lg:w-16 bg-gradient-to-l from-teal-400 to-transparent' : 'left-1/2 w-12 lg:w-16 bg-gradient-to-r from-teal-400 to-transparent'
+                      } pointer-events-none z-10`}
+                    />
 
-                      {/* Top status */}
-                      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] z-10 pointer-events-none">
-                        <span className="font-bold tracking-wide uppercase drop-shadow-sm text-teal-200">
-                          {course.category || 'Tiêu chuẩn'} · 2026
-                        </span>
-                        {isOwned && (
-                          <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase">
-                            Đã sở hữu
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Media footer */}
-                      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs z-10">
-                        <span className="text-[11px] font-medium text-slate-200 drop-shadow-sm">
-                          15–20 bài · Tự chủ thời gian
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setQuickViewCourse(course)}
-                          className="bg-white/25 active:bg-white active:text-slate-900 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white flex items-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>Xem Nhanh</span>
-                        </button>
-                      </div>
+                    {/* Mobile Node */}
+                    <div className="md:hidden absolute left-6 top-6 -translate-x-1/2 w-9 h-9 bg-white border-2 border-teal-500 rounded-lg shadow-sm z-20 flex items-center justify-center group-hover:scale-105 group-hover:border-teal-600 transition-transform">
+                      <IconComponent className="w-4 h-4 text-teal-600" />
                     </div>
 
-                    {/* Card Body */}
-                    <div className="p-4 flex flex-col flex-grow bg-white">
-                      <div className="flex items-center justify-between gap-2 mb-1.5 text-xs">
-                        <div className="flex items-center gap-1 text-amber-500 font-bold">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span>4.9</span>
-                          <span className="text-slate-400 font-normal text-[11px]">· 320+ học viên</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
-                          Thực hành
-                        </span>
-                      </div>
+                    {/* Desktop Center Node - Gọn gàng, thanh thoát */}
+                    <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-white border-2 border-teal-500 shadow-md shadow-teal-500/15 ring-2 ring-teal-500/10 z-20 flex-col items-center justify-center group-hover:scale-110 group-hover:border-teal-600 transition-all duration-300">
+                      <IconComponent className="w-5 h-5 text-teal-600" />
+                      <span className="text-[9px] font-black text-slate-800 leading-none mt-0.5">{item.step}</span>
+                    </div>
 
-                      <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug mb-2">
-                        <Link to={`/khoa-hoc/${course.id}`} className="hover:underline">
-                          {course.title}
-                        </Link>
-                      </h3>
+                    {/* Content Box */}
+                    <div className={`w-full pl-14 md:pl-0 md:w-1/2 ${isEven ? 'md:pl-10 lg:pl-14' : 'md:pr-10 lg:pr-14 text-left'}`}>
+                      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-lg hover:border-teal-400 hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
+                        {/* Glowing Edge Accent */}
+                        <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${item.accentGradient}`}></div>
 
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-3">
-                        {course.description || 'Chương trình chuẩn hóa kiến thức chuyên sâu bám sát thực tế kiểm toán an toàn thực phẩm.'}
-                      </p>
-
-                      <div className="space-y-1 py-2.5 border-y border-slate-100 mb-3 text-[11px] text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="truncate">Tặng bộ biểu mẫu SOP Word/Excel</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="truncate">Cấp Giấy chứng nhận hoàn thành QR</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-auto pt-1 flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-medium">Học phí</span>
-                          <span className="text-base font-black text-[#005c56]">
-                            {course.price || 'Miễn phí'}
+                        {/* Top Step Badge & Phase */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-teal-50 text-teal-800 text-[11px] font-black tracking-wide border border-teal-200/60">
+                            BƯỚC {item.step}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            {item.phase}
                           </span>
                         </div>
 
-                        <Link
-                          to={isOwned ? `/hoc/${course.id}` : `/khoa-hoc/${course.id}`}
-                          className={`px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1 min-h-[40px] cursor-pointer ${
-                            isOwned
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-[#005c56] text-white active:bg-[#00423e]'
-                          }`}
-                        >
-                          <span>{isOwned ? 'Vào Học' : 'Khám Phá'}</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </Link>
+                        {/* Title */}
+                        <h4 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-teal-700 transition-colors mb-2 leading-snug">
+                          {item.label}
+                        </h4>
+
+                        {/* Description */}
+                        <p className="text-slate-600 font-medium text-xs sm:text-sm leading-relaxed mb-3.5">
+                          {item.desc}
+                        </p>
+
+                        {/* Micro Outcome Tags */}
+                        <div className="flex flex-wrap gap-2 pt-2.5 border-t border-slate-100">
+                          {item.tags.map((tag, tagIdx) => (
+                            <span 
+                              key={tagIdx} 
+                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 rounded-md px-2.5 py-1 shadow-2xs"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                              <span>{tag}</span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* Mobile Navigation Dots & Hint */}
-            <div className="flex items-center justify-between mt-2 px-1">
-              <span className="text-[11px] font-medium text-slate-500">
-                👉 Vuốt ngang để lướt qua các khóa học
-              </span>
-              <div className="flex items-center gap-1">
-                {filteredMobileCourses.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => scrollToMobileCard(idx)}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                      mobileCardIndex === idx ? 'w-5 bg-[#007c76]' : 'w-1.5 bg-slate-300'
-                    }`}
-                    aria-label={`Chuyển tới khóa ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
 
-          {/* Form Nhận Tư Vấn & Giáo Trình Khóa Học Nổi Bật (Thiết Kế Mới) */}
-          <div ref={consultFormRef} className="mt-14 bg-gradient-to-br from-[#005c56] via-[#006e68] to-[#004440] text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
-            {/* Background pattern */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+          {/* Bottom Bento Action Banner - Xóa số liệu ảo tránh lừa dối khách hàng */}
+          <div className="mt-10 sm:mt-14 bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 sm:p-10 lg:p-12 border border-teal-500/30 shadow-2xl relative overflow-hidden">
+            {/* Ambient subtle glow */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              {/* Left Column: Heading & Value */}
-              <div className="lg:col-span-5 space-y-4 text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-yellow-300 text-xs font-black uppercase tracking-widest">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Tư Vấn Miễn Phí 100%</span>
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-snug">
-                  Chưa rõ khóa học nào phù hợp với bạn?
+            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+              <div className="space-y-3 text-center lg:text-left max-w-2xl">
+                <span className="text-teal-400 font-bold uppercase tracking-[0.25em] text-xs inline-flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  Đồng Hành Toàn Diện Cùng FAST E-Learning
+                </span>
+                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight text-white leading-tight">
+                  Sẵn Sàng Nâng Tầm Năng Lực Cùng FAST?
                 </h3>
-                <p className="text-sm text-white/80 leading-relaxed font-medium">
-                  Để lại thông tin, đội ngũ chuyên gia của FAST sẽ tư vấn lộ trình học phù hợp nhất với mô hình kinh doanh, vị trí công việc và gửi tặng bộ tài liệu SOP mẫu.
+                <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+                  Khám phá ngay kho bài giảng thực tế và kiến thức chuẩn hóa vận hành an toàn thực phẩm. Kích hoạt tài khoản để vào học ngay trong hôm nay.
                 </p>
 
-                <div className="space-y-2 pt-2 text-xs text-white/90 font-semibold">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
-                    <span>Lộ trình tối ưu cho cá nhân hoặc cơ sở sản xuất</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-300 shrink-0" />
-                    <span>Hỗ trợ hồ sơ thẩm định an toàn thực phẩm thực tế</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Interactive Consultation Form */}
-              <div className="lg:col-span-7 bg-white text-slate-900 p-6 sm:p-8 rounded-2xl shadow-lg">
-                {consultSuccess ? (
-                  <div className="text-center py-6 space-y-3">
-                    <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                      <Check className="w-8 h-8" />
+                {/* 3 Cam kết thực tế chuẩn hóa (Đã xóa số liệu ảo tránh lừa dối khách hàng) */}
+                <div className="pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/10 text-center sm:text-left">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/30 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-teal-300" />
                     </div>
-                    <h4 className="text-xl font-black text-slate-900 uppercase">Gửi Yêu Cầu Thành Công!</h4>
-                    <p className="text-xs text-slate-600 max-w-md mx-auto">
-                      Chuyên viên của FAST sẽ liên hệ với bạn trong thời gian sớm nhất qua số điện thoại <strong>{consultPhone}</strong>. Cảm ơn bạn đã tin tưởng FAST!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setConsultSuccess(false)}
-                      className="mt-4 px-5 py-2.5 bg-[#005c56] text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-[#00423e] transition-all cursor-pointer"
-                    >
-                      Gửi Yêu Cầu Khác
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleConsultSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
-                          Họ và tên *
-                        </label>
-                        <div className="relative">
-                          <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="text"
-                            required
-                            value={consultName}
-                            onChange={(e) => setConsultName(e.target.value)}
-                            placeholder="Nguyễn Văn A"
-                            className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
-                          Số điện thoại / Zalo *
-                        </label>
-                        <div className="relative">
-                          <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="tel"
-                            required
-                            value={consultPhone}
-                            onChange={(e) => setConsultPhone(e.target.value)}
-                            placeholder="0912 345 678"
-                            className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
-                          Khóa học quan tâm
-                        </label>
-                        <select
-                          value={consultCourse}
-                          onChange={(e) => setConsultCourse(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white cursor-pointer"
-                        >
-                          <option value="HACCP TCVN / CODEX">HACCP TCVN / CODEX</option>
-                          <option value="ISO 22000 - Quản Lý ATTP">ISO 22000 - Quản Lý ATTP</option>
-                          <option value="ISO 9001 - Hệ Thống QMS">ISO 9001 - Hệ Thống QMS</option>
-                          <option value="Chuyên Gia QA/QC Thực Phẩm">Chuyên Gia QA/QC Thực Phẩm</option>
-                          <option value="Quản Lý Nhà Cung Cấp & OEM">Quản Lý Nhà Cung Cấp &amp; OEM</option>
-                          <option value="Khác - Cần Tư Vấn Lộ Trình">Khác - Cần Tư Vấn Toàn Diện</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1">
-                          Mô hình / Vị trí
-                        </label>
-                        <input
-                          type="text"
-                          value={consultRole}
-                          onChange={(e) => setConsultRole(e.target.value)}
-                          placeholder="Bếp ăn, Cơ sở sản xuất, Nhân viên QA/QC..."
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#007c76] focus:bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isConsultSubmitting}
-                      className="w-full py-3 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md shadow-teal-900/15 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-                    >
-                      {isConsultSubmitting ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Đang gửi thông tin...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Gửi Yêu Cầu Nhận Tư Vấn Miễn Phí</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick View Modal (Xem Nhanh Giáo Trình) */}
-          <AnimatePresence>
-            {quickViewCourse && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200"
-                >
-                  <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-[#007c76]" />
-                      <span className="text-xs font-black uppercase text-slate-700 tracking-wider">
-                        Mục Lục &amp; Giáo Trình Khóa Học
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setQuickViewCourse(null)}
-                      className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-700 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div>
-                      <span className="text-[10px] font-black uppercase text-[#007c76] bg-teal-50 px-2 py-0.5 rounded">
-                        {quickViewCourse.category}
-                      </span>
-                      <h4 className="text-lg font-black text-slate-900 mt-1">
-                        {quickViewCourse.title}
-                      </h4>
-                      <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
-                        {quickViewCourse.description}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2.5 pt-2">
-                      <h5 className="text-xs font-black uppercase tracking-wider text-slate-700">
-                        Chủ đề trọng tâm trong khóa học:
-                      </h5>
-                      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2 text-xs font-medium text-slate-700">
-                        <div className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
-                          <span>Phân tích mối nguy sinh học, hóa học, vật lý theo chuẩn Codex mới nhất</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
-                          <span>Xây dựng sơ đồ cây quyết định xác định điểm kiểm soát tới hạn (CCP)</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
-                          <span>Thiết lập giới hạn tới hạn, hệ thống giám sát và hành động khắc phục</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-teal-600 mt-0.5 shrink-0" />
-                          <span>Thực hành lập hồ sơ lưu trữ và chuẩn bị tiếp đoàn thẩm định cơ quan nhà nước</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                      <div className="text-base font-black text-[#005c56]">
-                        {quickViewCourse.price || 'Miễn phí'}
-                      </div>
-                      <Link
-                        to={`/khoa-hoc/${quickViewCourse.id}`}
-                        onClick={() => setQuickViewCourse(null)}
-                        className="px-5 py-2.5 bg-[#005c56] hover:bg-[#00423e] text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <span>Xem Chi Tiết &amp; Đăng Ký</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="text-xs sm:text-sm font-bold text-white">Chuẩn Quốc Tế</div>
+                      <div className="text-[10px] text-teal-200/80 font-medium">ISO 22000 &amp; Codex</div>
                     </div>
                   </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-
-          {/* Highlights & Guarantees Strip */}
-          <div className="mt-16 pt-12 border-t border-slate-200/80">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Chuẩn Hóa Quốc Tế</h4>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Hệ thống kiến thức cập nhật theo ISO 22000 &amp; HACCP Codex mới nhất.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
-                  ★
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Giấy Chứng Nhận Hợp Lệ</h4>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Cấp Giấy chứng nhận hoàn thành có mã QR xác thực năng lực chuyên môn.</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-5 h-5 text-emerald-300" />
+                    </div>
+                    <div>
+                      <div className="text-xs sm:text-sm font-bold text-white">Kiến Thức Thực Tế</div>
+                      <div className="text-[10px] text-emerald-200/80 font-medium">Biểu mẫu áp dụng trực tiếp</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+                      <Award className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <div className="text-xs sm:text-sm font-bold text-white">Mã QR Định Danh</div>
+                      <div className="text-[10px] text-amber-200/80 font-medium">Xác thực chứng nhận số hóa</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
-                  📁
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Bộ Biểu Mẫu SOP Đính Kèm</h4>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Tải trọn gói tài liệu, quy trình tự kiểm và checklist thực hành tại chỗ.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
-                  ⚡
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Truy Cập Trọn Đời</h4>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Học linh hoạt trên mọi thiết bị máy tính, điện thoại 24/7 không giới hạn.</p>
-                </div>
+              <div className="flex flex-col sm:flex-row items-center gap-3.5 shrink-0 w-full sm:w-auto">
+                <Link
+                  to="/khoa-hoc"
+                  className="w-full sm:w-auto px-7 py-4 bg-[#007c76] hover:bg-[#00605b] text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-105 active:scale-95"
+                >
+                  <span>Khám Phá Khóa Học</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/account"
+                  className="w-full sm:w-auto px-7 py-4 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center cursor-pointer hover:border-white/40"
+                >
+                  <span>Vào Phòng Học</span>
+                </Link>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Quick CTA bottom button on Mobile */}
-          <div className="mt-8 text-center lg:hidden">
-            <Link 
-              to="/khoa-hoc" 
-              className="inline-block w-full bg-[#005c56] text-white px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs shadow-md transition-all text-center"
-            >
-              Xem tất cả khóa học
-            </Link>
+      {/* Highlights & Guarantees Strip */}
+      <section className="py-12 bg-slate-50 border-t border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                ✓
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Chuẩn Hóa Quốc Tế</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Hệ thống kiến thức cập nhật theo ISO 22000 &amp; HACCP Codex mới nhất.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                ★
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Giấy Chứng Nhận Hợp Lệ</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Cấp Giấy chứng nhận hoàn thành có mã QR xác thực năng lực chuyên môn.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                📁
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Tài Liệu Hướng Dẫn Đính Kèm</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Trọn gói tài liệu bài giảng, quy trình tự kiểm và checklist thực hành tại chỗ.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-teal-300 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#007c76] flex items-center justify-center shrink-0 border border-teal-100 font-bold">
+                ⚡
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Truy Cập Trọn Đời</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Học linh hoạt trên mọi thiết bị máy tính, điện thoại 24/7 không giới hạn.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

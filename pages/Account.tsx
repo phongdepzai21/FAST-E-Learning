@@ -13,6 +13,7 @@ import { AdminStudentConsole } from '../components/AdminStudentConsole';
 import FastStandardsAudit from '../components/FastStandardsAudit';
 import AdProfileManagement from '../components/AdProfileManagement';
 import FastFoodSafetyManagement from '../components/FastFoodSafetyManagement';
+import FastHaccpChecklist from '../components/FastHaccpChecklist';
 import { PurchaseHistory } from '../components/PurchaseHistory';
 import { FastCodeLookup } from '../components/FastCodeLookup';
 import { UnifiedWebhookCenter } from '../components/UnifiedWebhookCenter';
@@ -106,9 +107,9 @@ const MyOwnedCoursesView: React.FC<{
 
       {myCourses.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {myCourses.map(course => (
+          {myCourses.map((course, idx) => (
              <CourseCard 
-                key={course.id} 
+                key={`acc-my-course-${course.id}-${idx}`} 
                 course={course} 
                 isOwned={true} 
               />
@@ -260,11 +261,11 @@ const BuyCoursesView: React.FC<{
       {/* Course Grid */}
       {filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredCourses.map(course => {
+          {filteredCourses.map((course, idx) => {
             const isOwned = ownedCourseIds.includes(course.id);
             return (
               <CourseCard 
-                key={course.id} 
+                key={`acc-filtered-course-${course.id}-${idx}`} 
                 course={course} 
                 isOwned={isOwned}
               />
@@ -296,8 +297,8 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center'>('dashboard');
-  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'student'>('student');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center'>('dashboard');
+  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'student'>('student');
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
   const [qcClients, setQcClients] = useState<any[]>([]);
@@ -1726,9 +1727,10 @@ const Account: React.FC = () => {
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: 'Thẩm Định Chuẩn FSA', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-                  { id: 'attp', label: 'An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-                  { id: 'hsqc', label: 'Quảng Cáo / Băng-Rôn', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+                  { id: 'fsa', label: 'FSA Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+                  { id: 'haccp', label: 'HACCP Checklist', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'attp', label: 'Hồ Sơ An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'hsqc', label: 'Hồ Sơ Quảng Cáo', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
                 ].map((item) => {
                   const isActive = adminViewMode === item.id;
@@ -1794,9 +1796,10 @@ const Account: React.FC = () => {
                   }}
                   className="bg-white border border-gray-300 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-3 shadow-md outline-none"
                 >
-                  <option value="fsa">Thẩm Định Chuẩn FSA</option>
-                  <option value="attp">Thủ Tục An Toàn Thực Phẩm</option>
-                  <option value="hsqc">Thủ Tục Quảng Cáo / Băng-Rôn</option>
+                  <option value="fsa">FSA Checklist</option>
+                  <option value="haccp">HACCP Checklist</option>
+                  <option value="attp">Hồ Sơ An Toàn Thực Phẩm</option>
+                  <option value="hsqc">Hồ Sơ Quảng Cáo</option>
                   <option value="student">Quay lại Học viên</option>
                 </select>
               </div>
@@ -1805,14 +1808,20 @@ const Account: React.FC = () => {
               <div className="bg-white text-slate-800 rounded-[32px] md:rounded-[40px] p-5 md:p-8 lg:p-10 shadow-2xl border border-teal-900/10 min-h-[600px] w-full">
                 {adminViewMode === 'fsa' && (
                   <div className="space-y-4 animate-fade-in">
+                    <FastStandardsAudit />
+                  </div>
+                )}
+
+                {adminViewMode === 'haccp' && (
+                  <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hệ Thống Thẩm Định &amp; Đánh Giá Tiêu Chuẩn FSA</h4>
-                        <p className="text-xs text-gray-500 font-medium">Bảng đánh giá kiểm toán quy trình sản xuất theo chuẩn ISO 22000, HACCP Codex.</p>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">HACCP Checklist & Thẩm Tra An Toàn</h4>
+                        <p className="text-xs text-gray-500 font-medium">Hệ thống thẩm tra 12 bước, 7 nguyên tắc HACCP Codex & TCVN, xác định điểm tới hạn CCP và chương trình tiên quyết PRP.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                     </div>
-                    <FastStandardsAudit />
+                    <FastHaccpChecklist />
                   </div>
                 )}
 
@@ -1820,7 +1829,7 @@ const Account: React.FC = () => {
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Thủ Tục Cấp Giấy Phép An Toàn Thực Phẩm</h4>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ An Toàn Thực Phẩm</h4>
                         <p className="text-xs text-gray-500 font-medium">Cập nhật, thẩm định và xử lý quy trình pháp lý, giấy phép ATTP cho cơ sở.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
@@ -1833,7 +1842,7 @@ const Account: React.FC = () => {
                   <div className="space-y-4 animate-fade-in">
                     <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                       <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Thủ Tục Thông Báo Quảng Cáo / Băng-Rôn</h4>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ Quảng Cáo</h4>
                         <p className="text-xs text-gray-500 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
                       </div>
                       <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
@@ -2047,6 +2056,8 @@ const Account: React.FC = () => {
                   <UserManagement />
                 ) : activeTab === 'fast-standards-audit' && (isTeacher || isAdmin) ? (
                   <FastStandardsAudit />
+                ) : activeTab === 'fast-haccp-checklist' && (isTeacher || isAdmin) ? (
+                  <FastHaccpChecklist />
                 ) : activeTab === 'ad-profile-management' && isAdmin ? (
                   <AdProfileManagement />
                 ) : activeTab === 'fast-food-safety' && isAdmin ? (
@@ -2134,9 +2145,9 @@ const Account: React.FC = () => {
                      </div>
                   ) : myCourses.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {myCourses.map(course => (
+                      {myCourses.map((course, idx) => (
                          <CourseCard 
-                            key={course.id} 
+                            key={`acc-bot-my-course-${course.id}-${idx}`} 
                             course={course} 
                             isOwned={true} 
                             progress={progressMap[course.id] || 0}

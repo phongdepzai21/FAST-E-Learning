@@ -783,7 +783,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-                Quản Lý Toàn Trình Quảng Cáo Bảng &amp; Băng-Rôn
+                Hồ Sơ Quảng Cáo
               </h1>
               <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
                 Hệ thống quản trị đếm ngược thời hạn thụ lý 05 ngày làm việc và giám sát cơ sở dữ liệu khách hàng.

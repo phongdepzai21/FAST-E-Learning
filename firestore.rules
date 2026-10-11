@@ -205,6 +205,11 @@ service cloud.firestore {
       allow read, write: if isSystemOwner() || isAdmin();
     }
 
+    // 7. Fast HACCP CRM Records (HACCP Checklist)
+    match /fast_haccp_crm/{recordId} {
+      allow read, write: if isSystemOwner() || isAdmin();
+    }
+
     // 7. Manual Unlocks Logs
     match /manual_unlocks/{unlockId} {
       allow read, write: if isAdmin() || isSystemOwner();

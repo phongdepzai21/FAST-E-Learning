@@ -119,14 +119,20 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
           className="bg-white rounded-[24px] overflow-hidden border border-gray-100 flex flex-col h-full transition-colors duration-300 ease-out hover:border-[#007c76]/30"
         >
             {/* Image Container */}
-            <div className="relative aspect-[16/10] overflow-hidden bg-gray-100 group/image">
+            <div 
+              className="relative aspect-[16/10] overflow-hidden bg-gray-100 group/image"
+              style={{ aspectRatio: '16 / 10' }}
+            >
                 <div className={`absolute inset-0 bg-gray-200 animate-pulse transition-opacity duration-500 ${isLoaded ? 'opacity-0' : 'opacity-100'}`} />
                 
                 <img
                     src={getOptimizedUrl(course.image, 600)}
                     alt={course.title}
+                    width={640}
+                    height={400}
                     loading="lazy"
                     decoding="async"
+                    style={{ aspectRatio: '16 / 10' }}
                     onLoad={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
                     className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-106 ${isLoaded ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`}

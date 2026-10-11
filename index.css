@@ -208,3 +208,146 @@
   }
 }
 
+/* ==========================================================================
+   2D HORIZONTAL COURSE CAROUSEL (3 Khóa Học Nổi Bật, Dạng 2D, Trôi Từ Trái Sang Phải)
+   Mỗi lần hiển thị đúng 3 trang, di chuyển ngang từ trái sang phải, không nút thừa
+   ========================================================================== */
+
+@keyframes slideLtr2D {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-150%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-15deg);
+  }
+}
+
+@keyframes spineBeamFlow {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(300%);
+    opacity: 0;
+  }
+}
+
+.course-marquee-viewport {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+  mask-image: linear-gradient(to right, transparent, black 1.5%, black 98.5%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 1.5%, black 98.5%, transparent);
+}
+
+.course-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: slideLtr2D 65s linear infinite;
+  will-change: transform;
+}
+
+/* Tự động tạm dừng mượt mà khi lia chuột vào xem để dễ tương tác */
+.course-marquee-viewport:hover .course-marquee-track,
+.course-marquee-track:hover {
+  animation-play-state: paused !important;
+}
+
+/* Card hover zoom & elevate to center focus (phóng bự hơn một xíu và kéo ra giữa) */
+.course-card-wrapper {
+  position: relative;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), z-index 0s;
+  will-change: transform;
+  transform-origin: center center;
+}
+
+/* Hiệu ứng hào quang phát sáng (Halo Backlight) */
+.course-card-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 1.5rem;
+  background: radial-gradient(circle, rgba(0, 124, 118, 0.3) 0%, rgba(16, 185, 129, 0.12) 50%, transparent 75%);
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  z-index: -1;
+  pointer-events: none;
+  transform: scale(0.92);
+}
+
+.course-card-wrapper:hover::before,
+.course-card-wrapper.is-selected::before {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.course-card-wrapper:hover {
+  transform: scale(1.05) translateY(-8px);
+  z-index: 40;
+}
+
+.course-card-inner {
+  transition: box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, transform 0.35s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.course-card-wrapper:hover .course-card-inner {
+  border-color: #007c76;
+  box-shadow: 0 24px 50px -12px rgba(0, 92, 86, 0.28), 0 0 0 2px #007c76;
+}
+
+/* Panel nội dung khóa học: trượt mượt mà lên khi chuột chỉa vô, trượt xuống đóng lại khi chuột chỉ ra */
+.course-hover-content-panel {
+  will-change: transform, opacity;
+  box-shadow: 0 -10px 25px -4px rgba(0, 0, 0, 0.14);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease;
+}
+
+.course-card-wrapper.is-selected .course-card-inner {
+  border-color: #007c76;
+  box-shadow: 0 20px 40px -10px rgba(0, 92, 86, 0.32), 0 0 0 2px #007c76;
+}
+
+/* Ánh sáng lướt qua thumbnail khi hover (Shimmer sweep) */
+.course-card-wrapper:hover .course-shimmer-layer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.28) 50%, transparent 100%);
+  animation: shimmerSweep 1.6s infinite;
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* Khi lia chuột vào một card, các card còn lại giảm nhẹ độ nổi bật để card hover trở thành tâm điểm */
+.course-marquee-track:hover .course-card-wrapper:not(:hover) {
+  opacity: 0.82;
+  filter: grayscale(10%);
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* Hiệu ứng dòng ánh sáng chạy dọc trục lộ trình Bắt đầu cùng FAST */
+.spine-beam-light {
+  animation: spineBeamFlow 3s ease-in-out infinite;
+}
+
+

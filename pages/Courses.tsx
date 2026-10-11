@@ -23,7 +23,7 @@ const DEFAULT_COMBOS = [
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
     courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
   },
   {
     id: 'combo-pro',
@@ -32,7 +32,7 @@ const DEFAULT_COMBOS = [
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
   }
 ];
 
@@ -250,7 +250,11 @@ const Courses: React.FC = () => {
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
+    const seenIds = new Set<string>();
     return allCourses.filter(course => {
+      if (!course || !course.id || seenIds.has(course.id)) return false;
+      seenIds.add(course.id);
+
       const isDraft = course.status === 'draft' || course.status === 'inactive';
       if (isDraft) return false; // Hide drafts & inactive courses for general view
 
@@ -377,11 +381,11 @@ const Courses: React.FC = () => {
             </div>
         ) : filteredCourses.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {filteredCourses.map((course) => {
+                {filteredCourses.map((course, idx) => {
                     const isOwned = ownedCourseIds.includes(course.id);
                     return (
                         <CourseCard 
-                            key={course.id} 
+                            key={`course-${course.id}-${idx}`} 
                             course={course}
                             isOwned={isOwned} 
                             progress={isOwned ? 0 : undefined} 

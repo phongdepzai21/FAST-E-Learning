@@ -77,7 +77,14 @@ export const COURSES: Course[] = [
     price: '599.000đ',
     image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=800',
     category: 'HACCP',
-    description: 'Nắm vững nguyên tắc phân tích mối nguy và kiểm soát điểm tới hạn theo tiêu chuẩn Việt Nam.'
+    description: 'Nắm vững nguyên tắc phân tích mối nguy và kiểm soát điểm tới hạn theo tiêu chuẩn Việt Nam.',
+    curriculum: [
+      { title: "Bài 1: Tổng quan tiêu chuẩn HACCP & Quy chuẩn TCVN", content: "Cơ sở pháp lý, thuật ngữ cốt lõi và phạm vi áp dụng tại cơ sở sản xuất." },
+      { title: "Bài 2: 5 bước sơ bộ và lập lưu đồ quy trình chế biến", content: "Khảo sát thực địa, xác định dòng chảy nguyên liệu và thẩm tra tại hiện trường." },
+      { title: "Bài 3: 7 nguyên tắc thiết lập điểm kiểm soát tới hạn (CCP)", content: "Phân tích mối nguy sinh học, hóa học, vật lý và xác định ngưỡng tới hạn." },
+      { title: "Bài 4: Thiết lập hệ thống giám sát và hành động khắc phục", content: "Quy trình giám sát liên tục, biện pháp xử lý sự cố khi vượt ngưỡng an toàn." },
+      { title: "Bài 5: Thủ tục thẩm tra hệ thống và hồ sơ lưu trữ SOP", content: "Biểu mẫu báo cáo kiểm toán nội bộ và lưu trữ hồ sơ theo luật ATTP." }
+    ]
   },
   {
     id: 'iso-14001',
@@ -85,7 +92,14 @@ export const COURSES: Course[] = [
     price: '599.000đ',
     image: 'https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&q=80&w=800',
     category: 'ISO',
-    description: 'Xây dựng và vận hành hệ thống quản lý môi trường bền vững cho doanh nghiệp sản xuất.'
+    description: 'Xây dựng và vận hành hệ thống quản lý môi trường bền vững cho doanh nghiệp sản xuất.',
+    curriculum: [
+      { title: "Bài 1: Tổng quan Hệ thống Quản lý Môi trường ISO 14001", content: "Cấu trúc tiêu chuẩn cấp cao HLS và vai trò lãnh đạo doanh nghiệp." },
+      { title: "Bài 2: Xác định khía cạnh môi trường và rủi ro trọng yếu", content: "Phương pháp ma trận đánh giá tác động môi trường trực tiếp và gián tiếp." },
+      { title: "Bài 3: Hoạch định mục tiêu môi trường & chương trình hành động", content: "Thiết lập chỉ số KPI tiết kiệm năng lượng và giảm thiểu phát thải." },
+      { title: "Bài 4: Kiểm soát vận hành và phương án ứng phó khẩn cấp", content: "Kế hoạch diễn tập phòng ngừa sự cố tràn đổ hóa chất và ô nhiễm." },
+      { title: "Bài 5: Đánh giá nội bộ & cải tiến liên tục theo chu trình PDCA", content: "Kỹ năng đánh giá viên nội bộ và hành động khắc phục sự không phù hợp." }
+    ]
   },
   {
     id: 'iso-9001',
@@ -93,7 +107,14 @@ export const COURSES: Course[] = [
     price: '599.000đ',
     image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=800',
     category: 'ISO',
-    description: 'Tiêu chuẩn vàng về quản lý chất lượng, giúp tối ưu hóa quy trình và nâng cao sự hài lòng của khách hàng.'
+    description: 'Tiêu chuẩn vàng về quản lý chất lượng, giúp tối ưu hóa quy trình và nâng cao sự hài lòng của khách hàng.',
+    curriculum: [
+      { title: "Bài 1: Nền tảng Quản lý Chất lượng toàn diện theo ISO 9001", content: "7 nguyên tắc quản lý chất lượng và phương pháp tiếp cận theo quá trình." },
+      { title: "Bài 2: Phân tích bối cảnh tổ chức & tư duy quản lý rủi ro", content: "Nhận diện rủi ro, cơ hội và xây dựng ma trận SWOT/PESTLE chất lượng." },
+      { title: "Bài 3: Chuẩn hóa quy trình vận hành & kiểm soát văn bản SOP", content: "Biên soạn tài liệu hướng dẫn công việc và quy chế kiểm soát dữ liệu." },
+      { title: "Bài 4: Đánh giá sự thỏa mãn khách hàng và chỉ số đo lường", content: "Thu thập phản hồi, xử lý khiếu nại và đo lường hiệu lực chuỗi cung ứng." },
+      { title: "Bài 5: Đánh giá chất lượng nội bộ & khắc phục sự không phù hợp", content: "Quy trình audit chất lượng định kỳ và đóng báo cáo hành động khắc phục." }
+    ]
   },
   {
     id: 'iso-22000',
@@ -101,7 +122,14 @@ export const COURSES: Course[] = [
     price: '599.000đ',
     image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&q=80&w=800',
     category: 'ISO',
-    description: 'Tích hợp ISO 9001 và HACCP để đảm bảo An toàn thực phẩm trong toàn bộ chuỗi cung ứng.'
+    description: 'Tích hợp ISO 9001 và HACCP để đảm bảo An toàn thực phẩm trong toàn bộ chuỗi cung ứng.',
+    curriculum: [
+      { title: "Bài 1: Cấu trúc tiêu chuẩn Hệ thống Quản lý ATTP ISO 22000:2018", content: "Tổng quan chuỗi cung ứng thực phẩm và trách nhiệm giải trình." },
+      { title: "Bài 2: Chương trình tiên quyết (PRP) và thực hành vệ sinh GHP", content: "Kiểm soát vệ sinh cá nhân, nhà xưởng, nguồn nước và trang thiết bị." },
+      { title: "Bài 3: Kế hoạch kiểm soát mối nguy OPRP và điểm kiểm soát CCP", content: "Phân biệt chương trình tiên quyết vận hành và điểm tới hạn then chốt." },
+      { title: "Bài 4: Hệ thống truy xuất nguồn gốc và quy trình triệu hồi", content: "Biện pháp cô lập lô sản phẩm và kích hoạt quy trình triệu hồi khẩn cấp." },
+      { title: "Bài 5: Thẩm tra hiệu lực và xác nhận giá trị sử dụng của hệ thống", content: "Đánh giá nội bộ và họp xem xét của lãnh đạo để cải tiến hệ thống." }
+    ]
   },
   {
     id: 'iso-18000',
@@ -173,7 +201,14 @@ export const COURSES: Course[] = [
     price: '499.000đ',
     image: 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&q=80&w=800',
     category: 'VietGAP',
-    description: 'Xây dựng tiêu chuẩn thực hành nông nghiệp tốt tại Việt Nam, nâng cao năng suất, vệ sinh an toàn dịch bệnh cho nông sản sạch.'
+    description: 'Xây dựng tiêu chuẩn thực hành nông nghiệp tốt tại Việt Nam, nâng cao năng suất, vệ sinh an toàn dịch bệnh cho nông sản sạch.',
+    curriculum: [
+      { title: "Bài 1: Giới thiệu Tiêu chuẩn VietGAP Trồng trọt & Chăn nuôi", content: "Nguyên tắc cốt lõi, cơ sở pháp lý và điều kiện chứng nhận VietGAP." },
+      { title: "Bài 2: Đánh giá mối nguy & Quản lý đất, nguồn nước tưới", content: "Kiểm nghiệm kim loại nặng, vi sinh vật gây hại và giải pháp cải tạo." },
+      { title: "Bài 3: Sử dụng an toàn phân bón & thuốc bảo vệ thực vật", content: "Quy tắc 4 đúng, thời gian cách ly PHI và quản lý kho hóa chất." },
+      { title: "Bài 4: Thu hoạch, sơ chế, đóng gói & bảo quản sau thu hoạch", content: "Quy trình kiểm soát tạp chất, vệ sinh bao bì và chống nhiễm chéo." },
+      { title: "Bài 5: Lập hồ sơ nhật ký đồng ruộng & truy xuất nguồn gốc", content: "Biểu mẫu ghi chép nhật ký sản xuất và hồ sơ phục vụ đánh giá chứng nhận." }
+    ]
   },
   {
     id: 'halal',

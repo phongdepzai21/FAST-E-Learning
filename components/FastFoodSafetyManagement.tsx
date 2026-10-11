@@ -720,7 +720,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
                 </span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-                Cấp Giấy Chứng Nhận An Toàn Thực Phẩm
+                Hồ Sơ An Toàn Thực Phẩm
               </h1>
               <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
                 Quản lý toàn trình hồ sơ ATTP cho dịch vụ ăn uống, cơ sở sản xuất thực phẩm thuộc Bộ Y tế - Sở An toàn thực phẩm TP.HCM.
