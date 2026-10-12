@@ -2925,21 +2925,6 @@ export const DevDiagnosticDashboard: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Floating Fast Dev Quick Trigger (Bottom-Right, subtle & non-intrusive) */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 right-4 z-[9990] px-3 py-1.5 rounded-full bg-slate-900/85 hover:bg-slate-850 text-cyan-400 border border-cyan-500/30 hover:border-cyan-400/60 shadow-xl backdrop-blur-md text-[11px] font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer opacity-70 hover:opacity-100 group"
-          title="Mở Bảng Điều Khiển Fast Dev (Nhấn Ctrl+Shift+X hoặc click tại đây)"
-        >
-          <Code className="w-3.5 h-3.5 text-teal-400 group-hover:rotate-12 transition-transform" />
-          <span className="text-slate-300">Fast Dev</span>
-          <span className="hidden sm:inline text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
-            Ctrl+Shift+X
-          </span>
-        </button>
-      )}
     </>
   );
 };
