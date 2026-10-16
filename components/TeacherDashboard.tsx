@@ -1525,7 +1525,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
       {/* MODAL: NHẬP HÀNG LOẠT BÀI GIẢNG / VIDEO (TIẾT KIỆM THỜI GIAN KHI CÓ 10, 50, 153 VIDEO) */}
       {showBulkImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full border border-gray-100 shadow-2xl space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1655,7 +1655,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
       {/* Quick QR Viewer Modal for any Course */}
       {previewQrCourse && (
-        <div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen grid place-items-center bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative animate-in zoom-in-95">
             <button
               onClick={() => setPreviewQrCourse(null)}

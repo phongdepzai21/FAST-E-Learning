@@ -1526,7 +1526,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
 
       {/* Confirmation Dialog Modal */}
       {confirmDialog && confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 print:hidden">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-in fade-in duration-200 print:hidden">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-center">
             <div className="w-12 h-12 rounded-2xl bg-teal-50 text-[#005c56] flex items-center justify-center mx-auto text-xl font-bold">
               ?

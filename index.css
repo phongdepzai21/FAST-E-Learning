@@ -262,14 +262,21 @@
 .course-marquee-track {
   display: flex;
   width: max-content;
-  animation: slideLtr2D 65s linear infinite;
   will-change: transform;
 }
 
-/* Tự động tạm dừng mượt mà khi lia chuột vào xem để dễ tương tác */
-.course-marquee-viewport:hover .course-marquee-track,
-.course-marquee-track:hover {
-  animation-play-state: paused !important;
+/* Modal and system alert fullscreen aesthetic backdrop: Làm mờ và xám toàn bộ màn hình */
+.modal-backdrop-aesthetic {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100dvh;
+  background-color: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px) grayscale(30%);
+  -webkit-backdrop-filter: blur(12px) grayscale(30%);
+  z-index: 999990;
+  transition: opacity 0.25s ease-out;
 }
 
 /* Card hover zoom & elevate to center focus (phóng bự hơn một xíu và kéo ra giữa) */

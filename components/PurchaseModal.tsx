@@ -127,12 +127,21 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isWorking = isSending || isVerifying;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center bg-slate-950/80 backdrop-blur-md backdrop-grayscale-[30%] px-4 animate-fade-in">
       <div className="bg-white rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl relative overflow-hidden">
         
         {/* Progress Bar */}

@@ -1592,7 +1592,7 @@ export const FastStandardsAudit: React.FC = () => {
 
       {/* Custom Confirmation Modal to bypass native browser popups */}
       {confirmDialog && confirmDialog.isOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-fade-in">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-gray-150 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center gap-3 text-amber-600">
               <AlertCircle className="w-8 h-8" />

@@ -99,7 +99,13 @@ const Home: React.FC = () => {
   }, [allCourses, featuredCourses]);
 
   const marqueeContainerRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(1200);
+  const currentXRef = useRef<number>(0);
+  const targetXRef = useRef<number | null>(null);
+  const isHoveringRef = useRef<boolean>(false);
+  const hoveredCardKeyRef = useRef<string | null>(null);
+  const rafIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = marqueeContainerRef.current;
@@ -128,6 +134,89 @@ const Home: React.FC = () => {
     ? Math.floor((containerWidth - 2 * marqueeGap) / 3) 
     : Math.max(270, Math.min(330, containerWidth - 40));
   const groupWidth = 5 * cardWidth + 5 * marqueeGap;
+
+  // Tự động trôi chậm và mượt mà kéo card ra chính giữa vùng di chuyển khi lia chuột
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || groupWidth <= 0) return;
+
+    const minX = -groupWidth * 2.5;
+    const maxX = -groupWidth * 0.5;
+
+    if (currentXRef.current === 0 || isNaN(currentXRef.current)) {
+      currentXRef.current = -groupWidth * 1.5;
+    }
+
+    let lastTime = performance.now();
+
+    const loop = (now: number) => {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (isHoveringRef.current && targetXRef.current !== null) {
+        // Tự động kéo card ra đúng chính giữa phần di chuyển mượt mà
+        const diff = targetXRef.current - currentXRef.current;
+        if (Math.abs(diff) > 0.4) {
+          currentXRef.current += diff * 0.12;
+        } else {
+          currentXRef.current = targetXRef.current;
+        }
+      } else {
+        // Trôi chậm tự nhiên từ trái sang phải (~36px/s)
+        const speed = 36 * dt;
+        currentXRef.current += speed;
+
+        // Vòng lặp liên tục giữa các nhóm card
+        if (currentXRef.current > maxX) {
+          currentXRef.current -= groupWidth;
+          if (targetXRef.current !== null) targetXRef.current -= groupWidth;
+        } else if (currentXRef.current < minX) {
+          currentXRef.current += groupWidth;
+          if (targetXRef.current !== null) targetXRef.current += groupWidth;
+        }
+      }
+
+      if (track) {
+        track.style.transform = `translate3d(${currentXRef.current}px, 0, 0)`;
+      }
+
+      rafIdRef.current = requestAnimationFrame(loop);
+    };
+
+    rafIdRef.current = requestAnimationFrame(loop);
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, [groupWidth]);
+
+  // Handler: Lia chuột hoặc chạm vào card -> tính toán vị trí để kéo thẳng ra giữa
+  const handleCardFocusOrHover = (cardKey: string, cardEl: HTMLElement) => {
+    setActiveHoverCard(cardKey);
+    isHoveringRef.current = true;
+    hoveredCardKeyRef.current = cardKey;
+
+    if (!marqueeContainerRef.current) return;
+    const containerRect = marqueeContainerRef.current.getBoundingClientRect();
+    const cardRect = cardEl.getBoundingClientRect();
+
+    const containerCenter = containerRect.left + containerRect.width / 2;
+    const cardCenter = cardRect.left + cardRect.width / 2;
+    const delta = containerCenter - cardCenter;
+
+    targetXRef.current = currentXRef.current + delta;
+  };
+
+  const handleCardMouseLeave = () => {
+    setActiveHoverCard(null);
+    hoveredCardKeyRef.current = null;
+  };
+
+  const handleContainerMouseLeave = () => {
+    setActiveHoverCard(null);
+    hoveredCardKeyRef.current = null;
+    isHoveringRef.current = false;
+    targetXRef.current = null;
+  };
 
   // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
   useEffect(() => {
@@ -266,12 +355,14 @@ const Home: React.FC = () => {
             </p>
           </div>
 
-          {/* 2D Horizontal Moving Stage - Trôi chậm từ trái sang phải, hiển thị 5 khóa học nổi bật */}
+          {/* 2D Horizontal Moving Stage - Trôi chậm từ trái sang phải, tự động kéo card ra giữa khi lia chuột */}
           <div 
             ref={marqueeContainerRef}
             className="course-marquee-viewport w-full select-none"
+            onMouseLeave={handleContainerMouseLeave}
           >
             <div 
+              ref={trackRef}
               className="course-marquee-track flex"
               style={{ width: `${groupWidth * 4}px` }}
             >
@@ -295,11 +386,11 @@ const Home: React.FC = () => {
                         key={`card-${cardKey}`}
                         style={{ width: `${cardWidth}px` }}
                         className="shrink-0 select-none group course-card-wrapper"
-                        onMouseEnter={() => setActiveHoverCard(cardKey)}
-                        onMouseLeave={() => setActiveHoverCard(null)}
-                        onClick={() => {
-                          // Hỗ trợ chạm/bật trên thiết bị di động
-                          setActiveHoverCard(prev => prev === cardKey ? null : cardKey);
+                        onMouseEnter={(e) => handleCardFocusOrHover(cardKey, e.currentTarget)}
+                        onMouseLeave={handleCardMouseLeave}
+                        onClick={(e) => {
+                          // Hỗ trợ chạm/bật trên thiết bị di động và tự động kéo ra giữa
+                          handleCardFocusOrHover(cardKey, e.currentTarget);
                         }}
                       >
                         <div className="course-card-inner relative bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[360px] sm:h-[385px] overflow-hidden transition-all duration-300">
@@ -463,17 +554,17 @@ const Home: React.FC = () => {
           <div className="text-center mb-10 sm:mb-12">
             <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200/70 text-teal-700 text-xs font-bold uppercase tracking-wider mb-2.5 shadow-2xs">
               <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              Lộ trình 4 bước chuẩn hóa
+              Lộ trình chuẩn hóa thực chiến
             </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight uppercase">
               Bắt Đầu Cùng <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-emerald-600">FAST</span>
             </h2>
             <p className="text-slate-500 font-medium text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-              Quy trình 4 bước tinh gọn từ khảo sát nhu cầu đến vận hành đạt chuẩn và cấp chứng nhận QR số hóa.
+              Quy trình tinh gọn từ khảo sát nhu cầu đến vận hành đạt chuẩn và cấp chứng nhận QR số hóa.
             </p>
           </div>
 
-          {/* 4-Step Connected Roadmap - Tinh gọn, rút ngắn khoảng cách */}
+          {/* Connected Roadmap - Tinh gọn, thanh thoát, không số bước và không nút tích rườm rà */}
           <div className="relative">
             {/* Center Gradient Spine with Animated Glowing Light Beam for Desktop */}
             <div className="hidden md:block absolute left-1/2 top-6 bottom-6 w-1.5 -translate-x-1/2 bg-gradient-to-b from-teal-200 via-teal-300 to-emerald-200 rounded-full pointer-events-none overflow-hidden">
@@ -488,39 +579,31 @@ const Home: React.FC = () => {
             <div className="space-y-6 md:space-y-8">
               {[
                 {
-                  step: '01',
                   phase: 'Khảo sát & Định hướng',
                   icon: Compass,
                   label: 'Giới thiệu chung về tiêu chuẩn',
                   desc: 'Khảo sát nhanh nhu cầu và đặc thù cơ sở để xác định đúng tiêu chuẩn mục tiêu: HACCP Codex, ISO 22000 hay QA/QC chuyên sâu, tránh học dàn trải lãng phí chi phí.',
-                  tags: ['Khảo sát nhu cầu 1-1', 'Đúng mục tiêu cơ sở'],
                   accentGradient: 'from-teal-500 to-emerald-500'
                 },
                 {
-                  step: '02',
                   phase: 'Học tập & Thực hành',
                   icon: GraduationCap,
                   label: 'Lập phương án & Hướng dẫn thực hành',
                   desc: 'Học qua video bài giảng cô đọng 15-20 phút linh hoạt mọi lúc mọi nơi; hệ thống hóa toàn bộ biểu mẫu SOP, quy trình vệ sinh và biểu mẫu kiểm soát an toàn thực tế.',
-                  tags: ['Video bài giảng 15-20p', 'Trọn bộ biểu mẫu SOP'],
                   accentGradient: 'from-emerald-500 to-teal-600'
                 },
                 {
-                  step: '03',
                   phase: 'Thực địa & Cố vấn',
                   icon: ShieldCheck,
                   label: 'Áp dụng thực địa & Cố vấn 1-1',
                   desc: 'Đưa kiến thức vào dây chuyền vận hành thực tế, thiết lập các điểm kiểm soát tới hạn (CCP) và kết nối trao đổi 1-1 với chuyên gia FAST để khắc phục điểm yếu thanh tra.',
-                  tags: ['Thiết lập điểm CCP', 'Chuyên gia FAST kèm 1-1'],
                   accentGradient: 'from-teal-600 to-cyan-600'
                 },
                 {
-                  step: '04',
                   phase: 'Đánh giá & Chứng nhận',
                   icon: Award,
                   label: 'Đánh giá & Nhận chứng nhận QR',
                   desc: 'Hoàn thành bài kiểm tra trắc nghiệm năng lực, nhận ngay Giấy chứng nhận hoàn thành có mã QR số hóa định danh tra cứu năng lực toàn quốc.',
-                  tags: ['Kiểm tra năng lực online', 'Mã QR số hóa định danh'],
                   accentGradient: 'from-amber-500 to-teal-600'
                 }
               ].map((item, idx) => {
@@ -543,10 +626,9 @@ const Home: React.FC = () => {
                       <IconComponent className="w-4 h-4 text-teal-600" />
                     </div>
 
-                    {/* Desktop Center Node - Gọn gàng, thanh thoát */}
-                    <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-white border-2 border-teal-500 shadow-md shadow-teal-500/15 ring-2 ring-teal-500/10 z-20 flex-col items-center justify-center group-hover:scale-110 group-hover:border-teal-600 transition-all duration-300">
+                    {/* Desktop Center Node - Tinh tế, không số bước rườm rà */}
+                    <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-xl bg-white border-2 border-teal-500 shadow-md shadow-teal-500/15 ring-2 ring-teal-500/10 z-20 items-center justify-center group-hover:scale-110 group-hover:border-teal-600 transition-all duration-300">
                       <IconComponent className="w-5 h-5 text-teal-600" />
-                      <span className="text-[9px] font-black text-slate-800 leading-none mt-0.5">{item.step}</span>
                     </div>
 
                     {/* Content Box */}
@@ -555,12 +637,9 @@ const Home: React.FC = () => {
                         {/* Glowing Edge Accent */}
                         <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${item.accentGradient}`}></div>
 
-                        {/* Top Step Badge & Phase */}
+                        {/* Top Phase Header */}
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-teal-50 text-teal-800 text-[11px] font-black tracking-wide border border-teal-200/60">
-                            BƯỚC {item.step}
-                          </span>
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <span className="text-xs font-black text-teal-700 uppercase tracking-wider">
                             {item.phase}
                           </span>
                         </div>
@@ -571,22 +650,9 @@ const Home: React.FC = () => {
                         </h4>
 
                         {/* Description */}
-                        <p className="text-slate-600 font-medium text-xs sm:text-sm leading-relaxed mb-3.5">
+                        <p className="text-slate-600 font-medium text-xs sm:text-sm leading-relaxed">
                           {item.desc}
                         </p>
-
-                        {/* Micro Outcome Tags */}
-                        <div className="flex flex-wrap gap-2 pt-2.5 border-t border-slate-100">
-                          {item.tags.map((tag, tagIdx) => (
-                            <span 
-                              key={tagIdx} 
-                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 rounded-md px-2.5 py-1 shadow-2xs"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                              <span>{tag}</span>
-                            </span>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </div>

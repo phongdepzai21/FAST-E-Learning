@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { TEAM, SOCIAL_ICONS } from '../constants';
@@ -22,6 +22,14 @@ import {
 
 const About: React.FC = () => {
   const linkedinLink = "https://www.linkedin.com/company/96365912/";
+  const [clientSlide, setClientSlide] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setClientSlide(prev => (prev === 0 ? 1 : 0));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <main className="pb-20 animate-fade-in bg-slate-50/50">
@@ -385,116 +393,249 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      {/* Section 6: Tiêu biểu Khách hàng lớn */}
+      {/* Section 6: OUR CLIENTS (Slide 1 & Slide 2 theo mẫu thực tế) */}
       <section className="py-16 md:py-24 bg-white relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 space-y-3">
-            <span className="text-[#007c76] text-xs font-black uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full inline-block">
-              Sự Khẳng Định Về Uy Tín
-            </span>
-            <h2 className="text-2xl md:text-4xl font-black text-slate-900 uppercase">
-              Khách Hàng Đồng Hành Tiêu Biểu
+          {/* Header đúng chuẩn hình ảnh cung cấp: OUR CLIENTS với thanh gạch ngang màu xanh đậm */}
+          <div className="text-center mb-10 md:mb-14">
+            <h2 className="text-2xl md:text-4xl font-extrabold text-[#0f2d4a] tracking-wider uppercase font-sans">
+              OUR CLIENTS
             </h2>
-            <div className="w-16 h-1 bg-[#007c76] mx-auto rounded-full mt-2"></div>
-            <p className="text-xs md:text-sm text-slate-500 max-w-xl mx-auto font-medium">
-              FAST Consulting vinh dự đồng hành và nâng tầm chất lượng vận hành cho các chuỗi dịch vụ và tập đoàn hàng đầu.
-            </p>
+            <div className="w-12 h-1 bg-[#0f2d4a] mx-auto mt-2"></div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 items-stretch">
-            {[
-              {
-                name: '7-Eleven',
-                logo: 'https://upload.wikimedia.org/wikipedia/commons/4/40/7-eleven_logo.svg',
-                type: 'Chuỗi cửa hàng tiện lợi toàn cầu',
-                isSvg: true
-              },
-              {
-                name: 'GS25',
-                logo: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/GS25_logo.svg',
-                type: 'Chuỗi cửa hàng tiện lợi Hàn Quốc',
-                isSvg: true
-              },
-              {
-                name: 'Mixue',
-                logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Mixue_Ice_Cream_%26_Tea_logo.png/512px-Mixue_Ice_Cream_%26_Tea_logo.png',
-                type: 'Chuỗi trà sữa & kem lớn nhất',
-                isSvg: false
-              },
-              {
-                name: 'Genki Sushi',
-                logo: 'https://upload.wikimedia.org/wikipedia/commons/a/af/Genki_Sushi_logo.svg',
-                type: 'Chuỗi nhà hàng sushi nổi tiếng',
-                isSvg: true
-              },
-              {
-                name: 'Biofresh Đà Lạt',
-                emblem: '🍓',
-                emblemBg: 'bg-red-500/10 text-red-500 border-red-500/20',
-                type: 'Nông nghiệp CNC & Sinh thái'
-              },
-              {
-                name: 'Hương Việt Xưa',
-                emblem: '🌾',
-                emblemBg: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-                type: 'Nhà máy nước sốt, gia vị'
-              },
-              {
-                name: 'Phúc Lộc Thọ',
-                emblem: '🍚',
-                emblemBg: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-                type: 'Chuỗi Cơm Tấm nổi tiếng Sài Gòn'
-              },
-              {
-                name: 'Đảo Hải Sản',
-                emblem: '🐟',
-                emblemBg: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-                type: 'Chuỗi bán lẻ hải sản tươi sống'
-              },
-              {
-                name: 'Trí Kiên Food',
-                emblem: '🌶️',
-                emblemBg: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
-                type: 'Sản xuất xốt & gia vị xuất khẩu'
-              },
-              {
-                name: 'Ếch Xanh',
-                emblem: '🐸',
-                emblemBg: 'bg-green-500/10 text-green-500 border-green-500/20',
-                type: 'Hệ thống ẩm thực & Bếp trung tâm'
-              }
-            ].map((client, idx) => (
-              <div 
-                key={idx} 
-                className="bg-white border border-slate-100 hover:border-emerald-500/30 hover:shadow-xl rounded-2xl p-5 flex flex-col justify-between items-center text-center transition-all duration-300 group"
-              >
-                <div className="w-full flex flex-col items-center justify-center flex-1 mb-3">
-                  {client.logo ? (
-                    <div className="h-16 flex items-center justify-center w-full max-w-[120px] transition-all duration-300 filter grayscale group-hover:grayscale-0">
-                      <img 
-                        src={client.logo} 
-                        alt={`Logo ${client.name}`} 
-                        className={`object-contain max-h-12 ${client.isSvg ? 'w-auto' : 'w-12 h-12 rounded-full'}`}
-                        loading="lazy"
-                        decoding="async"
-                      />
+          {/* Client Logos Grid / Slider Container */}
+          <div className="relative overflow-hidden">
+            <div 
+              className="flex transition-transform duration-700 ease-in-out"
+              style={{ transform: `translateX(-${clientSlide * 100}%)` }}
+            >
+              {/* SLIDE 1: MIXUE, Phúc Lộc Thọ, Hảo Hương, Rau Má Mix, Tường An, Đảo Hải Sản */}
+              <div className="w-full shrink-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
+                  {/* Card 1: MIXUE */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#df1e26] text-white px-3 py-2 rounded-md flex items-center gap-2 shadow-xs w-full max-w-[140px] justify-center">
+                      <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center shrink-0 border border-red-100">
+                        <span className="text-sm leading-none select-none">⛄</span>
+                      </div>
+                      <div className="flex flex-col text-left leading-none">
+                        <span className="text-sm font-black tracking-wider text-white">MIXUE</span>
+                        <span className="text-[6.5px] font-bold text-red-100 uppercase tracking-tight mt-0.5 whitespace-nowrap">
+                          SINCE 1997 · ICE CREAM & TEA
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className={`w-12 h-12 rounded-full border flex items-center justify-center text-2xl mb-2 transition-transform duration-300 group-hover:scale-110 ${client.emblemBg}`}>
-                      {client.emblem}
+                  </div>
+
+                  {/* Card 2: Cơm Tấm Phúc Lộc Thọ */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#30160b] text-white px-2.5 py-2 rounded-lg border border-amber-600/30 flex flex-col items-center justify-center text-center shadow-xs w-full max-w-[140px]">
+                      <div className="flex items-center gap-1 leading-none">
+                        <span className="text-[9.5px] font-black text-[#e8b960] tracking-tight">Phúc Lộc Thọ</span>
+                        <span className="text-[6px] bg-[#e8b960] text-[#30160b] font-black px-0.5 py-0.2 rounded font-mono">Since 2005</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-black text-white tracking-wider my-0.5 leading-tight font-serif">
+                        CƠM TẤM
+                      </div>
+                      <div className="text-[6.5px] font-extrabold text-[#e8b960] tracking-wide uppercase whitespace-nowrap">
+                        Hệ Thống Phủ Khắp Sài Gòn
+                      </div>
                     </div>
-                  )}
+                  </div>
 
-                  <span className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-wide group-hover:text-[#007c76] transition-colors mt-2">
-                    {client.name}
-                  </span>
-                </div>
+                  {/* Card 3: Hảo Hương */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <svg className="w-12 sm:w-14 h-6 sm:h-7 text-[#d82a1e]" viewBox="0 0 64 32" fill="none">
+                        <path d="M16 26 A16 16 0 0 1 48 26 Z" fill="url(#sunGrad1)" />
+                        <line x1="32" y1="4" x2="32" y2="8" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
+                        <line x1="20" y1="7" x2="23" y2="11" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
+                        <line x1="44" y1="7" x2="41" y2="11" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
+                        <line x1="10" y1="15" x2="15" y2="17" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
+                        <line x1="54" y1="15" x2="49" y2="17" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
+                        <defs>
+                          <linearGradient id="sunGrad1" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#ff7a18" />
+                            <stop offset="100%" stopColor="#d82a1e" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <span className="text-sm sm:text-base font-black text-[#d82a1e] tracking-tight mt-1 font-serif italic whitespace-nowrap">
+                        Hảo Hương
+                      </span>
+                    </div>
+                  </div>
 
-                <div className="w-full border-t border-slate-50 pt-2 text-[10px] text-slate-400 font-bold">
-                  {client.type}
+                  {/* Card 4: Rau Má Mix */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <svg className="w-9 sm:w-10 h-9 sm:h-10" viewBox="0 0 48 48" fill="none">
+                        <path d="M24 6 C12 6, 8 16, 10 24 C12 30, 18 34, 24 32 C30 34, 36 30, 38 24 C40 16, 36 6, 24 6 Z" fill="#1b9e4b" />
+                        <path d="M24 32 C23 37, 21 42, 19 45" stroke="#167a39" strokeWidth="2" strokeLinecap="round" />
+                        <circle cx="21" cy="35" r="1.5" fill="#3cd070" />
+                        <circle cx="25" cy="38" r="1.8" fill="#3cd070" />
+                        <circle cx="27" cy="42" r="1.3" fill="#3cd070" />
+                      </svg>
+                      <span className="text-[8.5px] font-bold text-[#1a5d30] tracking-wider -mt-0.5">raumamix®</span>
+                      <div className="text-xs sm:text-sm font-black tracking-tight leading-none mt-0.5">
+                        <span className="text-[#1a5d30]">RAU MÁ</span>
+                        <span className="text-[#b2c825] ml-1">mix</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Tường An */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#ffeb00] px-3 py-2 rounded-xs flex flex-col items-center justify-center text-center shadow-2xs w-full max-w-[120px]">
+                      <svg className="w-9 sm:w-10 h-6 sm:h-7 text-[#d81d24]" viewBox="0 0 48 32" fill="currentColor">
+                        <path d="M12 24 C10 20, 8 14, 12 10 C16 6, 26 6, 32 8 C36 9, 40 12, 42 16 C41 18, 38 18, 36 17 C34 20, 32 24, 30 26 L26 26 L27 20 L23 20 L23 26 L17 26 L18 19 L13 19 Z" />
+                        <circle cx="15" cy="11" r="1" fill="#ffeb00" />
+                        <path d="M8 15 C6 18, 5 21, 5 23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      <span className="text-xs sm:text-sm font-black text-[#d81d24] font-serif italic tracking-tight -mt-0.5 whitespace-nowrap">
+                        Tường An®
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 6: Đảo Hải Sản */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#009fe3] px-2.5 py-3 rounded-xs flex items-center justify-center text-center shadow-2xs w-full max-w-[125px]">
+                      <div className="flex items-center font-black text-white text-xs sm:text-sm tracking-wider whitespace-nowrap">
+                        <span>D</span>
+                        <span className="text-amber-300 text-[9px] mx-0.5">★</span>
+                        <span>OHAISAN</span>
+                        <span className="text-[7px] align-super ml-0.5">®</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
+
+              {/* SLIDE 2: Tường An, Đảo Hải Sản, Biofresh, Tri Kien Food, Hương Việt Xưa, Thao Tien Foods */}
+              <div className="w-full shrink-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
+                  {/* Card 1: Tường An */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#ffeb00] px-3 py-2 rounded-xs flex flex-col items-center justify-center text-center shadow-2xs w-full max-w-[120px]">
+                      <svg className="w-9 sm:w-10 h-6 sm:h-7 text-[#d81d24]" viewBox="0 0 48 32" fill="currentColor">
+                        <path d="M12 24 C10 20, 8 14, 12 10 C16 6, 26 6, 32 8 C36 9, 40 12, 42 16 C41 18, 38 18, 36 17 C34 20, 32 24, 30 26 L26 26 L27 20 L23 20 L23 26 L17 26 L18 19 L13 19 Z" />
+                        <circle cx="15" cy="11" r="1" fill="#ffeb00" />
+                        <path d="M8 15 C6 18, 5 21, 5 23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      <span className="text-xs sm:text-sm font-black text-[#d81d24] font-serif italic tracking-tight -mt-0.5 whitespace-nowrap">
+                        Tường An®
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Đảo Hải Sản */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="bg-[#009fe3] px-2.5 py-3 rounded-xs flex items-center justify-center text-center shadow-2xs w-full max-w-[125px]">
+                      <div className="flex items-center font-black text-white text-xs sm:text-sm tracking-wider whitespace-nowrap">
+                        <span>D</span>
+                        <span className="text-amber-300 text-[9px] mx-0.5">★</span>
+                        <span>OHAISAN</span>
+                        <span className="text-[7px] align-super ml-0.5">®</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: BIOFRESH */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#11242c] border-2 border-emerald-400/40 p-1 flex flex-col items-center justify-center text-center relative shadow-xs">
+                      <div className="text-[6px] font-black text-white tracking-[0.2em] uppercase leading-none mb-0.5">BIOFRESH</div>
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#1b3a47] flex items-center justify-center relative">
+                        <span className="text-emerald-400 text-sm sm:text-base font-black font-sans leading-none">B</span>
+                        <span className="absolute -top-0.5 -right-0.5 text-[8px] text-emerald-300">🍃</span>
+                      </div>
+                      <div className="text-[4.5px] font-bold text-emerald-200 uppercase tracking-tighter leading-none mt-0.5 whitespace-nowrap">
+                        EST 2010 · FARM TO FACTORY
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: TRI KIEN FOOD */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 border-2 border-[#8b4513] rounded-md rotate-45 flex items-center justify-center mb-1 shadow-2xs">
+                        <div className="-rotate-45 font-black text-[#167a39] text-xs leading-none">
+                          1K
+                        </div>
+                      </div>
+                      <span className="text-[10px] sm:text-xs font-black text-[#167a39] uppercase tracking-wider whitespace-nowrap">
+                        TRI KIEN FOOD
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 5: HƯƠNG VIỆT XƯA */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <svg className="w-8 sm:w-9 h-10 sm:h-11" viewBox="0 0 40 48" fill="none">
+                        <defs>
+                          <linearGradient id="dropGrad2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f39c12" />
+                            <stop offset="60%" stopColor="#e67e22" />
+                            <stop offset="100%" stopColor="#d35400" />
+                          </linearGradient>
+                        </defs>
+                        <path d="M20 2 C20 2, 6 22, 6 32 A14 14 0 0 0 34 32 C34 22, 20 2, 20 2 Z" fill="url(#dropGrad2)" />
+                        <ellipse cx="20" cy="34" rx="7" ry="1.5" fill="#2c1a0e" />
+                        <path d="M19 28 L21 34" stroke="#2c1a0e" strokeWidth="1.2" />
+                        <circle cx="20" cy="27" r="1.5" fill="#2c1a0e" />
+                      </svg>
+                      <span className="text-[10px] sm:text-xs font-black text-[#8b4513] uppercase tracking-wide font-serif mt-0.5 whitespace-nowrap">
+                        HƯƠNG VIỆT XƯA
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 6: THAO TIEN FOODS */}
+                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <span className="text-[5.5px] sm:text-[6px] font-bold text-slate-500 uppercase tracking-tight leading-none mb-1">
+                        IMPORTING THE BEST QUALITY MEAT & POULTRY
+                      </span>
+                      <div className="flex gap-1 my-1">
+                        <span className="w-2.5 h-1.5 bg-[#f39c12] rounded-xs" />
+                        <span className="w-2.5 h-1.5 bg-[#2ecc71] rounded-xs" />
+                        <span className="w-2.5 h-1.5 bg-[#e74c3c] rounded-xs" />
+                        <span className="w-2.5 h-1.5 bg-[#3498db] rounded-xs" />
+                      </div>
+                      <span className="text-[10px] sm:text-xs font-black text-slate-900 uppercase tracking-wider mt-0.5 whitespace-nowrap">
+                        THAO TIEN FOODS
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dấu chấm chuyển trang (Pagination Dots) đúng chuẩn hình mẫu: chấm vàng / chấm xám */}
+          <div className="flex items-center justify-center gap-2.5 mt-8 md:mt-10">
+            <button
+              type="button"
+              onClick={() => setClientSlide(0)}
+              aria-label="Xem trang 1"
+              className={`w-3.5 h-3.5 rounded-full transition-all duration-300 cursor-pointer ${
+                clientSlide === 0 
+                  ? 'bg-amber-400 ring-2 ring-amber-300/50 scale-110' 
+                  : 'bg-gray-300 hover:bg-gray-400'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setClientSlide(1)}
+              aria-label="Xem trang 2"
+              className={`w-3.5 h-3.5 rounded-full transition-all duration-300 cursor-pointer ${
+                clientSlide === 1 
+                  ? 'bg-amber-400 ring-2 ring-amber-300/50 scale-110' 
+                  : 'bg-gray-300 hover:bg-gray-400'
+              }`}
+            />
           </div>
 
           {/* Partner Certification bodies */}

@@ -1302,7 +1302,7 @@ export const UserManagement: React.FC = () => {
 
       {/* --- MODAL: XEM CHI TIẾT THỜI GIAN MUA KHÓA HỌC (MẤY GIỜ) --- */}
       {viewingUserCourses && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-gray-50 to-white">
               <div className="flex items-center gap-3">
@@ -1381,7 +1381,7 @@ export const UserManagement: React.FC = () => {
 
       {/* --- MODAL: XÁC NHẬN KHÓA TÀI KHOẢN --- */}
       {lockModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-rose-50/50">
               <div className="flex items-center gap-2 text-rose-700">
@@ -1533,7 +1533,7 @@ export const UserManagement: React.FC = () => {
 
       {/* --- MODAL: PHÂN QUYỀN TÀI KHOẢN --- */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%] animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div className="flex items-center gap-2">

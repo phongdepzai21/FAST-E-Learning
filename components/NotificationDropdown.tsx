@@ -120,14 +120,21 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
         )}
       </button>
 
-      {/* Dropdown Popover */}
+      {/* Fullscreen Backdrop & Dropdown Popover */}
       {isOpen && (
-        <div 
-          id="notification-dropdown-menu"
-          className={`absolute ${
-            isMobile ? 'left-0 right-0 mt-2 mx-auto w-[92vw] max-w-[380px]' : 'right-0 mt-3 w-80 sm:w-96'
-          } bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}
-        >
+        <>
+          {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình khi mở bảng thông báo */}
+          <div 
+            className="fixed inset-0 w-screen h-screen min-h-screen bg-slate-950/70 backdrop-blur-md backdrop-grayscale-[30%] z-[105] animate-fade-in"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div 
+            id="notification-dropdown-menu"
+            className={`absolute ${
+              isMobile ? 'left-0 right-0 mt-2 mx-auto w-[92vw] max-w-[380px]' : 'right-0 mt-3 w-80 sm:w-96'
+            } bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}
+          >
           {/* Header */}
           <div className="px-4 py-3.5 bg-gradient-to-r from-gray-50 to-teal-50/40 dark:from-slate-800 dark:to-slate-800/80 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -279,6 +286,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             </button>
           </div>
         </div>
+        </>
       )}
     </div>
   );

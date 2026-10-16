@@ -177,18 +177,25 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
   const theme = getTheme();
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] p-4 flex items-center justify-center">
-        {/* Backdrop */}
+      <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+        {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onCancel}
-          className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
+          className="fixed inset-0 w-screen h-screen min-h-screen bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%]"
         />
 
         {/* Modal Card */}
@@ -440,18 +447,25 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
     }
   };
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-        {/* Backdrop */}
+      <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+        {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
+          className="fixed inset-0 w-screen h-screen min-h-screen bg-slate-950/75 backdrop-blur-md backdrop-grayscale-[30%]"
         />
 
         {/* Modal Content */}

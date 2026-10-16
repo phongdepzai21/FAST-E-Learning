@@ -1345,7 +1345,7 @@ const Classroom: React.FC = () => {
 
       {/* KEYBOARD SHORTCUTS CHEAT SHEET MODAL */}
       {showShortcutsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md backdrop-grayscale-[30%] animate-fade-in">
           <div 
             className="bg-[#111827] border border-white/[0.12] rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}

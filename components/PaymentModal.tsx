@@ -378,8 +378,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     }, 800);
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   return (
-    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/70 backdrop-blur-md px-4 overflow-y-auto py-6">
+    <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen grid place-items-center bg-slate-950/80 backdrop-blur-md backdrop-grayscale-[30%] px-4 overflow-y-auto py-6 animate-fade-in">
       <div className="bg-white max-w-lg w-full rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
         <button
           onClick={onClose}
