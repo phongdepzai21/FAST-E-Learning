@@ -1585,12 +1585,14 @@ const Account: React.FC = () => {
   };
 
   const myCourses = useMemo(() => {
-    // Quản trị viên và Giáo viên có thể xem các khóa nháp/ẩn nếu đã sở hữu hoặc mặc định
+    // Quản trị viên và Giáo viên xem các khóa đã nhận/sở hữu và khóa mặc định
     if (isAdmin || isTeacher) {
-      return allCourses.filter(c => c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id) || c.status === 'active');
+      return allCourses.filter(c => c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id));
     }
-    // Đối với học viên bình thường và VIP: Cưỡng chế ẩn hoàn toàn các khóa nháp hoặc ẩn (draft, inactive) kể cả đã đăng ký mua
-    return allCourses.filter(c => c.status === 'active' && (c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id)));
+    // Đối với học viên: Các khóa đã mua vẫn được học bình thường kể cả khi tạm ngưng tuyển sinh (inactive), trừ bản nháp (draft)
+    return allCourses.filter(c => 
+      c.status !== 'draft' && (c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id))
+    );
   }, [isAdmin, isTeacher, purchasedCourses, allCourses]);
   
   const progressMap = useMemo(() => {

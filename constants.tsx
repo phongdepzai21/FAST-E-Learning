@@ -729,6 +729,22 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       return;
     }
 
+    // Ensure status is normalized (active | inactive | draft)
+    if (!winner.status) {
+      winner.status = 'active';
+    }
+
+    // Fallback metadata if topOverride was partial
+    if (!winner.title) {
+      winner.title = fc?.title || lc?.title || base?.title || 'Khóa học';
+    }
+    if (!winner.image) {
+      winner.image = fc?.image || lc?.image || base?.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
+    }
+    if (!winner.category) {
+      winner.category = fc?.category || lc?.category || base?.category || 'Khác';
+    }
+
     combinedMap.set(id, winner);
   });
 

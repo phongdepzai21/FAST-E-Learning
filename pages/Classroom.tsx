@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { COURSES, ADMIN_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
+import { COURSES, ADMIN_EMAILS, TEACHER_EMAILS, getMergedCourses, getVideoEmbedInfo, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -213,7 +213,7 @@ const Classroom: React.FC = () => {
         });
 
         const normalizedEmail = user.email.toLowerCase();
-        if (ADMIN_EMAILS.includes(normalizedEmail)) {
+        if (ADMIN_EMAILS.includes(normalizedEmail) || TEACHER_EMAILS.includes(normalizedEmail)) {
           setIsAdmin(true);
         }
 
@@ -578,7 +578,7 @@ const Classroom: React.FC = () => {
 
   const isCourseHidden = course && (course.status === 'draft' || course.status === 'inactive');
 
-  if (isCourseHidden && !isAdmin) {
+  if (isCourseHidden && !isAdmin && !isOwned) {
     return (
       <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col items-center justify-center space-y-6 text-center px-4 font-sans relative z-10">
         <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20 shadow-lg shadow-red-500/10">

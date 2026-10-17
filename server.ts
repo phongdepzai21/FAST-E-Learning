@@ -653,6 +653,13 @@ async function startServer() {
         if (serverCourses[courseId]) {
           serverCourses[courseId] = {
             ...serverCourses[courseId],
+            ...(course || {}),
+            status,
+            updatedAt: now
+          };
+        } else if (course && course.id) {
+          serverCourses[courseId] = {
+            ...course,
             status,
             updatedAt: now
           };
@@ -662,6 +669,20 @@ async function startServer() {
             status,
             updatedAt: now
           };
+        }
+      } else if (action === "bulk_status" && status) {
+        Object.keys(serverCourses).forEach(id => {
+          if (serverCourses[id] && serverCourses[id].status !== 'draft') {
+            serverCourses[id].status = status;
+            serverCourses[id].updatedAt = now;
+          }
+        });
+        if (Array.isArray(courses)) {
+          courses.forEach((c: any) => {
+            if (c && c.id && c.status !== 'draft') {
+              serverCourses[c.id] = { ...(serverCourses[c.id] || {}), ...c, status, updatedAt: now };
+            }
+          });
         }
       } else if (action === "delete" && courseId) {
         delete serverCourses[courseId];

@@ -66,12 +66,12 @@ const Home: React.FC = () => {
     return list;
   }, [allCourses]);
 
-  // Top 5 Featured Prominent Courses (Tăng thêm 2 khóa nổi bật: HACCP, ISO 22000, ISO 9001, ISO 14001, VietGAP)
+  // Top 5 Featured Prominent Courses (HACCP, ISO 22000, ISO 9001, ISO 14001, VietGAP)
   const top5Courses = useMemo(() => {
     const famousCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
     const list: Course[] = [];
 
-    // 1. Lấy từ allCourses theo thứ tự ưu tiên
+    // 1. Lấy từ allCourses theo thứ tự ưu tiên (chỉ lấy khóa đang hoạt động, bỏ qua khóa ẩn/nháp)
     for (const id of famousCourseIds) {
       const found = allCourses.find(c => c.id === id && c.status !== 'draft' && c.status !== 'inactive');
       if (found && !list.some(item => item.id === found.id)) {
@@ -79,15 +79,7 @@ const Home: React.FC = () => {
       }
     }
 
-    // 2. Bổ sung từ HARDCODED_COURSES nếu chưa có
-    for (const id of famousCourseIds) {
-      if (!list.some(c => c.id === id)) {
-        const foundHc = HARDCODED_COURSES.find(c => c.id === id);
-        if (foundHc) list.push(foundHc);
-      }
-    }
-
-    // 3. Nếu vẫn thiếu 5 khóa, bù từ danh sách featuredCourses
+    // 2. Nếu thiếu 5 khóa do có khóa bị ẩn, bù từ các khóa học đang hoạt động khác trong featuredCourses
     for (const c of featuredCourses) {
       if (!list.some(item => item.id === c.id)) {
         list.push(c);

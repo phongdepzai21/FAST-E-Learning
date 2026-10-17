@@ -549,10 +549,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setCourses(prev => prev.map(c => (c.status !== 'draft' && c.status !== newStatus) ? { ...c, status: newStatus, updatedAt: nowIso } : c));
 
     // 2. Always persist to LocalStorage backup
+    let updatedCount = 0;
     try {
       const localStr = localStorage.getItem('local_custom_courses');
       let localList: any[] = localStr ? JSON.parse(localStr) : [];
-      let updatedCount = 0;
 
       localList = localList.map(c => {
         if (c.status === 'draft' || c.status === newStatus) return c;
@@ -578,19 +578,58 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       });
 
       localStorage.setItem('local_custom_courses', JSON.stringify(localList));
-
-      // 3. Show notification banner
-      setMessage({
-        type: 'success',
-        text: newStatus === 'inactive'
-          ? `Đã ẩn hàng loạt ${updatedCount} khóa học (Đồng bộ mọi thiết bị: Không hoạt động)`
-          : `Đã kích hoạt hàng loạt ${updatedCount} khóa học (Đồng bộ mọi thiết bị: Hoạt động)`
-      });
-      setTimeout(() => setMessage(null), 4000);
     } catch (error) {
       console.error('Error updating bulk course status to local storage', error);
-      toast.error('Có lỗi xảy ra khi lưu thay đổi hàng loạt. Vui lòng thử lại sau!');
     }
+
+    // 3. Persist to Firestore master database for all target courses
+    const nonDraftCourses = courses.filter(c => c.status !== 'draft');
+    const firestorePromises = nonDraftCourses.map(async (c) => {
+      try {
+        const docRef = doc(db, 'courses', c.id);
+        await setDoc(docRef, {
+          status: newStatus,
+          updatedAt: nowIso
+        }, { merge: true });
+      } catch (fErr) {
+        console.warn(`Lỗi sync Firestore bulk cho khóa ${c.id}:`, fErr);
+      }
+    });
+    Promise.allSettled(firestorePromises);
+
+    // 4. Update Server & Broadcast across all tabs, accounts & devices
+    const allUpdatedList = courses.map(c => 
+      c.status !== 'draft' ? { ...c, status: newStatus, updatedAt: nowIso } : c
+    );
+    broadcastCourseUpdate('sync_all', { courses: allUpdatedList });
+    try {
+      fetch('/api/courses/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'bulk_status',
+          status: newStatus,
+          courses: allUpdatedList
+        })
+      }).catch(() => null);
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('courses_updated'));
+    window.dispatchEvent(new Event('storage'));
+
+    // 5. Show notification
+    setMessage({
+      type: 'success',
+      text: newStatus === 'inactive'
+        ? `Đã ẩn hàng loạt ${updatedCount || nonDraftCourses.length} khóa học (Đồng bộ toàn hệ thống: Không hoạt động)`
+        : `Đã kích hoạt hàng loạt ${updatedCount || nonDraftCourses.length} khóa học (Đồng bộ toàn hệ thống: Hoạt động)`
+    });
+    toast.success(
+      newStatus === 'inactive'
+        ? `Đã ẩn hàng loạt ${updatedCount || nonDraftCourses.length} khóa học thành công!`
+        : `Đã kích hoạt hàng loạt ${updatedCount || nonDraftCourses.length} khóa học thành công!`
+    );
+    setTimeout(() => setMessage(null), 4000);
   };
 
   // Toggle Course Visibility with Custom Confirmation Dialog
@@ -615,9 +654,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const executeToggleCourseStatus = async (course: Course, newStatus: 'active' | 'inactive') => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     const nowIso = new Date().toISOString();
+    const updatedCourseObj: Course = {
+      ...course,
+      status: newStatus,
+      updatedAt: nowIso
+    };
 
     // 1. Optimistically update local React state
-    setCourses(prev => prev.map(c => c.id === course.id ? { ...c, status: newStatus, updatedAt: nowIso } : c));
+    setCourses(prev => prev.map(c => c.id === course.id ? updatedCourseObj : c));
 
     // 2. Always persist to LocalStorage backup
     try {
@@ -627,21 +671,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       if (idx !== -1) {
         localList[idx] = {
           ...localList[idx],
-          ...course,
-          status: newStatus,
-          updatedAt: nowIso
+          ...updatedCourseObj
         };
       } else {
-        localList.push({
-          id: course.id,
-          title: course.title || '',
-          price: course.price || '0đ',
-          image: course.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
-          category: course.category || 'Khác',
-          description: course.description || '',
-          status: newStatus,
-          updatedAt: nowIso
-        });
+        localList.push(updatedCourseObj);
       }
       localStorage.setItem('local_custom_courses', JSON.stringify(localList));
     } catch (e) {
@@ -671,8 +704,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       logFirestoreError(`Đổi trạng thái khóa học "${course.title}"`, `courses/${course.id}`, firestoreErr, { status: newStatus });
     }
 
-    // 4. Real-time broadcast to ALL tabs & ALL accounts
-    broadcastCourseUpdate('status', { courseId: course.id, status: newStatus });
+    // 4. Real-time broadcast to ALL tabs & ALL accounts (with full course metadata)
+    broadcastCourseUpdate('status', { courseId: course.id, status: newStatus, course: updatedCourseObj });
 
     toast.success(
       newStatus === 'inactive' 
@@ -1175,19 +1208,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                                         id={`toggle-course-status-${course.id}`}
                                         onClick={(e) => promptToggleCourseStatus(course, e)}
                                         className={`px-3 py-2 border rounded-xl uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shadow-xs font-bold ${
-                                          course.status === 'inactive'
+                                          course.status === 'inactive' || course.status === 'draft'
                                             ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                                             : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
                                         }`}
-                                        title={course.status === 'inactive' ? 'Hiện lại khóa học trên hệ thống' : 'Tạm ẩn khóa học khỏi học viên'}
+                                        title={course.status === 'inactive' || course.status === 'draft' ? 'Kích hoạt / hiện khóa học công khai' : 'Tạm ẩn khóa học khỏi học viên'}
                                       >
-                                        {course.status === 'inactive' ? (
+                                        {course.status === 'inactive' || course.status === 'draft' ? (
                                           <>
                                             <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                             </svg>
-                                            <span>Hiện</span>
+                                            <span>{course.status === 'draft' ? 'Kích hoạt' : 'Hiện'}</span>
                                           </>
                                         ) : (
                                           <>
