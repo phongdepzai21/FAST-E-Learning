@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
@@ -112,8 +112,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   });
 
 
-  // Auto-sync any local custom courses to Firestore on mount
+  const hasCheckedInitialOfflineSyncRef = useRef(false);
+
+  // One-time check for offline created custom courses (only if completely missing from Firestore)
   const syncLocalEditsToFirestore = async (currentFsList: Course[]) => {
+    if (hasCheckedInitialOfflineSyncRef.current) return;
+    hasCheckedInitialOfflineSyncRef.current = true;
     try {
       const localStr = localStorage.getItem('local_custom_courses');
       if (!localStr) return;
@@ -126,11 +130,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       for (const localCourse of localList) {
         if (!localCourse || !localCourse.id || localCourse.id === 'khoa-vip' || localCourse.id === 'vip-lifetime-access' || localCourse.id === 'vip-course') continue;
         const fsCourse = fsMap.get(localCourse.id);
-        const localTime = new Date(localCourse.updatedAt || localCourse.createdAt || 0).getTime();
-        const fsTime = fsCourse ? new Date(fsCourse.updatedAt || fsCourse.createdAt || 0).getTime() : 0;
 
-        // If local course is newer or missing in Firestore, upload to Firestore!
-        if (!fsCourse || localTime > fsTime) {
+        // ONLY upload if the custom course does NOT exist in Firestore at all (brand new offline course)
+        if (!fsCourse && localCourse.id.startsWith('course-')) {
           const currLessons = extractLessonsFlat(localCourse.curriculum);
           const payload = cleanForFirestore({
             id: String(localCourse.id),
@@ -150,11 +152,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
 
       if (syncedCount > 0) {
-        console.log(`Đã đồng bộ ${syncedCount} khóa học từ máy lên cơ sở dữ liệu Cloud.`);
-      }
-
-      if (localList.length > 0) {
-        broadcastCourseUpdate('sync_all', { courses: localList });
+        console.log(`Đã đồng bộ ${syncedCount} khóa học mới từ máy lên cơ sở dữ liệu Cloud.`);
       }
     } catch (e) {
       console.warn("Lỗi auto-sync local sang cloud:", e);
@@ -192,8 +190,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         });
 
         syncCourses(firestoreCourses);
-        // Also check if any local custom edits need to be pushed
-        syncLocalEditsToFirestore(firestoreCourses);
+        // Only check once on first snapshot for newly created offline courses, never loop or broadcast
+        if (!hasCheckedInitialOfflineSyncRef.current && firestoreCourses.length > 0) {
+          syncLocalEditsToFirestore(firestoreCourses);
+        }
       },
       (error) => {
         console.warn("Lỗi đồng bộ danh sách khóa học ở TeacherDashboard:", error);
@@ -582,20 +582,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.error('Error updating bulk course status to local storage', error);
     }
 
-    // 3. Persist to Firestore master database for all target courses
+    // 3. Persist to Firestore master database for all target courses with atomic writeBatch
     const nonDraftCourses = courses.filter(c => c.status !== 'draft');
-    const firestorePromises = nonDraftCourses.map(async (c) => {
-      try {
+    try {
+      const batch = writeBatch(db);
+      nonDraftCourses.forEach(c => {
         const docRef = doc(db, 'courses', c.id);
-        await setDoc(docRef, {
+        batch.set(docRef, {
+          id: String(c.id),
+          title: String(c.title || ''),
           status: newStatus,
           updatedAt: nowIso
         }, { merge: true });
-      } catch (fErr) {
-        console.warn(`Lỗi sync Firestore bulk cho khóa ${c.id}:`, fErr);
-      }
-    });
-    Promise.allSettled(firestorePromises);
+      });
+      await batch.commit();
+    } catch (fErr) {
+      console.warn("Lỗi sync Firestore bulk batch:", fErr);
+    }
 
     // 4. Update Server & Broadcast across all tabs, accounts & devices
     const allUpdatedList = courses.map(c => 
@@ -681,23 +684,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       console.warn('LocalStorage error:', e);
     }
 
-    // 3. Update Firestore master collection
+    // 3. Update Firestore master collection safely with focused status payload
     try {
       const docRef = doc(db, 'courses', course.id);
       const updatePayload: Record<string, any> = cleanForFirestore({
         id: String(course.id),
         title: String(course.title || ''),
-        price: formatPriceSubmit(course.price || '0đ'),
-        image: String(course.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
-        category: String(course.category || 'Khác'),
-        description: String(course.description || ''),
         status: newStatus,
         updatedAt: nowIso
       });
-      if (course.curriculum && Array.isArray(course.curriculum) && course.curriculum.length > 0) {
-        updatePayload.curriculum = cleanForFirestore(course.curriculum);
-      }
-
       await setDoc(docRef, updatePayload, { merge: true });
     } catch (firestoreErr: any) {
       console.warn('Firestore toggle status sync notice:', firestoreErr);

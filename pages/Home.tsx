@@ -335,10 +335,6 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header - Nổi bật, sang trọng, đẳng cấp */}
           <div className="text-center mb-8 md:mb-10">
-            <span className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-800 text-xs font-black uppercase tracking-widest shadow-2xs mb-2.5">
-              <Sparkles className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
-              Chương trình đào tạo trọng tâm
-            </span>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 uppercase tracking-tight">
               Khóa Học <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800">Nổi Bật</span>
             </h2>

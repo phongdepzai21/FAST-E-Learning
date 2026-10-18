@@ -79,6 +79,22 @@ export function initCourseSyncService() {
       if (data && data.type === 'courses_updated') {
         if (data.courses && Array.isArray(data.courses)) {
           updateStoredCourses(data.courses);
+        } else if (data.action === 'status' && data.courseId && data.status) {
+          try {
+            ['local_custom_courses', 'server_custom_courses', 'cached_firestore_courses'].forEach(key => {
+              const str = localStorage.getItem(key);
+              if (str) {
+                const list = JSON.parse(str);
+                if (Array.isArray(list)) {
+                  const idx = list.findIndex((c: any) => c.id === data.courseId);
+                  if (idx >= 0) {
+                    list[idx] = { ...list[idx], status: data.status, updatedAt: new Date().toISOString() };
+                    localStorage.setItem(key, JSON.stringify(list));
+                  }
+                }
+              }
+            });
+          } catch (e) {}
         }
         window.dispatchEvent(new CustomEvent('courses_updated', { detail: data }));
       } else if (data && data.type === 'combos_updated') {
@@ -274,6 +290,25 @@ export async function broadcastCourseUpdate(
       } else {
         localList.push({ id: payload.courseId, status: payload.status, updatedAt: now } as Course);
       }
+
+      // Also sync into server_custom_courses and cached_firestore_courses
+      ['server_custom_courses', 'cached_firestore_courses'].forEach(key => {
+        try {
+          const str = localStorage.getItem(key);
+          if (str) {
+            const list = JSON.parse(str);
+            if (Array.isArray(list)) {
+              const sIdx = list.findIndex((c: any) => c.id === payload.courseId);
+              if (sIdx >= 0) {
+                list[sIdx] = { ...list[sIdx], status: payload.status, updatedAt: now };
+              } else {
+                list.push({ id: payload.courseId, status: payload.status, updatedAt: now });
+              }
+              localStorage.setItem(key, JSON.stringify(list));
+            }
+          }
+        } catch (e) {}
+      });
     } else if (action === 'delete' && payload.courseId) {
       localList = localList.filter((c) => c.id !== payload.courseId);
 

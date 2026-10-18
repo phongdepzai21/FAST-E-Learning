@@ -14,9 +14,7 @@ const root = createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <HelmetProvider>
-        <App />
-      </HelmetProvider>
+      <App />
     </ErrorBoundary>
   </React.StrictMode>
 );

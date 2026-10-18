@@ -137,7 +137,7 @@ export const ComboManagement: React.FC = () => {
     // Sync available courses (filter out VIP/combos)
     const allCoursesList = getMergedCourses([]);
     const selectable = allCoursesList.filter(
-      c => c.id !== 'khoa-vip' && c.id !== 'combo-basic' && c.id !== 'combo-pro' && c.category !== 'Gói VIP'
+      c => c.id !== 'khoa-vip' && c.id !== 'combo-basic' && c.id !== 'combo-pro' && c.category !== 'Gói VIP' && c.status !== 'inactive' && c.status !== 'draft'
     );
     setCourses(selectable);
 

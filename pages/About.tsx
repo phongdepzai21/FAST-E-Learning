@@ -19,6 +19,18 @@ import {
   Cpu,
   Layers
 } from 'lucide-react';
+import {
+  MixueLogo,
+  PhucLocThoLogo,
+  HaoHuongLogo,
+  RauMaMixLogo,
+  TuongAnLogo,
+  DaoHaiSanLogo,
+  BiofreshLogo,
+  TriKienFoodLogo,
+  HuongVietXuaLogo,
+  ThaoTienFoodsLogo
+} from '../components/ClientBrandLogos';
 
 const About: React.FC = () => {
   const linkedinLink = "https://www.linkedin.com/company/96365912/";
@@ -54,7 +66,7 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      {/* Section 1: Thư ngỏ của Giám Đốc (Mrs. Dung Trần) */}
+      {/* Section 1: Thư ngỏ của Giám Đốc (Ms. Dung Trần) */}
       <section className="py-16 md:py-24 bg-white relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 md:gap-16 items-center">
@@ -65,14 +77,14 @@ const About: React.FC = () => {
                 <div className="relative rounded-3xl overflow-hidden border-4 border-gray-50 shadow-2xl z-10 w-full max-w-[380px] aspect-[4/5] bg-slate-100">
                   <img 
                     src="https://2fast.com.vn/wp-content/uploads/2024/10/av_01-1.jpg" 
-                    alt="Mrs. Dung Trần - Founder & Lead Auditor" 
+                    alt="Ms. Dung Trần - Founder & Lead Auditor" 
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                     loading="lazy"
                     decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent flex flex-col justify-end p-6">
                     <span className="text-amber-400 text-xs font-black uppercase tracking-widest mb-1">Founder & Lead Auditor</span>
-                    <h3 className="text-white text-xl font-black uppercase tracking-wide">Mrs. Dung Trần</h3>
+                    <h3 className="text-white text-xl font-black uppercase tracking-wide">Ms. Dung Trần</h3>
                     <p className="text-slate-300 text-xs font-medium">BSI Training Academy Certified FSSC 22000 Lead Auditor</p>
                   </div>
                 </div>
@@ -397,7 +409,7 @@ const About: React.FC = () => {
       <section className="py-16 md:py-24 bg-white relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header đúng chuẩn hình ảnh cung cấp: OUR CLIENTS với thanh gạch ngang màu xanh đậm */}
-          <div className="text-center mb-10 md:mb-14">
+          <div className="text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-4xl font-extrabold text-[#0f2d4a] tracking-wider uppercase font-sans">
               OUR CLIENTS
             </h2>
@@ -414,200 +426,68 @@ const About: React.FC = () => {
               <div className="w-full shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
                   {/* Card 1: MIXUE */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#df1e26] text-white px-3 py-2 rounded-md flex items-center gap-2 shadow-xs w-full max-w-[140px] justify-center">
-                      <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center shrink-0 border border-red-100">
-                        <span className="text-sm leading-none select-none">⛄</span>
-                      </div>
-                      <div className="flex flex-col text-left leading-none">
-                        <span className="text-sm font-black tracking-wider text-white">MIXUE</span>
-                        <span className="text-[6.5px] font-bold text-red-100 uppercase tracking-tight mt-0.5 whitespace-nowrap">
-                          SINCE 1997 · ICE CREAM & TEA
-                        </span>
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-red-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <MixueLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 2: Cơm Tấm Phúc Lộc Thọ */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#30160b] text-white px-2.5 py-2 rounded-lg border border-amber-600/30 flex flex-col items-center justify-center text-center shadow-xs w-full max-w-[140px]">
-                      <div className="flex items-center gap-1 leading-none">
-                        <span className="text-[9.5px] font-black text-[#e8b960] tracking-tight">Phúc Lộc Thọ</span>
-                        <span className="text-[6px] bg-[#e8b960] text-[#30160b] font-black px-0.5 py-0.2 rounded font-mono">Since 2005</span>
-                      </div>
-                      <div className="text-sm sm:text-base font-black text-white tracking-wider my-0.5 leading-tight font-serif">
-                        CƠM TẤM
-                      </div>
-                      <div className="text-[6.5px] font-extrabold text-[#e8b960] tracking-wide uppercase whitespace-nowrap">
-                        Hệ Thống Phủ Khắp Sài Gòn
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-amber-500 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <PhucLocThoLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 3: Hảo Hương */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <svg className="w-12 sm:w-14 h-6 sm:h-7 text-[#d82a1e]" viewBox="0 0 64 32" fill="none">
-                        <path d="M16 26 A16 16 0 0 1 48 26 Z" fill="url(#sunGrad1)" />
-                        <line x1="32" y1="4" x2="32" y2="8" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
-                        <line x1="20" y1="7" x2="23" y2="11" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
-                        <line x1="44" y1="7" x2="41" y2="11" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
-                        <line x1="10" y1="15" x2="15" y2="17" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
-                        <line x1="54" y1="15" x2="49" y2="17" stroke="#d82a1e" strokeWidth="2.5" strokeLinecap="round" />
-                        <defs>
-                          <linearGradient id="sunGrad1" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#ff7a18" />
-                            <stop offset="100%" stopColor="#d82a1e" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      <span className="text-sm sm:text-base font-black text-[#d82a1e] tracking-tight mt-1 font-serif italic whitespace-nowrap">
-                        Hảo Hương
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-orange-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <HaoHuongLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 4: Rau Má Mix */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <svg className="w-9 sm:w-10 h-9 sm:h-10" viewBox="0 0 48 48" fill="none">
-                        <path d="M24 6 C12 6, 8 16, 10 24 C12 30, 18 34, 24 32 C30 34, 36 30, 38 24 C40 16, 36 6, 24 6 Z" fill="#1b9e4b" />
-                        <path d="M24 32 C23 37, 21 42, 19 45" stroke="#167a39" strokeWidth="2" strokeLinecap="round" />
-                        <circle cx="21" cy="35" r="1.5" fill="#3cd070" />
-                        <circle cx="25" cy="38" r="1.8" fill="#3cd070" />
-                        <circle cx="27" cy="42" r="1.3" fill="#3cd070" />
-                      </svg>
-                      <span className="text-[8.5px] font-bold text-[#1a5d30] tracking-wider -mt-0.5">raumamix®</span>
-                      <div className="text-xs sm:text-sm font-black tracking-tight leading-none mt-0.5">
-                        <span className="text-[#1a5d30]">RAU MÁ</span>
-                        <span className="text-[#b2c825] ml-1">mix</span>
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-emerald-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <RauMaMixLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 5: Tường An */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#ffeb00] px-3 py-2 rounded-xs flex flex-col items-center justify-center text-center shadow-2xs w-full max-w-[120px]">
-                      <svg className="w-9 sm:w-10 h-6 sm:h-7 text-[#d81d24]" viewBox="0 0 48 32" fill="currentColor">
-                        <path d="M12 24 C10 20, 8 14, 12 10 C16 6, 26 6, 32 8 C36 9, 40 12, 42 16 C41 18, 38 18, 36 17 C34 20, 32 24, 30 26 L26 26 L27 20 L23 20 L23 26 L17 26 L18 19 L13 19 Z" />
-                        <circle cx="15" cy="11" r="1" fill="#ffeb00" />
-                        <path d="M8 15 C6 18, 5 21, 5 23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                      <span className="text-xs sm:text-sm font-black text-[#d81d24] font-serif italic tracking-tight -mt-0.5 whitespace-nowrap">
-                        Tường An®
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-yellow-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <TuongAnLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 6: Đảo Hải Sản */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#009fe3] px-2.5 py-3 rounded-xs flex items-center justify-center text-center shadow-2xs w-full max-w-[125px]">
-                      <div className="flex items-center font-black text-white text-xs sm:text-sm tracking-wider whitespace-nowrap">
-                        <span>D</span>
-                        <span className="text-amber-300 text-[9px] mx-0.5">★</span>
-                        <span>OHAISAN</span>
-                        <span className="text-[7px] align-super ml-0.5">®</span>
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <DaoHaiSanLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
                 </div>
               </div>
 
-              {/* SLIDE 2: Tường An, Đảo Hải Sản, Biofresh, Tri Kien Food, Hương Việt Xưa, Thao Tien Foods */}
+              {/* SLIDE 2: Tường An, Đảo Hải Sản, Biofresh, Tri Kien Food, Hương Việt Xưa, Thảo Tiến Foods */}
               <div className="w-full shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
                   {/* Card 1: Tường An */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#ffeb00] px-3 py-2 rounded-xs flex flex-col items-center justify-center text-center shadow-2xs w-full max-w-[120px]">
-                      <svg className="w-9 sm:w-10 h-6 sm:h-7 text-[#d81d24]" viewBox="0 0 48 32" fill="currentColor">
-                        <path d="M12 24 C10 20, 8 14, 12 10 C16 6, 26 6, 32 8 C36 9, 40 12, 42 16 C41 18, 38 18, 36 17 C34 20, 32 24, 30 26 L26 26 L27 20 L23 20 L23 26 L17 26 L18 19 L13 19 Z" />
-                        <circle cx="15" cy="11" r="1" fill="#ffeb00" />
-                        <path d="M8 15 C6 18, 5 21, 5 23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                      <span className="text-xs sm:text-sm font-black text-[#d81d24] font-serif italic tracking-tight -mt-0.5 whitespace-nowrap">
-                        Tường An®
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-yellow-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <TuongAnLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 2: Đảo Hải Sản */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="bg-[#009fe3] px-2.5 py-3 rounded-xs flex items-center justify-center text-center shadow-2xs w-full max-w-[125px]">
-                      <div className="flex items-center font-black text-white text-xs sm:text-sm tracking-wider whitespace-nowrap">
-                        <span>D</span>
-                        <span className="text-amber-300 text-[9px] mx-0.5">★</span>
-                        <span>OHAISAN</span>
-                        <span className="text-[7px] align-super ml-0.5">®</span>
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <DaoHaiSanLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 3: BIOFRESH */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#11242c] border-2 border-emerald-400/40 p-1 flex flex-col items-center justify-center text-center relative shadow-xs">
-                      <div className="text-[6px] font-black text-white tracking-[0.2em] uppercase leading-none mb-0.5">BIOFRESH</div>
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#1b3a47] flex items-center justify-center relative">
-                        <span className="text-emerald-400 text-sm sm:text-base font-black font-sans leading-none">B</span>
-                        <span className="absolute -top-0.5 -right-0.5 text-[8px] text-emerald-300">🍃</span>
-                      </div>
-                      <div className="text-[4.5px] font-bold text-emerald-200 uppercase tracking-tighter leading-none mt-0.5 whitespace-nowrap">
-                        EST 2010 · FARM TO FACTORY
-                      </div>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-teal-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <BiofreshLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 4: TRI KIEN FOOD */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 border-2 border-[#8b4513] rounded-md rotate-45 flex items-center justify-center mb-1 shadow-2xs">
-                        <div className="-rotate-45 font-black text-[#167a39] text-xs leading-none">
-                          1K
-                        </div>
-                      </div>
-                      <span className="text-[10px] sm:text-xs font-black text-[#167a39] uppercase tracking-wider whitespace-nowrap">
-                        TRI KIEN FOOD
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-green-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <TriKienFoodLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 5: HƯƠNG VIỆT XƯA */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <svg className="w-8 sm:w-9 h-10 sm:h-11" viewBox="0 0 40 48" fill="none">
-                        <defs>
-                          <linearGradient id="dropGrad2" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f39c12" />
-                            <stop offset="60%" stopColor="#e67e22" />
-                            <stop offset="100%" stopColor="#d35400" />
-                          </linearGradient>
-                        </defs>
-                        <path d="M20 2 C20 2, 6 22, 6 32 A14 14 0 0 0 34 32 C34 22, 20 2, 20 2 Z" fill="url(#dropGrad2)" />
-                        <ellipse cx="20" cy="34" rx="7" ry="1.5" fill="#2c1a0e" />
-                        <path d="M19 28 L21 34" stroke="#2c1a0e" strokeWidth="1.2" />
-                        <circle cx="20" cy="27" r="1.5" fill="#2c1a0e" />
-                      </svg>
-                      <span className="text-[10px] sm:text-xs font-black text-[#8b4513] uppercase tracking-wide font-serif mt-0.5 whitespace-nowrap">
-                        HƯƠNG VIỆT XƯA
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-amber-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <HuongVietXuaLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 6: THAO TIEN FOODS */}
-                  <div className="bg-white border border-gray-200 hover:border-gray-300 rounded-none p-3 sm:p-5 flex items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-md group">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <span className="text-[5.5px] sm:text-[6px] font-bold text-slate-500 uppercase tracking-tight leading-none mb-1">
-                        IMPORTING THE BEST QUALITY MEAT & POULTRY
-                      </span>
-                      <div className="flex gap-1 my-1">
-                        <span className="w-2.5 h-1.5 bg-[#f39c12] rounded-xs" />
-                        <span className="w-2.5 h-1.5 bg-[#2ecc71] rounded-xs" />
-                        <span className="w-2.5 h-1.5 bg-[#e74c3c] rounded-xs" />
-                        <span className="w-2.5 h-1.5 bg-[#3498db] rounded-xs" />
-                      </div>
-                      <span className="text-[10px] sm:text-xs font-black text-slate-900 uppercase tracking-wider mt-0.5 whitespace-nowrap">
-                        THAO TIEN FOODS
-                      </span>
-                    </div>
+                  <div className="bg-white border border-slate-200/90 hover:border-sky-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <ThaoTienFoodsLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
                 </div>
               </div>
@@ -637,35 +517,6 @@ const About: React.FC = () => {
               }`}
             />
           </div>
-
-          {/* Partner Certification bodies */}
-          <div className="mt-16 pt-12 border-t border-slate-100">
-            <h4 className="text-center text-xs font-black text-slate-400 uppercase tracking-widest mb-8">
-              Đối tác Chuyên môn & Hiệp hội Chứng nhận Toàn cầu
-            </h4>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-              {[
-                { name: 'BSI Group', logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/BSI_Group_logo.svg' },
-                { name: 'DNV', logo: 'https://upload.wikimedia.org/wikipedia/commons/2/23/DNV_logo.svg' },
-                { name: 'Bureau Veritas', logo: 'https://upload.wikimedia.org/wikipedia/commons/8/87/Bureau_Veritas_logo.svg' }
-              ].map((partner, idx) => (
-                <div 
-                  key={idx} 
-                  className="h-12 flex items-center justify-center filter grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
-                  title={partner.name}
-                >
-                  <img 
-                    src={partner.logo} 
-                    alt={partner.name} 
-                    className="max-h-8 md:max-h-10 object-contain"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
         </div>
       </section>
     </main>

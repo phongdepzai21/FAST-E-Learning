@@ -283,6 +283,54 @@ const BuyCoursesView: React.FC<{
 
 
 
+interface TabErrorBoundaryProps {
+  children: React.ReactNode;
+  fallbackTitle?: string;
+}
+
+interface TabErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class TabErrorBoundary extends React.Component<TabErrorBoundaryProps, TabErrorBoundaryState> {
+  constructor(props: TabErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error): TabErrorBoundaryState {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("[Account TabErrorBoundary] Caught error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-white rounded-3xl p-8 border border-amber-200 shadow-sm text-center space-y-4 my-4 max-w-xl mx-auto">
+          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black">
+            ⚡
+          </div>
+          <h4 className="text-lg font-black text-gray-800">
+            {this.props.fallbackTitle || "Tạm thời không tải được phân hệ"}
+          </h4>
+          <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
+            {this.state.error?.message || "Hệ thống đang tự khôi phục dữ liệu phân hệ này. Các tab và chức năng tài khoản khác vẫn hoạt động bình thường."}
+          </p>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-6 py-2.5 bg-[#007c76] text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-[#00625d] transition-all cursor-pointer shadow-md shadow-[#007c76]/20"
+          >
+            Tải lại phân hệ này
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const Account: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -302,7 +350,7 @@ const Account: React.FC = () => {
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
   const [qcClients, setQcClients] = useState<any[]>([]);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
   // Listen to CRM customer databases in Firestore in real-time
   useEffect(() => {
@@ -1662,7 +1710,7 @@ const Account: React.FC = () => {
     }
 
     if (user && user.isAdmin && adminViewMode !== 'student') {
-      const isExpanded = isSidebarHovered;
+      const isExpanded = isSidebarExpanded;
 
       return (
         <div className="min-h-screen bg-[#f8fafc] flex animate-fade-in overflow-hidden">
@@ -1670,33 +1718,37 @@ const Account: React.FC = () => {
             <title>FAST SERVICE | FAST Admin</title>
           </Helmet>
 
-          {/* EXACT IDENTICAL SIDEBAR */}
+          {/* SIDEBAR: Đứng im, có nút nhấn kéo ngang mượt mà, không méo lệch */}
           <aside 
-            onMouseEnter={() => setIsSidebarHovered(true)}
-            onMouseLeave={() => setIsSidebarHovered(false)}
-            className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
-              isSidebarHovered ? 'w-80 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+            className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-[width] duration-300 ease-in-out relative z-30 select-none ${
+              isExpanded ? 'w-72 shadow-xl ring-1 ring-black/5' : 'w-20 shadow-xs'
             }`}
           >
-            <div className={`transition-all duration-300 ${!isExpanded ? 'p-3' : 'p-8'}`}>
-              {!isExpanded ? (
-                <div className="mb-6 flex flex-col items-center justify-center pt-2">
-                  <div 
-                    className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group"
-                    title="Lia chuột vào để mở rộng"
-                  >
-                    <svg className="w-5 h-5 text-[#007c76] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-10 block">
-                  <span className="text-xs font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3.5 py-1.5 rounded-full border border-[#007c76]/20">
+            <div className="p-3.5">
+              {/* Header with click toggle button */}
+              <div className="h-12 flex items-center justify-between mb-4 px-1">
+                {isExpanded && (
+                  <span className="text-[11px] font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3 py-1.5 rounded-full border border-[#007c76]/20 whitespace-nowrap overflow-hidden">
                     QUẢN TRỊ DỊCH VỤ
                   </span>
-                </div>
-              )}
+                )}
+                <button 
+                  type="button"
+                  onClick={() => setIsSidebarExpanded(prev => !prev)}
+                  className={`w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group ${
+                    !isExpanded ? 'mx-auto' : 'ml-auto'
+                  }`}
+                  title={isExpanded ? "Thu gọn thanh điều hướng" : "Nhấn để kéo mở rộng"}
+                >
+                  <svg className="w-5 h-5 text-[#007c76] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {isExpanded ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
+                    )}
+                  </svg>
+                </button>
+              </div>
               
               <nav className="space-y-1.5">
                 {[
@@ -1718,8 +1770,8 @@ const Account: React.FC = () => {
                           setAdminViewMode(item.id as any);
                         }
                       }}
-                      className={`w-full flex items-center rounded-2xl font-bold text-sm transition-all cursor-pointer ${
-                        !isExpanded ? 'justify-center p-3.5' : 'gap-4 px-5 py-3.5'
+                      className={`w-full h-12 flex items-center rounded-2xl font-bold text-sm transition-colors cursor-pointer ${
+                        !isExpanded ? 'justify-center px-0' : 'gap-3.5 px-4'
                       } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
                     >
                       {item.icon && (
@@ -1727,27 +1779,41 @@ const Account: React.FC = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
                         </svg>
                       )}
-                      {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                      {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">{item.label}</span>}
                     </button>
                   );
                 })}
               </nav>
             </div>
             
-            <div className={`mt-auto border-t border-gray-100 transition-all duration-300 ${!isExpanded ? 'p-3 flex justify-center' : 'p-6'}`}>
+            <div className="mt-auto border-t border-gray-100 p-3 flex items-center justify-center">
               {!isExpanded ? (
-                <div 
-                  title="Quản Trị Portal"
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-[#007c76] text-white"
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarExpanded(true)}
+                  title="Nhấn để mở rộng"
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-[#007c76] text-white hover:bg-[#00625d] transition-colors"
                 >
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                </div>
+                </button>
               ) : (
-                <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
-                  <p className="text-xs font-black uppercase tracking-widest mb-1">Hệ Thống Quản Trị</p>
-                  <p className="text-[10px] opacity-90">Theo dõi toàn trình</p>
+                <div className="w-full bg-teal-50 border border-teal-200/80 rounded-2xl p-3 flex items-center justify-between text-[#007c76]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🛡️</span>
+                    <span className="text-xs font-black uppercase tracking-wider">FAST ADMIN</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarExpanded(false)}
+                    className="p-1 rounded-lg text-teal-700 hover:bg-teal-100 cursor-pointer"
+                    title="Thu gọn"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
                 </div>
               )}
             </div>
@@ -1833,35 +1899,43 @@ const Account: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
-        {/* Sidebar */}
+        {/* Sidebar: Đứng im, nút nhấn kéo ngang, không méo lệch, không chữ Thành viên */}
         {(() => {
-          const isExpanded = isSidebarHovered;
+          const isExpanded = isSidebarExpanded;
 
           return (
             <aside 
-              onMouseEnter={() => setIsSidebarHovered(true)}
-              onMouseLeave={() => setIsSidebarHovered(false)}
-              className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-all duration-300 ease-in-out relative z-30 select-none ${
-                isSidebarHovered ? 'w-72 shadow-2xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+              className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-[width] duration-300 ease-in-out relative z-30 select-none ${
+                isExpanded ? 'w-72 shadow-xl ring-1 ring-black/5' : 'w-20 shadow-xs'
               }`}
             >
-              <div className={`transition-all duration-300 ${!isExpanded ? 'p-3' : 'p-8'}`}>
-                {!isExpanded ? (
-                  <div className="mb-6 flex flex-col items-center justify-center pt-2">
-                    <div 
-                      className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group"
-                      title="Lia chuột vào để mở rộng thanh điều hướng"
-                    >
-                      <svg className="w-5 h-5 text-[#007c76] group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-3.5">
+                {/* Header with click toggle button */}
+                <div className="h-12 flex items-center justify-between mb-4 px-1">
+                  {isExpanded && (
+                    <Link to="/" className="flex items-center gap-2 pl-1">
+                      <span className="font-black text-sm uppercase tracking-wider text-[#007c76]">
+                        FAST PORTAL
+                      </span>
+                    </Link>
+                  )}
+                  <button 
+                    type="button"
+                    onClick={() => setIsSidebarExpanded(prev => !prev)}
+                    className={`w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group ${
+                      !isExpanded ? 'mx-auto' : 'ml-auto'
+                    }`}
+                    title={isExpanded ? "Thu gọn thanh điều hướng" : "Nhấn để kéo mở rộng"}
+                  >
+                    <svg className="w-5 h-5 text-[#007c76] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {isExpanded ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                      ) : (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                    </div>
-                  </div>
-                ) : (
-                  <Link to="/" className="mb-10 block">
-                    {/* Logo removed as requested */}
-                  </Link>
-                )}
+                      )}
+                    </svg>
+                  </button>
+                </div>
                 
                 <nav className="space-y-1.5">
                   {[
@@ -1894,32 +1968,48 @@ const Account: React.FC = () => {
                             setActiveTab(item.id as any);
                           }
                         }}
-                        className={`w-full flex items-center rounded-2xl font-bold text-sm transition-all cursor-pointer ${
-                          !isExpanded ? 'justify-center p-3.5' : 'gap-4 px-5 py-3.5'
+                        className={`w-full h-12 flex items-center rounded-2xl font-bold text-sm transition-colors cursor-pointer ${
+                          !isExpanded ? 'justify-center px-0' : 'gap-3.5 px-4'
                         } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
                       >
                         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
-                        {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                        {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">{item.label}</span>}
                       </button>
                     );
                   })}
                 </nav>
               </div>
               
-              <div className={`mt-auto border-t border-gray-100 transition-all duration-300 ${!isExpanded ? 'p-3 flex justify-center' : 'p-6'}`}>
+              <div className="mt-auto border-t border-gray-100 p-3 flex items-center justify-center">
                 {!isExpanded ? (
-                  <div 
-                    title={isVip ? "Thành viên VIP FAST" : "Nâng cấp VIP"}
+                  <button 
+                    type="button"
+                    onClick={() => setIsSidebarExpanded(true)}
+                    title={isVip ? "VIP FAST" : "Nâng cấp VIP"}
                     className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs ${
                       isVip ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' : 'bg-[#007c76] text-white'
                     }`}
                   >
                     <span className="text-base">{isVip ? '⭐' : '👑'}</span>
-                  </div>
+                  </button>
                 ) : (
-                  <div className="bg-[#007c76] rounded-[24px] p-6 text-white text-center shadow-lg shadow-[#007c76]/20">
-                    <p className="text-xs font-black uppercase tracking-widest mb-1">Thành viên</p>
-                    <p className="text-[10px] opacity-90">Khám phá tri thức cùng FAST</p>
+                  <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{isVip ? '⭐' : '👑'}</span>
+                      <span className="text-xs font-bold text-slate-700">
+                        {isVip ? 'VIP TRỌN ĐỜI' : 'HỌC VIÊN FAST'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsSidebarExpanded(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 cursor-pointer"
+                      title="Thu gọn"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
                   </div>
                 )}
               </div>
@@ -2013,6 +2103,7 @@ const Account: React.FC = () => {
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full"
               >
+                <TabErrorBoundary fallbackTitle={`Phân hệ ${activeTab}`}>
                 {activeTab === 'unified-webhook-center' && isAdmin ? (
                   <UnifiedWebhookCenter />
                 ) : activeTab === 'fast-code-lookup' && isAdmin ? (
@@ -2158,6 +2249,7 @@ const Account: React.FC = () => {
                 />
               </div>
             )}
+            </TabErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </div>

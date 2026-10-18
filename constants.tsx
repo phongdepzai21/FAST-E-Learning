@@ -715,7 +715,7 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       }
     }
     if (fc) {
-      if (!topOverride || parseTime(fc.updatedAt || fc.createdAt) > parseTime(topOverride.updatedAt || topOverride.createdAt)) {
+      if (!topOverride || parseTime(fc.updatedAt || fc.createdAt) >= parseTime(topOverride.updatedAt || topOverride.createdAt)) {
         topOverride = fc;
       }
     }
@@ -729,8 +729,17 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       return;
     }
 
-    // Ensure status is normalized (active | inactive | draft)
-    if (!winner.status) {
+    // Determine the latest explicit status among all sources (Firestore, Local, Server)
+    const sourcesWithStatus = [
+      { status: fc?.status, time: parseTime(fc?.updatedAt || fc?.createdAt) },
+      { status: lc?.status, time: parseTime(lc?.updatedAt || lc?.createdAt) },
+      { status: sc?.status, time: parseTime(sc?.updatedAt || sc?.createdAt) },
+    ].filter(s => s.status === 'active' || s.status === 'inactive' || s.status === 'draft');
+
+    if (sourcesWithStatus.length > 0) {
+      sourcesWithStatus.sort((a, b) => b.time - a.time);
+      winner.status = sourcesWithStatus[0].status;
+    } else if (!winner.status) {
       winner.status = 'active';
     }
 

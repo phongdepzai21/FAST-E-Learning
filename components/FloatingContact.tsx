@@ -99,7 +99,10 @@ const FloatingContact: React.FC = () => {
 
   // Tạo System Prompt thông minh dựa trên dữ liệu thật
   const systemContext = useMemo(() => {
-    const courseData = liveCourses.map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`).join('\n');
+    const courseData = liveCourses
+      .filter(c => c && c.status !== 'inactive' && c.status !== 'draft')
+      .map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`)
+      .join('\n');
     const serviceData = CONSULTING_SERVICES.map(s => `- Dịch vụ tư vấn: "${s.title}". Mô tả: ${s.description}.`).join('\n');
     const teamData = TEAM.map(t => `- Chuyên gia: ${t.name} (${t.role})`).join('\n');
     
