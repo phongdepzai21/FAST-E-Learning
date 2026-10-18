@@ -1897,7 +1897,7 @@ const Account: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
+      <div className="min-h-screen bg-[#007c76] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
         {/* Sidebar: Đứng im, nút nhấn kéo ngang, không méo lệch, không chữ Thành viên */}
         {(() => {
@@ -1914,9 +1914,6 @@ const Account: React.FC = () => {
                 <div className="h-12 flex items-center justify-between mb-4 px-1">
                   {isExpanded && (
                     <Link to="/" className="flex items-center gap-2 pl-1">
-                      <span className="font-black text-sm uppercase tracking-wider text-[#007c76]">
-                        FAST PORTAL
-                      </span>
                     </Link>
                   )}
                   <button 
