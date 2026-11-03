@@ -732,7 +732,7 @@ async function startServer() {
   async function updateSyncControl() {
     try {
       const db = getFirestore();
-      await db.collection("sync_control").doc("courses").set({
+      await db.collection("sync_control").doc("global").set({
         lastUpdated: Date.now()
       });
     } catch (err) {
@@ -825,6 +825,16 @@ async function startServer() {
     }
   });
 
+  // Admin API to force global sync
+  app.post("/api/admin/sync", async (req, res) => {
+    try {
+      await updateSyncControl();
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Admin sync error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // 4. Post Combo Sync (add, edit, status toggle, delete)
   app.post("/api/combos/sync", (req, res) => {

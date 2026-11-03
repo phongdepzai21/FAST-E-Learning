@@ -103,7 +103,7 @@ const Courses: React.FC = () => {
     loadCourses();
 
     // Listen for global sync updates via meta-document
-    const unsubSync = onSnapshot(doc(db, "sync_control", "courses"), () => {
+    const unsubSync = onSnapshot(doc(db, "sync_control", "global"), () => {
       loadCourses();
     });
 
