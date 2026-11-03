@@ -5,12 +5,13 @@ import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAloVxfuTnVJCd5IcN2Vd54IV7oIkKbBx0",
-  authDomain: "decisive-carver-7lrqd.firebaseapp.com",
-  projectId: "decisive-carver-7lrqd",
-  storageBucket: "decisive-carver-7lrqd.firebasestorage.app",
-  messagingSenderId: "888698371847",
-  appId: "1:888698371847:web:45dd515119c63ea3e3cfa2"
+  apiKey: "AIzaSyA-ifqmttPrxRY36zKc_dbEYq3NOXqElPo",
+  authDomain: "fast-e-learning.firebaseapp.com",
+  projectId: "fast-e-learning",
+  storageBucket: "fast-e-learning.firebasestorage.app",
+  messagingSenderId: "81409711510",
+  appId: "1:81409711510:web:5297e414e028d7280fd1b7",
+  measurementId: "G-25HCM3EEFE"
 };
 
 // Đảm bảo chỉ khởi tạo app một lần duy nhất (Singleton)
