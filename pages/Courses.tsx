@@ -253,6 +253,8 @@ const Courses: React.FC = () => {
 
 
 
+  const [hideOwned, setHideOwned] = useState<boolean>(true);
+
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
     const seenIds = new Set<string>();
@@ -265,6 +267,11 @@ const Courses: React.FC = () => {
 
       // Hide VIP package / Combos from regular single courses list
       if (course.id === 'khoa-vip' || course.category === 'Gói VIP' || course.id.startsWith('combo-')) {
+        return false;
+      }
+
+      // Hide purchased courses from unbought course catalog if student already owns the course
+      if (hideOwned && ownedCourseIds.includes(course.id)) {
         return false;
       }
 
@@ -282,7 +289,7 @@ const Courses: React.FC = () => {
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, activeCategory, allCourses]);
+  }, [searchTerm, activeCategory, allCourses, ownedCourseIds, hideOwned]);
 
   return (
     <main className="min-h-screen bg-[#f8fafc] pb-20 animate-fade-in">
@@ -355,6 +362,42 @@ const Courses: React.FC = () => {
                 );
             })}
         </div>
+
+        {/* Owned Courses Notice Banner & Toggle Control */}
+        {ownedCourseIds.length > 0 && (
+          <div className="mb-8 bg-emerald-50 border border-emerald-200/80 p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+            <div className="flex items-center gap-3 text-xs sm:text-sm text-emerald-900 font-bold">
+              <span className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-black text-sm">
+                ✓
+              </span>
+              <div>
+                <span>Bạn đã sở hữu <strong className="text-emerald-700 font-black">{ownedCourseIds.length} khóa học</strong>.</span>
+                <span className="block text-xs font-semibold text-emerald-700/80 mt-0.5">
+                  {hideOwned 
+                    ? 'Hệ thống tự động ẩn các khóa học bạn đã mua khỏi danh mục để bạn dễ chọn khóa học mới.' 
+                    : 'Đang hiển thị toàn bộ khóa học bao gồm các khóa bạn đã sở hữu.'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setHideOwned(!hideOwned)}
+                className="px-3.5 py-2 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-2xs"
+              >
+                {hideOwned ? 'Hiện khóa đã mua' : 'Ẩn khóa đã mua'}
+              </button>
+              <Link
+                to="/account"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+              >
+                <span>Khóa học của tôi</span>
+                <span>→</span>
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Course Grid Results */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">

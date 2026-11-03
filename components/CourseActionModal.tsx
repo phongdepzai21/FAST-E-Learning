@@ -277,7 +277,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
               {!otpSent ? (
                 <div className="space-y-2">
                   <p className="text-[11px] text-gray-500 dark:text-zinc-400 font-semibold leading-relaxed">
-                    Xóa khóa học là hành động không thể khôi phục. Vui lòng bấm nút nhận mã OTP gửi đến <strong className="text-gray-800 dark:text-zinc-200">{adminEmail}</strong> để xác nhận danh tính Quản trị viên/Giáo viên của bạn.
+                    Xóa khóa học là hành động không thể khôi phục. Bạn có thể bấm nhận mã OTP gửi đến <strong className="text-gray-800 dark:text-zinc-200">{adminEmail}</strong> hoặc bấm nút <strong className="text-rose-600">"Xác nhận Xóa"</strong> bên dưới để thực hiện xóa ngay lập tức.
                   </p>
                   <button
                     type="button"
@@ -372,21 +372,13 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
               id="course-modal-confirm-btn"
               type="button"
               onClick={async () => {
-                if (isDelete) {
-                  if (!otpSent) {
-                    setOtpError('Vui lòng click nút "Gửi Mã OTP" trước!');
-                    return;
-                  }
-                  if (otpInput.length !== 6) {
-                    setOtpError('Vui lòng nhập đầy đủ mã OTP 6 số.');
-                    return;
-                  }
+                if (isDelete && otpSent && otpInput.trim().length === 6) {
                   setIsVerifyingOtp(true);
                   setOtpError('');
                   try {
                     const result = await verifyOtp({
                       email: adminEmail,
-                      otp: otpInput,
+                      otp: otpInput.trim(),
                       flow: 'lock'
                     });
                     if (!result.success) {
@@ -403,7 +395,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
                 }
                 onConfirm();
               }}
-              disabled={isProcessing || isVerifyingOtp || (isDelete && otpInput.length !== 6 && otpSent)}
+              disabled={isProcessing || isVerifyingOtp}
               className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer ${theme.btnConfirm} disabled:opacity-50`}
             >
               {isProcessing || isVerifyingOtp ? (

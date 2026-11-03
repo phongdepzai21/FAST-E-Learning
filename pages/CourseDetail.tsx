@@ -88,16 +88,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
           setCurriculum(DEFAULT_LESSONS);
         }
       } else {
-        const fallbackBase: Course = {
-          id,
-          title: 'Khóa học',
-          price: '599.000đ',
-          image: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7',
-          category: 'Chung',
-          description: 'Chi tiết khóa học'
-        };
-        setCourse(fallbackBase);
-        setCurriculum(DEFAULT_LESSONS);
+        showToast('Khóa học này không tồn tại hoặc đã bị gỡ khỏi hệ thống.', 'error', 4000);
+        navigate('/khoa-hoc', { replace: true });
       }
     };
 

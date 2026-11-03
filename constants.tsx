@@ -64,14 +64,6 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
 
 export const COURSES: Course[] = [
   {
-    id: 'test-course-2k',
-    title: 'Test System Payment',
-    price: '199.000đ',
-    image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800',
-    category: 'Khác',
-    description: 'Khóa học dùng để kiểm thử hệ thống thanh toán và kích hoạt tự động với giá 199.000đ.'
-  },
-  {
     id: 'haccp-tcvn',
     title: 'Khóa học HACCP TCVN',
     price: '599.000đ',
@@ -696,10 +688,9 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
   ]);
 
   allIds.forEach(id => {
-    // If it's explicitly deleted and not a core system course, exclude it
+    // If it's explicitly deleted, exclude it unconditionally
     if (deletedIds.has(id)) {
-      const isSystem = COURSES.some(c => c.id === id);
-      if (!isSystem) return;
+      return;
     }
 
     const base = combinedMap.get(id);
@@ -767,8 +758,8 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       winner.category = fc?.category || lc?.category || base?.category || 'Khác';
     }
 
-    // Filter out any course matching "Nguyễn Đăng Khôi"
-    const isKhoiCourse = (c: Course) => {
+    // Filter out unwanted courses (Nguyễn Đăng Khôi or Test 2)
+    const isUnwantedCourse = (c: Course) => {
       const t = (c.title || '').toLowerCase();
       const cId = (c.id || '').toLowerCase();
       const desc = (c.description || '').toLowerCase();
@@ -783,18 +774,24 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
         cId.includes('khoi') ||
         desc.includes('nguyễn đăng khôi') ||
         desc.includes('nguyen dang khoi') ||
-        author.includes('khoi')
+        author.includes('khoi') ||
+        t.includes('test 2') ||
+        t.includes('test2') ||
+        cId.includes('test-2') ||
+        cId.includes('test2') ||
+        cId.includes('test_2') ||
+        cId === 'test-course-2k'
       );
     };
 
-    if (isKhoiCourse(winner)) {
+    if (isUnwantedCourse(winner)) {
       return;
     }
 
     combinedMap.set(id, winner);
   });
 
-  const isKhoiCourseGlobal = (c: Course) => {
+  const isUnwantedGlobal = (c: Course) => {
     const t = (c.title || '').toLowerCase();
     const cId = (c.id || '').toLowerCase();
     const desc = (c.description || '').toLowerCase();
@@ -809,9 +806,15 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       cId.includes('khoi') ||
       desc.includes('nguyễn đăng khôi') ||
       desc.includes('nguyen dang khoi') ||
-      author.includes('khoi')
+      author.includes('khoi') ||
+      t.includes('test 2') ||
+      t.includes('test2') ||
+      cId.includes('test-2') ||
+      cId.includes('test2') ||
+      cId.includes('test_2') ||
+      cId === 'test-course-2k'
     );
   };
 
-  return Array.from(combinedMap.values()).filter(c => !isKhoiCourseGlobal(c));
+  return Array.from(combinedMap.values()).filter(c => !isUnwantedGlobal(c));
 };

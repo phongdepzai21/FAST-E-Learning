@@ -78,10 +78,25 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     }
     setIsOpen(false);
     onItemClick?.();
+
     if (notif.type === 'approval') {
       navigate('/account', { state: { tab: 'user-management' } });
-    } else if (notif.courseId) {
-      navigate(`/khoa-hoc/${notif.courseId}`);
+      return;
+    }
+
+    if (notif.courseId) {
+      import('../constants').then(({ getMergedCourses }) => {
+        const availableCourses = getMergedCourses([]);
+        const targetCourse = availableCourses.find(c => c.id === notif.courseId && c.status !== 'draft' && c.status !== 'inactive');
+        if (targetCourse) {
+          navigate(`/khoa-hoc/${notif.courseId}`);
+        } else {
+          // Stale or deleted course notification
+          deleteNotification(notif.id);
+          refresh();
+          navigate('/khoa-hoc');
+        }
+      });
     } else {
       navigate('/khoa-hoc');
     }

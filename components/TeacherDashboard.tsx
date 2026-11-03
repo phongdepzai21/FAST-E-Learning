@@ -181,22 +181,33 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       collection(db, 'courses'),
       (querySnapshot) => {
         const firestoreCourses: Course[] = [];
+        const isTest2OrKhoi = (titleStr: string, docIdStr: string, descStr: string, authorStr: string) => {
+          return (
+            titleStr.includes('nguyễn đăng khôi') ||
+            titleStr.includes('nguyen dang khoi') ||
+            titleStr.includes('đăng khôi') ||
+            titleStr.includes('dang khoi') ||
+            docIdStr.includes('khoi') ||
+            descStr.includes('nguyễn đăng khôi') ||
+            descStr.includes('nguyen dang khoi') ||
+            authorStr.includes('khoi') ||
+            titleStr.includes('test 2') ||
+            titleStr.includes('test2') ||
+            docIdStr.includes('test-2') ||
+            docIdStr.includes('test2') ||
+            docIdStr.includes('test_2') ||
+            docIdStr === 'test-course-2k'
+          );
+        };
+
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
           const title = (data?.title || '').toLowerCase();
           const docId = docSnap.id.toLowerCase();
           const desc = (data?.description || '').toLowerCase();
           const author = (data?.authorEmail || '').toLowerCase();
-          if (
-            title.includes('nguyễn đăng khôi') ||
-            title.includes('nguyen dang khoi') ||
-            title.includes('đăng khôi') ||
-            title.includes('dang khoi') ||
-            docId.includes('khoi') ||
-            desc.includes('nguyễn đăng khôi') ||
-            desc.includes('nguyen dang khoi') ||
-            author.includes('khoi')
-          ) {
+
+          if (isTest2OrKhoi(title, docId, desc, author)) {
             // Delete permanently from Cloud Firestore
             deleteDoc(docSnap.ref).catch(() => {});
             return;
@@ -217,7 +228,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 const cleaned = list.filter((c: any) => {
                   const t = (c?.title || '').toLowerCase();
                   const id = (c?.id || '').toLowerCase();
-                  return !t.includes('khôi') && !t.includes('khoi') && !id.includes('khoi');
+                  const descStr = (c?.description || '').toLowerCase();
+                  const authorStr = (c?.authorEmail || '').toLowerCase();
+                  return !isTest2OrKhoi(t, id, descStr, authorStr);
                 });
                 localStorage.setItem(key, JSON.stringify(cleaned));
               }
@@ -309,13 +322,47 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       const file = e.target.files[0];
       setImageFile(file);
 
-      // Read local file as Base64 Data URL immediately so preview works and persistence never fails
+      // Compress local image file using Canvas to fit within Firestore/LocalStorage limits
       const reader = new FileReader();
       reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        if (dataUrl) {
-          setImageUrlInput(dataUrl);
-        }
+        const rawDataUrl = event.target?.result as string;
+        if (!rawDataUrl) return;
+
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            setImageUrlInput(compressedDataUrl);
+          } else {
+            setImageUrlInput(rawDataUrl);
+          }
+        };
+        img.onerror = () => {
+          setImageUrlInput(rawDataUrl);
+        };
+        img.src = rawDataUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -328,8 +375,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     if (fileInput) fileInput.value = '';
   };
 
-  // Open Edit Mode for a selected Course
-  const startEditCourse = async (course: Course) => {
+  // Open Edit Mode for a selected Course instantly on first click
+  const startEditCourse = (course: Course) => {
+    setActiveTab('edit');
     setEditingCourseId(course.id);
     setTitle(course.title);
     setPrice(course.price);
@@ -340,25 +388,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setStatus(course.status || 'active');
     setMessage(null);
 
-    // Fetch curriculum content or revert to template if empty
-    try {
-      const courseDocSnap = await getDoc(doc(db, 'courses', course.id));
+    // Initialize curriculum immediately from existing course data
+    if (course.curriculum) {
+      setFlatLessons(extractLessonsFlat(course.curriculum));
+    } else {
+      setFlatLessons(DEFAULT_FLAT_LESSONS);
+    }
+
+    // Asynchronously update latest curriculum from Firestore in background if available
+    getDoc(doc(db, 'courses', course.id)).then((courseDocSnap) => {
       if (courseDocSnap.exists()) {
         const cData = courseDocSnap.data();
         if (cData.curriculum) {
           setFlatLessons(extractLessonsFlat(cData.curriculum));
-        } else {
-          setFlatLessons(extractLessonsFlat(course.curriculum));
         }
-      } else {
-        setFlatLessons(extractLessonsFlat(course.curriculum));
       }
-    } catch (err) {
-      console.error("Lỗi lấy thông tin giáo trình:", err);
-      setFlatLessons(extractLessonsFlat(course.curriculum));
-    }
-
-    setActiveTab('edit');
+    }).catch((err) => {
+      console.warn("Background fetch curriculum notice:", err);
+    });
   };
 
   // Helper validation function for course input fields
@@ -480,6 +527,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       courseId,
     });
 
+    // Automatically switch back to list view
+    setActiveTab('list');
     resetForm();
     setIsSubmitting(false);
   };
@@ -563,7 +612,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     setMessage({ type: 'success', text: `Cập nhật thông tin khóa học & học phí "${title}" thành công trên toàn hệ thống!` });
     window.dispatchEvent(new CustomEvent('courses_updated'));
-    window.dispatchEvent(new Event('storage'));
+    // Automatically switch back to the course/lesson list view
+    setActiveTab('list');
+    resetForm();
     setIsSubmitting(false);
 
     // Trigger rich success modal
@@ -813,9 +864,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  // Delete / Reset Course Trigger with Custom Confirmation Dialog
+  // Delete Course Trigger with Custom Confirmation Dialog
   const promptDeleteCourse = (courseId: string, courseTitle: string, e: React.MouseEvent) => {
-    const isSystemCourse = HARDCODED_COURSES.some(c => c.id === courseId);
     const targetCourse = courses.find(c => c.id === courseId);
 
     // Calculate a position near the clicked button
@@ -827,39 +877,46 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     setConfirmModal({
       isOpen: true,
-      type: isSystemCourse ? 'reset' : 'delete',
-      title: isSystemCourse ? 'Reset Khóa học về mặc định' : 'Xóa Khóa học vĩnh viễn',
+      type: 'delete',
+      title: 'Xác nhận Xóa Khóa Học',
       courseTitle: courseTitle,
       category: targetCourse?.category,
       price: targetCourse?.price,
-      description: isSystemCourse
-        ? 'Khóa học này là học liệu hệ thống. Thao tác này sẽ hủy các chỉnh sửa tùy biến và khôi phục nội dung gốc ban đầu.'
-        : 'Thao tác này sẽ xóa toàn bộ nội dung khóa học và giáo trình bài giảng khỏi cơ sở dữ liệu Cloud và thiết bị.',
+      description: 'Thao tác này sẽ xóa vĩnh viễn khóa học và giáo trình bài giảng khỏi cơ sở dữ liệu Cloud và tất cả thiết bị.',
       position,
-      onConfirm: () => executeDeleteCourse(courseId, courseTitle, isSystemCourse),
+      onConfirm: () => executeDeleteCourse(courseId, courseTitle),
     });
   };
 
-  const executeDeleteCourse = async (courseId: string, courseTitle: string, isSystemCourse: boolean) => {
+  const executeDeleteCourse = async (courseId: string, courseTitle: string) => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
-    // Optimistically update React state immediately
-    if (isSystemCourse) {
-      const defaultCourse = HARDCODED_COURSES.find(c => c.id === courseId);
-      if (defaultCourse) {
-        setCourses(prev => prev.map(c => c.id === courseId ? { ...defaultCourse } : c));
-      }
-    } else {
-      setCourses(prev => prev.filter(c => c.id !== courseId));
-    }
 
-    // Also clean up from LocalStorage
+    // 1. Save to deleted_course_ids in LocalStorage so getMergedCourses never re-hydrates it
     try {
-      const localStr = localStorage.getItem('local_custom_courses');
-      if (localStr) {
-        let localList: any[] = JSON.parse(localStr);
-        localList = localList.filter((item: any) => item.id !== courseId);
-        localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+      const deletedStr = localStorage.getItem('deleted_course_ids');
+      let deletedList: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      if (!Array.isArray(deletedList)) deletedList = [];
+      if (!deletedList.includes(courseId)) {
+        deletedList.push(courseId);
+        localStorage.setItem('deleted_course_ids', JSON.stringify(deletedList));
       }
+    } catch (e) {}
+
+    // 2. Optimistically update React state immediately
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+
+    // 3. Clean up from all local caches
+    try {
+      ['local_custom_courses', 'cached_firestore_courses', 'server_custom_courses'].forEach(key => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const cleaned = list.filter((item: any) => item && item.id !== courseId);
+            localStorage.setItem(key, JSON.stringify(cleaned));
+          }
+        }
+      });
     } catch (e) {}
 
     // Clean up unlocks if any
@@ -867,6 +924,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       localStorage.removeItem(`course_unlocked_${courseId}`);
     } catch (e) {}
 
+    // 4. Delete document in Cloud Firestore
     try {
       await deleteDoc(doc(db, 'courses', courseId));
     } catch (err: any) {
@@ -874,22 +932,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       logFirestoreError(`Xóa khóa học "${courseTitle}"`, `courses/${courseId}`, err);
     }
 
-    // Real-time broadcast deletion to ALL tabs & ALL accounts
+    // 5. Broadcast deletion across all tabs & accounts, and sync to server
     broadcastCourseUpdate('delete', { courseId });
+    try {
+      fetch('/api/courses/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', courseId })
+      }).catch(() => null);
+    } catch (e) {}
 
-    toast.success(
-      isSystemCourse 
-        ? `Đã reset khóa học "${courseTitle}" về nội dung gốc!` 
-        : `Đã xóa thành công khóa học "${courseTitle}"!`,
-      4000,
-      'Đã xóa'
-    );
+    toast.success(`Đã xóa thành công khóa học "${courseTitle}"!`, 4000, 'Đã xóa');
 
     setMessage({ 
       type: 'success', 
-      text: isSystemCourse 
-        ? `Đã reset khóa học hệ thống "${courseTitle}" về mặc định` 
-        : `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` 
+      text: `Xóa thành công khóa học "${courseTitle}" trên mọi thiết bị!` 
     });
     window.dispatchEvent(new CustomEvent('courses_updated'));
     window.dispatchEvent(new Event('storage'));
