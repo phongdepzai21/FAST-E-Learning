@@ -12,9 +12,10 @@ import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
 import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
+import { fetchLatestCoursesFromServer } from '../utils/courseSyncService';
 import { trackCourseView } from '../utils/courseTrackingService';
 
-const Categories = ['Tất cả', 'Mới cập nhật', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
+const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
 const DEFAULT_COMBOS = [
   {
@@ -281,8 +282,6 @@ const Courses: React.FC = () => {
       let matchesCategory = false;
       if (activeCategory === 'Tất cả') {
         matchesCategory = true;
-      } else if (activeCategory === 'Mới cập nhật') {
-        matchesCategory = isCourseNewOrUpdated(course.id);
       } else {
         matchesCategory = Boolean(course.category && course.category.toUpperCase().includes(activeCategory.toUpperCase()));
       }
@@ -370,6 +369,17 @@ const Courses: React.FC = () => {
                 {activeCategory === 'Tất cả' ? 'Tất cả bài học' : `Khóa học ${activeCategory}`}
                 <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
             </h2>
+            <button 
+              onClick={async () => {
+                toast.success('Đang cập nhật khóa học mới nhất...');
+                await fetchLatestCoursesFromServer();
+                toast.success('Đã cập nhật danh sách khóa học.');
+              }}
+              className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl text-xs font-black text-[#007c76] border border-[#007c76] hover:bg-[#007c76] hover:text-white transition-all uppercase tracking-widest"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Làm mới dữ liệu
+            </button>
         </div>
 
         {isLoadingOwnership ? (
