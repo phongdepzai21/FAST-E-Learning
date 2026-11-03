@@ -56,7 +56,7 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
     features: [
       'Phân tích mối nguy và điểm kiểm soát tới hạn',
       'Xây dựng kế hoạch HACCP chi tiết',
-      'Chuẩn hóa quy trình vận hành tiêu chuẩn (SOP)',
+      'Chuẩn hóa quy trình vận hành kiểm soát chất lượng',
       'Hỗ trợ đánh giá và công nhận đạt chuẩn quốc tế'
     ]
   }
@@ -68,7 +68,7 @@ export const COURSES: Course[] = [
     title: 'Test System Payment',
     price: '199.000đ',
     image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800',
-    category: 'Testing',
+    category: 'Khác',
     description: 'Khóa học dùng để kiểm thử hệ thống thanh toán và kích hoạt tự động với giá 199.000đ.'
   },
   {
@@ -83,7 +83,7 @@ export const COURSES: Course[] = [
       { title: "Bài 2: 5 bước sơ bộ và lập lưu đồ quy trình chế biến", content: "Khảo sát thực địa, xác định dòng chảy nguyên liệu và thẩm tra tại hiện trường." },
       { title: "Bài 3: 7 nguyên tắc thiết lập điểm kiểm soát tới hạn (CCP)", content: "Phân tích mối nguy sinh học, hóa học, vật lý và xác định ngưỡng tới hạn." },
       { title: "Bài 4: Thiết lập hệ thống giám sát và hành động khắc phục", content: "Quy trình giám sát liên tục, biện pháp xử lý sự cố khi vượt ngưỡng an toàn." },
-      { title: "Bài 5: Thủ tục thẩm tra hệ thống và hồ sơ lưu trữ SOP", content: "Biểu mẫu báo cáo kiểm toán nội bộ và lưu trữ hồ sơ theo luật ATTP." }
+      { title: "Bài 5: Thủ tục thẩm tra hệ thống và lưu trữ hồ sơ", content: "Quy trình báo cáo kiểm toán nội bộ và lưu trữ hồ sơ theo luật ATTP." }
     ]
   },
   {
@@ -111,7 +111,7 @@ export const COURSES: Course[] = [
     curriculum: [
       { title: "Bài 1: Nền tảng Quản lý Chất lượng toàn diện theo ISO 9001", content: "7 nguyên tắc quản lý chất lượng và phương pháp tiếp cận theo quá trình." },
       { title: "Bài 2: Phân tích bối cảnh tổ chức & tư duy quản lý rủi ro", content: "Nhận diện rủi ro, cơ hội và xây dựng ma trận SWOT/PESTLE chất lượng." },
-      { title: "Bài 3: Chuẩn hóa quy trình vận hành & kiểm soát văn bản SOP", content: "Biên soạn tài liệu hướng dẫn công việc và quy chế kiểm soát dữ liệu." },
+      { title: "Bài 3: Chuẩn hóa quy trình vận hành & kiểm soát văn bản", content: "Biên soạn tài liệu hướng dẫn công việc và quy chế kiểm soát dữ liệu." },
       { title: "Bài 4: Đánh giá sự thỏa mãn khách hàng và chỉ số đo lường", content: "Thu thập phản hồi, xử lý khiếu nại và đo lường hiệu lực chuỗi cung ứng." },
       { title: "Bài 5: Đánh giá chất lượng nội bộ & khắc phục sự không phù hợp", content: "Quy trình audit chất lượng định kỳ và đóng báo cáo hành động khắc phục." }
     ]
@@ -199,7 +199,7 @@ export const COURSES: Course[] = [
     id: 'vietgap',
     title: 'VietGAP - Thực hành sản xuất nông nghiệp tốt',
     price: '499.000đ',
-    image: 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&q=80&w=800',
+    image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800',
     category: 'VietGAP',
     description: 'Xây dựng tiêu chuẩn thực hành nông nghiệp tốt tại Việt Nam, nâng cao năng suất, vệ sinh an toàn dịch bệnh cho nông sản sạch.',
     curriculum: [
@@ -729,11 +729,24 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       return;
     }
 
+    // Check global bulk status override if set
+    let bulkOverride: { status: 'active' | 'inactive'; time: number } | null = null;
+    try {
+      const rawBulk = localStorage.getItem('fast_bulk_courses_status_override');
+      if (rawBulk) {
+        const parsed = JSON.parse(rawBulk);
+        if (parsed && (parsed.status === 'active' || parsed.status === 'inactive')) {
+          bulkOverride = { status: parsed.status, time: Number(parsed.timestamp) || 0 };
+        }
+      }
+    } catch (e) {}
+
     // Determine the latest explicit status among all sources (Firestore, Local, Server)
     const sourcesWithStatus = [
       { status: fc?.status, time: parseTime(fc?.updatedAt || fc?.createdAt) },
       { status: lc?.status, time: parseTime(lc?.updatedAt || lc?.createdAt) },
       { status: sc?.status, time: parseTime(sc?.updatedAt || sc?.createdAt) },
+      ...(bulkOverride ? [{ status: bulkOverride.status, time: bulkOverride.time }] : [])
     ].filter(s => s.status === 'active' || s.status === 'inactive' || s.status === 'draft');
 
     if (sourcesWithStatus.length > 0) {
@@ -754,8 +767,51 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
       winner.category = fc?.category || lc?.category || base?.category || 'Khác';
     }
 
+    // Filter out any course matching "Nguyễn Đăng Khôi"
+    const isKhoiCourse = (c: Course) => {
+      const t = (c.title || '').toLowerCase();
+      const cId = (c.id || '').toLowerCase();
+      const desc = (c.description || '').toLowerCase();
+      const author = (c.authorEmail || '').toLowerCase();
+      return (
+        t.includes('nguyễn đăng khôi') ||
+        t.includes('nguyen dang khoi') ||
+        t.includes('đăng khôi') ||
+        t.includes('dang khoi') ||
+        cId.includes('nguyen-dang-khoi') ||
+        cId.includes('dang-khoi') ||
+        cId.includes('khoi') ||
+        desc.includes('nguyễn đăng khôi') ||
+        desc.includes('nguyen dang khoi') ||
+        author.includes('khoi')
+      );
+    };
+
+    if (isKhoiCourse(winner)) {
+      return;
+    }
+
     combinedMap.set(id, winner);
   });
 
-  return Array.from(combinedMap.values());
+  const isKhoiCourseGlobal = (c: Course) => {
+    const t = (c.title || '').toLowerCase();
+    const cId = (c.id || '').toLowerCase();
+    const desc = (c.description || '').toLowerCase();
+    const author = (c.authorEmail || '').toLowerCase();
+    return (
+      t.includes('nguyễn đăng khôi') ||
+      t.includes('nguyen dang khoi') ||
+      t.includes('đăng khôi') ||
+      t.includes('dang khoi') ||
+      cId.includes('nguyen-dang-khoi') ||
+      cId.includes('dang-khoi') ||
+      cId.includes('khoi') ||
+      desc.includes('nguyễn đăng khôi') ||
+      desc.includes('nguyen dang khoi') ||
+      author.includes('khoi')
+    );
+  };
+
+  return Array.from(combinedMap.values()).filter(c => !isKhoiCourseGlobal(c));
 };

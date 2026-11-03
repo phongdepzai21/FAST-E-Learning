@@ -91,6 +91,10 @@ export const FastHaccpChecklist: React.FC = () => {
   const [isCrmOpen, setIsCrmOpen] = useState<boolean>(false);
   const [crmRecords, setCrmRecords] = useState<Record<string, any>>({});
 
+  // Report Modal State (Toàn Diện & Không Phù Hợp)
+  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [reportType, setReportType] = useState<'comprehensive' | 'non_conformity'>('comprehensive');
+
   // Sync state debounce ref
   const saveTimeoutRef = useRef<any>(null);
 
@@ -402,122 +406,219 @@ export const FastHaccpChecklist: React.FC = () => {
     });
   };
 
-  // Generate Defect Report Window (Non-Conformity Report)
-  const generateReport = () => {
-    const data = getCurrentStateDataObject();
-
+  // Computed statistics for Comprehensive & Non-Conformity reports
+  const reportStats = useMemo(() => {
+    let compliantCount = 0;
+    let nonCompliantCount = 0;
+    let naCount = 0;
+    let unassessedCount = 0;
     let majorCount = 0;
     let minorCount = 0;
     let obsCount = 0;
-    let reportRows = '';
 
-    allSections.forEach((section) => {
-      section.items.forEach((item) => {
-        const severity = data[`sev_${item.id}`];
-        const notes = data[`cmt_${item.id}`] || '';
-        const status = data[`comp_${item.id}`] || 'Chưa đánh giá';
+    const defectItems: any[] = [];
+    const allDetailedItems: any[] = [];
 
-        if (severity === 'Major' || severity === 'Minor' || severity === 'Observation') {
-          if (severity === 'Major') majorCount++;
-          if (severity === 'Minor') minorCount++;
-          if (severity === 'Observation') obsCount++;
+    allSections.forEach(section => {
+      section.items.forEach(item => {
+        const comp = compliance[item.id] || '';
+        const sev = severities[item.id] || '';
+        const cmt = comments[item.id] || '';
 
-          const badgeColor = severity === 'Major' ? '#d9534f' : (severity === 'Minor' ? '#f0ad4e' : '#0275d8');
+        if (comp === 'Đạt') compliantCount++;
+        else if (comp === 'Không đạt') nonCompliantCount++;
+        else if (comp === 'N/A') naCount++;
+        else unassessedCount++;
 
-          reportRows += `
-            <tr>
-                <td style="text-align:center;"><strong>${item.id}</strong></td>
-                <td>${item.text}</td>
-                <td style="text-align:center;"><strong>${status}</strong></td>
-                <td style="text-align:center; color:${badgeColor}; font-weight:bold;">${severity}</td>
-                <td>${notes}</td>
-            </tr>
-          `;
+        if (sev === 'Major') majorCount++;
+        if (sev === 'Minor') minorCount++;
+        if (sev === 'Observation') obsCount++;
+
+        const isDefect = sev === 'Major' || sev === 'Minor' || sev === 'Observation' || comp === 'Không đạt';
+        const itemObj = {
+          sectionTitle: section.section,
+          id: item.id,
+          text: item.text,
+          status: comp || 'Chưa đánh giá',
+          severity: sev || '—',
+          notes: cmt
+        };
+
+        allDetailedItems.push(itemObj);
+        if (isDefect) {
+          defectItems.push(itemObj);
         }
       });
     });
 
-    if (!reportRows) {
-      alert("Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo!");
-      return;
-    }
+    const evaluatedTotal = compliantCount + nonCompliantCount + naCount;
+    const rate = evaluatedTotal > 0 ? Math.round((compliantCount / evaluatedTotal) * 100) : 0;
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Vui lòng cho phép mở cửa sổ popup để xuất báo cáo in!");
-      return;
-    }
+    return {
+      compliantCount,
+      nonCompliantCount,
+      naCount,
+      unassessedCount,
+      majorCount,
+      minorCount,
+      obsCount,
+      totalDefects: majorCount + minorCount + obsCount,
+      rate,
+      defectItems,
+      allDetailedItems
+    };
+  }, [allSections, compliance, severities, comments]);
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <meta charset="UTF-8">
-          <title>Báo Cáo Lỗi Đánh Giá - FAST CONSULTING</title>
-          <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; line-height: 1.5; }
-              h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; font-size: 20px; }
-              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f4f8f8; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; }
-              .info-grid div { margin-bottom: 5px; }
-              .summary { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-weight: bold; background: #fff; }
-              .badge-major { color: #d9534f; } .badge-minor { color: #f0ad4e; } .badge-obs { color: #0275d8; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-              th, td { border: 1px solid #000; padding: 10px; text-align: left; }
-              th { background-color: #007c76; color: white; text-align: center; }
-              @media print { body { padding: 0; } .info-grid { background: transparent; border: none; padding: 0; } }
-          </style>
-      </head>
-      <body>
-          <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ (NON-CONFORMITY REPORT)</h1>
-          <div class="info-grid">
-              <div><strong>Khách hàng:</strong> ${data.clientName || '...........................................'}</div>
-              <div><strong>Loại đánh giá:</strong> ${data.auditType || '...........................................'}</div>
-              <div><strong>Ngày đánh giá:</strong> ${data.auditDate || '...........................................'}</div>
-              <div><strong>Địa chỉ:</strong> ${data.auditAddress || '...........................................'}</div>
-              <div><strong>Phạm vi:</strong> ${data.fsmsScope || '...........................................'}</div>
-              <div><strong>Số Report:</strong> ${data.reportNo || '...........................................'}</div>
-          </div>
-
-          <div class="summary">
-              <span>Tổng số lỗi phát hiện: ${majorCount + minorCount + obsCount}</span>
-              <span class="badge-major">Major: ${majorCount}</span>
-              <span class="badge-minor">Minor: ${minorCount}</span>
-              <span class="badge-obs">Observation: ${obsCount}</span>
-          </div>
-
-          <table>
-              <thead>
-                  <tr>
-                      <th style="width: 8%;">Điều khoản</th>
-                      <th style="width: 35%;">Yêu cầu & Hướng dẫn</th>
-                      <th style="width: 10%;">Đánh giá</th>
-                      <th style="width: 15%;">Phân loại</th>
-                      <th style="width: 32%;">Bằng chứng & Ghi chú</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  ${reportRows}
-              </tbody>
-          </table>
-          
-          <div style="margin-top: 50px; display: flex; justify-content: space-around;">
-              <div style="text-align: center;">
-                  <strong>Đại diện Khách Hàng</strong><br><br><br><br>
-                  .......................................
-              </div>
-              <div style="text-align: center;">
-                  <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br><br><br><br>
-                  .......................................
-              </div>
-          </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
+  // Open In-App Report Modal
+  const openReportModal = (type: 'comprehensive' | 'non_conformity') => {
+    setReportType(type);
+    setIsReportOpen(true);
   };
+
+  // Close Report Modal
+  const closeReportModal = () => {
+    setIsReportOpen(false);
+  };
+
+  // Print Report Handler
+  const handlePrintReport = () => {
+    document.body.classList.add('haccp-report-printing');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('haccp-report-printing');
+    }, 1200);
+  };
+
+  // Download Standalone HTML Report
+  const handleDownloadHtml = () => {
+    const isComp = reportType === 'comprehensive';
+    const items = isComp ? reportStats.allDetailedItems : reportStats.defectItems;
+
+    let rowsHtml = '';
+    items.forEach(item => {
+      const sevColor = item.severity === 'Major' ? '#d9534f' : (item.severity === 'Minor' ? '#f0ad4e' : (item.severity === 'Observation' ? '#0275d8' : '#777'));
+      const statusColor = item.status === 'Đạt' ? '#2e7d32' : (item.status === 'Không đạt' ? '#d32f2f' : '#666');
+      rowsHtml += `
+        <tr>
+          <td style="text-align:center; font-weight:bold;">${item.id}</td>
+          <td>${item.text}</td>
+          <td style="text-align:center; font-weight:bold; color:${statusColor};">${item.status}</td>
+          <td style="text-align:center; font-weight:bold; color:${sevColor};">${item.severity}</td>
+          <td>${item.notes || '—'}</td>
+        </tr>
+      `;
+    });
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>${isComp ? 'Báo Cáo Toàn Diện HACCP Codex 2022' : 'Báo Cáo Điểm Không Phù Hợp (NC & CAPA)'} - ${clientName || 'FAST CONSULTING'}</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #222; line-height: 1.5; background: #fff; }
+    h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 12px; font-size: 22px; text-transform: uppercase; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; background: #f8fbfa; padding: 16px; border-radius: 8px; border: 1px solid #d9e5e4; font-size: 13px; }
+    .kpis { display: flex; justify-content: space-around; gap: 10px; margin: 20px 0; padding: 14px; background: #eef6f5; border: 1px solid #b2d7d4; border-radius: 8px; font-weight: bold; font-size: 13px; text-align: center; }
+    .kpis div span { display: block; font-size: 18px; color: #007c76; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+    th, td { border: 1px solid #999; padding: 8px 10px; text-align: left; }
+    th { background: #007c76; color: #fff; text-align: center; }
+    .signatures { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; font-size: 13px; }
+    .sig-box { width: 40%; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <h1>${isComp ? 'BÁO CÁO KẾT QUẢ ĐÁNH GIÁ TOÀN DIỆN (CODEX 2022)' : 'BÁO CÁO ĐIỂM KHÔNG PHÙ HỢP (NON-CONFORMITY REPORT)'}</h1>
+  <div class="grid">
+    <div><strong>Khách hàng / Doanh nghiệp:</strong> ${clientName || '...........................................'}</div>
+    <div><strong>Loại đánh giá:</strong> ${auditType || '...........................................'}</div>
+    <div><strong>Ngày đánh giá:</strong> ${auditDate || '...........................................'}</div>
+    <div><strong>Số Report:</strong> ${reportNo || '...........................................'}</div>
+    <div><strong>Địa chỉ:</strong> ${auditAddress || '...........................................'}</div>
+    <div><strong>Phạm vi hệ thống:</strong> ${fsmsScope || '...........................................'}</div>
+  </div>
+
+  <div class="kpis">
+    <div>TỔNG TIÊU CHUẨN<span>${totalItemsCount}</span></div>
+    <div>TỶ LỆ TUÂN THỦ<span>${reportStats.rate}%</span></div>
+    <div>ĐẠT<span>${reportStats.compliantCount}</span></div>
+    <div>KHÔNG ĐẠT<span>${reportStats.nonCompliantCount}</span></div>
+    <div>MAJOR<span>${reportStats.majorCount}</span></div>
+    <div>MINOR<span>${reportStats.minorCount}</span></div>
+    <div>OBSERVATION<span>${reportStats.obsCount}</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">Mã</th>
+        <th style="width: 40%;">Tiêu chuẩn Codex 2022</th>
+        <th style="width: 12%;">Đánh giá</th>
+        <th style="width: 12%;">Mức độ</th>
+        <th style="width: 28%;">Bằng chứng & Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml || '<tr><td colspan="5" style="text-align:center; padding: 20px;">Không có điểm không phù hợp nào. 100% tuân thủ tiêu chuẩn.</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="signatures">
+    <div class="sig-box">
+      <strong>ĐẠI DIỆN KHÁCH HÀNG</strong><br>
+      <em>(Ký, ghi rõ họ tên & đóng dấu)</em><br><br><br><br><br>
+      .........................................................
+    </div>
+    <div class="sig-box">
+      <strong>TRƯỞNG ĐOÀN ĐÁNH GIÁ (LEAD AUDITOR)</strong><br>
+      <em>(Ký và ghi rõ họ tên)</em><br><br><br><br><br>
+      .........................................................
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bao_Cao_HACCP_${(clientName || 'FAST').replace(/\s+/g, '_')}_${reportType}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Export to Excel / CSV
+  const handleExportExcel = () => {
+    const isComp = reportType === 'comprehensive';
+    const items = isComp ? reportStats.allDetailedItems : reportStats.defectItems;
+
+    let csv = '\uFEFF';
+    csv += `"BÁO CÁO ĐÁNH GIÁ HACCP CODEX 2022 - ${isComp ? 'TOÀN DIỆN' : 'ĐIỂM KHÔNG PHÙ HỢP'}"\n`;
+    csv += `"Khách hàng:","${(clientName || '').replace(/"/g, '""')}","Loại đánh giá:","${(auditType || '').replace(/"/g, '""')}"\n`;
+    csv += `"Ngày đánh giá:","${auditDate || ''}","Số Report:","${(reportNo || '').replace(/"/g, '""')}"\n`;
+    csv += `"Địa chỉ:","${(auditAddress || '').replace(/"/g, '""')}","Phạm vi:","${(fsmsScope || '').replace(/"/g, '""')}"\n\n`;
+    csv += `"Mã điều khoản","Nội dung tiêu chuẩn","Kết quả","Phân loại lỗi","Bằng chứng / Ghi chú"\n`;
+
+    items.forEach(item => {
+      const cleanText = (item.text || '').replace(/"/g, '""');
+      const cleanNotes = (item.notes || '').replace(/"/g, '""');
+      csv += `"${item.id}","${cleanText}","${item.status}","${item.severity}","${cleanNotes}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bao_Cao_HACCP_${(clientName || 'FAST').replace(/\s+/g, '_')}_${reportType}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
 
   // Filtered Checklist Sections
   const filteredSections = useMemo(() => {
@@ -1007,6 +1108,26 @@ export const FastHaccpChecklist: React.FC = () => {
           .fast-haccp-wrapper .radio-label { flex-direction: row !important; font-size: 14px !important; }
           .fast-haccp-wrapper .radio-label input:checked + span { font-weight: bold !important; text-decoration: underline !important; }
           .fast-haccp-wrapper .radio-label input:not(:checked) + span { display: none !important; }
+
+          /* Dedicated in-modal print styles */
+          body.haccp-report-printing * {
+            visibility: hidden !important;
+          }
+          body.haccp-report-printing #haccpReportPrintArea,
+          body.haccp-report-printing #haccpReportPrintArea * {
+            visibility: visible !important;
+          }
+          body.haccp-report-printing #haccpReportPrintArea {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            background: #fff !important;
+            color: #000 !important;
+            z-index: 9999999 !important;
+          }
         }
       `}</style>
 
@@ -1036,8 +1157,9 @@ export const FastHaccpChecklist: React.FC = () => {
           <div className="btn-group">
             <button className="btn-outline" onClick={() => toggleAll(true)}>Mở rộng tất cả</button>
             <button className="btn-outline" onClick={() => toggleAll(false)}>Thu gọn tất cả</button>
-            <button className="btn-primary" onClick={() => window.print()}>🖨 In Checklist</button>
-            <button className="btn-warning" onClick={generateReport}>📄 Xuất Báo Cáo Lỗi</button>
+            <button className="btn-primary" onClick={() => openReportModal('comprehensive')}>📑 Xuất Báo Cáo Toàn Diện</button>
+            <button className="btn-warning" onClick={() => openReportModal('non_conformity')}>⚠️ Báo Cáo Không Phù Hợp</button>
+            <button className="btn-outline" onClick={() => window.print()}>🖨 In Checklist</button>
           </div>
         </div>
 
@@ -1327,6 +1449,312 @@ export const FastHaccpChecklist: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comprehensive & Non-Conformity Report In-App Modal */}
+      {isReportOpen && (
+        <div id="reportModal" className="modal" onClick={(e) => {
+          if ((e.target as HTMLElement).id === 'reportModal') {
+            closeReportModal();
+          }
+        }}>
+          <div className="modal-content" style={{ maxWidth: '1050px', padding: '24px' }}>
+            {/* Top Toolbar (Excluded from print) */}
+            <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', borderBottom: '1px solid #ddd', paddingBottom: '16px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setReportType('comprehensive')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #007c76',
+                    background: reportType === 'comprehensive' ? '#007c76' : '#fff',
+                    color: reportType === 'comprehensive' ? '#fff' : '#007c76',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📑 Báo Cáo Toàn Diện (Codex 2022)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportType('non_conformity')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #f0ad4e',
+                    background: reportType === 'non_conformity' ? '#f0ad4e' : '#fff',
+                    color: reportType === 'non_conformity' ? '#fff' : '#8a6d3b',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚠️ Báo Cáo Điểm Không Phù Hợp ({reportStats.totalDefects})
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handlePrintReport}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    background: '#0275d8',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  🖨️ In / Xuất PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadHtml}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    background: '#5cb85c',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📥 Tải File HTML
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    background: '#2e7d32',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📊 Xuất Excel (CSV)
+                </button>
+                <button
+                  type="button"
+                  onClick={closeReportModal}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    background: '#eee',
+                    color: '#333',
+                    border: '1px solid #ccc',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Area */}
+            <div id="haccpReportPrintArea">
+              <div style={{ textAlign: 'center', borderBottom: '2px solid #007c76', paddingBottom: '12px', marginBottom: '20px' }}>
+                <div style={{ color: '#007c76', fontSize: '14px', fontWeight: 'bold', letterSpacing: '2px' }}>FAST CONSULTING QUALITY MANAGEMENT</div>
+                <h1 style={{ color: '#005a56', fontSize: '22px', margin: '8px 0', textTransform: 'uppercase' }}>
+                  {reportType === 'comprehensive'
+                    ? 'BÁO CÁO KẾT QUẢ ĐÁNH GIÁ HACCP TOÀN DIỆN (CODEX 2022)'
+                    : 'BÁO CÁO ĐIỂM KHÔNG PHÙ HỢP & HÀNH ĐỘNG KHẮC PHỤC (NC & CAPA)'}
+                </h1>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  Tiêu chuẩn: CXC 1-1969 (Rev. 2022) • General Principles of Food Hygiene
+                </div>
+              </div>
+
+              {/* Audit Header Info Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px',
+                background: '#f4f8f8',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid #d2dedd',
+                fontSize: '13px',
+                marginBottom: '20px'
+              }}>
+                <div><strong>Khách Hàng / Cơ Sở:</strong> {clientName || '...................................................'}</div>
+                <div><strong>Loại hình đánh giá:</strong> {auditType || 'Đánh giá định kỳ'}</div>
+                <div><strong>Ngày đánh giá:</strong> {auditDate || 'Chưa chọn'}</div>
+                <div><strong>Mã số báo cáo (Report No):</strong> {reportNo || 'HACCP-2026-001'}</div>
+                <div><strong>Địa chỉ cơ sở:</strong> {auditAddress || '...................................................'}</div>
+                <div><strong>Phạm vi FSMS:</strong> {fsmsScope || 'Sản xuất & kinh doanh thực phẩm'}</div>
+                <div><strong>Điện thoại liên hệ:</strong> {contactPhone || '...................................................'}</div>
+                <div><strong>Trưởng đoàn đánh giá:</strong> FAST Lead Auditor</div>
+              </div>
+
+              {/* Summary Metrics Bar */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                gap: '10px',
+                background: '#fff',
+                padding: '14px',
+                borderRadius: '8px',
+                border: '1px solid #ccc',
+                textAlign: 'center',
+                marginBottom: '20px',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>TỔNG MỤC</div>
+                  <div style={{ fontSize: '18px', color: '#007c76' }}>{totalItemsCount}</div>
+                </div>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>TỶ LỆ TUÂN THỦ</div>
+                  <div style={{ fontSize: '18px', color: '#2e7d32' }}>{reportStats.rate}%</div>
+                </div>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>ĐẠT (PASS)</div>
+                  <div style={{ fontSize: '18px', color: '#5cb85c' }}>{reportStats.compliantCount}</div>
+                </div>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>KHÔNG ĐẠT</div>
+                  <div style={{ fontSize: '18px', color: '#d9534f' }}>{reportStats.nonCompliantCount}</div>
+                </div>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>LỖI MAJOR</div>
+                  <div style={{ fontSize: '18px', color: '#d9534f' }}>{reportStats.majorCount}</div>
+                </div>
+                <div style={{ borderRight: '1px solid #eee' }}>
+                  <div style={{ color: '#666', fontSize: '11px' }}>LỖI MINOR</div>
+                  <div style={{ fontSize: '18px', color: '#f0ad4e' }}>{reportStats.minorCount}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#666', fontSize: '11px' }}>OBSERVATION</div>
+                  <div style={{ fontSize: '18px', color: '#0275d8' }}>{reportStats.obsCount}</div>
+                </div>
+              </div>
+
+              {/* View 1: Comprehensive Report */}
+              {reportType === 'comprehensive' && (
+                <div>
+                  <h3 style={{ fontSize: '15px', color: '#007c76', fontWeight: 'bold', marginBottom: '10px' }}>
+                    Chi Tiết Đánh Giá Toàn Diện (30 Điều Khoản Codex 2022)
+                  </h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#007c76', color: '#fff' }}>
+                        <th style={{ width: '8%', padding: '8px', border: '1px solid #005a56', textAlign: 'center' }}>Mã</th>
+                        <th style={{ width: '42%', padding: '8px', border: '1px solid #005a56' }}>Yêu cầu & Nội dung tiêu chuẩn Codex 2022</th>
+                        <th style={{ width: '14%', padding: '8px', border: '1px solid #005a56', textAlign: 'center' }}>Đánh giá</th>
+                        <th style={{ width: '12%', padding: '8px', border: '1px solid #005a56', textAlign: 'center' }}>Phân loại</th>
+                        <th style={{ width: '24%', padding: '8px', border: '1px solid #005a56' }}>Bằng chứng / Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportStats.allDetailedItems.map((item, idx) => {
+                        const sevColor = item.severity === 'Major' ? '#d9534f' : (item.severity === 'Minor' ? '#f0ad4e' : (item.severity === 'Observation' ? '#0275d8' : '#666'));
+                        const compColor = item.status === 'Đạt' ? '#2e7d32' : (item.status === 'Không đạt' ? '#d32f2f' : '#555');
+                        return (
+                          <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#fcfcfc' }}>
+                            <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{item.id}</td>
+                            <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.text}</td>
+                            <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: compColor }}>{item.status}</td>
+                            <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: sevColor }}>{item.severity}</td>
+                            <td style={{ padding: '8px', border: '1px solid #ddd', color: '#444' }}>{item.notes || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* View 2: Non-Conformity & CAPA Report */}
+              {reportType === 'non_conformity' && (
+                <div>
+                  <h3 style={{ fontSize: '15px', color: '#d9534f', fontWeight: 'bold', marginBottom: '10px' }}>
+                    Danh Sách Điểm Không Phù Hợp & Kế Hoạch Khắc Phục (CAPA)
+                  </h3>
+
+                  {reportStats.defectItems.length === 0 ? (
+                    <div style={{
+                      padding: '30px',
+                      background: '#e8f5e9',
+                      border: '2px solid #81c784',
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      color: '#2e7d32',
+                      margin: '20px 0'
+                    }}>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold' }}>100% TUÂN THỦ TIÊU CHUẨN (ZERO NON-CONFORMITY)</div>
+                      <p style={{ fontSize: '13px', marginTop: '6px', color: '#388e3c' }}>
+                        Cơ sở không phát hiện bất kỳ điểm không phù hợp (Major / Minor) nào trong kỳ đánh giá. Hệ thống quản lý an toàn thực phẩm vận hành hoàn toàn đạt chuẩn Codex 2022.
+                      </p>
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: '#d9534f', color: '#fff' }}>
+                          <th style={{ width: '8%', padding: '8px', border: '1px solid #b52b27', textAlign: 'center' }}>Mã</th>
+                          <th style={{ width: '30%', padding: '8px', border: '1px solid #b52b27' }}>Yêu cầu tiêu chuẩn</th>
+                          <th style={{ width: '12%', padding: '8px', border: '1px solid #b52b27', textAlign: 'center' }}>Phân loại</th>
+                          <th style={{ width: '25%', padding: '8px', border: '1px solid #b52b27' }}>Hiện trạng / Bằng chứng lỗi</th>
+                          <th style={{ width: '25%', padding: '8px', border: '1px solid #b52b27' }}>Biện pháp khắc phục (CAPA) & Hạn chót</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportStats.defectItems.map((item, idx) => {
+                          const badgeColor = item.severity === 'Major' ? '#d9534f' : (item.severity === 'Minor' ? '#f0ad4e' : '#0275d8');
+                          return (
+                            <tr key={idx}>
+                              <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold' }}>{item.id}</td>
+                              <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.text}</td>
+                              <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center', fontWeight: 'bold', color: badgeColor }}>{item.severity}</td>
+                              <td style={{ padding: '8px', border: '1px solid #ddd', color: '#d32f2f' }}>{item.notes || 'Không đáp ứng đầy đủ yêu cầu hiện trường'}</td>
+                              <td style={{ padding: '8px', border: '1px solid #ddd', color: '#333' }}>
+                                <div>• Khắc phục triệt để lỗi cơ sở</div>
+                                <div>• Hạn chót: <strong>15 ngày làm việc</strong></div>
+                                <div>• Trách nhiệm: Ban ATTP cơ sở</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* Signatures & Approvals */}
+              <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-around', textAlign: 'center', fontSize: '13px' }}>
+                <div style={{ width: '40%' }}>
+                  <strong>ĐẠI DIỆN CƠ SỞ / KHÁCH HÀNG</strong><br />
+                  <span style={{ fontSize: '11px', color: '#666' }}>(Ký, ghi rõ họ tên và đóng dấu)</span><br /><br /><br /><br /><br />
+                  ...............................................................
+                </div>
+                <div style={{ width: '40%' }}>
+                  <strong>TRƯỞNG ĐOÀN ĐÁNH GIÁ (LEAD AUDITOR)</strong><br />
+                  <span style={{ fontSize: '11px', color: '#666' }}>(Ký và ghi rõ họ tên)</span><br /><br /><br /><br /><br />
+                  ...............................................................
+                </div>
+              </div>
             </div>
           </div>
         </div>

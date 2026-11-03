@@ -14,7 +14,6 @@ import { initCourseSyncService } from './utils/courseSyncService';
 import { LessonUpdateNotifier } from './components/LessonUpdateNotifier';
 import { CourseUpdateNotifier } from './components/CourseUpdateNotifier';
 import { NetworkStatusNotifier } from './components/NetworkStatusNotifier';
-import { DevDiagnosticDashboard } from './components/DevDiagnosticDashboard';
 import { authDebugger } from './utils/authDebugger';
 import { otpLogger } from './auth/otp-logger';
 import { subscribeToPaymentConfig } from './utils/qrService';
@@ -166,7 +165,6 @@ const AppLayout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background text-text transition-colors duration-300">
       <ToastContainer />
-      <DevDiagnosticDashboard />
       <NetworkStatusNotifier />
       <LessonUpdateNotifier />
       <CourseUpdateNotifier />
@@ -186,6 +184,7 @@ const AppLayout: React.FC = () => {
             <Route path="/lien-he" element={<Contact />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/teacher-dashboard" element={<Account />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
             <Route path="/account/vip-upgrade" element={<VipUpgrade />} />

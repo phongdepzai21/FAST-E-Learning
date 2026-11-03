@@ -29,7 +29,8 @@ import {
   BiofreshLogo,
   TriKienFoodLogo,
   HuongVietXuaLogo,
-  ThaoTienFoodsLogo
+  ThaoTienFoodsLogo,
+  MaxidiLogo
 } from '../components/ClientBrandLogos';
 
 const About: React.FC = () => {
@@ -422,52 +423,52 @@ const About: React.FC = () => {
               className="flex transition-transform duration-700 ease-in-out"
               style={{ transform: `translateX(-${clientSlide * 100}%)` }}
             >
-              {/* SLIDE 1: MIXUE, Phúc Lộc Thọ, Hảo Hương, Rau Má Mix, Tường An, Đảo Hải Sản */}
+              {/* SLIDE 1: Phúc Lộc Thọ, Hương Việt Xưa, Đảo Hải Sản, Maxidi, Tường An, MIXUE */}
               <div className="w-full shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
-                  {/* Card 1: MIXUE */}
-                  <div className="bg-white border border-slate-200/90 hover:border-red-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <MixueLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
-                  </div>
-
-                  {/* Card 2: Cơm Tấm Phúc Lộc Thọ */}
+                  {/* Card 1: Cơm Tấm Phúc Lộc Thọ */}
                   <div className="bg-white border border-slate-200/90 hover:border-amber-500 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
                     <PhucLocThoLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 3: Hảo Hương */}
-                  <div className="bg-white border border-slate-200/90 hover:border-orange-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <HaoHuongLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                  {/* Card 2: Hương Việt Xưa */}
+                  <div className="bg-white border border-slate-200/90 hover:border-amber-600 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <HuongVietXuaLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 4: Rau Má Mix */}
-                  <div className="bg-white border border-slate-200/90 hover:border-emerald-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <RauMaMixLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                  {/* Card 3: Đảo Hải Sản */}
+                  <div className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <DaoHaiSanLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 5: Tường An */}
+                  {/* Card 4: MAXIDI */}
+                  <div className="bg-white border border-slate-200/90 hover:border-teal-500 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <MaxidiLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                  </div>
+
+                  {/* Card 5: Dầu Ăn Tường An */}
                   <div className="bg-white border border-slate-200/90 hover:border-yellow-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
                     <TuongAnLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 6: Đảo Hải Sản */}
-                  <div className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <DaoHaiSanLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                  {/* Card 6: MIXUE */}
+                  <div className="bg-white border border-slate-200/90 hover:border-red-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <MixueLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
                 </div>
               </div>
 
-              {/* SLIDE 2: Tường An, Đảo Hải Sản, Biofresh, Tri Kien Food, Hương Việt Xưa, Thảo Tiến Foods */}
+              {/* SLIDE 2: Hảo Hương, Rau Má Mix, Biofresh, Tri Kien Food, Thảo Tiến Foods */}
               <div className="w-full shrink-0">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 items-stretch">
-                  {/* Card 1: Tường An */}
-                  <div className="bg-white border border-slate-200/90 hover:border-yellow-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <TuongAnLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5 items-stretch">
+                  {/* Card 1: Hảo Hương */}
+                  <div className="bg-white border border-slate-200/90 hover:border-orange-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <HaoHuongLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 2: Đảo Hải Sản */}
-                  <div className="bg-white border border-slate-200/90 hover:border-blue-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <DaoHaiSanLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
+                  {/* Card 2: Rau Má Mix */}
+                  <div className="bg-white border border-slate-200/90 hover:border-emerald-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
+                    <RauMaMixLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
                   {/* Card 3: BIOFRESH */}
@@ -480,12 +481,7 @@ const About: React.FC = () => {
                     <TriKienFoodLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>
 
-                  {/* Card 5: HƯƠNG VIỆT XƯA */}
-                  <div className="bg-white border border-slate-200/90 hover:border-amber-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
-                    <HuongVietXuaLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
-                  </div>
-
-                  {/* Card 6: THAO TIEN FOODS */}
+                  {/* Card 5: THAO TIEN FOODS */}
                   <div className="bg-white border border-slate-200/90 hover:border-sky-400 rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center h-32 sm:h-36 md:h-44 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
                     <ThaoTienFoodsLogo className="w-full max-w-[160px] max-h-20 sm:max-h-24 md:max-h-28 object-contain drop-shadow-xs group-hover:scale-105 transition-transform duration-300" />
                   </div>

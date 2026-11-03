@@ -1070,7 +1070,7 @@ export const FastStandardsAudit: React.FC = () => {
           <div className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-gray-800 uppercase tracking-tight">Trụ cột: FAST People</h2>
-              <p className="text-xs text-gray-500">10 tiêu chuẩn về hướng dẫn nhân viên, phân công ca làm việc, cẩm nang SOP</p>
+              <p className="text-xs text-gray-500">10 tiêu chuẩn về hướng dẫn nhân viên, phân công ca làm việc, cẩm nang hướng dẫn kiểm soát</p>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-xs font-bold text-gray-600">Lọc nhóm:</label>

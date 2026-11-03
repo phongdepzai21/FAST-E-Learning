@@ -15,7 +15,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
   }, [defaultSection]);
 
   const sections = [
-    { id: 'owner', label: '1. Thông tin chủ sở hữu', category: 'Pháp lý', keywords: 'mst chủ sở hữu địa chỉ điện thoại hotline email đại diện phong' },
+    { id: 'owner', label: '1. Thông tin doanh nghiệp', category: 'Pháp lý', keywords: 'mst 0314568146 thông tin doanh nghiệp fast consulting company limited mộc gia nguyễn oanh gò vấp' },
     { id: 'terms', label: '2. Điều khoản sử dụng', category: 'Thỏa thuận', keywords: 'chia sẻ tài khoản quay màn hình phát tán khóa tài khoản' },
     { id: 'transaction', label: '3. Điều kiện giao dịch', category: 'Mua bán', keywords: 'quyền học phí 599k kích hoạt đơn hàng xác nhận tcvn haccp' },
     { id: 'payment', label: '4. Chính sách thanh toán', category: 'Giao dịch', keywords: 'vietqr qr ngân hàng đối soát sai nội dung thiếu thừa' },
@@ -112,11 +112,11 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
           {/* Dynamic Content Renderer */}
           <div className="lg:col-span-8 bg-white p-6 md:p-12 rounded-3xl border border-gray-150 shadow-sm text-slate-700 space-y-6 leading-relaxed">
             
-            {/* 1. THÔNG TIN CHỦ SỞ HỮU */}
+            {/* 1. THÔNG TIN DOANH NGHIỆP */}
             {activeSection === 'owner' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="border-b border-gray-100 pb-4">
-                  <h2 className="text-2xl font-black text-slate-900 uppercase">1. Thông tin chủ sở hữu</h2>
+                  <h2 className="text-2xl font-black text-slate-900 uppercase">1. Thông tin doanh nghiệp</h2>
                   <p className="text-xs text-gray-400 font-bold mt-1">Cập nhật lần cuối: Ngày {updateDate}</p>
                 </div>
                 
@@ -125,23 +125,18 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">1.1. Thông tin pháp lý website</h3>
                     <p><strong>Tên website thương mại:</strong> FAST Elearning</p>
                     <p><strong>Địa chỉ tên miền:</strong> fastelearning.com.vn</p>
-                    <p><strong>Loại hình:</strong> Website thương mại điện tử cung ứng dịch vụ học liệu & tư vấn trực tuyến</p>
+                    <p><strong>Loại hình:</strong> Website thương mại điện tử cung ứng dịch vụ học liệu &amp; tư vấn trực tuyến</p>
                   </div>
 
                   <div className="space-y-2 pt-2">
-                    <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">1.2. Pháp nhân chủ sở hữu doanh nghiệp</h3>
-                    <p><strong>Tên doanh nghiệp chính thức:</strong> Công ty TNHH FAST Consulting Việt Nam</p>
-                    <p><strong>Mã số thuế / Mã số doanh nghiệp:</strong> 0317829140 (Cấp bởi Sở Kế hoạch và Đầu tư)</p>
-                    <p><strong>Địa chỉ trụ sở chính:</strong> Tòa nhà FAST Tower, Số 12 Khuất Duy Tiến, Quận Thanh Xuân, Thành phố Hà Nội, Việt Nam</p>
-                    <p><strong>Số điện thoại hỗ trợ:</strong> 0903 456 789 / 024 3356 7890</p>
-                    <p><strong>Email chính thức:</strong> support@fastelearning.com.vn</p>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">1.3. Đại diện trước pháp luật</h3>
-                    <p><strong>Họ và tên:</strong> Nguyễn Thanh Phong</p>
-                    <p><strong>Chức danh:</strong> Giám đốc điều hành (CEO)</p>
-                    <p><strong>Hòm thư điện tử liên hệ trực tiếp:</strong> h1h4phong@gmail.com</p>
+                    <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">1.2. Pháp nhân doanh nghiệp</h3>
+                    <p><strong>Mã số thuế:</strong> 0314568146</p>
+                    <p><strong>Tên quốc tế:</strong> FAST CONSULTING COMPANY LIMITED</p>
+                    <p><strong>Tên viết tắt:</strong> FAST CONSULTING CO., LTD</p>
+                    <p><strong>Địa chỉ:</strong> Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam</p>
+                    <p><strong>Điện thoại:</strong> 0989 499 579</p>
+                    <p><strong>Email chính thức:</strong> hkc.qms@gmail.com</p>
+                    <p><strong>Email hỗ trợ học tập:</strong> support@fastelearning.com.vn</p>
                   </div>
                 </div>
               </div>

@@ -58,7 +58,10 @@ service cloud.firestore {
         (
           exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && (
             get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isTeacher', false) == true ||
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true ||
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'teacher' ||
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'giangvien' ||
+            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'admin'
           )
         )
       );

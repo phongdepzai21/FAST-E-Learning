@@ -6,7 +6,7 @@ import { getMergedCourses } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { broadcastComboUpdate } from '../utils/courseSyncService';
 import { LivePriceQrPreview } from './LivePriceQrPreview';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Layers,
   Crown,

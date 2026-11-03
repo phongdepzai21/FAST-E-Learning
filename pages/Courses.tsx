@@ -12,6 +12,7 @@ import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
 import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
+import { trackCourseView } from '../utils/courseTrackingService';
 
 const Categories = ['Tất cả', 'Mới cập nhật', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
@@ -49,6 +50,10 @@ const Courses: React.FC = () => {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [combos, setCombos] = useState<any[]>(DEFAULT_COMBOS);
+  const [expandedComboIds, setExpandedComboIds] = useState<{ [id: string]: boolean }>({});
+  const toggleComboExpand = (id: string) => {
+    setExpandedComboIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // --- FETCH ALL COMBOS FROM FIRESTORE & LOCAL CACHE ---
   useEffect(() => {
@@ -457,6 +462,49 @@ const Courses: React.FC = () => {
                                         {combo.description}
                                     </p>
                                 </div>
+
+                                {/* Interactive Hide/Show Courses Toggle for Combo */}
+                                {(() => {
+                                    const cIds: string[] = Array.isArray(combo.courseIds) ? combo.courseIds : [];
+                                    const comboCourses = allCourses.filter(c => cIds.includes(c.id));
+                                    const isExpanded = !!expandedComboIds[combo.id];
+
+                                    return (
+                                        <div className="space-y-2 pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleComboExpand(combo.id)}
+                                                className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-teal-50/70 border border-slate-200/80 text-[#007c76] text-xs font-black flex items-center justify-between transition cursor-pointer"
+                                            >
+                                                <span>{isExpanded ? 'Ẩn danh sách khóa học' : `Xem khóa học trong combo (${cIds.length})`}</span>
+                                                <span className="text-xs transition-transform duration-200">{isExpanded ? '▲' : '▼'}</span>
+                                            </button>
+
+                                            {isExpanded && (
+                                                <div className="space-y-1.5 p-2.5 bg-slate-50/80 rounded-2xl border border-slate-200/60 max-h-48 overflow-y-auto">
+                                                    {comboCourses.length > 0 ? (
+                                                        comboCourses.map((c, cIdx) => (
+                                                            <div 
+                                                                key={c.id || cIdx} 
+                                                                onClick={() => trackCourseView(c, currentUserEmail)}
+                                                                className="p-2 rounded-xl bg-white border border-slate-100 flex items-center justify-between gap-2 text-xs shadow-2xs hover:border-teal-200 transition"
+                                                            >
+                                                                <span className="font-bold text-slate-800 truncate">{c.title}</span>
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-[#007c76] font-bold shrink-0">
+                                                                    {c.category || 'ISO'}
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="text-[11px] text-slate-400 p-2 text-center font-medium">
+                                                            Gói gồm {cIds.length} chuyên đề đào tạo thực tế
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 <div className="pt-2 border-t border-gray-150 flex justify-between items-center mt-auto">
                                     <div className="flex flex-col">

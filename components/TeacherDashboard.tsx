@@ -17,7 +17,7 @@ interface TeacherDashboardProps {
   userEmail: string;
 }
 
-const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Testing', 'Khác'];
+const Categories = ['ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị', 'Khác'];
 
 const DEFAULT_FLAT_LESSONS = DEFAULT_LESSONS;
 
@@ -183,11 +183,47 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         const firestoreCourses: Course[] = [];
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
+          const title = (data?.title || '').toLowerCase();
+          const docId = docSnap.id.toLowerCase();
+          const desc = (data?.description || '').toLowerCase();
+          const author = (data?.authorEmail || '').toLowerCase();
+          if (
+            title.includes('nguyễn đăng khôi') ||
+            title.includes('nguyen dang khoi') ||
+            title.includes('đăng khôi') ||
+            title.includes('dang khoi') ||
+            docId.includes('khoi') ||
+            desc.includes('nguyễn đăng khôi') ||
+            desc.includes('nguyen dang khoi') ||
+            author.includes('khoi')
+          ) {
+            // Delete permanently from Cloud Firestore
+            deleteDoc(docSnap.ref).catch(() => {});
+            return;
+          }
           firestoreCourses.push({
             id: docSnap.id,
             ...data
           } as Course);
         });
+
+        // Clean from local storage caches
+        try {
+          ['local_custom_courses', 'cached_firestore_courses', 'server_custom_courses'].forEach(key => {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                const cleaned = list.filter((c: any) => {
+                  const t = (c?.title || '').toLowerCase();
+                  const id = (c?.id || '').toLowerCase();
+                  return !t.includes('khôi') && !t.includes('khoi') && !id.includes('khoi');
+                });
+                localStorage.setItem(key, JSON.stringify(cleaned));
+              }
+            }
+          });
+        } catch (e) {}
 
         syncCourses(firestoreCourses);
         // Only check once on first snapshot for newly created offline courses, never loop or broadcast
@@ -270,8 +306,26 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setImageFile(file);
+
+      // Read local file as Base64 Data URL immediately so preview works and persistence never fails
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setImageUrlInput(dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
     }
+  };
+
+  const handleClearCoverImage = () => {
+    setImageUrlInput('');
+    setImageFile(null);
+    const fileInput = document.getElementById('cover-upload-form') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   // Open Edit Mode for a selected Course
@@ -545,29 +599,37 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setConfirmModal(prev => ({ ...prev, isOpen: false }));
     const nowIso = new Date().toISOString();
 
-    // 1. Optimistically update local React state
-    setCourses(prev => prev.map(c => (c.status !== 'draft' && c.status !== newStatus) ? { ...c, status: newStatus, updatedAt: nowIso } : c));
+    // 0. Persist global bulk override flag
+    try {
+      localStorage.setItem('fast_bulk_courses_status_override', JSON.stringify({
+        status: newStatus,
+        timestamp: Date.now()
+      }));
+    } catch (e) {}
 
-    // 2. Always persist to LocalStorage backup
+    // 1. Optimistically update local React state for all courses
+    setCourses(prev => prev.map(c => ({ ...c, status: newStatus, updatedAt: nowIso })));
+
+    // 2. Always persist to LocalStorage backup for all caches
     let updatedCount = 0;
     try {
       const localStr = localStorage.getItem('local_custom_courses');
       let localList: any[] = localStr ? JSON.parse(localStr) : [];
+      if (!Array.isArray(localList)) localList = [];
 
+      const currentIds = new Set(courses.map(c => c.id));
       localList = localList.map(c => {
-        if (c.status === 'draft' || c.status === newStatus) return c;
-        updatedCount++;
-        return {
-          ...c,
-          status: newStatus,
-          updatedAt: nowIso
-        };
+        if (currentIds.has(c.id)) {
+          updatedCount++;
+          return { ...c, status: newStatus, updatedAt: nowIso };
+        }
+        return c;
       });
 
-      // Update remaining courses in the main list that aren't in localList yet
-      const localIds = new Set(localList.map(c => c.id));
+      // Add missing courses to localList
+      const localExistingIds = new Set(localList.map(c => c.id));
       courses.forEach(c => {
-        if (!localIds.has(c.id) && c.status !== 'draft' && c.status !== newStatus) {
+        if (!localExistingIds.has(c.id)) {
           updatedCount++;
           localList.push({
             ...c,
@@ -576,17 +638,38 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           });
         }
       });
-
       localStorage.setItem('local_custom_courses', JSON.stringify(localList));
+
+      // Also sync cached_firestore_courses & server_custom_courses
+      try {
+        const cachedStr = localStorage.getItem('cached_firestore_courses');
+        if (cachedStr) {
+          const cachedList = JSON.parse(cachedStr);
+          if (Array.isArray(cachedList)) {
+            const updatedCached = cachedList.map(c => ({ ...c, status: newStatus, updatedAt: nowIso }));
+            localStorage.setItem('cached_firestore_courses', JSON.stringify(updatedCached));
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const srvStr = localStorage.getItem('server_custom_courses');
+        if (srvStr) {
+          const srvList = JSON.parse(srvStr);
+          if (Array.isArray(srvList)) {
+            const updatedSrv = srvList.map(c => ({ ...c, status: newStatus, updatedAt: nowIso }));
+            localStorage.setItem('server_custom_courses', JSON.stringify(updatedSrv));
+          }
+        }
+      } catch (e) {}
     } catch (error) {
       console.error('Error updating bulk course status to local storage', error);
     }
 
-    // 3. Persist to Firestore master database for all target courses with atomic writeBatch
-    const nonDraftCourses = courses.filter(c => c.status !== 'draft');
+    // 3. Persist to Firestore master database with atomic batch and per-doc fallback
     try {
       const batch = writeBatch(db);
-      nonDraftCourses.forEach(c => {
+      courses.forEach(c => {
         const docRef = doc(db, 'courses', c.id);
         batch.set(docRef, {
           id: String(c.id),
@@ -597,13 +680,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       });
       await batch.commit();
     } catch (fErr) {
-      console.warn("Lỗi sync Firestore bulk batch:", fErr);
+      console.warn("Lỗi sync Firestore bulk batch, chuyển sang ghi tuần tự:", fErr);
+      courses.forEach(async (c) => {
+        try {
+          await setDoc(doc(db, 'courses', c.id), {
+            id: String(c.id),
+            title: String(c.title || ''),
+            status: newStatus,
+            updatedAt: nowIso
+          }, { merge: true });
+        } catch (subErr) {}
+      });
     }
 
     // 4. Update Server & Broadcast across all tabs, accounts & devices
-    const allUpdatedList = courses.map(c => 
-      c.status !== 'draft' ? { ...c, status: newStatus, updatedAt: nowIso } : c
-    );
+    const allUpdatedList = courses.map(c => ({ ...c, status: newStatus, updatedAt: nowIso }));
     broadcastCourseUpdate('sync_all', { courses: allUpdatedList });
     try {
       fetch('/api/courses/sync', {
@@ -621,16 +712,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     window.dispatchEvent(new Event('storage'));
 
     // 5. Show notification
+    const totalAffected = courses.length;
     setMessage({
       type: 'success',
       text: newStatus === 'inactive'
-        ? `Đã ẩn hàng loạt ${updatedCount || nonDraftCourses.length} khóa học (Đồng bộ toàn hệ thống: Không hoạt động)`
-        : `Đã kích hoạt hàng loạt ${updatedCount || nonDraftCourses.length} khóa học (Đồng bộ toàn hệ thống: Hoạt động)`
+        ? `Đã ẩn toàn bộ ${totalAffected} khóa học khỏi danh sách hiển thị học viên.`
+        : `Đã kích hoạt hiển thị công khai toàn bộ ${totalAffected} khóa học.`
     });
     toast.success(
       newStatus === 'inactive'
-        ? `Đã ẩn hàng loạt ${updatedCount || nonDraftCourses.length} khóa học thành công!`
-        : `Đã kích hoạt hàng loạt ${updatedCount || nonDraftCourses.length} khóa học thành công!`
+        ? `Đã ẩn ${totalAffected} khóa học thành công!`
+        : `Đã kích hoạt ${totalAffected} khóa học thành công!`
     );
     setTimeout(() => setMessage(null), 4000);
   };
@@ -1362,9 +1454,41 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#007c76]/10 file:text-[#007c76] hover:file:bg-[#007c76]/20 cursor-pointer"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Nhà quản trị khuyên dùng sử dụng ảnh từ Unsplash để đảm bảo hiệu suất truyền tải tuyệt vời nhất.
+                  Có thể dán link URL trực tiếp hoặc chọn file ảnh JPG, PNG, WEBP từ thiết bị.
                 </p>
               </div>
+
+              {/* Cover Image Live Preview Card */}
+              {imageUrlInput.trim() && (
+                <div className="md:col-span-2 bg-white p-4 rounded-2xl border border-teal-200/80 shadow-2xs flex flex-col sm:flex-row items-center gap-4">
+                  <img
+                    src={imageUrlInput}
+                    alt="Xem trước ảnh bìa"
+                    className="w-36 h-24 object-cover rounded-xl border border-gray-200 shadow-sm shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
+                    }}
+                  />
+                  <div className="flex-1 space-y-1.5 text-center sm:text-left">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#007c76] bg-teal-50 px-2.5 py-1 rounded-md inline-block">
+                      {imageFile ? `Ảnh đã chọn từ máy (${imageFile.name})` : 'Ảnh bìa khóa học'}
+                    </span>
+                    <p className="text-xs font-semibold text-gray-700 line-clamp-1 break-all">
+                      {imageUrlInput.startsWith('data:') ? 'Dữ liệu ảnh cục bộ (Base64 sẵn sàng lưu)' : imageUrlInput}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleClearCoverImage}
+                      className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1 mt-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Xóa / Chọn lại ảnh
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Reactive Live QR Code Generator that automatically syncs with price */}
               <div className="md:col-span-2">

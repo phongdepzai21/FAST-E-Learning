@@ -375,9 +375,6 @@ export const FastFoodSafetyManagement: React.FC = () => {
     if (date) {
       const deadline = mode === 'business' ? calculateBusinessDays(date, 20) : calculateCalendarDays(date, 20);
       setCustTargetDate(deadline);
-      if (custStatus === 'Đang chuẩn bị hồ sơ') {
-        setCustStatus('Đã nộp Sở - Chờ thẩm định');
-      }
     }
   };
 
@@ -392,8 +389,30 @@ export const FastFoodSafetyManagement: React.FC = () => {
         const m = String(expDate.getMonth() + 1).padStart(2, '0');
         const d = String(expDate.getDate()).padStart(2, '0');
         setCustExpireDate(`${y}-${m}-${d}`);
-        setCustStatus('Đã cấp Giấy chứng nhận ATTP');
       }
+    }
+  };
+
+  const handleStatusChange = (newStatus: string) => {
+    setCustStatus(newStatus);
+    setActiveSession(prev => ({
+      ...prev,
+      status: newStatus
+    }));
+
+    // If currently editing an existing customer in CRM DB, commit status change immediately
+    if (currentCustomerId) {
+      const updatedDb = db.map(c => {
+        if (c.id === currentCustomerId) {
+          return {
+            ...c,
+            status: newStatus,
+            updatedAt: new Date().toLocaleString('vi-VN')
+          };
+        }
+        return c;
+      });
+      persistDatabase(updatedDb);
     }
   };
 
@@ -992,7 +1011,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
               <label className="block font-bold text-gray-700 mb-1">Trạng Thái Hồ Sơ:</label>
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-gray-400 pointer-events-none flex items-center justify-center"><Clock className="w-4 h-4" /></span>
-                <select value={custStatus} onChange={(e) => setCustStatus(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
+                <select value={custStatus} onChange={(e) => handleStatusChange(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#f4f8f8] border border-[#d2dedd] rounded-xl focus:ring-1 focus:ring-teal-500 focus:bg-white focus:border-teal-500 outline-none text-xs min-h-[38px] transition-all text-gray-800 font-medium text-slate-800">
                   <option value="Đang chuẩn bị hồ sơ">🟡 Đang chuẩn bị hồ sơ</option>
                   <option value="Đã nộp Sở - Chờ thẩm định">🔵 Đã nộp Sở - Chờ thẩm định</option>
                   <option value="Đã thẩm định">🟣 Đã thẩm định (Đạt kiểm tra thực tế)</option>

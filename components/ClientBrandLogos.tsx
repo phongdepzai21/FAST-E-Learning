@@ -13,7 +13,7 @@ export interface LogoProps {
   forceSvg?: boolean;
 }
 
-// Official client logo URLs provided by 2fast.com.vn
+// Official client logo URLs provided by 2fast.com.vn & TopCV
 export const CLIENT_LOGO_URLS = {
   mixue: 'https://2fast.com.vn/wp-content/uploads/2024/10/logo_12.jpg',
   phucloctho: 'https://2fast.com.vn/wp-content/uploads/2024/10/logo_11.jpg',
@@ -25,6 +25,7 @@ export const CLIENT_LOGO_URLS = {
   trikien: 'https://2fast.com.vn/wp-content/uploads/2024/10/logo_05.jpg',
   huongvietxua: 'https://2fast.com.vn/wp-content/uploads/2024/10/logo_01.jpg',
   thaotienfood: 'https://2fast.com.vn/wp-content/uploads/2024/10/logo_03.jpg',
+  maxidi: 'https://cdn-new.topcv.vn/unsafe/https://static.topcv.vn/company_logos/2pHFvHEnSBHKHdJQOLTnAZprJmgNVjYF_1702264485____92e8802672a0841fd7616cf851441552.jpg',
 } as const;
 
 // Local fallback copies in /logos/
@@ -39,6 +40,7 @@ export const LOCAL_CLIENT_LOGO_URLS = {
   trikien: '/logos/logo_05.jpg',
   huongvietxua: '/logos/logo_01.jpg',
   thaotienfood: '/logos/logo_03.jpg',
+  maxidi: 'https://cdn-new.topcv.vn/unsafe/https://static.topcv.vn/company_logos/2pHFvHEnSBHKHdJQOLTnAZprJmgNVjYF_1702264485____92e8802672a0841fd7616cf851441552.jpg',
 } as const;
 
 interface StandardBrandLogoImageProps extends LogoProps {
@@ -594,6 +596,46 @@ export const ThaoTienFoodsLogo: React.FC<LogoProps> = (props) => (
     localUrl={LOCAL_CLIENT_LOGO_URLS.thaotienfood}
     alt="Logo Thảo Tiến Foods"
     svgFallback={<ThaoTienFoodsSvg {...props} />}
+    {...props}
+  />
+);
+
+// =========================================================================
+// 10b. MAXIDI - Công Ty TNHH Maxidi
+// =========================================================================
+export const MaxidiSvg: React.FC<LogoProps> = ({ className = "h-11 sm:h-13 w-auto", width, height }) => (
+  <svg 
+    viewBox="0 0 240 70" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg" 
+    className={className} 
+    width={width} 
+    height={height}
+    aria-label="Logo MAXIDI"
+  >
+    <rect width="240" height="70" rx="14" fill="#0A2540" />
+    <g transform="translate(18, 14)">
+      <circle cx="22" cy="21" r="18" fill="#00D4B2" />
+      <path d="M12 21 L18 12 L24 21 L30 12 L34 21 L34 30 L12 30 Z" fill="#0A2540" />
+      <circle cx="23" cy="20" r="3" fill="#FFFFFF" />
+    </g>
+    <g transform="translate(68, 16)">
+      <text x="0" y="24" fill="#FFFFFF" fontFamily="Arial Black, Montserrat, sans-serif" fontWeight="900" fontSize="22" letterSpacing="0.08em">
+        MAXIDI
+      </text>
+      <text x="1" y="38" fill="#00D4B2" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="8" letterSpacing="0.18em">
+        FOOD &amp; PACKAGING SOLUTIONS
+      </text>
+    </g>
+  </svg>
+);
+
+export const MaxidiLogo: React.FC<LogoProps> = (props) => (
+  <StandardBrandLogoImage
+    remoteUrl={CLIENT_LOGO_URLS.maxidi}
+    localUrl={LOCAL_CLIENT_LOGO_URLS.maxidi}
+    alt="Logo MAXIDI"
+    svgFallback={<MaxidiSvg {...props} />}
     {...props}
   />
 );

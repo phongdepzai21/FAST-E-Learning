@@ -137,7 +137,17 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const isDelete = type === 'delete';
   const isReset = type === 'reset';
@@ -176,15 +186,6 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   const theme = getTheme();
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
-  if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>
@@ -430,7 +431,17 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
   onClose,
   onViewCourse,
 }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const getTitle = () => {
     switch (action) {
@@ -446,15 +457,6 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
         return 'Thao tác thành công!';
     }
   };
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
-  if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>

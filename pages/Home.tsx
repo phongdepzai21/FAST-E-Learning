@@ -318,9 +318,9 @@ const Home: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Award className="w-6 h-6 text-teal-200" />
               </div>
-              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Chứng Nhận QR Số Hóa</h3>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Nhận Chứng Nhận Ngay &amp; Liền</h3>
               <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
-                Mã QR định danh cá nhân xác thực năng lực chuyên môn toàn quốc
+                Nhận chứng nhận ngay và liền (không nhận chứng nhận online), xác thực năng lực chuyên môn
               </p>
             </div>
           </div>
@@ -333,13 +333,13 @@ const Home: React.FC = () => {
         className="py-12 md:py-16 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Header - Nổi bật, sang trọng, đẳng cấp */}
+          {/* Header - Nổi bật, sang trọng, rõ dấu tiếng Việt */}
           <div className="text-center mb-8 md:mb-10">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 uppercase tracking-tight">
-              Khóa Học <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800">Nổi Bật</span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-normal pt-1.5 pb-1.5 leading-snug">
+              Khóa Học <span className="text-[#007c76] inline-block font-black">Nổi Bật</span>
             </h2>
             <p className="text-slate-500 font-medium text-xs sm:text-sm md:text-base max-w-xl mx-auto mt-2">
-              Chương trình chuẩn hóa ISO, HACCP & VietGAP dành cho doanh nghiệp và chuyên gia
+              Chương trình chuẩn hóa ISO, HACCP &amp; VietGAP dành cho doanh nghiệp và chuyên gia
             </p>
           </div>
 
@@ -577,7 +577,7 @@ const Home: React.FC = () => {
                   phase: 'Học tập & Thực hành',
                   icon: GraduationCap,
                   label: 'Lập phương án & Hướng dẫn thực hành',
-                  desc: 'Học qua video bài giảng cô đọng 15-20 phút linh hoạt mọi lúc mọi nơi; hệ thống hóa toàn bộ biểu mẫu SOP, quy trình vệ sinh và biểu mẫu kiểm soát an toàn thực tế.',
+                  desc: 'Học qua video bài giảng cô đọng 15-20 phút linh hoạt mọi lúc mọi nơi; hệ thống hóa toàn bộ quy trình kiểm soát an toàn và chất lượng thực tế.',
                   accentGradient: 'from-emerald-500 to-teal-600'
                 },
                 {
@@ -590,8 +590,8 @@ const Home: React.FC = () => {
                 {
                   phase: 'Đánh giá & Chứng nhận',
                   icon: Award,
-                  label: 'Đánh giá & Nhận chứng nhận QR',
-                  desc: 'Hoàn thành bài kiểm tra trắc nghiệm năng lực, nhận ngay Giấy chứng nhận hoàn thành có mã QR số hóa định danh tra cứu năng lực toàn quốc.',
+                  label: 'Nhận Chứng Nhận Ngay & Liền',
+                  desc: 'Hoàn thành bài kiểm tra năng lực, nhận chứng nhận ngay và liền (không nhận chứng nhận online), xác thực chuẩn năng lực chuyên môn toàn quốc.',
                   accentGradient: 'from-amber-500 to-teal-600'
                 }
               ].map((item, idx) => {
@@ -692,8 +692,8 @@ const Home: React.FC = () => {
                       <Award className="w-5 h-5 text-amber-300" />
                     </div>
                     <div>
-                      <div className="text-xs sm:text-sm font-bold text-white">Mã QR Định Danh</div>
-                      <div className="text-[10px] text-amber-200/80 font-medium">Xác thực chứng nhận số hóa</div>
+                      <div className="text-xs sm:text-sm font-bold text-white">Nhận Chứng Nhận Ngay &amp; Liền</div>
+                      <div className="text-[10px] text-amber-200/80 font-medium">Không nhận chứng nhận online</div>
                     </div>
                   </div>
                 </div>
@@ -738,8 +738,8 @@ const Home: React.FC = () => {
                 ★
               </div>
               <div>
-                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Giấy Chứng Nhận Hợp Lệ</h4>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Cấp Giấy chứng nhận hoàn thành có mã QR xác thực năng lực chuyên môn.</p>
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-wide">Nhận Chứng Nhận Ngay &amp; Liền</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">Cấp Giấy chứng nhận hoàn thành ngay và liền, không nhận chứng nhận online.</p>
               </div>
             </div>
 

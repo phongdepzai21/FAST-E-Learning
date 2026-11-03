@@ -15,8 +15,8 @@ import AdProfileManagement from '../components/AdProfileManagement';
 import FastFoodSafetyManagement from '../components/FastFoodSafetyManagement';
 import FastHaccpChecklist from '../components/FastHaccpChecklist';
 import { PurchaseHistory } from '../components/PurchaseHistory';
+import { ViewedCoursesView } from '../components/ViewedCoursesView';
 import { FastCodeLookup } from '../components/FastCodeLookup';
-import { UnifiedWebhookCenter } from '../components/UnifiedWebhookCenter';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
@@ -71,17 +71,19 @@ const MyOwnedCoursesView: React.FC<{
   isVip?: boolean;
   isAdmin?: boolean;
   unownedCount?: number;
+  userEmail?: string | null;
 }> = ({ 
   myCourses, 
   onGoToBuyCourses,
   isVip = false,
   isAdmin = false,
-  unownedCount = 0
+  unownedCount = 0,
+  userEmail
 }) => {
   const isPrivileged = isVip || isAdmin;
 
   return (
-    <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-6">
+    <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
@@ -133,7 +135,7 @@ const MyOwnedCoursesView: React.FC<{
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     Mua khóa học ngay
                   </button>
-                ) : (
+               ) : (
                   <Link 
                     to="/khoa-hoc" 
                     className="w-full sm:w-auto bg-[#007c76] hover:bg-[#00605b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 flex items-center justify-center gap-2"
@@ -141,10 +143,15 @@ const MyOwnedCoursesView: React.FC<{
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                     Mua khóa học ngay
                   </Link>
-                )}
+               )}
              </div>
          </div>
       )}
+
+      {/* Integrated Viewed Courses Section */}
+      <div className="pt-8 border-t border-slate-200">
+        <ViewedCoursesView userEmail={userEmail} />
+      </div>
     </section>
   );
 };
@@ -477,12 +484,20 @@ const Account: React.FC = () => {
   useEffect(() => {
     if (courseId) {
       setActiveTab('course-learning');
-    } else if (location.state && (location.state as any).tab) {
-      setActiveTab((location.state as any).tab);
-      // clean up state so refresh doesn't stick to it unless intended
-      window.history.replaceState({}, document.title)
+    } else if (location.pathname === '/teacher-dashboard') {
+      setActiveTab('teacher-dashboard');
+    } else {
+      const searchParams = new URLSearchParams(location.search);
+      const tabParam = searchParams.get('tab');
+      if (tabParam) {
+        setActiveTab(tabParam as any);
+      } else if (location.state && (location.state as any).tab) {
+        setActiveTab((location.state as any).tab);
+        // clean up state so refresh doesn't stick to it unless intended
+        window.history.replaceState({}, document.title);
+      }
     }
-  }, [courseId, location.state]);
+  }, [courseId, location.pathname, location.search, location.state]);
 
   // Default to TRUE to prevent flash
   const [purchasedCourses, setPurchasedCourses] = useState<PurchasedCourseData[]>([]);
@@ -661,8 +676,8 @@ const Account: React.FC = () => {
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
                         curVip = userData.isVip === true;
-                        curAdmin = userData.isAdmin === true || isHardcodedAdmin;
-                        curTeacher = userData.isTeacher === true || curAdmin || isHardcodedTeacher;
+                        curAdmin = userData.isAdmin === true || userData.role === 'admin' || isHardcodedAdmin;
+                        curTeacher = userData.isTeacher === true || userData.role === 'teacher' || userData.role === 'giangvien' || curAdmin || isHardcodedTeacher;
                         curLocked = userData.isLocked === true;
                         curLockedAt = userData.lockedAt;
                         curLockReason = userData.lockReason;
@@ -674,30 +689,30 @@ const Account: React.FC = () => {
                             isLocked: curLocked
                         }));
                     } else {
-                        // Create default user document
+                        // Create default user document with proper hardcoded role preservation
                         try {
                             await setDoc(userDocRef, {
                                 email: userEmail,
                                 displayName: freshUser.displayName || 'Học viên',
                                 photoURL: freshUser.photoURL || '',
-                                isAdmin: false,
-                                isTeacher: false,
+                                isAdmin: isHardcodedAdmin,
+                                isTeacher: isHardcodedTeacher || isHardcodedAdmin,
                                 isVip: false,
                                 isLocked: false,
                                 createdAt: new Date().toISOString()
                             });
                             curVip = false;
-                            curAdmin = false;
-                            curTeacher = false;
+                            curAdmin = isHardcodedAdmin;
+                            curTeacher = isHardcodedTeacher || isHardcodedAdmin;
                             curLocked = false;
                         } catch (err) {
                             console.error('Error creating user profile:', err);
                         }
                         
                         localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
-                            isVip: false,
-                            isAdmin: false,
-                            isTeacher: false,
+                            isVip: curVip,
+                            isAdmin: curAdmin,
+                            isTeacher: curTeacher,
                             isLocked: false
                         }));
                     }
@@ -1368,10 +1383,11 @@ const Account: React.FC = () => {
     }
   };
 
-  const userEmailLower = (user?.email || '').toLowerCase().trim();
+  const userEmailLower = (user?.email || auth.currentUser?.email || '').toLowerCase().trim();
+  const isOwner = userEmailLower === 'h1h4phong@gmail.com' || userEmailLower === 'trdung153@gmail.com';
   const isVip = user?.isVip === true;
-  const isAdmin = user?.isAdmin === true || ADMIN_EMAILS.some(e => e.toLowerCase() === userEmailLower);
-  const isTeacher = user?.isTeacher === true || isAdmin || TEACHER_EMAILS.some(e => e.toLowerCase() === userEmailLower);
+  const isAdmin = user?.isAdmin === true || isOwner || ADMIN_EMAILS.some(e => e.toLowerCase() === userEmailLower);
+  const isTeacher = user?.isTeacher === true || (user as any)?.role === 'teacher' || (user as any)?.role === 'giangvien' || isAdmin || isOwner || TEACHER_EMAILS.some(e => e.toLowerCase() === userEmailLower);
   const showSkeleton = !isVip && isLoadingCourses;
 
   // LOGIC CẤU HÌNH MÀU SẮC AVATAR THEO YÊU CẦU BẮT BUỘC:
@@ -1718,29 +1734,29 @@ const Account: React.FC = () => {
             <title>FAST SERVICE | FAST Admin</title>
           </Helmet>
 
-          {/* SIDEBAR: Đứng im, có nút nhấn kéo ngang mượt mà, không méo lệch */}
+          {/* SIDEBAR: Đứng im, có nút nhấn kéo ngang mượt mà, màu #007c76 mờ kính */}
           <aside 
-            className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-[width] duration-300 ease-in-out relative z-30 select-none ${
-              isExpanded ? 'w-72 shadow-xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+            className={`print:hidden hidden lg:flex flex-col shrink-0 bg-[#007c76]/85 backdrop-blur-xl border-r border-[#007c76]/30 text-white transition-[width] duration-300 ease-in-out relative z-30 select-none shadow-2xl ${
+              isExpanded ? 'w-72 ring-1 ring-black/10' : 'w-20 shadow-md'
             }`}
           >
             <div className="p-3.5">
               {/* Header with click toggle button */}
               <div className="h-12 flex items-center justify-between mb-4 px-1">
                 {isExpanded && (
-                  <span className="text-[11px] font-black uppercase tracking-widest text-[#007c76] bg-[#007c76]/10 px-3 py-1.5 rounded-full border border-[#007c76]/20 whitespace-nowrap overflow-hidden">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-white bg-white/20 px-3 py-1.5 rounded-full border border-white/30 whitespace-nowrap overflow-hidden">
                     QUẢN TRỊ DỊCH VỤ
                   </span>
                 )}
                 <button 
                   type="button"
                   onClick={() => setIsSidebarExpanded(prev => !prev)}
-                  className={`w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group ${
+                  className={`w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white cursor-pointer hover:bg-white/25 transition-colors shadow-2xs group ${
                     !isExpanded ? 'mx-auto' : 'ml-auto'
                   }`}
                   title={isExpanded ? "Thu gọn thanh điều hướng" : "Nhấn để kéo mở rộng"}
                 >
-                  <svg className="w-5 h-5 text-[#007c76] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-white transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {isExpanded ? (
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                     ) : (
@@ -1772,14 +1788,14 @@ const Account: React.FC = () => {
                       }}
                       className={`w-full h-12 flex items-center rounded-2xl font-bold text-sm transition-colors cursor-pointer ${
                         !isExpanded ? 'justify-center px-0' : 'gap-3.5 px-4'
-                      } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
+                      } ${isActive ? 'bg-white/25 text-white shadow-md border border-white/30 backdrop-blur-md' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
                     >
                       {item.icon && (
-                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 shrink-0 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
                         </svg>
                       )}
-                      {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">{item.label}</span>}
+                      {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left text-white">{item.label}</span>}
                     </button>
                   );
                 })}
@@ -1897,7 +1913,7 @@ const Account: React.FC = () => {
     }
 
     return (
-      <div className="min-h-screen bg-[#007c76] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
+      <div className="min-h-screen bg-[#f8fafc] print:bg-white print:min-h-0 flex animate-fade-in overflow-hidden print:overflow-visible">
         
         {/* Sidebar: Đứng im, nút nhấn kéo ngang, không méo lệch, không chữ Thành viên */}
         {(() => {
@@ -1905,8 +1921,8 @@ const Account: React.FC = () => {
 
           return (
             <aside 
-              className={`print:hidden hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-150 transition-[width] duration-300 ease-in-out relative z-30 select-none ${
-                isExpanded ? 'w-72 shadow-xl ring-1 ring-black/5' : 'w-20 shadow-xs'
+              className={`print:hidden hidden lg:flex flex-col shrink-0 bg-[#007c76]/85 backdrop-blur-xl border-r border-[#007c76]/30 text-white transition-[width] duration-300 ease-in-out relative z-30 select-none shadow-2xl ${
+                isExpanded ? 'w-72 ring-1 ring-black/10' : 'w-20 shadow-md'
               }`}
             >
               <div className="p-3.5">
@@ -1919,12 +1935,12 @@ const Account: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => setIsSidebarExpanded(prev => !prev)}
-                    className={`w-10 h-10 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-[#007c76] cursor-pointer hover:bg-teal-100 transition-colors shadow-2xs group ${
+                    className={`w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white cursor-pointer hover:bg-white/25 transition-colors shadow-2xs group ${
                       !isExpanded ? 'mx-auto' : 'ml-auto'
                     }`}
                     title={isExpanded ? "Thu gọn thanh điều hướng" : "Nhấn để kéo mở rộng"}
                   >
-                    <svg className="w-5 h-5 text-[#007c76] transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-white transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       {isExpanded ? (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                       ) : (
@@ -1938,17 +1954,14 @@ const Account: React.FC = () => {
                   {[
                     { id: 'dashboard', label: 'Bảng điều khiển', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
                     { id: 'my-courses', label: 'Khóa học của tôi', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
-                    { id: 'badges', label: 'Huy hiệu vinh danh', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
                     { id: 'buy-courses', label: 'Mua khóa học', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z' },
                     { id: 'purchase-history', label: 'Lịch sử mua hàng', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-                    { id: 'settings', label: 'Cài đặt tài khoản', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
                     ...(isTeacher || isAdmin ? [
                       { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
-                      { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-                      { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' }
+                      { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' }
                     ] : []),
                     ...(isAdmin ? [
-                      { id: 'unified-webhook-center', label: 'Trung tâm Webhook', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+                      { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
                       { id: 'fast-code-lookup', label: 'Truy vết Giao dịch (Payment Trace)', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
                       { id: 'admin-audit-center', label: 'FAST SERVICE', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
@@ -1967,40 +1980,40 @@ const Account: React.FC = () => {
                         }}
                         className={`w-full h-12 flex items-center rounded-2xl font-bold text-sm transition-colors cursor-pointer ${
                           !isExpanded ? 'justify-center px-0' : 'gap-3.5 px-4'
-                        } ${isActive ? 'bg-[#007c76]/10 text-[#007c76] shadow-xs' : 'text-gray-500 hover:bg-gray-50 hover:text-[#007c76]'}`}
+                        } ${isActive ? 'bg-white/25 text-white shadow-md border border-white/30 backdrop-blur-md' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}
                       >
-                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
-                        {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left">{item.label}</span>}
+                        <svg className="w-5 h-5 shrink-0 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /></svg>
+                        {isExpanded && <span className="whitespace-nowrap overflow-hidden text-ellipsis text-left text-white">{item.label}</span>}
                       </button>
                     );
                   })}
                 </nav>
               </div>
               
-              <div className="mt-auto border-t border-gray-100 p-3 flex items-center justify-center">
+              <div className="mt-auto border-t border-white/10 p-3 flex items-center justify-center">
                 {!isExpanded ? (
                   <button 
                     type="button"
                     onClick={() => setIsSidebarExpanded(true)}
-                    title={isVip ? "VIP FAST" : "Nâng cấp VIP"}
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs ${
-                      isVip ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' : 'bg-[#007c76] text-white'
-                    }`}
+                    title="Mở rộng menu"
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer shadow-xs bg-white/20 text-white hover:bg-white/30 transition-colors border border-white/30"
                   >
-                    <span className="text-base">{isVip ? '⭐' : '👑'}</span>
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 ) : (
-                  <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3 flex items-center justify-between">
+                  <div className="w-full bg-white/15 border border-white/20 rounded-2xl p-3 flex items-center justify-between text-white">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">{isVip ? '⭐' : '👑'}</span>
-                      <span className="text-xs font-bold text-slate-700">
+                      <div className="w-2.5 h-2.5 rounded-full bg-teal-300 ring-2 ring-white/30" />
+                      <span className="text-xs font-bold text-white tracking-wide">
                         {isVip ? 'VIP TRỌN ĐỜI' : 'HỌC VIÊN FAST'}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setIsSidebarExpanded(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 cursor-pointer"
+                      className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/20 cursor-pointer"
                       title="Thu gọn"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2030,14 +2043,11 @@ const Account: React.FC = () => {
                 >
                   <option value="dashboard">Bảng điều khiển</option>
                   <option value="my-courses">Khóa học của tôi</option>
-                  <option value="badges">Huy hiệu vinh danh</option>
                   <option value="buy-courses">Mua khóa học</option>
                   <option value="purchase-history">Lịch sử mua hàng</option>
-                  <option value="settings">Cài đặt tài khoản</option>
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
-                  {(isTeacher || isAdmin) && <option value="user-management">Học viên & Khóa học</option>}
-                  {isAdmin && <option value="unified-webhook-center">Trung tâm Webhook</option>}
+                  {isAdmin && <option value="user-management">Học viên & Khóa học</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
                   {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (FSA • ATTP • HSQC)</option>}
                 </select>
@@ -2100,24 +2110,22 @@ const Account: React.FC = () => {
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full"
               >
-                <TabErrorBoundary fallbackTitle={`Phân hệ ${activeTab}`}>
-                {activeTab === 'unified-webhook-center' && isAdmin ? (
-                  <UnifiedWebhookCenter />
-                ) : activeTab === 'fast-code-lookup' && isAdmin ? (
+                <TabErrorBoundary key={activeTab} fallbackTitle={`Phân hệ ${activeTab}`}>
+                {activeTab === 'fast-code-lookup' && isAdmin ? (
                   <FastCodeLookup />
                 ) : activeTab === 'admin-student-console' && isAdmin ? (
                   <AdminStudentConsole />
                 ) : activeTab === 'admin-manual-unlock' && isAdmin ? (
                   <AdminManualUnlock />
-                ) : activeTab === 'teacher-dashboard' && (isTeacher || isAdmin) ? (
-                  <TeacherDashboard userEmail={user.email} />
-                ) : activeTab === 'combo-management' && (isTeacher || isAdmin) ? (
+                ) : activeTab === 'teacher-dashboard' ? (
+                  <TeacherDashboard userEmail={user?.email || auth.currentUser?.email || ''} />
+                ) : activeTab === 'combo-management' ? (
                   <ComboManagement />
-                ) : activeTab === 'user-management' && (isTeacher || isAdmin) ? (
+                ) : activeTab === 'user-management' && isAdmin ? (
                   <UserManagement />
-                ) : activeTab === 'fast-standards-audit' && (isTeacher || isAdmin) ? (
+                ) : activeTab === 'fast-standards-audit' && isAdmin ? (
                   <FastStandardsAudit />
-                ) : activeTab === 'fast-haccp-checklist' && (isTeacher || isAdmin) ? (
+                ) : activeTab === 'fast-haccp-checklist' && isAdmin ? (
                   <FastHaccpChecklist />
                 ) : activeTab === 'ad-profile-management' && isAdmin ? (
                   <AdProfileManagement />
@@ -2151,6 +2159,7 @@ const Account: React.FC = () => {
                     isVip={isVip}
                     isAdmin={isAdmin}
                     unownedCount={unownedCoursesCount}
+                    userEmail={user?.email}
                   />
                 ) : (
                   <div className="space-y-10">

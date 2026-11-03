@@ -18,6 +18,7 @@ import { parseNumericPrice } from '../utils/qrService';
 import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 import { useToast } from '../contexts/ToastContext';
 import { markCourseAsSeen } from '../utils/courseNotificationService';
+import { trackCourseView } from '../utils/courseTrackingService';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { showToast, success } = useToast();
@@ -78,6 +79,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
       if (found) {
         setCourse(found);
+        trackCourseView(found, currentUser?.email);
         const curr = dataToUse?.curriculum || found.curriculum;
         const flatList = extractLessonsFlat(curr);
         if (flatList.length > 0) {

@@ -5,7 +5,8 @@ import emailjs from '@emailjs/browser';
 export interface SendOtpOptions {
   email: string;
   name?: string;
-  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock';
+  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock' | 'dev_access';
+  customOtp?: string;
 }
 
 export interface SendOtpResponse {
@@ -19,7 +20,7 @@ export interface SendOtpResponse {
 export interface VerifyOtpOptions {
   email: string;
   otp: string;
-  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock';
+  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock' | 'dev_access';
 }
 
 export interface VerifyOtpResponse {
@@ -50,7 +51,7 @@ const EMAILJS_CREDENTIALS = [
   }
 ];
 
-const OTP_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes (600s)
 
 function getClientOtpStorageKey(email: string, flow: string): string {
   return `_client_otp_${email.toLowerCase().trim()}_${flow}`;
@@ -70,7 +71,7 @@ function checkAndConsumeClientOtp(email: string, flow: string, inputOtp: string)
         sessionStorage.removeItem(storageKey);
         localStorage.removeItem(storageKey);
       } catch (e) {}
-      return { matched: false, error: 'Mã OTP đã hết hạn (sau 15 phút). Vui lòng yêu cầu mã mới.' };
+      return { matched: false, error: 'Mã OTP đã hết hạn (sau 10 phút). Vui lòng yêu cầu mã mới.' };
     }
 
     if (record.attempts >= 5) {
@@ -180,7 +181,7 @@ export async function sendOtp(options: SendOtpOptions): Promise<SendOtpResponse>
       const res = await fetch('/api/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, flow })
+        body: JSON.stringify({ email, name, flow, customOtp: options.customOtp })
       });
 
       const contentType = res.headers.get('content-type') || '';
@@ -221,7 +222,9 @@ export async function sendOtp(options: SendOtpOptions): Promise<SendOtpResponse>
     // --- CLIENT-SIDE ENGINE (For Netlify, Vercel, or when backend API is offline) ---
     console.log('[otpService] Executing Client-Side OTP Engine for:', email, flow);
 
-    const clientOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const clientOtp = (options.customOtp && options.customOtp.length === 6)
+      ? options.customOtp
+      : Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + OTP_EXPIRY_MS;
 
     try {

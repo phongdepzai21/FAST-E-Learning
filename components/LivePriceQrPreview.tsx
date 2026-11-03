@@ -32,6 +32,8 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
   const [qrLoaded, setQrLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string>('');
+  const [isCustomPriceOpen, setIsCustomPriceOpen] = useState(false);
+  const [customPriceInput, setCustomPriceInput] = useState('');
 
   const handleSyncFromFirestore = async () => {
     setIsSyncing(true);
@@ -90,9 +92,6 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
     setCopiedField(fieldName);
     setTimeout(() => setCopiedField(null), 2000);
   };
-
-  const [isCustomPriceOpen, setIsCustomPriceOpen] = useState(false);
-  const [customPriceInput, setCustomPriceInput] = useState('');
 
   const pricePresets = [
     { label: '199.000đ', val: '199.000đ' },
