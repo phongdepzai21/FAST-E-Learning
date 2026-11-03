@@ -20,25 +20,56 @@ import { subscribeToPaymentConfig } from './utils/qrService';
 // Direct import for Critical LCP Page
 import Home from './pages/Home'; 
 
-// Lazy load các trang con để giảm bundle size ban đầu
-const Courses = lazy(() => import('./pages/Courses'));
-const CourseDetail = lazy(() => import('./pages/CourseDetail'));
-const About = lazy(() => import('./pages/About'));
-const Contact = lazy(() => import('./pages/Contact'));
-const FAQ = lazy(() => import('./pages/FAQ'));
-const Consulting = lazy(() => import('./pages/Consulting'));
-const Handbook = lazy(() => import('./pages/Handbook'));
-const Account = lazy(() => import('./pages/Account'));
-const AccountSettings = lazy(() => import('./pages/AccountSettings'));
-const VipUpgrade = lazy(() => import('./pages/VipUpgrade'));
-const TermsOfService = lazy(() => import('./pages/TermsOfService'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const Classroom = lazy(() => import('./pages/Classroom'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+// Resilient lazy loader that retries on dynamic import failures (e.g. during server restart/redeployment)
+const lazyWithRetry = <T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+): React.LazyExoticComponent<T> => {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err: any) {
+      console.warn('[App] Retrying dynamic import...', err);
+      try {
+        await new Promise((res) => setTimeout(res, 350));
+        return await factory();
+      } catch (retryErr: any) {
+        const msg = retryErr?.message || '';
+        if (
+          msg.includes('dynamically imported module') ||
+          msg.includes('Failed to fetch') ||
+          retryErr?.name === 'ChunkLoadError'
+        ) {
+          const key = 'chunk_reload_' + (typeof window !== 'undefined' ? window.location.pathname : '');
+          if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            window.location.reload();
+          }
+        }
+        throw retryErr;
+      }
+    }
+  });
+};
+
+// Lazy load các trang con với cơ chế tự phục hồi
+const Courses = lazyWithRetry(() => import('./pages/Courses'));
+const CourseDetail = lazyWithRetry(() => import('./pages/CourseDetail'));
+const About = lazyWithRetry(() => import('./pages/About'));
+const Contact = lazyWithRetry(() => import('./pages/Contact'));
+const FAQ = lazyWithRetry(() => import('./pages/FAQ'));
+const Consulting = lazyWithRetry(() => import('./pages/Consulting'));
+const Handbook = lazyWithRetry(() => import('./pages/Handbook'));
+const Account = lazyWithRetry(() => import('./pages/Account'));
+const AccountSettings = lazyWithRetry(() => import('./pages/AccountSettings'));
+const VipUpgrade = lazyWithRetry(() => import('./pages/VipUpgrade'));
+const TermsOfService = lazyWithRetry(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = lazyWithRetry(() => import('./pages/PrivacyPolicy'));
+const Classroom = lazyWithRetry(() => import('./pages/Classroom'));
+const NotFound = lazyWithRetry(() => import('./pages/NotFound'));
 
 // Lazy load Components phụ trợ & Footer
-const FloatingContact = lazy(() => import('./components/FloatingContact'));
-const Footer = lazy(() => import('./components/Footer'));
+const FloatingContact = lazyWithRetry(() => import('./components/FloatingContact'));
+const Footer = lazyWithRetry(() => import('./components/Footer'));
 
 // Loading Fallback Component
 const PageLoader = () => (

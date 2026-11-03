@@ -15,10 +15,38 @@ let eventSource: EventSource | null = null;
 let isInitialized = false;
 let reconnectTimer: any = null;
 
+// Helper to purge deleted course IDs from all local caches
+export function applyDeletedCourses(deletedIds: string[]) {
+  if (!Array.isArray(deletedIds) || deletedIds.length === 0) return;
+  try {
+    const delStr = localStorage.getItem('deleted_course_ids');
+    const existingDel: string[] = delStr ? JSON.parse(delStr) : [];
+    const mergedDel = Array.from(new Set([...existingDel, ...deletedIds]));
+    localStorage.setItem('deleted_course_ids', JSON.stringify(mergedDel));
+
+    ['local_custom_courses', 'server_custom_courses', 'cached_firestore_courses'].forEach(key => {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          const cleaned = list.filter((c: any) => c && c.id && !mergedDel.includes(c.id));
+          localStorage.setItem(key, JSON.stringify(cleaned));
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('Error purging deleted courses:', err);
+  }
+}
+
 /**
  * Apply updated courses into localStorage safely
  */
-function updateStoredCourses(courses: Course[]) {
+function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
+  if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+    applyDeletedCourses(deletedIds);
+  }
+
   if (!Array.isArray(courses)) return;
   try {
     localStorage.setItem('server_custom_courses', JSON.stringify(courses));
@@ -66,6 +94,28 @@ function updateStoredCombos(combos: any[]) {
 }
 
 /**
+ * Fetch latest courses directly from backend server (used for on-demand sync)
+ */
+export async function fetchLatestCoursesFromServer(): Promise<Course[]> {
+  try {
+    const res = await fetch('/api/courses');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data && Array.isArray(data.deletedCourseIds) && data.deletedCourseIds.length > 0) {
+      applyDeletedCourses(data.deletedCourseIds);
+    }
+    if (data && Array.isArray(data.courses)) {
+      updateStoredCourses(data.courses, data.deletedCourseIds);
+      window.dispatchEvent(new CustomEvent('courses_updated', { detail: { action: 'poll', courses: data.courses, deletedCourseIds: data.deletedCourseIds } }));
+      return data.courses;
+    }
+  } catch (e) {
+    // Silent fallback
+  }
+  return [];
+}
+
+/**
  * Initialize cross-tab, cross-account, and cross-device real-time sync
  */
 export function initCourseSyncService() {
@@ -77,8 +127,11 @@ export function initCourseSyncService() {
     broadcastChannel.onmessage = (event) => {
       const data = event.data;
       if (data && data.type === 'courses_updated') {
+        if (data.deletedCourseIds && Array.isArray(data.deletedCourseIds)) {
+          applyDeletedCourses(data.deletedCourseIds);
+        }
         if (data.courses && Array.isArray(data.courses)) {
-          updateStoredCourses(data.courses);
+          updateStoredCourses(data.courses, data.deletedCourseIds);
         } else if (data.action === 'status' && data.courseId && data.status) {
           try {
             ['local_custom_courses', 'server_custom_courses', 'cached_firestore_courses'].forEach(key => {
@@ -107,17 +160,7 @@ export function initCourseSyncService() {
   }
 
   // 2. Fetch initial courses & combos snapshot from backend API
-  fetch('/api/courses')
-    .then((res) => res.json())
-    .then((data) => {
-      if (data && Array.isArray(data.courses) && data.courses.length > 0) {
-        updateStoredCourses(data.courses);
-        window.dispatchEvent(new CustomEvent('courses_updated', { detail: { action: 'init', courses: data.courses } }));
-      }
-    })
-    .catch((err) => {
-      console.warn('Could not fetch initial /api/courses snapshot:', err);
-    });
+  fetchLatestCoursesFromServer();
 
   fetch('/api/combos')
     .then((res) => res.json())
@@ -131,34 +174,30 @@ export function initCourseSyncService() {
       console.warn('Could not fetch initial /api/combos snapshot:', err);
     });
 
-  let sseRetryCount = 0;
-  const MAX_SSE_RETRIES = 3;
-
   // 3. Connect to Server-Sent Events stream for real-time push from server
   function connectSSE() {
     if (eventSource) {
-      eventSource.close();
+      try {
+        eventSource.close();
+      } catch (e) {}
       eventSource = null;
-    }
-
-    if (sseRetryCount >= MAX_SSE_RETRIES) {
-      // Backend SSE endpoint is not available (e.g. static CDN / Netlify hosting).
-      // Fallback silently to BroadcastChannel and localStorage events.
-      return;
     }
 
     try {
       eventSource = new EventSource('/api/courses/stream');
 
       eventSource.onopen = () => {
-        sseRetryCount = 0; // Reset counter on successful connection
+        // Connected
       };
 
       eventSource.addEventListener('init', (e: MessageEvent) => {
         try {
           const payload = JSON.parse(e.data);
-          if (payload && Array.isArray(payload.courses) && payload.courses.length > 0) {
-            updateStoredCourses(payload.courses);
+          if (payload && Array.isArray(payload.deletedCourseIds)) {
+            applyDeletedCourses(payload.deletedCourseIds);
+          }
+          if (payload && Array.isArray(payload.courses)) {
+            updateStoredCourses(payload.courses, payload.deletedCourseIds);
             window.dispatchEvent(new CustomEvent('courses_updated', { detail: payload }));
           }
           if (payload && Array.isArray(payload.combos) && payload.combos.length > 0) {
@@ -173,8 +212,11 @@ export function initCourseSyncService() {
       eventSource.addEventListener('courses_updated', (e: MessageEvent) => {
         try {
           const payload = JSON.parse(e.data);
+          if (payload && Array.isArray(payload.deletedCourseIds)) {
+            applyDeletedCourses(payload.deletedCourseIds);
+          }
           if (payload && Array.isArray(payload.courses)) {
-            updateStoredCourses(payload.courses);
+            updateStoredCourses(payload.courses, payload.deletedCourseIds);
           } else if (payload && payload.action === 'status' && payload.courseId) {
             const localStr = localStorage.getItem('local_custom_courses');
             if (localStr) {
@@ -224,22 +266,37 @@ export function initCourseSyncService() {
           eventSource.close();
           eventSource = null;
         }
-        sseRetryCount++;
-        if (sseRetryCount < MAX_SSE_RETRIES) {
-          if (!reconnectTimer) {
-            reconnectTimer = setTimeout(() => {
-              reconnectTimer = null;
-              connectSSE();
-            }, 5000 * sseRetryCount);
-          }
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connectSSE();
+          }, 4000);
         }
       };
     } catch (err) {
       console.warn('Could not establish SSE connection:', err);
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connectSSE();
+        }, 5000);
+      }
     }
   }
 
   connectSSE();
+
+  // 4. Background heartbeat polling for multi-device sync guarantee
+  setInterval(() => {
+    if (typeof document !== 'undefined' && !document.hidden) {
+      fetchLatestCoursesFromServer();
+    }
+  }, 4000);
+
+  // Instant refresh when user returns to window / tab
+  window.addEventListener('focus', () => {
+    fetchLatestCoursesFromServer();
+  });
 
   // 4. Also listen to native storage events
   window.addEventListener('storage', (e) => {

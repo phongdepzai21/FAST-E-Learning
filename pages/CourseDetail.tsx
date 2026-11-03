@@ -589,7 +589,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                       <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
                       {course.title}
                   </h3>
-                  <Link to="/account" state={{ tab: 'my-courses' }} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-primary transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                  <Link to="/account" state={{ tab: 'dashboard' }} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-primary transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                       Quay lại
                   </Link>

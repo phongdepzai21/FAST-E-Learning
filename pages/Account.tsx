@@ -490,9 +490,10 @@ const Account: React.FC = () => {
       const searchParams = new URLSearchParams(location.search);
       const tabParam = searchParams.get('tab');
       if (tabParam) {
-        setActiveTab(tabParam as any);
+        setActiveTab(tabParam === 'my-courses' ? 'dashboard' : (tabParam as any));
       } else if (location.state && (location.state as any).tab) {
-        setActiveTab((location.state as any).tab);
+        const stateTab = (location.state as any).tab;
+        setActiveTab(stateTab === 'my-courses' ? 'dashboard' : stateTab);
         // clean up state so refresh doesn't stick to it unless intended
         window.history.replaceState({}, document.title);
       }
@@ -1649,15 +1650,20 @@ const Account: React.FC = () => {
   };
 
   const myCourses = useMemo(() => {
-    // Quản trị viên và Giáo viên xem các khóa đã nhận/sở hữu và khóa mặc định
-    if (isAdmin || isTeacher) {
-      return allCourses.filter(c => c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id));
-    }
-    // Đối với học viên: Các khóa đã mua vẫn được học bình thường kể cả khi tạm ngưng tuyển sinh (inactive), trừ bản nháp (draft)
-    return allCourses.filter(c => 
-      c.status !== 'draft' && (c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id))
-    );
-  }, [isAdmin, isTeacher, purchasedCourses, allCourses]);
+    let deletedIds: string[] = [];
+    try {
+      const stored = localStorage.getItem('deleted_course_ids');
+      if (stored) deletedIds = JSON.parse(stored);
+    } catch (e) {}
+
+    return allCourses.filter(c => {
+      if (!c || !c.id) return false;
+      if (deletedIds.includes(c.id)) return false;
+      // Khóa học đã bị ẩn (inactive hoặc draft) phải ẩn hoàn toàn khỏi danh mục trên trang tài khoản
+      if (c.status === 'inactive' || c.status === 'draft') return false;
+      return c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id);
+    });
+  }, [purchasedCourses, allCourses]);
   
   const progressMap = useMemo(() => {
       return purchasedCourses.reduce((acc, curr) => {
@@ -1953,7 +1959,6 @@ const Account: React.FC = () => {
                 <nav className="space-y-1.5">
                   {[
                     { id: 'dashboard', label: 'Bảng điều khiển', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
-                    { id: 'my-courses', label: 'Khóa học của tôi', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
                     { id: 'buy-courses', label: 'Mua khóa học', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z' },
                     { id: 'purchase-history', label: 'Lịch sử mua hàng', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
                     ...(isTeacher || isAdmin ? [
@@ -2042,7 +2047,6 @@ const Account: React.FC = () => {
                   className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-2.5 outline-none"
                 >
                   <option value="dashboard">Bảng điều khiển</option>
-                  <option value="my-courses">Khóa học của tôi</option>
                   <option value="buy-courses">Mua khóa học</option>
                   <option value="purchase-history">Lịch sử mua hàng</option>
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
@@ -2149,17 +2153,7 @@ const Account: React.FC = () => {
                     ownedCourseIds={purchasedCourses.map(pc => pc.courseId)}
                     isVip={isVip}
                     isAdmin={isAdmin}
-                    onGoToMyCourses={() => setActiveTab('my-courses')}
-                  />
-                ) : activeTab === 'my-courses' ? (
-                  <MyOwnedCoursesView 
-                    myCourses={myCourses} 
-                    progressMap={progressMap} 
-                    onGoToBuyCourses={() => setActiveTab('buy-courses')}
-                    isVip={isVip}
-                    isAdmin={isAdmin}
-                    unownedCount={unownedCoursesCount}
-                    userEmail={user?.email}
+                    onGoToMyCourses={() => setActiveTab('dashboard')}
                   />
                 ) : (
                   <div className="space-y-10">

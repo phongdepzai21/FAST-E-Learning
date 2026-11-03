@@ -6,12 +6,12 @@ import { db, storage } from '../firebase';
 import { ADMIN_EMAILS, COURSES as HARDCODED_COURSES, getMergedCourses, formatPriceSubmit, extractLessonsFlat, DEFAULT_LESSONS } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
-import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
-import { broadcastCourseUpdate, broadcastComboUpdate } from '../utils/courseSyncService';
+import { broadcastCourseUpdate, broadcastComboUpdate, fetchLatestCoursesFromServer } from '../utils/courseSyncService';
 import LivePriceQrPreview from './LivePriceQrPreview';
-import { motion, AnimatePresence } from 'motion/react';
 import { Download, Upload } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { logFirestoreError } from '../utils/firestoreDiagnostics';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -177,6 +177,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       setIsLoadingCourses(false);
     };
 
+    // Initial load from server directly
+    fetchLatestCoursesFromServer().then((list) => {
+      if (Array.isArray(list) && list.length > 0) {
+        syncCourses(list);
+      }
+    });
+
     const unsubscribe = onSnapshot(
       collection(db, 'courses'),
       (querySnapshot) => {
@@ -250,15 +257,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       }
     );
 
-    const handleCustomUpdate = () => {
-      syncCourses();
+    const handleCustomUpdate = (e?: any) => {
+      const detailList = e?.detail?.courses;
+      if (Array.isArray(detailList) && detailList.length > 0) {
+        syncCourses(detailList);
+      } else {
+        syncCourses();
+      }
     };
 
     window.addEventListener('courses_updated', handleCustomUpdate);
     window.addEventListener('storage', handleCustomUpdate);
 
+    // Periodic heartbeat sync: every 4 seconds refresh from server for cross-device consistency
+    const pollTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchLatestCoursesFromServer().then(list => {
+          if (Array.isArray(list) && list.length > 0) {
+            syncCourses(list);
+          }
+        });
+      }
+    }, 4000);
+
     return () => {
       unsubscribe();
+      clearInterval(pollTimer);
       window.removeEventListener('courses_updated', handleCustomUpdate);
       window.removeEventListener('storage', handleCustomUpdate);
     };
@@ -506,6 +530,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     // 3. Broadcast real-time across ALL tabs, ALL accounts, and devices
     broadcastCourseUpdate('upsert', { course: newCourse });
+    try {
+      fetch('/api/courses/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert', course: newCourse })
+      }).catch(() => null);
+    } catch (e) {}
 
     toast.success(`Đã thêm khóa học "${title}" thành công!`, 4000, 'Tạo thành công');
 
@@ -607,6 +638,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
     // 3. Broadcast real-time across ALL tabs, ALL accounts, and devices
     broadcastCourseUpdate('upsert', { course: updatedCourse });
+    try {
+      fetch('/api/courses/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert', course: updatedCourse })
+      }).catch(() => null);
+    } catch (e) {}
 
     toast.success(`Đã lưu thay đổi khóa học "${title}"!`, 4000, 'Đã cập nhật');
 

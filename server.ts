@@ -114,7 +114,7 @@ function saveCombosToDisk(combos: Record<string, any>) {
   }
 }
 
-function loadCoursesFromDisk(): Record<string, any> {
+function loadCoursesDataFromDisk(): { courses: Record<string, any>; deletedIds: string[] } {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -122,22 +122,29 @@ function loadCoursesFromDisk(): Record<string, any> {
     if (fs.existsSync(COURSES_FILE)) {
       const content = fs.readFileSync(COURSES_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      return parsed.courses || {};
+      return {
+        courses: parsed.courses || {},
+        deletedIds: Array.isArray(parsed.deletedCourseIds) ? parsed.deletedCourseIds : []
+      };
     }
   } catch (err) {
     console.warn("Failed to read courses from disk:", err);
   }
-  return {};
+  return { courses: {}, deletedIds: [] };
 }
 
-function saveCoursesToDisk(courses: Record<string, any>) {
+function saveCoursesToDisk(courses: Record<string, any>, deletedCourseIds: Set<string>) {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     fs.writeFileSync(
       COURSES_FILE,
-      JSON.stringify({ courses, updatedAt: new Date().toISOString() }, null, 2),
+      JSON.stringify({ 
+        courses, 
+        deletedCourseIds: Array.from(deletedCourseIds),
+        updatedAt: new Date().toISOString() 
+      }, null, 2),
       "utf-8"
     );
   } catch (err) {
@@ -146,7 +153,9 @@ function saveCoursesToDisk(courses: Record<string, any>) {
 }
 
 // In-memory courses & combos state synchronized across all users & tabs
-const serverCourses: Record<string, any> = loadCoursesFromDisk();
+const initialCoursesData = loadCoursesDataFromDisk();
+const serverCourses: Record<string, any> = initialCoursesData.courses;
+const serverDeletedCourseIds: Set<string> = new Set<string>(initialCoursesData.deletedIds);
 const serverCombos: Record<string, any> = loadCombosFromDisk();
 // Set of active SSE subscribers
 const sseClients = new Set<express.Response>();
@@ -195,7 +204,10 @@ async function startServer() {
   // API routes
   // 1. Get current synchronized courses & combos
   app.get("/api/courses", (req, res) => {
-    res.json({ courses: Object.values(serverCourses) });
+    res.json({ 
+      courses: Object.values(serverCourses),
+      deletedCourseIds: Array.from(serverDeletedCourseIds)
+    });
   });
 
   app.get("/api/combos", (req, res) => {
@@ -496,6 +508,7 @@ async function startServer() {
       `event: init\ndata: ${JSON.stringify({
         courses: Object.values(serverCourses),
         combos: Object.values(serverCombos),
+        deletedCourseIds: Array.from(serverDeletedCourseIds),
         timestamp: Date.now()
       })}\n\n`
     );
@@ -649,6 +662,7 @@ async function startServer() {
           ...course,
           updatedAt: course.updatedAt || now
         };
+        serverDeletedCourseIds.delete(course.id);
       } else if (action === "status" && courseId && status) {
         if (serverCourses[courseId]) {
           serverCourses[courseId] = {
@@ -686,6 +700,7 @@ async function startServer() {
         }
       } else if (action === "delete" && courseId) {
         delete serverCourses[courseId];
+        serverDeletedCourseIds.add(courseId);
       } else if (action === "sync_all" && Array.isArray(courses)) {
         courses.forEach((c: any) => {
           if (c && c.id) {
@@ -694,9 +709,10 @@ async function startServer() {
         });
       }
 
-      saveCoursesToDisk(serverCourses);
+      saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
 
       const allList = Object.values(serverCourses);
+      const deletedList = Array.from(serverDeletedCourseIds);
 
       // Broadcast immediately to ALL other tabs, accounts, and devices
       broadcastCoursesUpdate("courses_updated", {
@@ -705,10 +721,11 @@ async function startServer() {
         courseId,
         status,
         courses: allList,
+        deletedCourseIds: deletedList,
         timestamp: Date.now()
       });
 
-      res.json({ success: true, courses: allList });
+      res.json({ success: true, courses: allList, deletedCourseIds: deletedList });
     } catch (err: any) {
       console.error("Course sync error:", err);
       res.status(500).json({ error: err.message });
