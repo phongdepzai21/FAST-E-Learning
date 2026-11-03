@@ -12,7 +12,6 @@ import { Course } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
 import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
-import { fetchLatestCoursesFromServer } from '../utils/courseSyncService';
 import { trackCourseView } from '../utils/courseTrackingService';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
@@ -56,118 +55,68 @@ const Courses: React.FC = () => {
     setExpandedComboIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // --- FETCH ALL COMBOS FROM FIRESTORE & LOCAL CACHE ---
+  // --- FETCH ALL COMBOS FROM SERVER API ---
   useEffect(() => {
-    let localCombos: any[] = [];
-    try {
-      const cached = localStorage.getItem('combo_cache_all');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) localCombos = parsed;
-      }
-    } catch (e) {}
-
-    const mergeWithDefaults = (sourceCombos: any[]) => {
-      const merged = DEFAULT_COMBOS.map(def => {
-        const found = sourceCombos.find(dbc => dbc.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = sourceCombos.filter(dbc => !defaultIds.includes(dbc.id));
-      return [...merged, ...customCombos];
-    };
-
-    // Immediate display from cache if available
-    if (localCombos.length > 0) {
-      setCombos(mergeWithDefaults(localCombos));
-    }
-
-    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
-      const dbCombos: any[] = [];
-      snapshot.forEach(docSnap => {
-        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
-      });
-
-      if (dbCombos.length > 0) {
-        try {
-          localStorage.setItem('combo_cache_all', JSON.stringify(dbCombos));
-        } catch (e) {}
-        setCombos(mergeWithDefaults(dbCombos));
-      } else if (localCombos.length > 0) {
-        setCombos(mergeWithDefaults(localCombos));
-      } else {
-        setCombos(DEFAULT_COMBOS);
-      }
-    }, (err) => {
-      console.warn("Lỗi đồng bộ danh sách combo:", err);
-      if (localCombos.length > 0) {
-        setCombos(mergeWithDefaults(localCombos));
-      } else {
-        setCombos(DEFAULT_COMBOS);
-      }
-    });
-
-    const handleSync = () => {
+    const loadCombos = async () => {
       try {
-        const cached = localStorage.getItem('combo_cache_all');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            setCombos(mergeWithDefaults(parsed));
+        const response = await fetch('/api/combos');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data.combos)) {
+            setCombos(data.combos);
           }
         }
-      } catch (e) {}
+      } catch (error) {
+        console.warn("Lỗi đồng bộ danh sách combo từ API:", error);
+      }
     };
+
+    loadCombos();
+
+    const handleSync = () => loadCombos();
 
     window.addEventListener('combos_updated', handleSync);
     window.addEventListener('storage', handleSync);
 
     return () => {
-      unsub();
       window.removeEventListener('combos_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
   }, []);
 
-  // --- FETCH ALL COURSES FROM FIRESTORE (REAL-TIME SNAPSHOT) ---
+  // --- FETCH ALL COURSES FROM SERVER API ---
   useEffect(() => {
-    let latestFirestoreCourses: Course[] = [];
-
-    const syncCourses = (fsList?: Course[]) => {
-      if (fsList) latestFirestoreCourses = fsList;
-      setAllCourses(getMergedCourses(latestFirestoreCourses));
+    const loadCourses = async () => {
+      try {
+        const response = await fetch('/api/courses');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data.courses)) {
+            setAllCourses(getMergedCourses(data.courses));
+          }
+        }
+      } catch (error) {
+        console.error("Lỗi đồng bộ danh sách khóa học từ API:", error);
+      }
     };
 
-    const unsubscribeSnapshot = onSnapshot(
-      collection(db, 'courses'),
-      (querySnapshot) => {
-        const firestoreCourses: Course[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          firestoreCourses.push({
-            id: doc.id,
-            ...data
-          } as Course);
-        });
-        syncCourses(firestoreCourses);
-      },
-      (error) => {
-        console.error("Lỗi đồng bộ danh sách khóa học:", error);
-        syncCourses();
-      }
-    );
+    loadCourses();
 
-    const handleCustomUpdate = () => syncCourses();
+    // Listen for global sync updates via meta-document
+    const unsubSync = onSnapshot(doc(db, "sync_control", "courses"), () => {
+      loadCourses();
+    });
+
+    const handleCustomUpdate = () => loadCourses();
     window.addEventListener('courses_updated', handleCustomUpdate);
     window.addEventListener('storage', handleCustomUpdate);
 
     return () => {
-      unsubscribeSnapshot();
+      unsubSync();
       window.removeEventListener('courses_updated', handleCustomUpdate);
       window.removeEventListener('storage', handleCustomUpdate);
     };
-  }, []);
+  }, [currentUserEmail]);
 
   // --- LOGIC ĐỒNG BỘ KHÓA HỌC ĐÃ SỞ HỮU (REAL-TIME) ---
   useEffect(() => {
@@ -204,21 +153,20 @@ const Courses: React.FC = () => {
               }
             } catch (e) {}
 
-            unsubscribeSnapshot = onSnapshot(
-                collection(db, "users", normalizedEmail, "purchased_courses"),
-                (snapshot: QuerySnapshot<DocumentData>) => {
+            // Fetch purchased courses one-time
+            getDocs(collection(db, "users", normalizedEmail, "purchased_courses"))
+                .then((snapshot) => {
                     const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
                     setOwnedCourseIds(ids);
                     setIsLoadingOwnership(false);
                     try {
                       localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
                     } catch (e) {}
-                },
-                (error) => {
+                })
+                .catch((error) => {
                     console.error("Lỗi đồng bộ khóa học:", error);
                     setIsLoadingOwnership(false);
-                }
-            );
+                });
         } else {
             setCurrentUserEmail(null);
             setOwnedCourseIds([]);
@@ -244,9 +192,6 @@ const Courses: React.FC = () => {
 
     return () => {
         unsubscribeAuth();
-        if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-        }
         window.removeEventListener('courses_updated', handleStorageChange);
         window.removeEventListener('storage', handleStorageChange);
     };
@@ -264,6 +209,13 @@ const Courses: React.FC = () => {
       seenIds.add(course.id);
 
       const isDraft = course.status === 'draft' || course.status === 'inactive';
+      
+      // If a course is inactive, hide all courses in the same category
+      if (isDraft) {
+        const otherCoursesInSameCategory = allCourses.filter(c => c.category === course.category && (c.status === 'draft' || c.status === 'inactive'));
+        if (otherCoursesInSameCategory.some(c => c.id === course.id)) return false;
+      }
+      
       if (isDraft) return false; // Hide drafts & inactive courses for general view
 
       // Hide VIP package / Combos from regular single courses list
@@ -369,17 +321,6 @@ const Courses: React.FC = () => {
                 {activeCategory === 'Tất cả' ? 'Tất cả bài học' : `Khóa học ${activeCategory}`}
                 <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
             </h2>
-            <button 
-              onClick={async () => {
-                toast.success('Đang cập nhật khóa học mới nhất...');
-                await fetchLatestCoursesFromServer();
-                toast.success('Đã cập nhật danh sách khóa học.');
-              }}
-              className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl text-xs font-black text-[#007c76] border border-[#007c76] hover:bg-[#007c76] hover:text-white transition-all uppercase tracking-widest"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              Làm mới dữ liệu
-            </button>
         </div>
 
         {isLoadingOwnership ? (

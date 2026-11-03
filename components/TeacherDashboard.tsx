@@ -8,7 +8,6 @@ import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 import { broadcastCourseUpdate, broadcastComboUpdate, fetchLatestCoursesFromServer } from '../utils/courseSyncService';
-import LivePriceQrPreview from './LivePriceQrPreview';
 import { Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { logFirestoreError } from '../utils/firestoreDiagnostics';

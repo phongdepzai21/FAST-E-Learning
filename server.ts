@@ -728,8 +728,20 @@ async function startServer() {
     }
   });
 
+  // Helper to update sync version in Firestore
+  async function updateSyncControl() {
+    try {
+      const db = getFirestore();
+      await db.collection("sync_control").doc("courses").set({
+        lastUpdated: Date.now()
+      });
+    } catch (err) {
+      console.error("[Sync] Failed to update sync_control:", err);
+    }
+  }
+
   // 3. Post Course Sync (add, edit, status toggle, delete)
-  app.post("/api/courses/sync", (req, res) => {
+  app.post("/api/courses/sync", async (req, res) => {
     try {
       const { action, course, courseId, status, courses } = req.body;
       const now = new Date().toISOString();
@@ -788,6 +800,9 @@ async function startServer() {
       }
 
       saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
+      
+      // Update sync control meta-document
+      await updateSyncControl();
 
       const allList = Object.values(serverCourses);
       const deletedList = Array.from(serverDeletedCourseIds);
@@ -809,6 +824,7 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
+
 
   // 4. Post Combo Sync (add, edit, status toggle, delete)
   app.post("/api/combos/sync", (req, res) => {
@@ -1488,6 +1504,61 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  // Sync courses from Firestore periodically
+  const syncFromFirestore = async () => {
+    try {
+      const db = getFirestore();
+      const snap = await db.collection("courses").get();
+      const firestoreCourses: Record<string, any> = {};
+      snap.forEach(doc => {
+        firestoreCourses[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      Object.assign(serverCourses, firestoreCourses);
+      saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
+      broadcastCoursesUpdate("courses_updated", {
+        action: "sync_all",
+        courses: Object.values(serverCourses),
+        timestamp: Date.now()
+      });
+      console.log("[Sync] Synchronized courses from Firestore to disk.");
+    } catch (err) {
+      console.error("[Sync] Error syncing from Firestore:", err);
+    }
+  };
+
+  // Sync every 5 minutes
+  setInterval(syncFromFirestore, 5 * 60 * 1000);
+  
+  // Initial sync
+  syncFromFirestore();
 }
 
 startServer();
+  // 1. Sync courses from Firestore periodically
+  const syncFromFirestore = async () => {
+    try {
+      const db = getFirestore();
+      const snap = await db.collection("courses").get();
+      const firestoreCourses: Record<string, any> = {};
+      snap.forEach(doc => {
+        firestoreCourses[doc.id] = { id: doc.id, ...doc.data() };
+      });
+      Object.assign(serverCourses, firestoreCourses);
+      saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
+      broadcastCoursesUpdate("courses_updated", {
+        action: "sync_all",
+        courses: Object.values(serverCourses),
+        timestamp: Date.now()
+      });
+      console.log("[Sync] Synchronized courses from Firestore to disk.");
+    } catch (err) {
+      console.error("[Sync] Error syncing from Firestore:", err);
+    }
+  };
+
+  // Sync every 5 minutes
+  setInterval(syncFromFirestore, 5 * 60 * 1000);
+  
+  // Initial sync
+  syncFromFirestore();

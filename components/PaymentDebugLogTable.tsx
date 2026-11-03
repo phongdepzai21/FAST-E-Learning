@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, orderBy, limit, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 interface PaymentLog {
   id: string;
@@ -16,6 +16,7 @@ export const PaymentDebugLogTable: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const userEmail = auth.currentUser?.email;
 
   useEffect(() => {
     setIsLoading(true);
@@ -24,7 +25,6 @@ export const PaymentDebugLogTable: React.FC = () => {
     const logsRef = collection(db, "payment_logs");
     const q = query(logsRef, orderBy("timestamp", "desc"), limit(20));
 
-    // Subscribe to live updates in real-time
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLogs: PaymentLog[] = [];
       snapshot.forEach((doc) => {
@@ -49,6 +49,15 @@ export const PaymentDebugLogTable: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  const deleteLog = async (logId: string) => {
+    if (userEmail !== 'h1h4phong@gmail.com') return;
+    try {
+      await deleteDoc(doc(db, 'payment_logs', logId));
+    } catch (err) {
+      console.error("Lỗi khi xóa log:", err);
+    }
+  };
 
   const renderStatusBadge = (status: string) => {
     const s = status.toLowerCase();
@@ -95,6 +104,7 @@ export const PaymentDebugLogTable: React.FC = () => {
                 <th className="p-4 font-bold">Trạng thái</th>
                 <th className="p-4 font-bold">Nội dung Lỗi</th>
                 <th className="p-4 font-bold">Dữ liệu thô (Payload)</th>
+                {userEmail === 'h1h4phong@gmail.com' && <th className="p-4 font-bold">Thao tác</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
@@ -127,10 +137,20 @@ export const PaymentDebugLogTable: React.FC = () => {
                           </button>
                         </div>
                       </td>
+                      {userEmail === 'h1h4phong@gmail.com' && (
+                        <td className="p-4">
+                          <button
+                            onClick={() => deleteLog(log.id)}
+                            className="text-rose-500 font-black text-[10px] uppercase hover:underline"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      )}
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-50/50">
-                        <td colSpan={4} className="p-4 border-b border-gray-100">
+                        <td colSpan={userEmail === 'h1h4phong@gmail.com' ? 5 : 4} className="p-4 border-b border-gray-100">
                           <div className="space-y-2">
                             <p className="font-bold text-[10px] text-gray-400 uppercase tracking-wider font-sans">Chi tiết Gói tin (Payload Detail)</p>
                             <pre className="p-4 bg-slate-950 text-emerald-400 font-mono text-[10px] rounded-xl overflow-x-auto leading-relaxed border border-slate-900 shadow-inner">
