@@ -104,7 +104,7 @@ export async function fetchLatestCoursesFromServer(): Promise<Course[]> {
     if (data && Array.isArray(data.deletedCourseIds) && data.deletedCourseIds.length > 0) {
       applyDeletedCourses(data.deletedCourseIds);
     }
-    if (data && Array.isArray(data.courses)) {
+    if (data && Array.isArray(data.courses) && data.courses.length > 0) {
       updateStoredCourses(data.courses, data.deletedCourseIds);
       window.dispatchEvent(new CustomEvent('courses_updated', { detail: { action: 'poll', courses: data.courses, deletedCourseIds: data.deletedCourseIds } }));
       return data.courses;

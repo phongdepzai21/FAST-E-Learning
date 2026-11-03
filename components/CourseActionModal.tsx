@@ -146,7 +146,6 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
   const isDelete = type === 'delete';
@@ -189,7 +188,8 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+      {isOpen && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
         {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -410,6 +410,7 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>,
     document.body
   );
@@ -432,14 +433,13 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
   const getTitle = () => {
     switch (action) {
       case 'create':
         return 'Tạo khóa học thành công!';
-      case 'update':
+        case 'update':
         return 'Cập nhật khóa học thành công!';
       case 'status-change':
         return 'Thay đổi trạng thái thành công!';
@@ -452,7 +452,8 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
+      {isOpen && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
         {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -560,6 +561,7 @@ export const CourseSuccessBannerModal: React.FC<SuccessNotificationProps> = ({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>,
     document.body
   );

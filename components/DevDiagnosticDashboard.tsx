@@ -2509,7 +2509,7 @@ export const DevDiagnosticDashboard: React.FC = () => {
                               <td className="py-3 px-4 text-right font-bold text-cyan-400">{collectionTimestamps.ads_session}</td>
                             </tr>
                             <tr className="hover:bg-slate-900/40">
-                              <td className="py-3 px-4 font-bold text-white">FSA-Checklist (Nháp)</td>
+                              <td className="py-3 px-4 font-bold text-white">Food Safety Audit Checklist (Nháp)</td>
                               <td className="py-3 px-4 text-slate-500">fast_standards_audits/current_session</td>
                               <td className="py-3 px-4">
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase">

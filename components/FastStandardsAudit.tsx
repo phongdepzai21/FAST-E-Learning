@@ -483,7 +483,7 @@ export const FastStandardsAudit: React.FC = () => {
     triggerGlobalSaveReset();
     
     setTimeout(() => {
-      showSuccessToast(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu FSA-Checklist.`, 5000, 'Đồng bộ thành công');
+      showSuccessToast(`Đã lưu và đồng bộ thành công kết quả đánh giá của "${savedName}" vào Cơ sở dữ liệu Food Safety Audit Checklist.`, 5000, 'Đồng bộ thành công');
     }, 150);
   };
 
@@ -763,7 +763,7 @@ export const FastStandardsAudit: React.FC = () => {
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">
-              FSA Checklist
+              Food Safety Audit Checklist
             </h1>
             <p className="text-teal-100/90 text-xs md:text-sm font-medium mt-1 max-w-2xl">
               Đánh giá toàn diện 8 trụ cột Vận hành &amp; An toàn thực phẩm (265 tiêu chuẩn chuẩn hóa ISO &amp; HACCP Codex).

@@ -444,8 +444,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       return false;
     }
 
-    if (imageUrlInput.trim() && !imageUrlInput.trim().startsWith('http://') && !imageUrlInput.trim().startsWith('https://')) {
-      setImageUrlInput('https://' + imageUrlInput.trim().replace(/^\/+/, ''));
+    const rawImg = imageUrlInput.trim();
+    if (rawImg && !rawImg.startsWith('http://') && !rawImg.startsWith('https://') && !rawImg.startsWith('data:') && !rawImg.startsWith('/')) {
+      setImageUrlInput('https://' + rawImg.replace(/^\/+/, ''));
     }
 
     return true;
@@ -481,7 +482,27 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const courseId = `course-${Date.now()}`;
     let finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
 
-    if (imageFile) {
+    // Prioritize server disk upload for local data URL images
+    if (imageUrlInput.trim().startsWith('data:')) {
+      try {
+        const uploadRes = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: imageUrlInput.trim(),
+            fileName: `${courseId}_cover`
+          })
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.url) {
+            finalImageUrl = uploadData.url;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Server upload-image fallback notice:', uploadErr);
+      }
+    } else if (imageFile) {
       try {
         const storageRef = ref(storage, `course_covers/${courseId}_${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
@@ -584,7 +605,27 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const finalPrice = formatPriceSubmit(price);
     let finalImageUrl = imageUrlInput.trim();
 
-    if (imageFile) {
+    // Prioritize server disk upload for local data URL images
+    if (imageUrlInput.trim().startsWith('data:')) {
+      try {
+        const uploadRes = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: imageUrlInput.trim(),
+            fileName: `${editingCourseId}_cover`
+          })
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && uploadData.url) {
+            finalImageUrl = uploadData.url;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Server upload-image edit fallback notice:', uploadErr);
+      }
+    } else if (imageFile) {
       try {
         const storageRef = ref(storage, `course_covers/${editingCourseId}_${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);

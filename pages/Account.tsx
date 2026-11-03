@@ -1774,7 +1774,7 @@ const Account: React.FC = () => {
               
               <nav className="space-y-1.5">
                 {[
-                  { id: 'fsa', label: 'FSA Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+                  { id: 'fsa', label: 'Food Safety Audit Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
                   { id: 'haccp', label: 'HACCP Checklist', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
                   { id: 'attp', label: 'Hồ Sơ An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
                   { id: 'hsqc', label: 'Hồ Sơ Quảng Cáo', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
@@ -1857,7 +1857,7 @@ const Account: React.FC = () => {
                   }}
                   className="bg-white border border-gray-300 text-gray-800 text-sm font-bold rounded-xl focus:ring-[#005c56] focus:border-[#005c56] block w-full p-3 shadow-md outline-none"
                 >
-                  <option value="fsa">FSA Checklist</option>
+                  <option value="fsa">Food Safety Audit + Checklist</option>
                   <option value="haccp">HACCP Checklist</option>
                   <option value="attp">Hồ Sơ An Toàn Thực Phẩm</option>
                   <option value="hsqc">Hồ Sơ Quảng Cáo</option>
@@ -2053,7 +2053,7 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
                   {isAdmin && <option value="user-management">Học viên & Khóa học</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
-                  {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (FSA • ATTP • HSQC)</option>}
+                  {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (Food Safety Audit + Checklist • ATTP • HSQC)</option>}
                 </select>
              </div>
              

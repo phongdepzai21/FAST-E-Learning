@@ -1242,9 +1242,9 @@ export const UserManagement: React.FC = () => {
                     <td className="py-3.5 px-5 text-right font-black text-gray-700">{collectionTimestamps.ads_session}</td>
                   </tr>
 
-                  {/* FSA-Checklist Active Session */}
+                  {/* Food Safety Audit Checklist Active Session */}
                   <tr className="hover:bg-gray-50/50">
-                    <td className="py-3.5 px-5 font-bold text-gray-900">FSA-Checklist (Nháp)</td>
+                    <td className="py-3.5 px-5 font-bold text-gray-900">Food Safety Audit Checklist (Nháp)</td>
                     <td className="py-3.5 px-5 text-gray-500 font-mono">fast_standards_audits/current_session</td>
                     <td className="py-3.5 px-5 text-gray-400 font-semibold">Active Checklist (Object)</td>
                     <td className="py-3.5 px-5">

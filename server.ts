@@ -114,23 +114,56 @@ function saveCombosToDisk(combos: Record<string, any>) {
   }
 }
 
+const DEFAULT_SERVER_COURSES: Record<string, any> = {
+  'course-test-free': {
+    id: 'course-test-free',
+    title: 'Khóa Học Thử Nghiệm Miễn Phí',
+    price: 'Miễn phí',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
+    category: 'Kiến thức chung',
+    description: 'Khóa học trải nghiệm hệ thống hoàn toàn miễn phí dành cho tất cả học viên và giáo viên kiểm thử tính năng.',
+    status: 'active',
+    curriculum: [
+      {
+        title: "Danh sách bài giảng",
+        lessons: [
+          { title: "Bài 1: Hướng dẫn trải nghiệm giao diện học tập FAST E-Learning", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+          { title: "Bài 2: Thực hành quy trình kiểm tra An toàn thực phẩm cơ bản", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+          { title: "Bài 3: Bài kiểm tra đánh giá và hoàn thành khóa học", videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }
+        ]
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  }
+};
+
 function loadCoursesDataFromDisk(): { courses: Record<string, any>; deletedIds: string[] } {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+    let loadedCourses: Record<string, any> = {};
+    let deletedIds: string[] = [];
+
     if (fs.existsSync(COURSES_FILE)) {
       const content = fs.readFileSync(COURSES_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      return {
-        courses: parsed.courses || {},
-        deletedIds: Array.isArray(parsed.deletedCourseIds) ? parsed.deletedCourseIds : []
-      };
+      loadedCourses = parsed.courses || {};
+      deletedIds = Array.isArray(parsed.deletedCourseIds) ? parsed.deletedCourseIds : [];
     }
+
+    // Ensure default test course exists if not explicitly deleted
+    Object.keys(DEFAULT_SERVER_COURSES).forEach(id => {
+      if (!loadedCourses[id] && !deletedIds.includes(id)) {
+        loadedCourses[id] = DEFAULT_SERVER_COURSES[id];
+      }
+    });
+
+    return { courses: loadedCourses, deletedIds };
   } catch (err) {
     console.warn("Failed to read courses from disk:", err);
   }
-  return { courses: {}, deletedIds: [] };
+  return { courses: { ...DEFAULT_SERVER_COURSES }, deletedIds: [] };
 }
 
 function saveCoursesToDisk(courses: Record<string, any>, deletedCourseIds: Set<string>) {
@@ -200,6 +233,51 @@ async function startServer() {
       req.rawBody = buf.toString();
     }
   }));
+
+  // Serve uploaded images statically
+  const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  app.use("/uploads", express.static(UPLOADS_DIR));
+
+  // Upload image API (Base64 data URL to local server disk)
+  app.post("/api/upload-image", (req, res) => {
+    try {
+      const { image, fileName } = req.body;
+      if (!image || typeof image !== 'string') {
+        return res.status(400).json({ success: false, error: "Dữ liệu ảnh không hợp lệ." });
+      }
+
+      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let ext = 'jpg';
+
+      if (matches && matches.length === 3) {
+        const mime = matches[1];
+        if (mime.includes('png')) ext = 'png';
+        else if (mime.includes('webp')) ext = 'webp';
+        else if (mime.includes('gif')) ext = 'gif';
+        buffer = Buffer.from(matches[2], 'base64');
+      } else {
+        buffer = Buffer.from(image, 'base64');
+      }
+
+      const safeName = (fileName || 'cover')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .substring(0, 40);
+      const uniqueName = `${safeName}_${Date.now()}.${ext}`;
+      const filePath = path.join(UPLOADS_DIR, uniqueName);
+
+      fs.writeFileSync(filePath, buffer);
+      const fileUrl = `/uploads/${uniqueName}`;
+
+      return res.json({ success: true, url: fileUrl });
+    } catch (err: any) {
+      console.error("[Upload-Image API] Error:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
   // API routes
   // 1. Get current synchronized courses & combos
