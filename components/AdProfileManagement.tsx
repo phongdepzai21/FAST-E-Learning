@@ -49,7 +49,6 @@ const LocalSyncInput: React.FC<LocalSyncInputProps> = ({ value, onCommit, classN
 };
 import { useGlobalSync } from '../hooks/useGlobalSync';
 import { useToast } from '../contexts/ToastContext';
-import AdminSync from './AdminSync';
 import { 
   Building2, 
   FileText, 
@@ -807,7 +806,6 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <AdminSync />
               <a
                 href="https://dichvucong.gov.vn"
                 target="_blank"
