@@ -1448,20 +1448,6 @@ const Account: React.FC = () => {
                 >
                   🔑 Đặt lại / Kích hoạt mật khẩu bằng OTP
                 </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await sendPasswordResetEmail(auth, cleanEmail);
-                      toast.success("Đã gửi email liên kết khôi phục mật khẩu đến " + cleanEmail);
-                    } catch (e: any) {
-                      toast.error("Không thể gửi email khôi phục: " + (e?.message || e));
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer"
-                >
-                  📩 Gửi link khôi phục về email
-                </button>
               </div>
             </div>
           );
@@ -1901,9 +1887,10 @@ const Account: React.FC = () => {
       if (deletedIds.includes(c.id)) return false;
       // Khóa học đã bị ẩn (inactive hoặc draft) phải ẩn hoàn toàn khỏi danh mục trên trang tài khoản
       if (c.status === 'inactive' || c.status === 'draft') return false;
+      if (isVip || isAdmin || isTeacher || purchasedCourses.length === 0) return true;
       return c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id);
     });
-  }, [purchasedCourses, allCourses]);
+  }, [purchasedCourses, allCourses, isVip, isAdmin, isTeacher]);
   
   const progressMap = useMemo(() => {
       return purchasedCourses.reduce((acc, curr) => {
@@ -2818,7 +2805,7 @@ const Account: React.FC = () => {
                             </div>
 
                             {!isRegistering && !isResettingPassword && (
-                                <div className="flex justify-between items-center text-xs px-1 pt-1">
+                                <div className="flex justify-start items-center text-xs px-1 pt-1">
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -2829,24 +2816,6 @@ const Account: React.FC = () => {
                                         className="text-[#007c76] hover:underline font-bold transition-colors cursor-pointer"
                                     >
                                         Quên mật khẩu?
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={async () => {
-                                            if (!email || !email.includes('@')) {
-                                                toast.error("Vui lòng nhập địa chỉ email vào ô bên trên trước.");
-                                                return;
-                                            }
-                                            try {
-                                                await sendPasswordResetEmail(auth, email.toLowerCase().trim());
-                                                toast.success("Đã gửi email liên kết đặt lại mật khẩu đến " + email);
-                                            } catch (e: any) {
-                                                toast.error("Không thể gửi email đặt lại: " + (e?.message || e));
-                                            }
-                                        }}
-                                        className="text-gray-400 hover:text-gray-600 font-medium transition-colors cursor-pointer text-[11px]"
-                                    >
-                                        Gửi link đặt lại qua Email
                                     </button>
                                 </div>
                             )}
