@@ -132,20 +132,6 @@ export const COURSES: Course[] = [
     description: 'Bảo vệ nguồn nhân lực và giảm thiểu rủi ro tai nạn lao động trong môi trường chuyên nghiệp.'
   },
   {
-    id: 'course-test-free',
-    title: 'Khóa Học Thử Nghiệm Miễn Phí',
-    price: 'Miễn phí',
-    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800',
-    category: 'Kiến thức chung',
-    description: 'Khóa học trải nghiệm hệ thống hoàn toàn miễn phí dành cho tất cả học viên và giáo viên kiểm thử tính năng.',
-    status: 'active',
-    curriculum: [
-      { title: "Bài 1: Hướng dẫn trải nghiệm giao diện học tập FAST E-Learning", content: "Giới thiệu tổng quan về thanh điều hướng, theo dõi tiến độ bài học và cấp chứng chỉ." },
-      { title: "Bài 2: Thực hành quy trình kiểm tra An toàn thực phẩm cơ bản", content: "Các nguyên tắc vệ sinh cá nhân, phòng ngừa ô nhiễm chéo và kiểm soát nhiệt độ thực phẩm." },
-      { title: "Bài 3: Bài kiểm tra đánh giá và hoàn thành khóa học", content: "Tổng kết kiến thức và nhận xác nhận hoàn thành khóa học trên hệ thống." }
-    ]
-  },
-  {
     id: 'basic-principles',
     title: 'Các Nguyên Tắc Cơ Bản',
     price: '0đ',
@@ -622,13 +608,13 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
   });
 
   // Track deleted custom courses
-  let deletedIds = new Set<string>();
+  let deletedIds = new Set<string>(['course-test-free']);
   try {
     const delStr = localStorage.getItem('deleted_course_ids');
     if (delStr) {
       const parsed = JSON.parse(delStr);
       if (Array.isArray(parsed)) {
-        deletedIds = new Set(parsed);
+        parsed.forEach(id => deletedIds.add(id));
       }
     }
   } catch (e) {}

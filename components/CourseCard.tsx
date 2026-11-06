@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { getCachedLastLessonIdx } from '../utils/lessonTracking';
 import { isCourseNewOrUpdated, markCourseAsSeen } from '../utils/courseNotificationService';
 import { motion } from 'motion/react';
+import { useToast } from '../contexts/ToastContext';
 
 interface CourseCardProps {
   course: Course;
@@ -44,6 +45,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
   onClaimCourse,
   isClaiming = false
 }) => {
+  const { showToast } = useToast();
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [lastLessonIdx, setLastLessonIdx] = useState<number>(() => {
@@ -89,6 +91,12 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
 
   const handleClick = (e: React.MouseEvent) => {
     markCourseAsSeen(course.id);
+    const isHidden = course.status === 'inactive' || course.status === 'draft';
+    if (isHidden && !isOwned) {
+      e.preventDefault();
+      showToast(`Khóa học "${course.title}" hiện đang tạm ẩn hoặc bảo trì bởi Quản trị viên.`, 'error', 4500);
+      return;
+    }
     if (onSelect) {
       e.preventDefault();
       onSelect(course);
