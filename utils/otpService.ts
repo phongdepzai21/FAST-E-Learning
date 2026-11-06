@@ -21,12 +21,15 @@ export interface VerifyOtpOptions {
   email: string;
   otp: string;
   flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock' | 'dev_access';
+  password?: string;
+  fullName?: string;
 }
 
 export interface VerifyOtpResponse {
   success: boolean;
   message?: string;
   error?: string;
+  user?: any;
 }
 
 const envServiceId = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EMAILJS_SERVICE_ID) || "service_q86r4ap";
@@ -283,7 +286,13 @@ export async function verifyOtp(options: VerifyOtpOptions): Promise<VerifyOtpRes
     const res = await fetch('/api/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp: inputOtp, flow })
+      body: JSON.stringify({
+        email,
+        otp: inputOtp,
+        flow,
+        password: options.password,
+        fullName: options.fullName
+      })
     });
 
     const contentType = res.headers.get('content-type') || '';
@@ -310,7 +319,11 @@ export async function verifyOtp(options: VerifyOtpOptions): Promise<VerifyOtpRes
       payload: { flow, mode: 'server_otp_verified' }
     });
 
-    return { success: true, message: serverData.message || 'Xác thực OTP thành công!' };
+    return {
+      success: true,
+      message: serverData.message || 'Xác thực OTP thành công!',
+      user: serverData?.user
+    };
   }
 
   // 2. Dual check: verify against client-side record (in case server failed, was bypassed, or client fallback was triggered)

@@ -7,6 +7,10 @@
       "properties": {
         "email": { "type": "string", "description": "Lowercase email address of the user" },
         "displayName": { "type": "string", "description": "Display name of the user" },
+        "fullName": { "type": "string", "description": "Full name of the user" },
+        "photoURL": { "type": "string", "description": "Avatar photo URL" },
+        "avatar": { "type": "string", "description": "Avatar icon or image data" },
+        "phone": { "type": "string", "description": "Phone number" },
         "createdAt": { "type": "string", "description": "ISO 8601 creation timestamp string" },
         "isVip": { "type": "boolean", "description": "Flag indicating if user is a VIP subscriber" },
         "isAdmin": { "type": "boolean", "description": "Flag indicating if user is an Administrator" },
@@ -88,6 +92,57 @@
         "type": { "type": "string", "description": "Type of claim or purchase" }
       },
       "required": ["studentEmail", "courseId", "registeredAt"]
+    },
+    "PaymentConfig": {
+      "title": "PaymentConfig",
+      "description": "Global bank account and QR payment configuration",
+      "type": "object",
+      "properties": {
+        "bankId": { "type": "string", "description": "Bank code" },
+        "bankName": { "type": "string", "description": "Bank full name" },
+        "accountNo": { "type": "string", "description": "Bank account number" },
+        "accountName": { "type": "string", "description": "Beneficiary account name" }
+      }
+    },
+    "SyncControl": {
+      "title": "SyncControl",
+      "description": "Meta-document for real-time global cache invalidation signals",
+      "type": "object",
+      "properties": {
+        "lastUpdated": { "type": "integer", "description": "Millisecond timestamp of the last invalidation" }
+      }
+    },
+    "GlobalSync": {
+      "title": "GlobalSync",
+      "description": "Signal document for cross-tab multi-session real-time form reset",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "integer", "description": "Millisecond timestamp of the reset signal" }
+      }
+    },
+    "FastIso22kCrm": {
+      "title": "FastIso22kCrm",
+      "description": "ISO 22000 checklist state and records",
+      "type": "object",
+      "properties": {
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "StudentProgress": {
+      "title": "StudentProgress",
+      "description": "Student lesson autosave progress data",
+      "type": "object",
+      "properties": {
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "PaymentLog": {
+      "title": "PaymentLog",
+      "description": "Audit and diagnostic webhook records",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "description": "ISO timestamp" }
+      }
     }
   },
   "firestore": {
@@ -114,6 +169,30 @@
     "course_registrations/{registrationId}": {
       "schema": "CourseRegistration",
       "description": "Public/Admin feed tracking course enrollments on the platform"
+    },
+    "payment_config/{configId}": {
+      "schema": "PaymentConfig",
+      "description": "Global bank account and QR payment configuration"
+    },
+    "sync_control/{docId}": {
+      "schema": "SyncControl",
+      "description": "Global sync invalidation signals"
+    },
+    "global_sync/{docId}": {
+      "schema": "GlobalSync",
+      "description": "Real-time form reset synchronization across tabs"
+    },
+    "fast_iso22k_crm/{recordId}": {
+      "schema": "FastIso22kCrm",
+      "description": "ISO 22000 audit records and session"
+    },
+    "student_progress/{userEmail}": {
+      "schema": "StudentProgress",
+      "description": "Live student lesson progress autosave"
+    },
+    "payment_logs/{logId}": {
+      "schema": "PaymentLog",
+      "description": "Payment webhook inspection logs"
     }
   }
 }

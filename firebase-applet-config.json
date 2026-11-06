@@ -1,12 +1,12 @@
 {
-  "projectId": "decisive-carver-7lrqd",
-  "appId": "1:888698371847:web:45dd515119c63ea3e3cfa2",
-  "apiKey": "AIzaSyAloVxfuTnVJCd5IcN2Vd54IV7oIkKbBx0",
-  "authDomain": "decisive-carver-7lrqd.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-592fcebf-22e2-43c1-85c8-81b96c293560",
-  "storageBucket": "decisive-carver-7lrqd.firebasestorage.app",
-  "messagingSenderId": "888698371847",
+  "projectId": "fast-e-learning",
+  "appId": "1:81409711510:web:4b48664f31e0068b0fd1b7",
+  "apiKey": "AIzaSyBr8NRzr0n4BcJviuqzmjT3aGcRmz5Cx4U",
+  "authDomain": "fast-e-learning.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "fast-e-learning.firebasestorage.app",
+  "messagingSenderId": "81409711510",
   "measurementId": "",
-  "oAuthClientId": "888698371847-2ou9f3qjfb0toftjr1jf6v6nnv9p888o.apps.googleusercontent.com",
+  "oAuthClientId": "81409711510-6evuv5doqfauvtnjo50i6tstahkpdmal.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

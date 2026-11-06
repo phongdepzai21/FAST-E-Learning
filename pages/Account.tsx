@@ -34,6 +34,7 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   type User
 } from 'firebase/auth';
@@ -43,6 +44,8 @@ import { Helmet } from 'react-helmet-async';
 import { authDebugger } from '../utils/authDebugger';
 import { otpLogger } from '../auth/otp-logger';
 import { sendOtp, verifyOtp } from '../utils/otpService';
+import { getFastSessionUser, setFastSessionUser, clearFastSessionUser, createSyntheticFirebaseUser } from '../utils/sessionAuth';
+import { ReCaptcha } from '../components/ReCaptcha';
 
 interface UserProfile {
   name: string;
@@ -565,9 +568,11 @@ const Account: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
 
-  // Google reCAPTCHA v3 states (with seamless non-blocking fallback)
+  // Google reCAPTCHA states
+  const [captchaToken, setCaptchaToken] = useState('');
   const [captchaError, setCaptchaError] = useState('');
 
   // OTP Verification States
@@ -742,9 +747,41 @@ const Account: React.FC = () => {
               isTeacher: isTeacherStatus
             });
         } else {
-            setUser(null);
-            setPurchasedCourses([]);
-            setIsLoadingCourses(false);
+            const fastUser = getFastSessionUser();
+            if (fastUser) {
+              const cleanEmail = fastUser.email.toLowerCase().trim();
+              const isUserAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === cleanEmail);
+              const isUserTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === cleanEmail);
+              const isOwnerUser = cleanEmail === 'h1h4phong@gmail.com' || cleanEmail === 'trdung153@gmail.com';
+
+              let isVip = fastUser.isVip || false;
+              let isAdmin = isUserAdmin || isOwnerUser || fastUser.isAdmin || false;
+              let isTeacher = isUserTeacher || isAdmin || fastUser.isTeacher || false;
+
+              // Check localStorage backup
+              try {
+                const stored = localStorage.getItem(`user_roles_${cleanEmail}`);
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  if (parsed.isVip) isVip = true;
+                  if (parsed.isAdmin) isAdmin = true;
+                  if (parsed.isTeacher) isTeacher = true;
+                }
+              } catch (e) {}
+
+              setUser({
+                name: fastUser.displayName || 'Học viên',
+                email: cleanEmail,
+                avatar: fastUser.photoURL || '',
+                isVip,
+                isAdmin,
+                isTeacher
+              });
+            } else {
+              setUser(null);
+              setPurchasedCourses([]);
+              setIsLoadingCourses(false);
+            }
         }
       } catch (err) {
           console.error("Auth Error:", err);
@@ -754,6 +791,28 @@ const Account: React.FC = () => {
           clearTimeout(safetyTimer);
       }
     });
+
+    const handleFastAuthEvent = () => {
+      if (!auth.currentUser) {
+        const fastUser = getFastSessionUser();
+        if (fastUser) {
+          const cleanEmail = fastUser.email.toLowerCase().trim();
+          const isUserAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === cleanEmail);
+          const isUserTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === cleanEmail);
+          const isOwnerUser = cleanEmail === 'h1h4phong@gmail.com' || cleanEmail === 'trdung153@gmail.com';
+
+          setUser({
+            name: fastUser.displayName || 'Học viên',
+            email: cleanEmail,
+            avatar: fastUser.photoURL || '',
+            isVip: fastUser.isVip || false,
+            isAdmin: isUserAdmin || isOwnerUser || fastUser.isAdmin || false,
+            isTeacher: isUserTeacher || isUserAdmin || isOwnerUser || fastUser.isTeacher || false
+          });
+        }
+      }
+    };
+    window.addEventListener('fast_auth_changed', handleFastAuthEvent);
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -765,6 +824,7 @@ const Account: React.FC = () => {
     return () => {
       unsubscribeAuth();
       clearTimeout(safetyTimer);
+      window.removeEventListener('fast_auth_changed', handleFastAuthEvent);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [location]);
@@ -935,6 +995,7 @@ const Account: React.FC = () => {
 
   const handleLogout = async () => {
     try {
+      clearFastSessionUser();
       await signOut(auth);
       setUser(null);
       setPurchasedCourses([]);
@@ -1001,6 +1062,53 @@ const Account: React.FC = () => {
     }
   };
 
+  const startResetOtpFlow = async () => {
+    setIsAuthenticating(true);
+    setError(null);
+    setOtpFormError(null);
+    try {
+      if (!email.trim() || !email.includes('@')) {
+        throw new Error("Vui lòng nhập địa chỉ email hợp lệ.");
+      }
+      if (password.length < 6) {
+        throw new Error("Mật khẩu mới của bạn phải có độ dài từ 6 ký tự trở lên.");
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      setEmail(normalizedEmail);
+      setOtpDigits(['', '', '', '', '', '']);
+      setOtpAttemptsLeft(5);
+      setOtpCountdown(60);
+
+      const sendResult = await sendOtp({
+        email: normalizedEmail,
+        name: fullName.trim() || 'Học viên',
+        flow: 'reset'
+      });
+
+      if (sendResult.success) {
+        setIsOtpPending(true);
+        if (sendResult.fallback && sendResult.otp) {
+          setOtpDigits(sendResult.otp.split(''));
+          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
+          toast.success('Hệ thống tự động điền mã OTP dự phòng!');
+        } else {
+          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP đặt lại mật khẩu đã được gửi đến email [${normalizedEmail}]. Vui lòng mở email để lấy mã.`);
+          toast.success('Mã OTP đặt lại mật khẩu đã được gửi đến email!');
+        }
+      } else {
+        throw new Error(sendResult?.error || "Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra lại email.");
+      }
+    } catch (err: any) {
+      console.error("Reset OTP Flow error:", err);
+      const errMsg = err?.message || "Có lỗi xảy ra khi yêu cầu mã OTP đặt lại mật khẩu.";
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   const handleVerifiedRegister = async () => {
     const enteredCode = otpDigits.join('');
     if (enteredCode.length !== 6) {
@@ -1012,11 +1120,13 @@ const Account: React.FC = () => {
     setIsAuthenticating(true);
     setOtpFormError(null);
 
+    const activeFlow = isResettingPassword ? 'reset' : 'register';
+
     try {
       const verifyRes = await verifyOtp({
         email: email.toLowerCase().trim(),
         otp: enteredCode,
-        flow: 'register'
+        flow: activeFlow
       });
 
       if (!verifyRes.success) {
@@ -1027,7 +1137,7 @@ const Account: React.FC = () => {
           const errorMsg = "Bạn đã nhập sai mã OTP quá 5 lần. Tiến trình xác thực đã bị hủy vì lý do bảo mật.";
           setOtpFormError(errorMsg);
           setIsOtpPending(false);
-          setError("Yêu cầu đăng ký tài khoản bị từ chối do nhập sai OTP quá số lần quy định. Vui lòng đăng ký lại.");
+          setError("Yêu cầu xác thực bị từ chối do nhập sai OTP quá số lần quy định. Vui lòng thử lại.");
           toast.error(errorMsg);
         } else {
           const errorMsg = verifyRes.error || `Mã xác thực không chính xác. Bạn còn ${left} lần nhập lại.`;
@@ -1038,31 +1148,60 @@ const Account: React.FC = () => {
         return;
       }
 
-      // OTP matches! Proceed to register in Firebase Auth & Firestore
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCredential.user;
-      await updateProfile(newUser, { displayName: fullName });
+      // OTP matches! Attempt creating or updating user in Firebase Auth
+      let newUser: any = null;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        newUser = userCredential.user;
+        const nameToSet = fullName.trim() || newUser.displayName || email.split('@')[0];
+        await updateProfile(newUser, { displayName: nameToSet });
+      } catch (authCreateErr: any) {
+        if (authCreateErr.code === 'auth/email-already-in-use') {
+          // Account already exists in Firebase Auth!
+          try {
+            const loginCredential = await signInWithEmailAndPassword(auth, email, password);
+            newUser = loginCredential.user;
+          } catch (loginErr: any) {
+            // Account exists in Firebase Auth with different password
+            try {
+              await sendPasswordResetEmail(auth, email);
+              toast.info(`Tài khoản đã có trên Firebase Auth. Hệ thống đã gửi email khôi phục mật khẩu đến ${email}. Vui lòng kiểm tra hộp thư.`);
+            } catch (e) {}
+            setIsOtpPending(false);
+            setIsResettingPassword(false);
+            setIsAuthenticating(false);
+            return;
+          }
+        } else {
+          throw authCreateErr;
+        }
+      }
       
       // Force refresh the ID token so the security rules have immediate access to email and displayName
       try {
-        await newUser.getIdToken(true);
+        if (newUser && newUser.getIdToken) {
+          await newUser.getIdToken(true);
+        }
       } catch (tokenErr) {
         console.warn("Could not force refresh auth token:", tokenErr);
       }
 
-      if (newUser.email) {
+      if (newUser && newUser.email) {
           const normalizedEmail = newUser.email.toLowerCase();
           const isUserAdmin = ADMIN_EMAILS.includes(normalizedEmail);
           const isUserTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+          const isOwnerUser = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
+          const nameToSet = fullName.trim() || newUser.displayName || normalizedEmail.split('@')[0];
 
           try {
               await setDoc(doc(db, "users", normalizedEmail), {
                   email: normalizedEmail,
-                  displayName: fullName,
+                  displayName: nameToSet,
                   createdAt: new Date().toISOString(),
                   isVip: false,
-                  isAdmin: isUserAdmin,
-                  isTeacher: isUserTeacher
+                  isAdmin: isUserAdmin || isOwnerUser,
+                  isTeacher: isUserTeacher || isUserAdmin || isOwnerUser,
+                  isOwner: isOwnerUser
               }, { merge: true });
           } catch (dbErr) {
               console.warn("User profile setDoc warning:", dbErr);
@@ -1075,7 +1214,7 @@ const Account: React.FC = () => {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       email: normalizedEmail,
-                      displayName: fullName
+                      displayName: nameToSet
                   })
               });
           } catch (syncErr) {
@@ -1086,23 +1225,31 @@ const Account: React.FC = () => {
           try {
               localStorage.setItem(`user_roles_${normalizedEmail}`, JSON.stringify({
                   isVip: false,
-                  isAdmin: isUserAdmin,
-                  isTeacher: isUserTeacher
+                  isAdmin: isUserAdmin || isOwnerUser,
+                  isTeacher: isUserTeacher || isUserAdmin || isOwnerUser,
+                  isOwner: isOwnerUser
               }));
           } catch (e) {}
 
           // Manually set the profile in the React state immediately to avoid delays/race conditions
           setUser({
-            name: fullName,
+            name: nameToSet,
             email: normalizedEmail,
             avatar: '',
             isVip: false,
-            isAdmin: isUserAdmin,
-            isTeacher: isUserTeacher
+            isAdmin: isUserAdmin || isOwnerUser,
+            isTeacher: isUserTeacher || isUserAdmin || isOwnerUser
           });
       }
 
-      toast.success('Xác nhận thành công! Chào mừng ' + fullName + ' gia nhập FAST E-Learning.');
+      const welcomeName = fullName.trim() || email.split('@')[0];
+      toast.success(isResettingPassword 
+        ? `Thiết lập mật khẩu thành công! Chào mừng ${welcomeName} quay trở lại.` 
+        : `Xác nhận thành công! Chào mừng ${welcomeName} gia nhập FAST E-Learning.`
+      );
+
+      setIsOtpPending(false);
+      setIsResettingPassword(false);
 
       if (location.state && location.state.from) {
           navigate(location.state.from);
@@ -1110,7 +1257,7 @@ const Account: React.FC = () => {
           navigate('/account');
       }
     } catch (err: any) {
-      console.error("Firebase registration error after OTP verification:", err);
+      console.error("Firebase registration/reset error after OTP verification:", err);
       let msg = "Lỗi xác thực và tạo tài khoản.";
       if (err.code === 'auth/email-already-in-use') {
         msg = "Email này hiện đã được sử dụng bởi học viên khác.";
@@ -1124,7 +1271,7 @@ const Account: React.FC = () => {
         msg = "Lỗi phân quyền hệ thống (Permission Denied). Vui lòng tải lại trang hoặc thử lại.";
       }
       setOtpFormError(msg);
-      toast.error('Đăng ký tài khoản thất bại: ' + msg);
+      toast.error('Thao tác thất bại: ' + msg);
     } finally {
       setIsAuthenticating(false);
     }
@@ -1138,11 +1285,12 @@ const Account: React.FC = () => {
     setOtpFormError(null);
 
     const normalizedEmail = email.toLowerCase().trim();
+    const activeFlow = isResettingPassword ? 'reset' : 'register';
     try {
       const sendResult = await sendOtp({
         email: normalizedEmail,
-        name: fullName.trim(),
-        flow: 'register'
+        name: fullName.trim() || 'Học viên',
+        flow: activeFlow
       });
 
       if (sendResult.success) {
@@ -1200,29 +1348,20 @@ const Account: React.FC = () => {
         return;
     }
 
+    if (isResettingPassword) {
+      setIsAuthenticating(false);
+      await startResetOtpFlow();
+      return;
+    }
+
     if (isRegistering) {
-      setCaptchaError("");
-      // Non-blocking anti-bot enhancement: verify in background without ever locking out human learners
-      try {
-        const grecaptcha = (window as any).grecaptcha;
-        if (grecaptcha && typeof grecaptcha.execute === 'function') {
-          grecaptcha.execute('6LdEkdQtAAAAABcenIZjUuHFBkC9qqkgEt3Nf9bz', { action: 'register' })
-            .then((token: string) => {
-              if (token) {
-                fetch('/api/verify-captcha', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ token })
-                }).catch(() => null);
-              }
-            })
-            .catch((bgErr: any) => {
-              console.warn("[reCAPTCHA] Background check note:", bgErr);
-            });
-        }
-      } catch (captchaInitErr) {
-        console.warn("[reCAPTCHA] Init note:", captchaInitErr);
+      if (!captchaToken) {
+        setCaptchaError("Vui lòng tích chọn xác minh 'Tôi không phải là người máy'.");
+        setIsAuthenticating(false);
+        toast.error("Vui lòng xác minh 'Tôi không phải là người máy' trước khi đăng ký.");
+        return;
       }
+      setCaptchaError("");
     }
 
     try {
@@ -1244,7 +1383,27 @@ const Account: React.FC = () => {
       
       if (err.code === 'auth/wrong-password') {
         errMsg = "Mật khẩu không chính xác.";
-        msg = "Mật khẩu không chính xác. Vui lòng kiểm tra kỹ lại.";
+        msg = (
+          <div className="space-y-2 text-left">
+            <p className="font-extrabold uppercase text-amber-600">MẬT KHẨU KHÔNG CHÍNH XÁC</p>
+            <p className="font-medium text-gray-700 leading-snug text-xs">
+              Mật khẩu bạn vừa nhập chưa chính xác. Bạn có thể thử lại hoặc sử dụng chức năng Đặt lại mật khẩu bằng mã OTP.
+            </p>
+            <div className="pt-1.5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResettingPassword(true);
+                  setIsRegistering(false);
+                  setError(null);
+                }}
+                className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3 py-1.5 rounded-lg font-black text-[11px] uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+              >
+                🔑 Đặt lại mật khẩu bằng OTP
+              </button>
+            </div>
+          </div>
+        );
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         // Modern Firebase Auth throws 'auth/invalid-credential' for both wrong password and non-existent users.
         // We call our server endpoint /api/user/exists which uses Admin SDK to check if user really exists!
@@ -1270,24 +1429,59 @@ const Account: React.FC = () => {
         }
 
         if (userExists) {
-          errMsg = "Mật khẩu không chính xác.";
-          msg = "Mật khẩu không chính xác. Vui lòng kiểm tra kỹ lại mật khẩu của bạn.";
-        } else {
-          errMsg = "Tài khoản không tồn tại.";
+          errMsg = "Mật khẩu không chính xác hoặc chưa thiết lập.";
           msg = (
-            <div className="space-y-2">
-              <p className="font-extrabold uppercase text-amber-600">tài khoản chưa khả dụng / chưa tồn tại</p>
+            <div className="space-y-2 text-left">
+              <p className="font-extrabold uppercase text-amber-600">MẬT KHẨU KHÔNG CHÍNH XÁC HOẶC CHƯA THIẾT LẬP</p>
+              <p className="font-medium text-gray-700 leading-snug text-xs">
+                Mật khẩu bạn vừa nhập chưa chính xác hoặc tài khoản này chưa được kích hoạt mật khẩu trên hệ thống mới.
+              </p>
+              <div className="pt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResettingPassword(true);
+                    setIsRegistering(false);
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3.5 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                >
+                  🔑 Đặt lại / Kích hoạt mật khẩu bằng OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await sendPasswordResetEmail(auth, cleanEmail);
+                      toast.success("Đã gửi email liên kết khôi phục mật khẩu đến " + cleanEmail);
+                    } catch (e: any) {
+                      toast.error("Không thể gửi email khôi phục: " + (e?.message || e));
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  📩 Gửi link khôi phục về email
+                </button>
+              </div>
+            </div>
+          );
+        } else {
+          errMsg = "Tài khoản chưa tồn tại.";
+          msg = (
+            <div className="space-y-2 text-left">
+              <p className="font-extrabold uppercase text-amber-600">TÀI KHOẢN CHƯA KHẢ DỤNG / CHƯA TỒN TẠI</p>
               <p className="font-medium text-gray-700 leading-snug text-xs">
                 Hệ thống không tìm thấy tài khoản học viên này. Nếu bạn chưa có tài khoản trên FAST E-Learning, hãy tạo tài khoản mới để bắt đầu học tập ngay nhé!
               </p>
-              <div className="pt-1.5">
+              <div className="pt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsRegistering(true);
+                    setIsResettingPassword(false);
                     setError(null);
                   }}
-                  className="inline-flex items-center gap-1.5 bg-[#007c76]/10 text-[#007c76] hover:bg-[#007c76]/20 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all animate-flicker"
+                  className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3.5 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer"
                 >
                   👉 Đăng ký tài khoản mới ngay
                 </button>
@@ -1295,6 +1489,47 @@ const Account: React.FC = () => {
             </div>
           );
         }
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "Phương thức Email/Mật khẩu chưa được bật trên Firebase.";
+        msg = (
+          <div className="space-y-3 text-left">
+            <p className="font-extrabold uppercase text-amber-600">CHƯA BẬT ĐĂNG NHẬP MẬT KHẨU TRÊN FIREBASE</p>
+            <p className="font-medium text-gray-700 leading-snug text-xs">
+              Dự án Firebase <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono text-amber-900 font-bold">fast-e-learning</code> hiện chưa kích hoạt nhà cung cấp <strong>Email/Password</strong> trong Firebase Console.
+            </p>
+            <div className="pt-1">
+              <a
+                href="https://console.firebase.google.com/project/fast-e-learning/authentication/providers"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 bg-[#007c76] text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-[#005f5b] transition-all shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                Mở Firebase Console để bật nhà cung cấp Email/Password
+              </a>
+            </div>
+          </div>
+        );
+      } else if (err.code === 'auth/network-request-failed') {
+        errMsg = "Lỗi kết nối mạng tới Firebase.";
+        msg = (
+          <div className="space-y-2 text-left">
+            <p className="font-extrabold uppercase text-red-600">LỖI KẾT NỐI MẠNG (NETWORK ERROR)</p>
+            <p className="font-medium text-gray-700 leading-snug text-xs">
+              Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra đường truyền Internet và thử lại.
+            </p>
+          </div>
+        );
+      } else if (err.code === 'auth/too-many-requests') {
+        errMsg = "Quá nhiều lần thử thất bại.";
+        msg = (
+          <div className="space-y-2 text-left">
+            <p className="font-extrabold uppercase text-amber-600">TẠM KHÓA DO THỬ QUÁ NHIỀU LẦN</p>
+            <p className="font-medium text-gray-700 leading-snug text-xs">
+              Hệ thống tạm khóa do nhập sai thông tin nhiều lần liên tiếp. Vui lòng đợi ít phút hoặc sử dụng chức năng Quên mật khẩu.
+            </p>
+          </div>
+        );
       } else if (err.code === 'auth/email-already-in-use') {
         errMsg = "Email đã được sử dụng.";
         msg = "Email này đã được đăng ký cho một tài khoản khác.";
@@ -1332,10 +1567,15 @@ const Account: React.FC = () => {
       if (window.self !== window.top) {
         // App is running in the preview iframe
         setError(
-          <div className="space-y-2 text-left">
+          <div className="space-y-3 text-left">
             <p className="font-extrabold uppercase text-amber-600">LỖI: BẢO MẬT IFRAME TRÌNH DUYỆT</p>
-            <p className="font-medium text-gray-700 leading-snug">Trình duyệt không cho phép đăng nhập Google từ bên trong khung (iframe) xem trước vì lý do an toàn bảo mật.</p>
-            <div className="pt-2">
+            <p className="font-medium text-gray-700 leading-snug text-xs">
+              Trình duyệt không cho phép mở cửa sổ đăng nhập Google từ bên trong khung (iframe) xem trước vì lý do an toàn bảo mật.
+            </p>
+            <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-teal-800 text-xs font-semibold">
+              👉 <strong>Khuyên dùng:</strong> Hãy đăng nhập bằng <strong>Email &amp; Mật khẩu</strong> ở khung bên trên để vào ngay hệ thống không bị hạn chế!
+            </div>
+            <div className="pt-1">
               <a 
                 href={window.location.href} 
                 target="_blank" 
@@ -1345,7 +1585,7 @@ const Account: React.FC = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                Mở trong tab mới để đăng nhập
+                Mở trong tab mới để đăng nhập Google
               </a>
             </div>
           </div>
@@ -2277,7 +2517,9 @@ const Account: React.FC = () => {
               </svg>
             </div>
 
-            <h3 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tighter mb-3">Xác thực OTP</h3>
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tighter mb-3">
+              {isResettingPassword ? 'Đặt lại mật khẩu' : 'Xác thực tài khoản'}
+            </h3>
             <p className="text-gray-500 text-xs md:text-sm font-semibold leading-relaxed mb-8">
               Mã xác thực gồm 6 chữ số đã được gửi qua hệ thống bảo mật FAST Security Gateway đến địa chỉ email: <br/>
               <strong className="text-gray-800 text-sm font-extrabold select-all bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 break-all inline-block mt-2">{email}</strong>
@@ -2401,7 +2643,7 @@ const Account: React.FC = () => {
                   </svg>
                 ) : (
                   <>
-                    Xác nhận & Kích hoạt tài khoản
+                    {isResettingPassword ? 'Xác nhận & Đổi mật khẩu' : 'Xác nhận & Kích hoạt tài khoản'}
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
@@ -2492,10 +2734,14 @@ const Account: React.FC = () => {
                     
                     <div className="text-center mb-10">
                         <h3 className="text-3xl font-black text-gray-800 uppercase tracking-tighter mb-2">
-                            {isRegistering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại!'}
+                            {isResettingPassword 
+                              ? 'Đặt lại mật khẩu' 
+                              : (isRegistering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại!')}
                         </h3>
                         <p className="text-gray-500 text-sm font-medium">
-                            {isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.'}
+                            {isResettingPassword 
+                              ? 'Nhập email và mật khẩu mới để nhận mã OTP xác thực qua email.' 
+                              : (isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.')}
                         </p>
                     </div>
 
@@ -2545,81 +2791,155 @@ const Account: React.FC = () => {
                             />
                         </div>
                         
-                        <div className="group relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        <div className="space-y-1.5">
+                            <div className="group relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                </div>
+                                <input
+     
+                                    type={showPassword ? "text" : "password"} 
+                                    value={password} 
+                                    onChange={e => setPassword(e.target.value)} 
+                                    placeholder={isResettingPassword ? "Mật khẩu mới (tối thiểu 6 ký tự)" : "Mật khẩu"} 
+                                    className="w-full py-4 pl-12 pr-12 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
+                                />
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#007c76] transition-colors p-1"
+                                >
+                                    {showPassword ? (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                    ) : (
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    )}
+                                </button>
                             </div>
-                            <input
- 
-                                type={showPassword ? "text" : "password"} 
-                                value={password} 
-                                onChange={e => setPassword(e.target.value)} 
-                                placeholder="Mật khẩu" 
-                                className="w-full py-4 pl-12 pr-12 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
-                            />
-                            <button 
-                                type="button" 
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#007c76] transition-colors p-1"
-                            >
-                                {showPassword ? (
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                                ) : (
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                )}
-                            </button>
+
+                            {!isRegistering && !isResettingPassword && (
+                                <div className="flex justify-between items-center text-xs px-1 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsResettingPassword(true);
+                                            setIsRegistering(false);
+                                            setError(null);
+                                        }}
+                                        className="text-[#007c76] hover:underline font-bold transition-colors cursor-pointer"
+                                    >
+                                        Quên mật khẩu?
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!email || !email.includes('@')) {
+                                                toast.error("Vui lòng nhập địa chỉ email vào ô bên trên trước.");
+                                                return;
+                                            }
+                                            try {
+                                                await sendPasswordResetEmail(auth, email.toLowerCase().trim());
+                                                toast.success("Đã gửi email liên kết đặt lại mật khẩu đến " + email);
+                                            } catch (e: any) {
+                                                toast.error("Không thể gửi email đặt lại: " + (e?.message || e));
+                                            }
+                                        }}
+                                        className="text-gray-400 hover:text-gray-600 font-medium transition-colors cursor-pointer text-[11px]"
+                                    >
+                                        Gửi link đặt lại qua Email
+                                    </button>
+                                </div>
+                            )}
                         </div>
+
+                        {isRegistering && (
+                            <div className="pt-2 pb-1">
+                                <ReCaptcha
+                                    onVerify={(token) => {
+                                        setCaptchaToken(token);
+                                        setCaptchaError('');
+                                    }}
+                                    onExpire={() => setCaptchaToken('')}
+                                    hasError={!!captchaError}
+                                    errorMessage={captchaError}
+                                />
+                            </div>
+                        )}
 
                         <button 
                             disabled={isAuthenticating}
-                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                         >
                             {isAuthenticating ? (
                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             ) : (
                                 <>
-                                    {isRegistering ? 'ĐĂNG KÝ NGAY' : 'ĐĂNG NHẬP'}
+                                    {isResettingPassword 
+                                      ? 'NHẬN MÃ OTP ĐẶT LẠI MẬT KHẨU' 
+                                      : (isRegistering ? 'ĐĂNG KÝ NGAY' : 'ĐĂNG NHẬP')}
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                 </>
                             )}
                         </button>
                     </form>
                     
-                    <div className="relative my-8">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                        <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-white px-4 text-gray-400 font-bold">Hoặc tiếp tục với</span></div>
-                    </div>
+                    {!isResettingPassword && (
+                        <>
+                            <div className="relative my-8">
+                                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+                                <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-white px-4 text-gray-400 font-bold">Hoặc tiếp tục với</span></div>
+                            </div>
 
-                    <button 
-                        onClick={handleGoogleLogin} 
-                        disabled={isAuthenticating}
-                        className="w-full border-2 border-gray-100 p-4 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 hover:border-gray-200 transition-all flex justify-center gap-3 items-center group disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                        {isAuthenticating ? (
-                            <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        ) : (
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" /> 
-                        )}
-                        <span>Đăng nhập bằng Google</span>
-                    </button>
+                            <button 
+                                onClick={handleGoogleLogin} 
+                                disabled={isAuthenticating}
+                                className="w-full border-2 border-gray-100 p-4 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 hover:border-gray-200 transition-all flex justify-center gap-3 items-center group disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                {isAuthenticating ? (
+                                    <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                ) : (
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" /> 
+                                )}
+                                <span>Đăng nhập bằng Google</span>
+                            </button>
+                        </>
+                    )}
                     
                     <div className="mt-8 text-center">
-                        <p className="text-sm font-bold text-gray-500">
-                            {isRegistering ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'} 
-                            <span 
-                                onClick={() => {
-                                    setIsRegistering(!isRegistering);
-                                    setError(null);
-                                    setCaptchaError('');
-                                    setEmailError('');
-                                    setPasswordError('');
-                                    setNameError('');
-                                }}
-                                className="ml-1 text-[#007c76] cursor-pointer hover:underline uppercase tracking-wide font-extrabold"
-                            >
-                                {isRegistering ? 'Đăng nhập' : 'Đăng ký miễn phí'}
-                            </span>
-                        </p>
+                        {isResettingPassword ? (
+                            <p className="text-sm font-bold text-gray-500">
+                                Bạn đã nhớ mật khẩu?
+                                <span 
+                                    onClick={() => {
+                                        setIsResettingPassword(false);
+                                        setIsRegistering(false);
+                                        setError(null);
+                                    }}
+                                    className="ml-1 text-[#007c76] cursor-pointer hover:underline uppercase tracking-wide font-extrabold"
+                                >
+                                    Quay lại Đăng nhập
+                                </span>
+                            </p>
+                        ) : (
+                            <p className="text-sm font-bold text-gray-500">
+                                {isRegistering ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'} 
+                                <span 
+                                    onClick={() => {
+                                        setIsRegistering(!isRegistering);
+                                        setIsResettingPassword(false);
+                                        setError(null);
+                                        setCaptchaToken('');
+                                        setCaptchaError('');
+                                        setEmailError('');
+                                        setPasswordError('');
+                                        setNameError('');
+                                    }}
+                                    className="ml-1 text-[#007c76] cursor-pointer hover:underline uppercase tracking-wide font-extrabold"
+                                >
+                                    {isRegistering ? 'Đăng nhập' : 'Đăng ký miễn phí'}
+                                </span>
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

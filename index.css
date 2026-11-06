@@ -19,9 +19,9 @@
   background: #94a3b8;
 }
 
-/* Hide Google reCAPTCHA v3 floating badge from UI layout */
+/* Google reCAPTCHA badge styling */
 .grecaptcha-badge {
-  visibility: hidden !important;
+  z-index: 999;
 }
 
 /* Smooth interaction utilities */

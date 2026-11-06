@@ -372,7 +372,11 @@ export const CourseConfirmModal: React.FC<ConfirmModalProps> = ({
               id="course-modal-confirm-btn"
               type="button"
               onClick={async () => {
-                if (isDelete && otpSent && otpInput.trim().length === 6) {
+                if (isDelete && otpSent) {
+                  if (otpInput.trim().length !== 6) {
+                    setOtpError('Vui lòng nhập đủ 6 chữ số mã OTP.');
+                    return;
+                  }
                   setIsVerifyingOtp(true);
                   setOtpError('');
                   try {

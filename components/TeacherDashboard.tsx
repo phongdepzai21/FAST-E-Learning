@@ -8,6 +8,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from './CourseActionModal';
 import { broadcastCourseUpdate, broadcastComboUpdate, fetchLatestCoursesFromServer } from '../utils/courseSyncService';
+import LivePriceQrPreview from './LivePriceQrPreview';
 import { Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { logFirestoreError } from '../utils/firestoreDiagnostics';
@@ -354,8 +355,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 800;
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 500;
           let width = img.width;
           let height = img.height;
 
@@ -376,7 +377,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
             setImageUrlInput(compressedDataUrl);
           } else {
             setImageUrlInput(rawDataUrl);
@@ -458,9 +459,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
     const cleanLessons = inputLessons.map((les, lIdx) => {
       const vUrl = les?.videoUrl ? String(les.videoUrl).trim() : '';
+      const cContent = les?.content ? String(les.content).trim() : '';
       return {
         title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
-        videoUrl: vUrl
+        videoUrl: vUrl,
+        content: cContent
       };
     });
     return [{ title: "Danh sách bài giảng", lessons: cleanLessons }];

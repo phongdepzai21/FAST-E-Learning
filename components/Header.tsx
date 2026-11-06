@@ -4,6 +4,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { NAV_LINKS, ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
+import { getFastSessionUser, clearFastSessionUser, createSyntheticFirebaseUser } from '../utils/sessionAuth';
 
 const Header: React.FC = () => {
   const location = useLocation();
@@ -20,14 +21,16 @@ const Header: React.FC = () => {
   useEffect(() => {
     let unsubs: Array<() => void> = [];
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const syncUserState = (user: any) => {
       // Clean up previous listeners
       unsubs.forEach(u => u());
       unsubs = [];
 
-      setCurrentUser(user);
-      if (user && user.email) {
-        const normalizedEmail = user.email.toLowerCase();
+      const sessionUser = getFastSessionUser();
+      const effectiveUser = user || auth.currentUser || (sessionUser ? createSyntheticFirebaseUser(sessionUser) : null);
+      setCurrentUser(effectiveUser);
+      if (effectiveUser && effectiveUser.email) {
+        const normalizedEmail = effectiveUser.email.toLowerCase();
         
         let localIsVip = false;
         let localIsAdmin = ADMIN_EMAILS.includes(normalizedEmail);
@@ -122,10 +125,24 @@ const Header: React.FC = () => {
         setIsAdmin(false);
         setIsTeacher(false);
       }
+    };
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      syncUserState(user);
     });
+
+    // Also trigger initial sync immediately in case session exists before onAuthStateChanged fires
+    syncUserState(auth.currentUser);
+
+    const handleFastAuthChange = () => {
+      syncUserState(auth.currentUser);
+    };
+
+    window.addEventListener('fast_auth_changed', handleFastAuthChange);
 
     return () => {
       unsubscribeAuth();
+      window.removeEventListener('fast_auth_changed', handleFastAuthChange);
       unsubs.forEach(u => u());
     };
   }, []);
@@ -144,7 +161,10 @@ const Header: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await auth.signOut();
+    try {
+      await auth.signOut();
+    } catch (e) {}
+    clearFastSessionUser();
     setIsDropdownOpen(false);
     navigate('/');
   };

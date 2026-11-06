@@ -1,1 +1,1 @@
-{"test@example.com":{"otp":"696014","expiresAt":1789909832582,"attempts":0},"h1h4phong@gmail.com":{"otp":"271553","expiresAt":1789909838613,"attempts":0}}
+{"h1h4phong@gmail.com_reset":{"otp":"961947","expiresAt":1793799735287,"attempts":0,"flow":"reset"},"h1h4phong@gmail.com":{"otp":"318049","expiresAt":1793799745702,"attempts":0,"flow":"register"},"h1h4phong@gmail.com_register":{"otp":"318049","expiresAt":1793799745702,"attempts":0,"flow":"register"}}

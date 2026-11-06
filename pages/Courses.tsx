@@ -103,7 +103,7 @@ const Courses: React.FC = () => {
     loadCourses();
 
     // Listen for global sync updates via meta-document
-    const unsubSync = onSnapshot(doc(db, "sync_control", "global"), () => {
+    const unsubSync = onSnapshot(doc(db, "sync_control", "courses"), () => {
       loadCourses();
     });
 
@@ -153,20 +153,22 @@ const Courses: React.FC = () => {
               }
             } catch (e) {}
 
-            // Fetch purchased courses one-time
-            getDocs(collection(db, "users", normalizedEmail, "purchased_courses"))
-                .then((snapshot) => {
-                    const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
-                    setOwnedCourseIds(ids);
-                    setIsLoadingOwnership(false);
-                    try {
-                      localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
-                    } catch (e) {}
-                })
-                .catch((error) => {
-                    console.error("Lỗi đồng bộ khóa học:", error);
-                    setIsLoadingOwnership(false);
-                });
+            // Real-time listener for purchased courses
+            unsubscribeSnapshot = onSnapshot(
+              collection(db, "users", normalizedEmail, "purchased_courses"),
+              (snapshot) => {
+                const ids = snapshot.docs.map(doc => doc.data().courseId || doc.id);
+                setOwnedCourseIds(ids);
+                setIsLoadingOwnership(false);
+                try {
+                  localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(ids));
+                } catch (e) {}
+              },
+              (error) => {
+                console.error("Lỗi đồng bộ khóa học realtime:", error);
+                setIsLoadingOwnership(false);
+              }
+            );
         } else {
             setCurrentUserEmail(null);
             setOwnedCourseIds([]);

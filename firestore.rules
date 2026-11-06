@@ -9,9 +9,15 @@ service cloud.firestore {
 
     // --- Primitives ---
     function isSignedIn() { 
-      return request.auth != null && request.auth.token.email != null; 
+      return request.auth != null; 
     }
     
+    function getUserEmail() {
+      return (request.auth != null && request.auth.token != null && request.auth.token.email != null) 
+        ? request.auth.token.email.lower() 
+        : '';
+    }
+
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
@@ -20,48 +26,47 @@ service cloud.firestore {
     }
     
     function isOwner(email) { 
-      return isSignedIn() && request.auth.token.email.lower() == email.lower(); 
+      return isSignedIn() && (
+        (getUserEmail() != '' && getUserEmail() == email.lower()) ||
+        (request.auth.uid == email)
+      ); 
     }
 
     function isSystemOwner() {
       return isSignedIn() && (
-        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
-        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
-        (
-          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
-          get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isOwner', false) == true
-        )
+        getUserEmail() == 'h1h4phong@gmail.com' ||
+        getUserEmail() == 'trdung153@gmail.com'
       );
     }
 
     function isAdmin() {
       return isSignedIn() && (
         isSystemOwner() ||
-        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
-        request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
-        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
-        request.auth.token.email.lower() == 'lediem.ngo@gmail.com' ||
+        getUserEmail() == 'h1h4phong@gmail.com' ||
+        getUserEmail() == 'hkc.qms@gmail.com' ||
+        getUserEmail() == 'trdung153@gmail.com' ||
+        getUserEmail() == 'lediem.ngo@gmail.com' ||
         (
-          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && 
-          get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true
+          getUserEmail() != '' &&
+          exists(/databases/$(database)/documents/users/$(getUserEmail())) && 
+          get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true
         )
       );
     }
     
     function isTeacher() {
       return isSignedIn() && (
-        isSystemOwner() ||
-        request.auth.token.email.lower() == 'h1h4phong@gmail.com' ||
-        request.auth.token.email.lower() == 'hkc.qms@gmail.com' ||
-        request.auth.token.email.lower() == 'trdung153@gmail.com' ||
-        request.auth.token.email.lower() == 'lediem.ngo@gmail.com' ||
+        isAdmin() ||
+        getUserEmail() == 'h1h4phong@gmail.com' ||
+        getUserEmail() == 'hkc.qms@gmail.com' ||
+        getUserEmail() == 'trdung153@gmail.com' ||
+        getUserEmail() == 'lediem.ngo@gmail.com' ||
         (
-          exists(/databases/$(database)/documents/users/$(request.auth.token.email.lower())) && (
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isTeacher', false) == true ||
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('isAdmin', false) == true ||
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'teacher' ||
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'giangvien' ||
-            get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data.get('role', '') == 'admin'
+          getUserEmail() != '' &&
+          exists(/databases/$(database)/documents/users/$(getUserEmail())) && (
+            get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isTeacher', false) == true ||
+            get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('isAdmin', false) == true ||
+            get(/databases/$(database)/documents/users/$(getUserEmail())).data.get('role', '') in ['teacher', 'giangvien', 'admin', 'Owner', 'Admin']
           )
         )
       );
@@ -71,6 +76,10 @@ service cloud.firestore {
     function isValidUser(data) {
       return (!('email' in data) || (data.email is string && data.email.size() <= 256)) &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('fullName' in data) || (data.fullName is string && data.fullName.size() <= 128)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2048)) &&
+             (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 2048)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 32)) &&
              (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
              (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
              (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
@@ -82,6 +91,7 @@ service cloud.firestore {
              (!('lockedAt' in data) || data.lockedAt == null || (data.lockedAt is string && data.lockedAt.size() <= 64)) &&
              (!('lockReason' in data) || data.lockReason == null || (data.lockReason is string && data.lockReason.size() <= 256)) &&
              (!('rolePromotedByAdmin' in data) || data.rolePromotedByAdmin is bool) &&
+             (!('purchasedCoursesCount' in data) || data.purchasedCoursesCount is int) &&
              (!('role' in data) || (data.role is string && data.role.size() <= 32));
     }
 
@@ -95,7 +105,7 @@ service cloud.firestore {
              (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64)) &&
              (!('progress' in data) || (data.progress is int || data.progress is float)) &&
              (!('completedLessons' in data) || (data.completedLessons is list && data.completedLessons.size() <= 1000)) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() <= 100000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 100000) || (data.notes is list && data.notes.size() <= 1000)) &&
              (!('lastNotesUpdatedAt' in data) || (data.lastNotesUpdatedAt is string && data.lastNotesUpdatedAt.size() <= 64)) &&
              (!('videoTimestamps' in data) || data.videoTimestamps is map);
     }
@@ -139,7 +149,8 @@ service cloud.firestore {
 
     // 1. Users
     match /users/{userEmail} {
-      allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
+      allow get: if isOwner(userEmail) || isAdmin() || isTeacher();
+      allow list: if isAdmin() || isTeacher();
       
       // On create: Owner can create their own profile, or Admin can provision/approve profile
       allow create: if (isOwner(userEmail) || isAdmin()) && isValidId(userEmail) && isValidUser(incoming()) && (
@@ -161,35 +172,35 @@ service cloud.firestore {
       // 1.1 Purchased Courses Subcollection
       match /purchased_courses/{courseId} {
         allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
-        
-        allow create: if (isOwner(userEmail) || isAdmin()) && isValidId(courseId) && isValidPurchasedCourse(incoming());
-        allow update: if (isOwner(userEmail) || isAdmin()) && isValidId(courseId) && isValidPurchasedCourse(incoming());
+        allow create, update: if (isOwner(userEmail) || isAdmin()) && isValidId(courseId) && isValidPurchasedCourse(incoming());
         allow delete: if isAdmin();
       }
 
       // 1.2 Gamification Stats
-      match /gamification/stats {
+      match /gamification/{docId} {
         allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
-        
-        allow create: if isOwner(userEmail) && isValidGamificationStats(incoming());
-        allow update: if isOwner(userEmail) && isValidGamificationStats(incoming());
+        allow create, update: if (isOwner(userEmail) || isAdmin()) && isValidGamificationStats(incoming());
         allow delete: if isAdmin();
+      }
+
+      // 1.3 Notifications Subcollection
+      match /notifications/{notifId} {
+        allow read: if isOwner(userEmail) || isAdmin();
+        allow write: if isAdmin() || isSystemOwner();
       }
     }
 
     // 2. Courses (Global)
     match /courses/{courseId} {
       allow read: if true; // Publicly readable for catalog listing
-      allow create: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
-      allow update: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
+      allow create, update: if (isAdmin() || isTeacher()) && isValidId(courseId) && isValidCourse(incoming());
       allow delete: if isAdmin() || isTeacher();
     }
 
     // 3. Combos (Global)
     match /combos/{comboId} {
       allow read: if true; // Publicly readable for catalog listing
-      allow create: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
-      allow update: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
+      allow create, update: if (isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
       allow delete: if isAdmin() || isTeacher();
     }
 
@@ -213,16 +224,62 @@ service cloud.firestore {
       allow read, write: if isSystemOwner() || isAdmin();
     }
 
-    // 7. Manual Unlocks Logs
+    // 8. Fast ISO 22000 CRM Records (ISO 22K Checklist)
+    match /fast_iso22k_crm/{recordId} {
+      allow read, write: if isSystemOwner() || isAdmin();
+    }
+
+    // 9. Manual Unlocks Logs
     match /manual_unlocks/{unlockId} {
       allow read, write: if isAdmin() || isSystemOwner();
     }
 
-    // 8. Course Registrations Logs and Notices
+    // 10. Course Registrations Logs and Notices
     match /course_registrations/{registrationId} {
       allow read: if isAdmin() || isSystemOwner() || isTeacher();
       allow create: if isSignedIn();
       allow update, delete: if isAdmin() || isSystemOwner();
+    }
+
+    // 11. Payment Config (Banking / QR Code)
+    match /payment_config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSystemOwner();
+    }
+
+    // 12. Sync Control (Global real-time cache invalidation)
+    match /sync_control/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSystemOwner();
+    }
+
+    // 13. Global Sync (Real-time form reset synchronization across tabs)
+    match /global_sync/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 14. Student Progress (Live progress autosave)
+    match /student_progress/{userEmail} {
+      allow read: if isOwner(userEmail) || isAdmin() || isTeacher();
+      allow write: if isOwner(userEmail) || isAdmin();
+    }
+
+    // 15. Payment Logs (Webhook inspection and debugging)
+    match /payment_logs/{logId} {
+      allow read, write: if isAdmin() || isSystemOwner();
+    }
+
+    // 16. System Diagnostics (Firestore latency ping)
+    match /system_diagnostics/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 17. Pending Payments (Pre-recorded bank transfer orders)
+    match /pending_payments/{paymentId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin() || isSystemOwner();
     }
   }
 }
