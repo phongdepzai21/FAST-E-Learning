@@ -20,6 +20,9 @@ export interface Course {
   id: string;
   title: string;
   price: string;
+  originalPrice?: string;
+  discountPercent?: number;
+  duration?: string;
   image: string;
   category: string;
   description?: string;

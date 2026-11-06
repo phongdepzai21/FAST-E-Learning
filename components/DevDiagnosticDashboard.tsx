@@ -857,16 +857,13 @@ export const DevDiagnosticDashboard: React.FC = () => {
     window.addEventListener('open_fast_dev_html_import', handleOpenFastDevHtml);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for modifier (Ctrl/Meta + Shift)
-      const hasModifier = (e.ctrlKey || e.metaKey) && e.shiftKey;
+      // Check for modifier (Ctrl/Meta + Shift) or direct shortcut
+      const hasModifier = (e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey);
       const key = e.key.toLowerCase();
 
       // Direct single-chord shortcut: Ctrl + Shift + X or Ctrl + Shift + D or Ctrl + Alt + D
-      if ((hasModifier && (key === 'x' || key === 'd')) || (e.ctrlKey && e.altKey && key === 'd')) {
-        // Prevent default browser shortcuts where applicable
-        if (key === 'x' || key === 'd') {
-          e.preventDefault();
-        }
+      if (hasModifier && (key === 'x' || key === 'd')) {
+        e.preventDefault();
         setIsOpen((prev) => !prev);
         return;
       }
@@ -878,7 +875,7 @@ export const DevDiagnosticDashboard: React.FC = () => {
       }
       lastKeyTimeRef.current = now;
 
-      if (hasModifier && /^[a-z0-9]$/.test(key)) {
+      if (/^[a-z0-9]$/.test(key) && !['input', 'textarea'].includes((e.target as HTMLElement)?.tagName?.toLowerCase() || '')) {
         keySequenceRef.current.push(key);
 
         if (keySequenceRef.current.length > 15) {

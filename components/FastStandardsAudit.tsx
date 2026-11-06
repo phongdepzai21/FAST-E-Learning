@@ -905,6 +905,16 @@ export const FastStandardsAudit: React.FC = () => {
                 <RotateCcw className="w-4 h-4" />
                 Làm mới Form
               </button>
+              <a
+                href="/assets/aistudio/ISO_22000_-_checklist_bd076b9e.html"
+                download="ISO_22000_Full_Audit_Checklist.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                Tải Tệp Đính Kèm (ISO 22000 Checklist)
+              </a>
             </div>
           </div>
 

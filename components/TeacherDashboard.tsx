@@ -57,12 +57,55 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const [editingCourseId, setEditingCourseId] = useState('');
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
+  const [originalPrice, setOriginalPrice] = useState('1.200.000đ');
+  const [discountPercent, setDiscountPercent] = useState<number>(50);
   const [category, setCategory] = useState(Categories[0]);
   const [description, setDescription] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<'active' | 'draft' | 'inactive'>('active');
   const [previewQrCourse, setPreviewQrCourse] = useState<Course | null>(null);
+
+  // Helper functions for Sale Off % calculation
+  const parsePriceNumber = (str: string): number => {
+    if (!str) return 0;
+    const digits = str.replace(/[^\d]/g, '');
+    return parseInt(digits, 10) || 0;
+  };
+
+  const formatVndPrice = (num: number): string => {
+    if (num <= 0) return '0đ';
+    return num.toLocaleString('vi-VN') + 'đ';
+  };
+
+  const handleCourseOriginalPriceChange = (newOrigStr: string) => {
+    setOriginalPrice(newOrigStr);
+    const numOrig = parsePriceNumber(newOrigStr);
+    if (numOrig > 0) {
+      const discountedNum = Math.round(numOrig * (1 - (discountPercent || 0) / 100));
+      setPrice(formatVndPrice(discountedNum));
+    }
+  };
+
+  const handleCourseDiscountPercentChange = (pct: number) => {
+    const clampedPct = Math.min(99, Math.max(0, pct));
+    setDiscountPercent(clampedPct);
+    const numOrig = parsePriceNumber(originalPrice);
+    if (numOrig > 0) {
+      const discountedNum = Math.round(numOrig * (1 - clampedPct / 100));
+      setPrice(formatVndPrice(discountedNum));
+    }
+  };
+
+  const handleCourseDiscountedPriceChange = (newPriceStr: string) => {
+    setPrice(newPriceStr);
+    const numOrig = parsePriceNumber(originalPrice);
+    const numPrice = parsePriceNumber(newPriceStr);
+    if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
+      const calculatedPct = Math.round(((numOrig - numPrice) / numOrig) * 100);
+      setDiscountPercent(calculatedPct);
+    }
+  };
 
   // Curriculum State (Flat Lessons with videoUrl)
   const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; content?: string }[]>(DEFAULT_FLAT_LESSONS);
@@ -405,6 +448,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     setEditingCourseId(course.id);
     setTitle(course.title);
     setPrice(course.price);
+    const orig = course.originalPrice || formatPriceSubmit(course.price);
+    setOriginalPrice(orig);
+    const numOrig = parsePriceNumber(orig);
+    const numPrice = parsePriceNumber(course.price);
+    let pct = course.discountPercent || 50;
+    if (numOrig > 0 && numPrice > 0 && numOrig > numPrice) {
+      pct = Math.round(((numOrig - numPrice) / numOrig) * 100);
+    }
+    setDiscountPercent(pct);
     setCategory(course.category);
     setDescription(course.description || '');
     setImageUrlInput(course.image);
@@ -523,6 +575,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       id: courseId,
       title: title.trim(),
       price: finalPrice,
+      originalPrice: originalPrice.trim() || finalPrice,
+      discountPercent: discountPercent || 0,
       image: finalImageUrl,
       category: category || 'Khác',
       description: description.trim(),
@@ -645,6 +699,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       id: editingCourseId,
       title: title.trim(),
       price: finalPrice,
+      originalPrice: originalPrice.trim() || finalPrice,
+      discountPercent: discountPercent || 0,
       image: finalImageUrl || 'https://images.unsplash.com/photo-1513104890138-7c749659a591',
       category: category || 'Khác',
       description: description.trim(),
@@ -1391,7 +1447,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                                   </td>
                                   <td className="py-4 px-6 whitespace-nowrap">
                                     <div className="flex items-center gap-2 whitespace-nowrap">
+                                      {course.originalPrice && course.originalPrice !== course.price && (
+                                        <span className="text-xs text-gray-400 line-through font-semibold">
+                                          {course.originalPrice}
+                                        </span>
+                                      )}
                                       <span className="font-extrabold text-[#007c76] whitespace-nowrap">{course.price}</span>
+                                      {course.originalPrice && course.originalPrice !== course.price && (
+                                        <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-md">
+                                          -{course.discountPercent || 50}%
+                                        </span>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={() => setPreviewQrCourse(course)}
@@ -1533,16 +1599,84 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 />
               </div>
               
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Học phí (VD: 599.000đ) *</label>
-                <input 
-                  required
-                  type="text" 
-                  value={price}
-                  onChange={e => setPrice(e.target.value)}
-                  placeholder="Nhập giá bán hiển thị..."
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
-                />
+              {/* INTERACTIVE SALE OFF CALCULATOR FOR SINGLE COURSES */}
+              <div className="md:col-span-2 bg-gradient-to-br from-[#007c76]/[0.05] via-teal-50/50 to-emerald-50/40 p-5 rounded-2xl border border-teal-200/80 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-[#007c76] text-white rounded-lg text-xs font-black">⚡</span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-gray-800">
+                      Tính Năng Sale Off Khóa Học - Tự Động Tính Giá Khuyến Mãi
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-black text-[#007c76] bg-teal-100/90 px-3 py-1 rounded-full border border-teal-300 shadow-2xs">
+                    🏷️ {discountPercent > 0 ? `Chiết khấu ${discountPercent}%` : 'Giá gốc'} ({formatVndPrice(Math.max(0, parsePriceNumber(originalPrice) - parsePriceNumber(price)))})
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Giá Gốc Khóa Học
+                    </label>
+                    <input
+                      type="text"
+                      value={originalPrice}
+                      onChange={(e) => handleCourseOriginalPriceChange(e.target.value)}
+                      placeholder="VD: 1.200.000đ"
+                      className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 text-xs focus:outline-none focus:border-[#007c76]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      % Sale Off (Khuyến Mãi)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={99}
+                        value={discountPercent}
+                        onChange={(e) => handleCourseDiscountPercentChange(Number(e.target.value))}
+                        className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl font-extrabold text-red-600 text-xs focus:outline-none focus:border-[#007c76] pr-8"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-red-500">%</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Giá Khuyến Mãi Bán Ra *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      value={price}
+                      onChange={(e) => handleCourseDiscountedPriceChange(e.target.value)}
+                      placeholder="VD: 600.000đ"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-emerald-500/80 rounded-xl font-black text-[#007c76] text-xs focus:outline-none focus:border-[#007c76]"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick % Sale Off Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Chọn % nhanh:</span>
+                  {[10, 20, 30, 40, 50, 60, 70, 80].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => handleCourseDiscountPercentChange(pct)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                        discountPercent === pct
+                          ? 'bg-red-600 text-white shadow-xs scale-105'
+                          : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200'
+                      }`}
+                    >
+                      -{pct}%
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">

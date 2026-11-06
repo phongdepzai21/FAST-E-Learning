@@ -247,9 +247,21 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
                         <div className="flex flex-col">
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Học phí</span>
-                            <p className="text-[#007c76] font-black text-lg md:text-xl">
-                                {course.price || 'Miễn phí'}
-                            </p>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                                {course.originalPrice && course.originalPrice !== course.price && (
+                                    <span className="text-xs text-gray-400 line-through font-semibold">
+                                        {course.originalPrice}
+                                    </span>
+                                )}
+                                <p className="text-[#007c76] font-black text-lg md:text-xl">
+                                    {course.price || 'Miễn phí'}
+                                </p>
+                                {course.originalPrice && course.originalPrice !== course.price && (
+                                    <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-md">
+                                        -{course.discountPercent || 50}%
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="w-10 h-10 rounded-2xl bg-[#007c76] text-white flex items-center justify-center shadow-lg shadow-[#007c76]/20 transform transition-all group-hover:scale-110 group-hover:rotate-6">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>

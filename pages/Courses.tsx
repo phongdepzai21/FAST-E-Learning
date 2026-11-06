@@ -21,6 +21,8 @@ const DEFAULT_COMBOS = [
     id: 'combo-basic',
     title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
     price: '1.200.000đ',
+    originalPrice: '2.400.000đ',
+    savings: 'Tiết kiệm 50%',
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
     courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
@@ -30,10 +32,23 @@ const DEFAULT_COMBOS = [
     id: 'combo-pro',
     title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
     price: '1.800.000đ',
+    originalPrice: '3.600.000đ',
+    savings: 'Tiết kiệm 50%',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
     benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'combo-vip',
+    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
+    price: '2.500.000đ',
+    originalPrice: '5.000.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
+    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
+    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền']
   }
 ];
 
@@ -376,49 +391,69 @@ const Courses: React.FC = () => {
 
         {/* COMBO PACKAGES SECTION */}
         <div className="mt-20 space-y-8">
-            <div className="border-l-4 border-[#007c76] pl-4">
-                <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight">
-                    🎁 Gói Combo Tiết Kiệm (Đăng ký học nhiều hơn, ưu đãi nhiều hơn)
-                </h2>
-                <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mt-1">
-                    Lộ trình chuẩn hóa trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-l-4 border-[#007c76] pl-4">
+                <div>
+                    <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+                        <span>🎁 Gói Combo Tiết Kiệm</span>
+                        <span className="text-xs bg-red-100 text-red-600 font-bold px-2.5 py-1 rounded-full border border-red-200">Sale Off 50%</span>
+                    </h2>
+                    <p className="text-gray-500 text-xs sm:text-sm font-medium mt-1">
+                        Lộ trình chuẩn hóa trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa học
+                    </p>
+                </div>
+                <Link to="/account/vip-upgrade" className="text-xs font-bold text-[#007c76] hover:underline flex items-center gap-1 shrink-0">
+                    Xem tất cả ưu đãi &amp; nâng cấp VIP →
+                </Link>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {combos.map((combo) => {
                     const isVip = combo.id === 'khoa-vip' || combo.id.includes('vip');
                     const isPro = combo.id === 'combo-pro' || combo.id.includes('pro');
+                    const savingsBadge = combo.savings || 'Tiết kiệm 50%';
+                    const originalPriceStr = combo.originalPrice || (combo.price === '1.200.000đ' ? '2.400.000đ' : combo.price === '1.800.000đ' ? '3.600.000đ' : combo.price === '2.500.000đ' ? '5.000.000đ' : '');
+
                     return (
-                        <div key={combo.id} className={`bg-white rounded-[32px] border-2 transition-all duration-300 overflow-hidden flex flex-col hover:shadow-xl hover:scale-[1.01] ${
+                        <div key={combo.id} className={`bg-white rounded-3xl border-2 transition-all duration-300 overflow-hidden flex flex-col hover:shadow-2xl hover:-translate-y-1.5 group relative ${
                             isVip 
-                                ? 'border-amber-500 shadow-md shadow-amber-500/5' 
+                                ? 'border-amber-400/90 shadow-md shadow-amber-500/10 hover:border-amber-500' 
                                 : isPro 
-                                    ? 'border-blue-500/50 shadow-md shadow-blue-500/5' 
-                                    : 'border-gray-100 hover:border-[#007c76]/30'
+                                    ? 'border-teal-400/80 shadow-md shadow-teal-500/10 hover:border-teal-500' 
+                                    : 'border-slate-200/90 hover:border-teal-500/60 shadow-sm'
                         }`}>
-                            <div className="relative h-44 overflow-hidden shrink-0">
+                            <div className="relative h-48 overflow-hidden shrink-0">
                                 <img 
                                     src={combo.image} 
                                     alt={combo.title} 
-                                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800';
                                     }}
                                 />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+
+                                {/* Badge Tiết Kiệm Prominent Overlay */}
+                                <div className="absolute top-3 right-3 z-10">
+                                    <span className="bg-gradient-to-r from-red-600 via-emerald-600 to-teal-600 text-white font-black px-3 py-1 rounded-xl text-[11px] uppercase tracking-wider shadow-lg border border-white/20 flex items-center gap-1 backdrop-blur-xs">
+                                        🏷️ {savingsBadge}
+                                    </span>
+                                </div>
+
                                 {isVip && (
-                                    <div className="absolute top-4 left-4 bg-amber-500 text-amber-950 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-1">
-                                        ⭐ Đặc Quyền VIP
+                                    <div className="absolute top-3 left-3 z-10">
+                                        <span className="bg-amber-500 text-amber-950 font-black px-3 py-1 rounded-xl text-[10px] uppercase tracking-widest shadow-md flex items-center gap-1 border border-amber-300/40">
+                                            ⭐ Đặc Quyền VIP
+                                        </span>
                                     </div>
                                 )}
                             </div>
 
                             <div className="p-6 flex-1 flex flex-col space-y-4">
                                 <div className="space-y-1.5">
-                                    <h3 className="text-base sm:text-lg font-black text-gray-800 leading-snug line-clamp-1">
+                                    <h3 className="text-base sm:text-lg font-black text-gray-900 group-hover:text-[#007c76] transition-colors leading-snug line-clamp-1">
                                         {combo.title}
                                     </h3>
-                                    <p className="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2">
+                                    <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">
                                         {combo.description}
                                     </p>
                                 </div>
@@ -441,13 +476,13 @@ const Courses: React.FC = () => {
                                             </button>
 
                                             {isExpanded && (
-                                                <div className="space-y-1.5 p-2.5 bg-slate-50/80 rounded-2xl border border-slate-200/60 max-h-48 overflow-y-auto">
+                                                <div className="space-y-1.5 p-2.5 bg-slate-50/80 rounded-2xl border border-slate-200/60 max-h-48 overflow-y-auto custom-scrollbar">
                                                     {comboCourses.length > 0 ? (
                                                         comboCourses.map((c, cIdx) => (
                                                             <div 
                                                                 key={c.id || cIdx} 
                                                                 onClick={() => trackCourseView(c, currentUserEmail)}
-                                                                className="p-2 rounded-xl bg-white border border-slate-100 flex items-center justify-between gap-2 text-xs shadow-2xs hover:border-teal-200 transition"
+                                                                className="p-2 rounded-xl bg-white border border-slate-100 flex items-center justify-between gap-2 text-xs shadow-2xs hover:border-teal-300 transition"
                                                             >
                                                                 <span className="font-bold text-slate-800 truncate">{c.title}</span>
                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-[#007c76] font-bold shrink-0">
@@ -466,23 +501,30 @@ const Courses: React.FC = () => {
                                     );
                                 })()}
 
-                                <div className="pt-2 border-t border-gray-150 flex justify-between items-center mt-auto">
+                                <div className="pt-3 border-t border-slate-100 flex justify-between items-center mt-auto">
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Học phí trọn gói</span>
-                                        <span className="text-lg font-extrabold text-[#007c76]">{combo.price}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Giá combo</span>
+                                            {originalPriceStr && (
+                                                <span className="text-[11px] text-slate-400 line-through font-medium">
+                                                    {originalPriceStr}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-lg font-black text-[#007c76]">{combo.price}</span>
                                     </div>
 
                                     <Link 
-                                        to="/lien-he"
-                                        className={`px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all ${
+                                        to="/account/vip-upgrade"
+                                        className={`px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all cursor-pointer shadow-sm flex items-center gap-1 ${
                                             isVip 
-                                                ? 'bg-amber-500 text-amber-950 hover:bg-amber-600' 
+                                                ? 'bg-amber-500 text-amber-950 hover:bg-amber-600 shadow-amber-500/20' 
                                                 : isPro 
-                                                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                                    : 'bg-[#007c76] text-white hover:bg-[#005f5b]'
+                                                    ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-900/20' 
+                                                    : 'bg-[#007c76] text-white hover:bg-[#005f5b] shadow-[#007c76]/20'
                                         }`}
                                     >
-                                        Đăng ký ngay
+                                        <span>Đăng ký gói ngay</span>
                                     </Link>
                                 </div>
                             </div>

@@ -133,6 +133,8 @@ const DEFAULT_SERVER_COMBOS: Record<string, any> = {
     id: 'combo-basic',
     title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
     price: '1.200.000đ',
+    originalPrice: '2.400.000đ',
+    savings: 'Tiết kiệm 50%',
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
     courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
@@ -144,10 +146,25 @@ const DEFAULT_SERVER_COMBOS: Record<string, any> = {
     id: 'combo-pro',
     title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
     price: '1.800.000đ',
+    originalPrice: '3.600.000đ',
+    savings: 'Tiết kiệm 50%',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
     benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
+    status: 'active',
+    updatedAt: new Date().toISOString()
+  },
+  'combo-vip': {
+    id: 'combo-vip',
+    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
+    price: '2.500.000đ',
+    originalPrice: '5.000.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
+    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
+    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền'],
     status: 'active',
     updatedAt: new Date().toISOString()
   }
@@ -1759,14 +1776,19 @@ async function startServer() {
     }
   });
 
-  // Gemini Chat
+  // Gemini Chat Endpoint with Role Normalization & Streaming
   app.post("/api/gemini/chat", async (req, res) => {
     try {
       const { messages, systemContext } = req.body;
       
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: "API Key not configured" });
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.write(`data: ${JSON.stringify({ text: "Chào bạn, hệ thống tư vấn tự động đang tạm thời bảo trì API Key. Vui lòng liên hệ trực tiếp qua Hotline/Zalo **0927 002 668** để được tư vấn ngay nhé!" })}\n\n`);
+        res.write(`data: [DONE]\n\n`);
+        return res.end();
       }
 
       const ai = new GoogleGenAI({ 
@@ -1778,38 +1800,68 @@ async function startServer() {
         }
       });
       
-      const model = 'gemini-2.5-flash';
-
       let validMessages = Array.isArray(messages) ? messages : [];
-      // Filter out empty messages
-      validMessages = validMessages.filter((m: any) => m && typeof m.text === 'string' && m.text.trim().length > 0);
+      // Filter out invalid/error messages
+      validMessages = validMessages.filter((m: any) => m && !m.isError && typeof m.text === 'string' && m.text.trim().length > 0);
 
-      // Map to Gemini API format
-      const historyContents = validMessages.map((m: any) => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-
-      if (historyContents.length === 0) {
-        return res.status(400).json({ error: "Không có nội dung tin nhắn hợp lệ." });
+      // Gemini contents MUST start with 'user' and alternate roles
+      // Drop any initial 'model' messages (e.g. greeting message)
+      while (validMessages.length > 0 && validMessages[0].role === 'model') {
+        validMessages.shift();
       }
 
-      // Chế độ streaming
+      if (validMessages.length === 0) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.write(`data: ${JSON.stringify({ text: "Bạn cần hỗ trợ thêm thông tin gì về các khóa học hoặc dịch vụ tư vấn không ạ?" })}\n\n`);
+        res.write(`data: [DONE]\n\n`);
+        return res.end();
+      }
+
+      // Merge consecutive same-role messages to guarantee strict role alternation
+      const historyContents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      for (const m of validMessages) {
+        const role = m.role === 'user' ? 'user' : 'model';
+        const text = String(m.text).trim();
+
+        if (historyContents.length > 0 && historyContents[historyContents.length - 1].role === role) {
+          historyContents[historyContents.length - 1].parts[0].text += `\n${text}`;
+        } else {
+          historyContents.push({ role, parts: [{ text }] });
+        }
+      }
+
+      // Streaming headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const responseStream = await ai.models.generateContentStream({
-        model: model,
-        contents: historyContents,
-        config: {
-          systemInstruction: systemContext,
-          temperature: 0.7,
-          maxOutputTokens: 800,
-        }
-      });
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      let streamResult = null;
+      let lastErr = null;
 
-      for await (const chunk of responseStream) {
+      for (const modelName of modelsToTry) {
+        try {
+          streamResult = await ai.models.generateContentStream({
+            model: modelName,
+            contents: historyContents,
+            config: {
+              systemInstruction: systemContext || undefined,
+              temperature: 0.7,
+              maxOutputTokens: 1000,
+            }
+          });
+          if (streamResult) break;
+        } catch (err: any) {
+          lastErr = err;
+          console.warn(`[Gemini API] Failed with model ${modelName}, trying fallback...`, err?.message || err);
+        }
+      }
+
+      if (!streamResult) {
+        throw lastErr || new Error("Không thể khởi tạo mô hình Gemini");
+      }
+
+      for await (const chunk of streamResult) {
         if (chunk.text) {
           res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
         }
@@ -1819,7 +1871,8 @@ async function startServer() {
 
     } catch (error: any) {
       console.error("Gemini API Error:", error);
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: "\nHệ thống trợ lí ảo gặp gián đoạn tạm thời. Bạn vui lòng thử lại hoặc nhắn Zalo **0927 002 668** để được hỗ trợ tức thì!" })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
       res.end();
     }
   });

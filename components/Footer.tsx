@@ -112,6 +112,12 @@ const Footer: React.FC = () => {
                 </div>
                 <a href={`tel:${rawPhone}`} className="text-sm text-[#374151] hover:text-[#007c76] font-normal">{phoneNumber}</a>
               </div>
+              <div className="flex items-center justify-center md:justify-start space-x-3 md:space-x-4">
+                <div className="w-5 h-5 text-[#007c76]">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                </div>
+                <a href="mailto:support@fastelearning.com.vn" className="text-sm text-[#374151] hover:text-[#007c76] font-normal">support@fastelearning.com.vn</a>
+              </div>
               <div className="flex items-start justify-center md:justify-start space-x-3 md:space-x-4">
                 <div className="w-5 h-5 text-[#007c76] mt-1 shrink-0">
                     <svg fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>

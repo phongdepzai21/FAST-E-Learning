@@ -18,7 +18,7 @@ const FloatingContact: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'model', 
-      text: 'Chào bạn! Tôi là trợ lý AI của FAST E-Learning. 🤖\n\nTôi có thể giúp bạn tìm hiểu về **các khóa học ISO/HACCP**, **dịch vụ tư vấn**, hoặc giải đáp thắc mắc về **An toàn thực phẩm**. \n\nBạn đang quan tâm đến nội dung nào?'
+      text: 'Chào bạn! Tôi là trợ lí ảo Trần Hạnh của FAST E-Learning. 🤖\n\nTôi có thể giúp bạn tìm hiểu về **các khóa học ISO/HACCP**, **dịch vụ tư vấn**, hoặc giải đáp thắc mắc về **An toàn thực phẩm**. \n\nBạn đang quan tâm đến nội dung nào?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -107,12 +107,12 @@ const FloatingContact: React.FC = () => {
     const teamData = TEAM.map(t => `- Chuyên gia: ${t.name} (${t.role})`).join('\n');
     
     return `
-      Bạn là Trợ lý AI Chuyên nghiệp của FAST E-Learning (Website: 2fast.com.vn).
+      Bạn là Trợ lí ảo Trần Hạnh chuyên nghiệp của FAST E-Learning (Website: 2fast.com.vn).
       Nhiệm vụ của bạn là tư vấn bán hàng, giải đáp thắc mắc về khóa học và dịch vụ tư vấn ISO/HACCP/QA-QC.
 
       THÔNG TIN LIÊN HỆ CÔNG TY:
       - Hotline/Zalo: 0927 002 668
-      - Email: hkc.qms@gmail.com
+      - Email hỗ trợ: support@fastelearning.com.vn & hkc.qms@gmail.com
       - Địa chỉ: Cityland Park Hills, Gò Vấp, TP.HCM
 
       DANH SÁCH KHÓA HỌC HIỆN CÓ:
@@ -135,12 +135,12 @@ const FloatingContact: React.FC = () => {
     `;
   }, [liveCourses]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (customText?: string) => {
+    const textToSend = (customText || input).trim();
+    if (!textToSend || isLoading) return;
     
-    const userMessage = input.trim();
     setInput('');
-    const updatedMessages = [...messages, { role: 'user' as const, text: userMessage }];
+    const updatedMessages = [...messages, { role: 'user' as const, text: textToSend }];
     setMessages(updatedMessages);
     setIsLoading(true);
 
@@ -199,13 +199,9 @@ const FloatingContact: React.FC = () => {
     } catch (error: any) {
       console.error("AI Chat Error Full Details:", error);
       
-      let errorMessage = "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau.";
-      
-      // Xử lý các lỗi cụ thể
-      if (error.message?.includes('API_KEY') || error.toString().includes('API Key') || error.toString().includes('process is not defined')) {
-        errorMessage = "Hệ thống chưa cấu hình API Key. Vui lòng liên hệ Admin.";
-      } else if (error.message?.includes('fetch') || error.message?.includes('network')) {
-         errorMessage = "Lỗi kết nối mạng. Vui lòng kiểm tra đường truyền.";
+      let errorMessage = "Xin lỗi, hệ thống đang bận. Vui lòng nhắn Zalo **0927 002 668** để được hỗ trợ tức thì!";
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        errorMessage = "Lỗi kết nối mạng. Vui lòng kiểm tra đường truyền.";
       }
 
       setMessages(prev => [...prev, { role: 'model', text: errorMessage, isError: true }]);
@@ -213,6 +209,13 @@ const FloatingContact: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const SUGGESTED_PROMPTS = [
+    "Khóa học ISO 22000 gồm nội dung gì?",
+    "Tư vấn thủ tục An toàn thực phẩm",
+    "Gói Combo học tập có ưu đãi gì?",
+    "Liên hệ Chuyên gia tư vấn"
+  ];
 
   if (location.pathname.startsWith('/account')) {
     return null;
@@ -232,7 +235,7 @@ const FloatingContact: React.FC = () => {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
               </div>
               <div>
-                <h3 className="font-bold text-sm leading-tight">Trợ lý ảo FAST</h3>
+                <h3 className="font-bold text-sm leading-tight">Trợ lí ảo Trần Hạnh</h3>
                 <div className="flex items-center gap-1.5">
                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
                    <span className="text-[10px] text-white/90 font-medium">Đang hoạt động</span>
@@ -250,8 +253,8 @@ const FloatingContact: React.FC = () => {
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
                 
                 {msg.role === 'model' && (
-                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[10px] font-black mr-2 shrink-0 mt-1 shadow-sm">
-                    AI
+                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[9px] font-black mr-2 shrink-0 mt-1 shadow-sm">
+                    TH
                   </div>
                 )}
 
@@ -269,7 +272,7 @@ const FloatingContact: React.FC = () => {
             
             {isLoading && (
                <div className="flex justify-start animate-pulse">
-                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[10px] font-black mr-2 shrink-0 mt-1">AI</div>
+                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[9px] font-black mr-2 shrink-0 mt-1">TH</div>
                   <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-none p-3.5 flex items-center gap-1 shadow-sm">
                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
@@ -279,6 +282,22 @@ const FloatingContact: React.FC = () => {
             )}
             <div ref={messagesEndRef} />
         </div>
+
+        {/* Suggested Quick Prompts */}
+        {messages.length <= 3 && !isLoading && (
+          <div className="px-3 pt-2 bg-[#f8fafc] flex flex-wrap gap-1.5 border-t border-gray-100">
+            {SUGGESTED_PROMPTS.map((promptText, pIdx) => (
+              <button
+                key={pIdx}
+                type="button"
+                onClick={() => handleSend(promptText)}
+                className="px-2.5 py-1 bg-white hover:bg-teal-50 text-teal-800 hover:text-[#007c76] border border-teal-200/60 rounded-full text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+              >
+                💡 {promptText}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Input Area */}
         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">

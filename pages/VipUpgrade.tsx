@@ -318,149 +318,178 @@ const VipUpgrade: React.FC = () => {
 
       {/* Pricing Grid */}
       <div id="pricing-grid" className="max-w-7xl mx-auto px-4 py-12 scroll-mt-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 max-w-5xl mx-auto gap-8">
           {combos.map((combo) => {
             const isVipPackage = combo.id === 'khoa-vip';
             const isProPackage = combo.id === 'combo-pro';
             const isOwned = purchasedComboIds.includes(combo.id) || (isVip && isVipPackage);
 
-            // Fetch course titles linked to this combo
+            // Fetch course objects linked to this combo
             const linkedCourses = allCourses.filter(c => combo.courseIds?.includes(c.id));
 
             return (
               <div
                 key={combo.id}
-                className={`rounded-[36px] bg-gray-900 border transition-all flex flex-col justify-between overflow-hidden relative group ${
+                className={`rounded-[36px] bg-gray-900/90 border transition-all duration-300 flex flex-col justify-between overflow-hidden relative group backdrop-blur-md ${
                   isVipPackage
-                    ? 'border-amber-500/40 shadow-2xl shadow-amber-500/5 ring-2 ring-amber-500/20 md:scale-105 md:-translate-y-2'
+                    ? 'border-amber-500/50 shadow-2xl shadow-amber-500/10 ring-2 ring-amber-500/20 lg:scale-[1.02]'
                     : isProPackage
-                      ? 'border-emerald-500/30 hover:border-emerald-500/50'
-                      : 'border-gray-800 hover:border-gray-700'
+                      ? 'border-teal-500/40 hover:border-teal-400/60 shadow-xl shadow-teal-900/20'
+                      : 'border-gray-800 hover:border-gray-700 shadow-lg'
                 }`}
               >
-                {/* Header Banner */}
+                {/* Header Badge Banner */}
                 {isVipPackage && (
-                  <div className="absolute top-0 left-0 w-full bg-amber-500 text-black py-2 text-center text-[10px] font-black uppercase tracking-widest z-10 flex items-center justify-center gap-1.5">
+                  <div className="absolute top-0 left-0 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-black py-2 text-center text-[10px] font-black uppercase tracking-widest z-10 flex items-center justify-center gap-1.5 shadow-md">
                     <Crown className="w-3.5 h-3.5 fill-black" />
-                    <span>Đặc quyền VIP cao cấp nhất</span>
+                    <span>Đặc Quyền VIP Toàn Diện • Mở Khóa Tất Cả Khóa Học</span>
                   </div>
                 )}
 
                 {/* Cover Image & Info */}
-                <div className="relative h-44 overflow-hidden">
+                <div className={`relative h-48 overflow-hidden ${isVipPackage ? 'pt-8' : ''}`}>
                   <img
                     src={combo.image}
                     alt={combo.title}
-                    className="w-full h-full object-cover transition-transform duration-750 group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800';
+                    }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
+                  
+                  <div className="absolute top-4 right-4 z-10">
+                    <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/90 text-white border border-emerald-400 backdrop-blur-md shadow-md flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Tiết kiệm 50%
+                    </span>
+                  </div>
+
                   <div className="absolute bottom-4 left-6 right-6">
                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
                       isVipPackage
-                        ? 'bg-amber-500/25 text-amber-300'
+                        ? 'bg-amber-500/30 text-amber-300 border border-amber-500/40'
                         : isProPackage
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : 'bg-blue-500/20 text-blue-300'
+                          ? 'bg-teal-500/25 text-teal-300 border border-teal-500/40'
+                          : 'bg-blue-500/25 text-blue-300 border border-blue-500/40'
                     }`}>
-                      {isVipPackage ? 'Combo VIP' : isProPackage ? 'Combo Pro' : 'Combo Basic'}
+                      {isVipPackage ? 'Gói Đặc Quyền VIP' : isProPackage ? 'Gói Combo Pro' : 'Gói Combo Basic'}
                     </span>
-                    <h3 className="text-xl font-black uppercase text-white mt-2 leading-tight">
-                      {combo.id === 'combo-basic' ? 'Combo Basic' : combo.id === 'combo-pro' ? 'Combo Pro' : 'Combo VIP Trọn Đời'}
+                    <h3 className="text-xl font-black uppercase text-white mt-1.5 leading-snug drop-shadow-sm">
+                      {combo.title}
                     </h3>
                   </div>
                 </div>
 
                 {/* Content Details */}
-                <div className="p-8 flex-grow flex flex-col justify-between space-y-6">
+                <div className="p-6 sm:p-8 flex-grow flex flex-col justify-between space-y-6">
                   {/* Pricing and Description */}
-                  <div className="space-y-4">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl md:text-4xl font-black text-white tracking-tight">
-                        {combo.price}
-                      </span>
-                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                        / sở hữu trọn đời
-                      </span>
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                          {combo.price}
+                        </span>
+                        <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">
+                          / sở hữu trọn đời
+                        </span>
+                      </div>
                     </div>
 
-                    <p className="text-gray-400 text-xs leading-relaxed font-semibold">
+                    <p className="text-gray-300 text-xs leading-relaxed font-semibold">
                       {combo.description}
                     </p>
                   </div>
 
-                  {/* Included Courses Section */}
-                  <div className="space-y-4 pt-4 border-t border-gray-800">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                      {isVipPackage ? 'Danh sách mở khóa:' : `Bao gồm ${linkedCourses.length} khóa học chuyên môn:`}
+                  {/* Visual Included Courses Section */}
+                  <div className="space-y-3 pt-4 border-t border-gray-800">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-teal-400 flex items-center justify-between">
+                      <span>{isVipPackage ? 'Khóa học được mở khóa:' : `Gồm ${linkedCourses.length} khóa học chuyên sâu:`}</span>
+                      <span className="text-gray-400 font-normal">Học liệu chuẩn hóa</span>
                     </p>
 
-                    <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar pr-1">
                       {isVipPackage ? (
-                        <div className="flex items-start gap-3 bg-amber-500/5 p-3 rounded-2xl border border-amber-500/10">
-                          <Crown className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-300/90 font-bold leading-relaxed">
-                            Mở khóa <strong>toàn bộ</strong> tất cả các khóa học hiện tại và mọi khóa học mới ra mắt trong tương lai trọn đời.
+                        <div className="flex items-start gap-3 bg-amber-500/10 p-3.5 rounded-2xl border border-amber-500/20">
+                          <Crown className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-200 font-bold leading-relaxed">
+                            Mở khóa <strong>toàn bộ</strong> tất cả các khóa học hiện tại và các khóa học thêm mới trong tương lai.
                           </p>
                         </div>
-                      ) : (
+                      ) : linkedCourses.length > 0 ? (
                         linkedCourses.map((c, cIdx) => (
-                          <div key={`vip-c-${c.id}-${cIdx}`} className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span className="text-xs text-gray-300 font-extrabold truncate">
-                              {c.title}
-                            </span>
-                          </div>
-                        ))
-                      )}
-
-                      {/* Custom Benefits or Fallback */}
-                      {combo.benefits && combo.benefits.length > 0 ? (
-                        combo.benefits.map((benefit, bIdx) => (
-                          <div key={bIdx} className="flex items-center gap-2">
-                            <Check className={`w-4 h-4 shrink-0 ${isVipPackage ? 'text-amber-500' : 'text-emerald-500'}`} />
-                            <span className={`text-xs font-bold ${isVipPackage ? 'text-amber-300' : 'text-gray-300'}`}>
-                              {benefit}
+                          <div
+                            key={`vip-c-${c.id}-${cIdx}`}
+                            className="flex items-center justify-between p-2.5 bg-gray-800/80 hover:bg-gray-800 rounded-2xl border border-gray-750 transition-all group/course"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 pr-2">
+                              <img
+                                src={c.image}
+                                alt={c.title}
+                                className="w-10 h-7 object-cover rounded-lg border border-gray-700 shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-200 group-hover/course:text-teal-300 transition-colors line-clamp-1">
+                                  {c.title}
+                                </p>
+                                <span className="text-[10px] font-bold text-gray-400">
+                                  {c.category} • Giá gốc: {c.price}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 bg-teal-500/20 text-teal-300 text-[10px] font-black rounded-md shrink-0 border border-teal-500/30">
+                              Bao gồm
                             </span>
                           </div>
                         ))
                       ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span className="text-xs text-gray-300 font-bold">Tài liệu hướng dẫn chuyên sâu đính kèm</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span className="text-xs text-gray-300 font-bold">Cấp chứng nhận hoàn thành</span>
-                          </div>
-                          {isVipPackage && (
-                            <div className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-amber-500 shrink-0" />
-                              <span className="text-xs text-amber-300 font-bold">Đặc quyền Hỗ trợ 1-1 từ chuyên gia</span>
-                            </div>
-                          )}
-                        </>
+                        <p className="text-xs text-gray-400 italic py-2">Gồm các chuyên đề đào tạo thực tế tiêu chuẩn ISO/HACCP.</p>
                       )}
                     </div>
                   </div>
 
+                  {/* Benefits checklist */}
+                  <div className="space-y-2 pt-3 border-t border-gray-800">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Quyền lợi đặc quyền:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(combo.benefits && combo.benefits.length > 0
+                        ? combo.benefits
+                        : [
+                            'Tài liệu hướng dẫn chuyên sâu đính kèm',
+                            'Cấp chứng nhận hoàn thành',
+                            'Hỗ trợ giải đáp 24/7',
+                            'Truy cập khóa học trọn đời'
+                          ]
+                      ).map((benefit, bIdx) => (
+                        <div key={bIdx} className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="text-xs font-semibold text-gray-300 line-clamp-1">
+                            {benefit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Actions Button */}
-                  <div className="pt-4">
+                  <div className="pt-2">
                     {isOwned ? (
-                      <div className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-center bg-gray-800 text-emerald-400 border border-gray-700/80 flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        <span>Đã kích hoạt</span>
+                      <div className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-center bg-gray-800 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-2 shadow-inner">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Đã kích hoạt gói combo này</span>
                       </div>
                     ) : (
                       <button
                         onClick={() => handlePurchaseClick(combo)}
-                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer transition-all ${
+                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer transition-all shadow-lg active:scale-98 ${
                           isVipPackage
-                            ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-black hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20'
-                            : 'bg-white text-gray-950 hover:bg-gray-100 hover:scale-103'
+                            ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-gray-950 hover:from-amber-300 hover:to-amber-400 shadow-amber-500/20'
+                            : 'bg-[#007c76] hover:bg-[#005f5b] text-white shadow-[#007c76]/30'
                         }`}
                       >
-                        Đăng ký gói {combo.id === 'combo-basic' ? 'Basic' : combo.id === 'combo-pro' ? 'Pro' : 'VIP'}
+                        Đăng ký gói {combo.title}
                       </button>
                     )}
                   </div>

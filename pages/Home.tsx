@@ -34,7 +34,9 @@ import {
   ArrowUpRight,
   FileText,
   Users,
-  Target
+  Target,
+  Star,
+  Filter
 } from 'lucide-react';
 
 const getOptimizedCourseImage = (url?: string, width = 720) => {
@@ -46,13 +48,74 @@ const getOptimizedCourseImage = (url?: string, width = 720) => {
   return url;
 };
 
+const DEFAULT_COMBOS_HOME = [
+  {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    originalPrice: '2.400.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP Codex, 5 nguyên tắc vàng của WHO và quy trình tự kiểm soát an toàn thực phẩm.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành']
+  },
+  {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    originalPrice: '3.600.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư & quản lý vận hành nhà máy gồm trọn bộ ISO 9001, ISO 14001 & ISO 22000.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu', 'Hỗ trợ giải đáp chuyên gia 24/7']
+  },
+  {
+    id: 'combo-vip',
+    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
+    price: '2.500.000đ',
+    originalPrice: '5.000.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo VIP: Độc quyền mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm cố vấn 1-1 và nhận chứng nhận ngay & liền.',
+    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
+    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Nhận chứng nhận ngay & liền']
+  }
+];
+
 const Home: React.FC = () => {
   const mainWebsite = "https://2fast.com.vn";
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
+  const [homeCombos, setHomeCombos] = useState<any[]>(DEFAULT_COMBOS_HOME);
   const [activeHoverCard, setActiveHoverCard] = useState<string | null>(null);
 
-  // Curated list of featured courses for carousel (deduplicated & active)
+  // Helper calculation for original price line-through and discount percentage badges
+  const getCoursePriceDisplay = (course: Course) => {
+    const price = course.price || 'Miễn phí';
+    let originalPrice = course.originalPrice;
+    let discountBadge = course.discountPercent ? `-${course.discountPercent}%` : null;
+
+    if (!originalPrice && price && price !== 'Miễn phí' && price.includes('đ')) {
+      const num = parseInt(price.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(num) && num > 0) {
+        originalPrice = (num * 2).toLocaleString('vi-VN') + 'đ';
+        discountBadge = '-50%';
+      }
+    } else if (originalPrice && !discountBadge && originalPrice !== price) {
+      const priceNum = parseInt(price.replace(/[^0-9]/g, ''), 10);
+      const origNum = parseInt(originalPrice.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(priceNum) && !isNaN(origNum) && origNum > priceNum) {
+        const pct = Math.round(((origNum - priceNum) / origNum) * 100);
+        discountBadge = `-${pct}%`;
+      }
+    }
+
+    return { price, originalPrice, discountBadge };
+  };
+
+  // Curated list of featured courses (deduplicated & active)
   const featuredCourses = useMemo(() => {
     const seen = new Set<string>();
     const list: Course[] = [];
@@ -249,6 +312,32 @@ const Home: React.FC = () => {
     };
   }, []);
 
+  // Sync combos real-time
+  useEffect(() => {
+    const loadCombos = async () => {
+      try {
+        const response = await fetch('/api/combos');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data.combos) && data.combos.length > 0) {
+            setHomeCombos(data.combos);
+          }
+        }
+      } catch (e) {}
+    };
+
+    loadCombos();
+
+    const handleSync = () => loadCombos();
+    window.addEventListener('combos_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      window.removeEventListener('combos_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   // Real-time ownership sync
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
@@ -328,205 +417,366 @@ const Home: React.FC = () => {
       </section>
 
 
-      {/* 2. Featured Courses (5 Khóa học nổi bật, Dạng 2D, Trôi Chậm, Nội Dung Trực Tiếp Trên Từng Card) */}
+      {/* 2. Featured Courses (Cấu trúc Khóa Học Nổi Bật Hiện Đại, Bắt Mắt, Layout 3 Cột, Filter Tabs, Sale Off & Dynamic Syllabus Preview) */}
       <section 
-        className="py-12 md:py-16 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden"
+        className="py-14 md:py-20 bg-gradient-to-b from-slate-50 via-teal-950/[0.02] to-white border-t border-slate-200/80 relative overflow-hidden"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Header - Nổi bật, sang trọng, rõ dấu tiếng Việt */}
-          <div className="text-center mb-8 md:mb-10">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-normal pt-1.5 pb-1.5 leading-snug">
-              Khóa Học <span className="text-[#007c76] inline-block font-black">Nổi Bật</span>
+          {/* Section Header */}
+          <div className="text-center mb-8 md:mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200/70 text-teal-800 text-xs font-bold uppercase tracking-wider mb-3 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-[#007c76]" />
+              <span>Chương Trình Đào Tạo Thực Chiến</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-snug">
+              Khóa Học <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#007c76] to-emerald-600">Nổi Bật</span>
             </h2>
-            <p className="text-slate-500 font-medium text-xs sm:text-sm md:text-base max-w-xl mx-auto mt-2">
-              Chương trình chuẩn hóa ISO, HACCP &amp; VietGAP dành cho doanh nghiệp và chuyên gia
+            <p className="text-slate-500 font-medium text-xs sm:text-sm md:text-base max-w-2xl mx-auto mt-2.5 leading-relaxed">
+              Chuẩn hóa quy trình ISO, HACCP Codex &amp; VietGAP cùng các chuyên gia hàng đầu. Đầy đủ bộ biểu mẫu SOP thực tế và cấp chứng nhận toàn quốc.
             </p>
           </div>
 
-          {/* 2D Horizontal Moving Stage - Trôi chậm từ trái sang phải, tự động kéo card ra giữa khi lia chuột */}
-          <div 
-            ref={marqueeContainerRef}
-            className="course-marquee-viewport w-full select-none"
-            onMouseLeave={handleContainerMouseLeave}
-          >
-            <div 
-              ref={trackRef}
-              className="course-marquee-track flex"
-              style={{ width: `${groupWidth * 4}px` }}
-            >
-              {[0, 1, 2, 3].map((groupIndex) => (
-                <div 
-                  key={`marquee-group-${groupIndex}`}
-                  className="flex shrink-0"
-                  style={{ 
-                    width: `${groupWidth}px`, 
-                    gap: `${marqueeGap}px`, 
-                    paddingRight: `${marqueeGap}px` 
-                  }}
+          {/* Featured Courses 3-Column Modern Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featuredCourses.map((c) => {
+              const cLessons = extractLessonsFlat(c.curriculum);
+              const { price, originalPrice, discountBadge } = getCoursePriceDisplay(c);
+              const isOwned = ownedCourseIds.includes(c.id);
+              const cardKey = `home-featured-${c.id}`;
+              const isHoveredOrActive = activeHoverCard === cardKey;
+
+              return (
+                <div
+                  key={c.id}
+                  className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl hover:border-teal-500/60 transition-all duration-300 flex flex-col overflow-hidden group relative hover:-translate-y-1.5"
+                  onMouseEnter={() => setActiveHoverCard(cardKey)}
+                  onMouseLeave={() => setActiveHoverCard(null)}
                 >
-                  {top5Courses.map((c, idx) => {
-                    const cLessons = extractLessonsFlat(c.curriculum);
-                    const cardKey = `${groupIndex}-${c.id}-${idx}`;
-                    const isHoveredOrActive = activeHoverCard === cardKey;
+                  {/* Image Container with scrim overlay & status badges */}
+                  <div className="relative h-52 sm:h-56 overflow-hidden bg-slate-100 shrink-0">
+                    <img
+                      src={getOptimizedCourseImage(c.image, 600)}
+                      alt={c.title}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=600';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
 
-                    return (
-                      <div 
-                        key={`card-${cardKey}`}
-                        style={{ width: `${cardWidth}px` }}
-                        className="shrink-0 select-none group course-card-wrapper"
-                        onMouseEnter={(e) => handleCardFocusOrHover(cardKey, e.currentTarget)}
-                        onMouseLeave={handleCardMouseLeave}
-                        onClick={(e) => {
-                          // Hỗ trợ chạm/bật trên thiết bị di động và tự động kéo ra giữa
-                          handleCardFocusOrHover(cardKey, e.currentTarget);
-                        }}
+                    {/* Top Left Category Tag */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="bg-slate-900/90 backdrop-blur-xs text-teal-200 font-bold px-2.5 py-1 rounded-lg text-[11px] uppercase tracking-wider shadow-sm border border-teal-500/30">
+                        {c.category || 'Tiêu chuẩn ISO'}
+                      </span>
+                    </div>
+
+                    {/* Top Right Sale Off Discount Badge */}
+                    {discountBadge && (
+                      <div className="absolute top-3 right-3 z-10">
+                        <span className="bg-gradient-to-r from-red-600 to-emerald-600 text-white font-black px-2.5 py-1 rounded-lg text-[11px] uppercase tracking-wider shadow-md border border-white/20 flex items-center gap-1 animate-pulse">
+                          🏷️ {discountBadge}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Owned status indicator */}
+                    {isOwned && (
+                      <div className="absolute bottom-3 left-3 z-10">
+                        <span className="bg-emerald-500 text-slate-950 font-black px-2.5 py-0.5 rounded-md text-[10px] uppercase tracking-wider shadow-md flex items-center gap-1">
+                          <CheckCircle2 className="w-3.0 h-3.0" />
+                          Đã sở hữu
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4 bg-white">
+                    <div className="space-y-2">
+                      <Link to={`/khoa-hoc/${c.id}`} className="block group-hover:text-[#007c76] transition-colors">
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug line-clamp-2">
+                          {c.title}
+                        </h3>
+                      </Link>
+
+                      {c.description && (
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">
+                          {c.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Side-by-side Pricing & Action Buttons */}
+                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Học phí</span>
+                          {originalPrice && originalPrice !== price && (
+                            <span className="text-xs text-slate-400 line-through font-medium">
+                              {originalPrice}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-black text-[#007c76]">
+                            {price}
+                          </span>
+                          {discountBadge && (
+                            <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200/60 px-1.5 py-0.5 rounded">
+                              {discountBadge}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Link
+                        to={`/khoa-hoc/${c.id}`}
+                        className="px-4 py-2.5 bg-[#007c76] hover:bg-[#005c56] text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
                       >
-                        <div className="course-card-inner relative bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[360px] sm:h-[385px] overflow-hidden transition-all duration-300">
-                          {/* Shimmer sweep effect layer on hover */}
-                          <div className="course-shimmer-layer pointer-events-none" />
+                        <span>{isOwned ? 'Vào Học' : 'Xem Chi Tiết'}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
 
-                          {/* ======================================================== */}
-                          {/* 1. MẶC ĐỊNH (LÚC ĐẦU): HIỆN TÊN VÀ ẢNH KHÓA HỌC          */}
-                          {/* ======================================================== */}
-                          <div className="flex flex-col h-full w-full">
-                            {/* 1.1 Ảnh khóa học */}
-                            <div 
-                              className="relative w-full overflow-hidden bg-slate-100 shrink-0 h-[215px] sm:h-[235px]"
+                  {/* Interactive Dynamic Syllabus Preview Slide-Up (Triggered on hover/focus) */}
+                  <div
+                    className={`absolute inset-0 z-20 bg-white flex flex-col transition-all duration-300 ease-out ${
+                      isHoveredOrActive
+                        ? 'translate-y-0 opacity-100 pointer-events-auto'
+                        : 'translate-y-full opacity-0 pointer-events-none'
+                    }`}
+                  >
+                    {/* Drawer Header */}
+                    <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white p-4 shrink-0 border-b border-teal-800/40">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 bg-teal-500/20 border border-teal-400/30 px-2 py-0.5 rounded">
+                          {c.category || 'Tiêu chuẩn'}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-emerald-400" />
+                          {cLessons.length} bài thực chiến
+                        </span>
+                      </div>
+                      <Link to={`/khoa-hoc/${c.id}`} className="block">
+                        <h4 className="text-xs sm:text-sm font-black text-white hover:text-teal-200 transition-colors line-clamp-1 leading-snug">
+                          {c.title}
+                        </h4>
+                      </Link>
+                    </div>
+
+                    {/* Lesson Scroll List */}
+                    <div className="p-3.5 flex-1 min-h-0 flex flex-col bg-slate-50/80">
+                      <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200/80">
+                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                          Nội Dung Đào Tạo Trọng Tâm
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">Cuộn để xem</span>
+                      </div>
+
+                      <div className="space-y-1.5 overflow-y-auto custom-scrollbar flex-1 pr-1">
+                        {cLessons.length > 0 ? (
+                          cLessons.map((lesson, lIdx) => (
+                            <Link
+                              key={lIdx}
+                              to={`/khoa-hoc/${c.id}`}
+                              className="flex items-start gap-2 p-2 rounded-lg bg-white hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 transition-all text-left group/item"
                             >
-                              <img 
-                                src={getOptimizedCourseImage(c.image, 480)}
-                                alt={c.title}
-                                width={480}
-                                height={270}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                onError={(e) => {
-                                  const target = e.currentTarget;
-                                  target.src = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=480';
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
-                              
-                              {/* Category badge */}
-                              <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
-                                <span className="bg-slate-900/85 backdrop-blur-xs text-teal-200 font-bold px-2.5 py-0.5 rounded text-[11px] uppercase tracking-wider shadow-sm border border-teal-500/20">
-                                  {c.category || 'Tiêu chuẩn'}
-                                </span>
+                              <div className="w-5 h-5 rounded-md bg-teal-100/90 text-teal-800 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5 group-hover/item:bg-teal-600 group-hover/item:text-white transition-colors">
+                                {String(lIdx + 1).padStart(2, '0')}
                               </div>
-
-                              {/* Price badge */}
-                              <div className="absolute bottom-2.5 right-2.5 z-10 pointer-events-none">
-                                <span className="bg-emerald-500/95 text-slate-950 font-black px-2.5 py-0.5 rounded-md text-xs shadow-md border border-emerald-300/40">
-                                  {c.price || 'Miễn phí'}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* 1.2 Tên khóa học */}
-                            <div className="p-4 sm:p-5 flex flex-col flex-grow justify-center bg-white">
-                              <div>
-                                <Link 
-                                  to={`/khoa-hoc/${c.id}`}
-                                  className="block"
-                                >
-                                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 group-hover:text-[#007c76] transition-colors line-clamp-2 leading-snug">
-                                    {c.title}
-                                  </h3>
-                                </Link>
-                                {c.description && (
-                                  <p className="text-slate-500 text-xs line-clamp-2 mt-1.5 font-medium leading-relaxed">
-                                    {c.description}
+                              <div className="min-w-0 flex-grow">
+                                <p className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-1 group-hover/item:text-teal-900 transition-colors">
+                                  {lesson.title}
+                                </p>
+                                {lesson.content && (
+                                  <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5 font-medium">
+                                    {lesson.content}
                                   </p>
                                 )}
                               </div>
-                            </div>
+                            </Link>
+                          ))
+                        ) : (
+                          <div className="p-3 text-xs text-slate-500 text-center italic">
+                            Chương trình đào tạo chi tiết được cập nhật liên tục.
                           </div>
-
-                          {/* ======================================================== */}
-                          {/* 2. CHUỘT CHỈA VÔ: HIỆN NỘI DUNG NGAY TRÊN CARD            */}
-                          {/*    CHUỘT CHỈ RA: ĐÓNG NỘI DUNG                            */}
-                          {/* ======================================================== */}
-                          <div 
-                            className={`course-hover-content-panel absolute inset-0 z-20 bg-white flex flex-col transition-all duration-300 ease-out ${
-                              isHoveredOrActive
-                                ? 'translate-y-0 opacity-100 pointer-events-auto' 
-                                : 'translate-y-full opacity-0 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto'
-                            }`}
-                          >
-                            {/* 2.1 Header nội dung khóa học */}
-                            <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white p-3.5 sm:p-4 shrink-0 border-b border-teal-800/40">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 bg-teal-500/20 border border-teal-400/30 px-2 py-0.5 rounded">
-                                  {c.category || 'Tiêu chuẩn'}
-                                </span>
-                                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                  <BookOpen className="w-3 h-3 text-emerald-400" />
-                                  {cLessons.length} bài thực chiến
-                                </span>
-                              </div>
-                              <Link to={`/khoa-hoc/${c.id}`} className="block">
-                                <h4 className="text-xs sm:text-sm font-black text-white hover:text-teal-200 transition-colors line-clamp-1 leading-snug">
-                                  {c.title}
-                                </h4>
-                              </Link>
-                            </div>
-
-                            {/* 2.2 Danh sách bài học trực tiếp trên card (Cuộn mượt mà) */}
-                            <div className="p-3 sm:p-3.5 flex-1 min-h-0 flex flex-col bg-slate-50/80">
-                              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200/80">
-                                <span className="text-[11px] font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                                  Nội Dung Đào Tạo Trọng Tâm
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">
-                                  Cuộn để xem
-                                </span>
-                              </div>
-
-                              <div className="space-y-1.5 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                                {cLessons.map((lesson, lIdx) => (
-                                  <Link
-                                    key={lIdx}
-                                    to={`/khoa-hoc/${c.id}`}
-                                    className="flex items-start gap-2 p-2 rounded-lg bg-white hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 transition-all text-left group/item"
-                                  >
-                                    <div className="w-5 h-5 rounded-md bg-teal-100/90 text-teal-800 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5 group-hover/item:bg-teal-600 group-hover/item:text-white transition-colors">
-                                      {String(lIdx + 1).padStart(2, '0')}
-                                    </div>
-                                    <div className="min-w-0 flex-grow">
-                                      <p className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-1 group-hover/item:text-teal-900 transition-colors">
-                                        {lesson.title}
-                                      </p>
-                                      {lesson.content && (
-                                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5 font-medium">
-                                          {lesson.content}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </Link>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* 2.3 Nút Vào Học Ngay */}
-                            <div className="p-3 bg-white rounded-b-2xl border-t border-slate-100 shrink-0">
-                              <Link
-                                to={`/khoa-hoc/${c.id}`}
-                                className="w-full py-2.5 px-4 bg-[#007c76] hover:bg-[#005c56] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
-                              >
-                                <span>Vào Học Ngay</span>
-                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    {/* Drawer Footer CTA */}
+                    <div className="p-3.5 bg-white rounded-b-3xl border-t border-slate-100 shrink-0 flex items-center justify-between gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Học phí ưu đãi</span>
+                        <span className="text-base font-black text-[#007c76]">{price}</span>
+                      </div>
+                      <Link
+                        to={`/khoa-hoc/${c.id}`}
+                        className="py-2.5 px-5 bg-[#007c76] hover:bg-[#005c56] text-white text-xs font-bold uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
+                      >
+                        <span>Vào Học Ngay</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+
+          {featuredCourses.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-3xl border border-slate-200/80 p-8">
+              <p className="text-slate-500 font-medium text-sm">
+                Đang cập nhật danh sách khóa học nổi bật.
+              </p>
             </div>
+          )}
+        </div>
+      </section>
+
+      {/* 2.5. Gói Combo & Ưu Đãi Sale Off 50% (Layout Lưới 3 Cột Hiện Đại, Đổ Bóng Hover & Badge Tiết Kiệm) */}
+      <section className="py-14 md:py-20 bg-gradient-to-b from-white via-slate-50 to-teal-950/[0.02] border-t border-slate-200/80 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Flash Sale Banner Header */}
+          <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 mb-10 border border-teal-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="space-y-2 text-center md:text-left relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-600/90 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md animate-pulse">
+                <span>🔥 SIÊU ƯU ĐÃI SALE OFF 50%</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white leading-tight">
+                Gói Combo Đào Tạo Trọn Gói Tiết Kiệm
+              </h3>
+              <p className="text-slate-300 text-xs sm:text-sm font-medium max-w-xl">
+                Đăng ký học trọn bộ tiêu chuẩn ISO, HACCP &amp; VietGAP với chi phí ưu đãi nhất. Tiết kiệm đến 50% so với đăng ký riêng lẻ.
+              </p>
+            </div>
+            <Link
+              to="/account/vip-upgrade"
+              className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all shrink-0 cursor-pointer flex items-center gap-2"
+            >
+              <span>Đăng Ký Nhận Sale Off</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* 3-Column Combo Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {homeCombos.map((combo) => {
+              const isVip = combo.id === 'khoa-vip' || combo.id.includes('vip');
+              const isPro = combo.id === 'combo-pro' || combo.id.includes('pro');
+              const savingsBadge = combo.savings || 'Tiết kiệm 50%';
+              const originalPriceStr = combo.originalPrice || (combo.price === '1.200.000đ' ? '2.400.000đ' : combo.price === '1.800.000đ' ? '3.600.000đ' : combo.price === '2.500.000đ' ? '5.000.000đ' : '');
+              const cIds: string[] = Array.isArray(combo.courseIds) ? combo.courseIds : [];
+              const comboCourses = allCourses.filter(c => cIds.includes(c.id));
+
+              return (
+                <div
+                  key={combo.id}
+                  className={`bg-white rounded-3xl border-2 transition-all duration-300 overflow-hidden flex flex-col hover:shadow-2xl hover:-translate-y-1.5 group relative ${
+                    isVip 
+                      ? 'border-amber-400/90 shadow-md shadow-amber-500/10 hover:border-amber-500' 
+                      : isPro 
+                        ? 'border-teal-400/80 shadow-md shadow-teal-500/10 hover:border-teal-500' 
+                        : 'border-slate-200/90 hover:border-teal-500/60 shadow-sm'
+                  }`}
+                >
+                  {/* Image & Badges */}
+                  <div className="relative h-48 overflow-hidden shrink-0">
+                    <img
+                      src={combo.image}
+                      alt={combo.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+
+                    {/* Status Badge 'Tiết kiệm' */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="bg-gradient-to-r from-red-600 via-emerald-600 to-teal-600 text-white font-black px-3 py-1 rounded-xl text-[11px] uppercase tracking-wider shadow-lg border border-white/20 flex items-center gap-1 backdrop-blur-xs">
+                        🏷️ {savingsBadge}
+                      </span>
+                    </div>
+
+                    {isVip && (
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="bg-amber-500 text-amber-950 font-black px-3 py-1 rounded-xl text-[10px] uppercase tracking-widest shadow-md flex items-center gap-1 border border-amber-300/40">
+                          ⭐ Đặc Quyền VIP
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Body Info */}
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-[#007c76] transition-colors leading-snug line-clamp-1">
+                        {combo.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">
+                        {combo.description}
+                      </p>
+                    </div>
+
+                    {/* Inner Courses List */}
+                    <div className="space-y-1.5 p-3 bg-slate-50 rounded-2xl border border-slate-200/60 max-h-40 overflow-y-auto custom-scrollbar">
+                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1 flex items-center justify-between">
+                        <span>Gồm {isVip ? 'Tất cả' : comboCourses.length} chuyên đề:</span>
+                        <span className="text-[#007c76]">ISO &amp; HACCP</span>
+                      </div>
+                      {comboCourses.length > 0 ? (
+                        comboCourses.map((c, cIdx) => (
+                          <div key={c.id || cIdx} className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs">
+                            <span className="truncate">{c.title}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-50 text-[#007c76] font-bold shrink-0">{c.category || 'ISO'}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-[11px] text-slate-500 font-medium italic">
+                          Mở khóa trọn bộ kiến thức đào tạo an toàn thực phẩm.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Price & CTA */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-auto">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Học phí</span>
+                          {originalPriceStr && (
+                            <span className="text-[11px] text-slate-400 line-through font-medium">
+                              {originalPriceStr}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-lg font-black text-[#007c76]">{combo.price}</span>
+                      </div>
+
+                      <Link
+                        to="/account/vip-upgrade"
+                        className={`px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all cursor-pointer shadow-sm flex items-center gap-1 ${
+                          isVip 
+                            ? 'bg-amber-500 text-amber-950 hover:bg-amber-600 shadow-amber-500/20' 
+                            : isPro 
+                              ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-900/20' 
+                              : 'bg-[#007c76] text-white hover:bg-[#005f5b] shadow-[#007c76]/20'
+                        }`}
+                      >
+                        <span>Đăng ký gói</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
