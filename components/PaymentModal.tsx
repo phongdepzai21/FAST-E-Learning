@@ -7,6 +7,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { parseNumericPrice, formatVND, getPaymentConfig } from '../utils/qrService';
 import { sendOtp, verifyOtp } from '../utils/otpService';
 import { PaymentStatusPolling } from './PaymentStatusPolling';
+import { authDebugger } from '../utils/authDebugger';
 
 interface PaymentModalProps {
   course: Course;
@@ -16,7 +17,11 @@ interface PaymentModalProps {
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, onSuccess }) => {
+  // Safe State Guard: Unconditional Top-Level Hooks
+  const isMountedRef = useRef<boolean>(true);
+  const otpInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
@@ -33,14 +38,28 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const [otpError, setOtpError] = useState<string>('');
   const [otpNotice, setOtpNotice] = useState<string>('');
   const [otpCountdown, setOtpCountdown] = useState<number>(0);
-  const otpInputRef = useRef<HTMLInputElement>(null);
 
   const targetEmail = (auth.currentUser?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim();
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const safeSetState = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T | ((prev: T) => T)) => {
+    if (isMountedRef.current) {
+      setter(value);
+    }
+  };
+
+  useEffect(() => {
     let timer: NodeJS.Timeout;
     if (otpCountdown > 0) {
-      timer = setTimeout(() => setOtpCountdown(prev => prev - 1), 1000);
+      timer = setTimeout(() => {
+        safeSetState(setOtpCountdown, prev => prev - 1);
+      }, 1000);
     }
     return () => clearTimeout(timer);
   }, [otpCountdown]);
@@ -48,14 +67,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   useEffect(() => {
     if (showOtpForm && isOpen) {
       const timer = setTimeout(() => {
-        otpInputRef.current?.focus();
+        if (isMountedRef.current) {
+          otpInputRef.current?.focus();
+        }
       }, 150);
       return () => clearTimeout(timer);
     }
   }, [showOtpForm, isOpen]);
 
   useEffect(() => {
-    setConfig(getPaymentConfig());
+    safeSetState(setConfig, getPaymentConfig());
     const user = auth.currentUser;
     if (user && user.email) {
       const email = user.email.toLowerCase();
@@ -69,19 +90,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
           } catch (e) {}
         }
       }
-      setIsVipOrAdmin(isPrivileged);
+      safeSetState(setIsVipOrAdmin, isPrivileged);
     } else {
-      setIsVipOrAdmin(false);
+      safeSetState(setIsVipOrAdmin, false);
     }
 
     // Reset states when modal toggles
-    setShowOtpForm(false);
-    setShowPaymentPolling(false);
-    setUserInputOtp('');
-    setOtpError('');
-    setOtpNotice('');
-    setOtpCountdown(0);
-    setOrderId('');
+    safeSetState(setShowOtpForm, false);
+    safeSetState(setShowPaymentPolling, false);
+    safeSetState(setUserInputOtp, '');
+    safeSetState(setOtpError, '');
+    safeSetState(setOtpNotice, '');
+    safeSetState(setOtpCountdown, 0);
+    safeSetState(setOrderId, '');
 
     if (isOpen) {
       const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim().toLowerCase();
@@ -102,10 +123,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         .then(res => res.json())
         .then(data => {
           if (data.success && data.paymentCode) {
-            setPaymentCode(data.paymentCode);
-            if (data.orderId) setOrderId(data.orderId);
+            safeSetState(setPaymentCode, data.paymentCode);
+            if (data.orderId) safeSetState(setOrderId, data.orderId);
             if (data.bankAccount) {
-              setConfig(prev => ({
+              safeSetState(setConfig, prev => ({
                 ...prev,
                 accountNo: data.bankAccount,
                 bankName: data.bankCode || 'ACB',
@@ -121,10 +142,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
           for (let i = 0; i < 6; i++) {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
           }
-          setPaymentCode(result);
+          safeSetState(setPaymentCode, result);
         });
       } else {
-        setPaymentCode('FREE');
+        safeSetState(setPaymentCode, 'FREE');
       }
     }
   }, [isOpen, course.id, course.price]);
@@ -143,10 +164,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         const data = docSnap.data();
         if (data.status === 'active') {
           localStorage.setItem(`course_unlocked_${course.id}`, 'true');
-          setIsCompleted(true);
+          safeSetState(setIsCompleted, true);
           setTimeout(() => {
-            onSuccess();
-            setIsCompleted(false);
+            if (isMountedRef.current) {
+              onSuccess();
+              safeSetState(setIsCompleted, false);
+            }
           }, 1200);
         }
       }
@@ -157,16 +180,25 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     return () => unsubscribe();
   }, [isOpen, course.id, onSuccess]);
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const numericAmount = parseNumericPrice(course.price);
   const isFreeCourse = numericAmount === 0;
 
   const handleConfirmTransfer = async () => {
-    setIsVerifying(true);
-    setOtpError('');
-    setOtpNotice('');
-    setUserInputOtp('');
+    safeSetState(setIsVerifying, true);
+    safeSetState(setOtpError, '');
+    safeSetState(setOtpNotice, '');
+    safeSetState(setUserInputOtp, '');
     const user = auth.currentUser;
     const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim();
 
@@ -178,26 +210,27 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       });
 
       if (result.success) {
-        setShowOtpForm(true);
-        setOtpNotice(result.message || `Mã xác thực OTP đã được gửi đến email ${email}.`);
-        setOtpCountdown(60);
+        safeSetState(setShowOtpForm, true);
+        safeSetState(setOtpNotice, result.message || `Mã xác thực OTP đã được gửi đến email ${email}.`);
+        safeSetState(setOtpCountdown, 60);
         if (result.fallback && result.otp) {
-          setUserInputOtp(result.otp);
+          safeSetState(setUserInputOtp, result.otp);
         }
       } else {
-        setOtpError(result.error || "Không thể gửi mã OTP qua email lúc này.");
+        safeSetState(setOtpError, result.error || "Không thể gửi mã OTP qua email lúc này.");
       }
     } catch (err: any) {
-      setOtpError(err?.message || "Lỗi kết nối tới máy chủ gửi mã OTP.");
+      safeSetState(setOtpError, err?.message || "Lỗi kết nối tới máy chủ gửi mã OTP.");
+      authDebugger.logOtpModalState({ componentName: "PaymentModal", event: "ConfirmTransferError", error: err?.message });
     }
-    setIsVerifying(false);
+    safeSetState(setIsVerifying, false);
   };
 
   const handleResendOtp = async () => {
     if (otpCountdown > 0) return;
-    setOtpError('');
-    setOtpNotice('');
-    setIsVerifying(true);
+    safeSetState(setOtpError, '');
+    safeSetState(setOtpNotice, '');
+    safeSetState(setIsVerifying, true);
     const user = auth.currentUser;
     const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim();
 
@@ -209,27 +242,28 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       });
 
       if (result.success) {
-        setOtpNotice(result.message || `Mã OTP mới đã được gửi lại thành công đến email ${email}.`);
-        setOtpCountdown(60);
+        safeSetState(setOtpNotice, result.message || `Mã OTP mới đã được gửi lại thành công đến email ${email}.`);
+        safeSetState(setOtpCountdown, 60);
         if (result.fallback && result.otp) {
-          setUserInputOtp(result.otp);
+          safeSetState(setUserInputOtp, result.otp);
         }
       } else {
-        setOtpError(result.error || "Không thể gửi lại mã OTP lúc này.");
+        safeSetState(setOtpError, result.error || "Không thể gửi lại mã OTP lúc này.");
       }
     } catch (err: any) {
-      setOtpError(err?.message || "Lỗi kết nối khi gửi lại OTP.");
+      safeSetState(setOtpError, err?.message || "Lỗi kết nối khi gửi lại OTP.");
+      authDebugger.logOtpModalState({ componentName: "PaymentModal", event: "ResendOtpError", error: err?.message });
     }
-    setIsVerifying(false);
+    safeSetState(setIsVerifying, false);
   };
 
   const handleVerifyOtp = async () => {
     if (userInputOtp.length !== 6) {
-      setOtpError("Vui lòng nhập đầy đủ mã OTP 6 chữ số từ email của bạn.");
+      safeSetState(setOtpError, "Vui lòng nhập đầy đủ mã OTP 6 chữ số từ email của bạn.");
       return;
     }
-    setIsVerifying(true);
-    setOtpError('');
+    safeSetState(setIsVerifying, true);
+    safeSetState(setOtpError, '');
 
     const user = auth.currentUser;
     const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim();
@@ -242,22 +276,23 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       });
 
       if (verifyRes.success) {
-        setOtpError('');
-        setShowOtpForm(false);
-        setShowPaymentPolling(true);
+        safeSetState(setOtpError, '');
+        safeSetState(setShowOtpForm, false);
+        safeSetState(setShowPaymentPolling, true);
       } else {
-        setOtpError(verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn.");
+        safeSetState(setOtpError, verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn.");
       }
-    } catch (err) {
-      setOtpError("Lỗi kết nối khi xác thực mã OTP.");
+    } catch (err: any) {
+      safeSetState(setOtpError, "Lỗi kết nối khi xác thực mã OTP.");
+      authDebugger.logOtpModalState({ componentName: "PaymentModal", event: "VerifyOtpError", error: err?.message });
     }
-    setIsVerifying(false);
+    safeSetState(setIsVerifying, false);
   };
 
   const handleRetryPayment = () => {
-    setShowPaymentPolling(false);
-    setShowOtpForm(false);
-    setUserInputOtp('');
+    safeSetState(setShowPaymentPolling, false);
+    safeSetState(setShowOtpForm, false);
+    safeSetState(setUserInputOtp, '');
     const user = auth.currentUser;
     const email = (user?.email || localStorage.getItem('user_email') || 'hocvien@gmail.com').trim().toLowerCase();
     const amount = parseNumericPrice(course.price);
@@ -276,8 +311,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       .then(res => res.json())
       .then(data => {
         if (data.success && data.paymentCode) {
-          setPaymentCode(data.paymentCode);
-          if (data.orderId) setOrderId(data.orderId);
+          safeSetState(setPaymentCode, data.paymentCode);
+          if (data.orderId) safeSetState(setOrderId, data.orderId);
         }
       })
       .catch(err => {
@@ -287,7 +322,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   };
 
   const handleInstantVipClaim = async () => {
-    setIsVerifying(true);
+    safeSetState(setIsVerifying, true);
     const user = auth.currentUser;
     if (user && user.email && course.id) {
       try {
@@ -307,24 +342,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
           { merge: true }
         );
         localStorage.setItem(`course_unlocked_${course.id}`, 'true');
-      } catch (e) {}
+      } catch (e: any) {
+        console.warn("Instant VIP claim write error:", e);
+      }
     }
-    setIsVerifying(false);
-    setIsCompleted(true);
+    safeSetState(setIsVerifying, false);
+    safeSetState(setIsCompleted, true);
     setTimeout(() => {
-      onSuccess();
-      setIsCompleted(false);
+      if (isMountedRef.current) {
+        onSuccess();
+        safeSetState(setIsCompleted, false);
+      }
     }, 800);
   };
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isOpen]);
 
   return (
     <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen grid place-items-center bg-slate-950/85 backdrop-blur-md px-4 overflow-y-auto py-6 animate-fade-in">
@@ -354,13 +384,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                   bankId: config.bankId,
                 }}
                 onSuccess={() => {
-                  setIsCompleted(true);
+                  safeSetState(setIsCompleted, true);
                   setTimeout(() => {
-                    onSuccess();
-                    setIsCompleted(false);
+                    if (isMountedRef.current) {
+                      onSuccess();
+                      safeSetState(setIsCompleted, false);
+                    }
                   }, 1200);
                 }}
-                onBack={() => setShowPaymentPolling(false)}
+                onBack={() => safeSetState(setShowPaymentPolling, false)}
                 onRetry={handleRetryPayment}
               />
             ) : (
@@ -419,8 +451,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                         value={userInputOtp}
                         disabled={isVerifying}
                         onChange={(e) => {
-                          setUserInputOtp(e.target.value.replace(/[^0-9]/g, ''));
-                          setOtpError('');
+                          safeSetState(setUserInputOtp, e.target.value.replace(/[^0-9]/g, ''));
+                          safeSetState(setOtpError, '');
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && userInputOtp.length === 6 && !isVerifying) {
@@ -471,7 +503,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                     <div className="flex gap-3 pt-2">
                       <button
                         type="button"
-                        onClick={() => setShowOtpForm(false)}
+                        onClick={() => safeSetState(setShowOtpForm, false)}
                         disabled={isVerifying}
                         className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer disabled:opacity-50"
                       >

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Course } from '../types';
 import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { formatVND, getVietQrUrl } from '../utils/qrService';
+import { authDebugger } from '../utils/authDebugger';
 
 interface PaymentStatusPollingProps {
   course: Course;
@@ -30,6 +31,9 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   onBack,
   onRetry,
 }) => {
+  // Safe State Guard: Prevent unmounted state updates
+  const isMountedRef = useRef<boolean>(true);
+
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [pollingCountdown, setPollingCountdown] = useState<number>(5);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
@@ -38,6 +42,19 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   // Timeout / Payment Failed states (3 minutes / 180 seconds timeout)
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
   const [isTimeout, setIsTimeout] = useState<boolean>(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const safeSetState = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T | ((prev: T) => T)) => {
+    if (isMountedRef.current) {
+      setter(value);
+    }
+  };
 
   const transferMemo = `FAST ${paymentCode || 'TEST'}`;
   const vietQrUrl = getVietQrUrl({
@@ -51,20 +68,24 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
 
   const copyText = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedField(fieldName);
-    setTimeout(() => setCopiedField(null), 2000);
+    safeSetState(setCopiedField, fieldName);
+    setTimeout(() => {
+      safeSetState(setCopiedField, null);
+    }, 2000);
   };
 
   const checkPaymentStatus = async () => {
-    if (isTimeout) return;
-    setIsCheckingPayment(true);
+    if (isTimeout || !isMountedRef.current) return;
+    safeSetState(setIsCheckingPayment, true);
     try {
       const queryParam = orderId ? `orderId=${encodeURIComponent(orderId)}` : `paymentCode=${encodeURIComponent(paymentCode)}`;
       const res = await fetch(`/api/check-payment?${queryParam}`);
       const data = await res.json();
       
       if (data.success && (data.status === 'PAID' || data.status === 'completed')) {
-        setStatusMessage('Thanh toán thành công! Đang kích hoạt khóa học...');
+        console.log(`[PaymentStatusPolling] SUCCESS: Payment verified for code ${paymentCode}, order ${orderId}`);
+        safeSetState(setStatusMessage, 'Thanh toán thành công! Đang kích hoạt khóa học...');
+        
         const user = auth.currentUser;
         const userEmail = (user?.email || localStorage.getItem('user_email') || '').toLowerCase().trim();
         if (userEmail && course.id) {
@@ -79,22 +100,34 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
               progress: 0,
               claimedVia: 'SEPAY_AUTO_POLL',
             }, { merge: true });
-          } catch (e) {
-            console.warn("Firestore purchase record write warning:", e);
+          } catch (e: any) {
+            console.warn("[PaymentStatusPolling] Firestore purchase record write warning:", e);
+            authDebugger.logOtpModalState({
+              componentName: "PaymentStatusPolling",
+              event: "FirestoreWriteWarning",
+              error: e?.message,
+            });
           }
         }
         localStorage.setItem(`course_unlocked_${course.id}`, 'true');
         setTimeout(() => {
-          onSuccess();
+          if (isMountedRef.current) {
+            onSuccess();
+          }
         }, 1000);
       } else {
-        setStatusMessage('Đang chờ giao dịch từ ngân hàng ACB (Chưa nhận được chuyển khoản)...');
+        safeSetState(setStatusMessage, 'Đang chờ giao dịch từ ngân hàng ACB (Chưa nhận được chuyển khoản)...');
       }
-    } catch (err) {
-      console.warn("Check payment polling error:", err);
-      setStatusMessage('Đang kết nối lại với máy chủ kiểm tra thanh toán...');
+    } catch (err: any) {
+      console.warn("[PaymentStatusPolling] Check payment polling error:", err);
+      authDebugger.logOtpModalState({
+        componentName: "PaymentStatusPolling",
+        event: "CheckPaymentError",
+        error: err?.message,
+      });
+      safeSetState(setStatusMessage, 'Đang kết nối lại với máy chủ kiểm tra thanh toán...');
     } finally {
-      setIsCheckingPayment(false);
+      safeSetState(setIsCheckingPayment, false);
     }
   };
 
@@ -103,16 +136,16 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
     if (isTimeout) return;
 
     const interval = setInterval(() => {
-      setPollingCountdown(5);
+      safeSetState(setPollingCountdown, 5);
       checkPaymentStatus();
     }, 5000);
 
     const countdownTimer = setInterval(() => {
-      setPollingCountdown(prev => (prev > 1 ? prev - 1 : 5));
-      setSecondsElapsed(prev => {
+      safeSetState(setPollingCountdown, prev => (prev > 1 ? prev - 1 : 5));
+      safeSetState(setSecondsElapsed, prev => {
         const next = prev + 1;
         if (next >= 180) {
-          setIsTimeout(true);
+          safeSetState(setIsTimeout, true);
         }
         return next;
       });

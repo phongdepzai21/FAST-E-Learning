@@ -5,12 +5,18 @@
 
 export interface OtpDebugInfo {
   componentName: string;
-  isOpen: boolean;
-  otpFormVisible: boolean;
-  userInputLength: number;
-  hasNotice: boolean;
-  hasError: boolean;
-  countdown: number;
+  isOpen?: boolean;
+  otpFormVisible?: boolean;
+  userInputLength?: number;
+  hasNotice?: boolean;
+  hasError?: boolean;
+  countdown?: number;
+  event?: string;
+  error?: string;
+  errorName?: string;
+  errorMessage?: string;
+  stack?: string;
+  componentStack?: string;
   extra?: any;
 }
 
@@ -237,12 +243,12 @@ class DiagnosticStore {
 
     this.state.modals.activeModals[info.componentName] = {
       componentName: info.componentName,
-      isOpen: info.isOpen,
-      otpFormVisible: info.otpFormVisible,
-      userInputLength: info.userInputLength,
-      hasNotice: info.hasNotice,
-      hasError: info.hasError,
-      countdown: info.countdown,
+      isOpen: info.isOpen ?? false,
+      otpFormVisible: info.otpFormVisible ?? false,
+      userInputLength: info.userInputLength ?? 0,
+      hasNotice: info.hasNotice ?? false,
+      hasError: info.hasError ?? false,
+      countdown: info.countdown ?? 0,
       lastUpdated: timestamp,
       triggerSource: info.extra?.triggerSource || existing?.triggerSource || 'React State Change',
     };
