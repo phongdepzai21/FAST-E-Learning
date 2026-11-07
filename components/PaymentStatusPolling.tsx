@@ -35,12 +35,7 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   const isMountedRef = useRef<boolean>(true);
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [pollingCountdown, setPollingCountdown] = useState<number>(5);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string>('Đang chờ giao dịch từ ngân hàng ACB...');
-  
-  // Timeout / Payment Failed states (3 minutes / 180 seconds timeout)
-  const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
   const [isTimeout, setIsTimeout] = useState<boolean>(false);
 
   useEffect(() => {
@@ -84,7 +79,6 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
       
       if (data.success && (data.status === 'PAID' || data.status === 'completed')) {
         console.log(`[PaymentStatusPolling] SUCCESS: Payment verified for code ${paymentCode}, order ${orderId}`);
-        safeSetState(setStatusMessage, 'Thanh toán thành công! Đang kích hoạt khóa học...');
         
         const user = auth.currentUser;
         const userEmail = (user?.email || localStorage.getItem('user_email') || '').toLowerCase().trim();
@@ -102,11 +96,6 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
             }, { merge: true });
           } catch (e: any) {
             console.warn("[PaymentStatusPolling] Firestore purchase record write warning:", e);
-            authDebugger.logOtpModalState({
-              componentName: "PaymentStatusPolling",
-              event: "FirestoreWriteWarning",
-              error: e?.message,
-            });
           }
         }
         localStorage.setItem(`course_unlocked_${course.id}`, 'true');
@@ -115,45 +104,29 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
             onSuccess();
           }
         }, 1000);
-      } else {
-        safeSetState(setStatusMessage, 'Đang chờ giao dịch từ ngân hàng ACB (Chưa nhận được chuyển khoản)...');
       }
     } catch (err: any) {
       console.warn("[PaymentStatusPolling] Check payment polling error:", err);
-      authDebugger.logOtpModalState({
-        componentName: "PaymentStatusPolling",
-        event: "CheckPaymentError",
-        error: err?.message,
-      });
-      safeSetState(setStatusMessage, 'Đang kết nối lại với máy chủ kiểm tra thanh toán...');
     } finally {
       safeSetState(setIsCheckingPayment, false);
     }
   };
 
-  // Poll every 5 seconds and track timeout (180 seconds)
+  // Poll silently every 5 seconds in background
   useEffect(() => {
     if (isTimeout) return;
 
     const interval = setInterval(() => {
-      safeSetState(setPollingCountdown, 5);
       checkPaymentStatus();
     }, 5000);
 
-    const countdownTimer = setInterval(() => {
-      safeSetState(setPollingCountdown, prev => (prev > 1 ? prev - 1 : 5));
-      safeSetState(setSecondsElapsed, prev => {
-        const next = prev + 1;
-        if (next >= 180) {
-          safeSetState(setIsTimeout, true);
-        }
-        return next;
-      });
-    }, 1000);
+    const timeoutTimer = setTimeout(() => {
+      safeSetState(setIsTimeout, true);
+    }, 180000); // 3 minutes timeout
 
     return () => {
       clearInterval(interval);
-      clearInterval(countdownTimer);
+      clearTimeout(timeoutTimer);
     };
   }, [orderId, paymentCode, isTimeout]);
 
@@ -168,12 +141,8 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
         <div className="space-y-2">
           <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Giao Dịch Hết Thời Gian Chờ</h3>
           <p className="text-slate-600 font-medium text-sm max-w-sm mx-auto leading-relaxed">
-            Hệ thống chưa nhận được thông tin chuyển khoản từ ngân hàng trong thời gian quy định (3 phút). Đơn hàng tạm thời hết hạn.
+            Hệ thống chưa nhận được thông tin chuyển khoản trong thời gian quy định (3 phút).
           </p>
-        </div>
-
-        <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 text-xs text-amber-900 font-medium">
-          Nếu bạn đã chuyển khoản thành công nhưng chưa được duyệt, vui lòng bấm <strong>Thử lại thanh toán</strong> để hệ thống tạo mã giao dịch mới hoặc liên hệ hỗ trợ.
         </div>
 
         <div className="flex gap-3 pt-2">
@@ -192,7 +161,7 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>Thử lại thanh toán (Retry)</span>
+            <span>Thử lại mã QR mới</span>
           </button>
         </div>
       </div>
@@ -200,167 +169,108 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+    <div className="space-y-5 animate-in fade-in zoom-in duration-300">
       {/* Header */}
       <div className="text-center space-y-1">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 border border-teal-200/60 rounded-full text-[#007c76] font-extrabold text-[11px] uppercase tracking-wider mb-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          Đã xác thực OTP - Chờ thanh toán ACB
-        </div>
-        <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Quét Mã QR Chuyển Khoản</h3>
+        <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Thanh Toán Chuyển Khoản Mã QR</h3>
         <p className="text-slate-500 font-medium text-xs sm:text-sm">
-          Sử dụng ứng dụng ngân hàng bất kỳ để quét mã và thanh toán tự động
+          Sử dụng ứng dụng ngân hàng bất kỳ để quét mã và chuyển khoản
         </p>
       </div>
 
-      {/* Live Polling Status Indicator */}
-      <div className="bg-white p-4 rounded-2xl border-2 border-teal-200 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+      {/* Horizontal Layout Container (Side-by-side QR + Bank Account Details) */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch bg-slate-50/70 p-5 rounded-3xl border border-slate-200 shadow-xs">
+        {/* Left Column: Pure QR Code */}
+        <div className="md:col-span-5 flex flex-col items-center justify-center bg-white p-4 rounded-2xl border-2 border-[#007c76] shadow-md">
+          <div className="w-52 h-52 sm:w-60 sm:h-60 relative flex items-center justify-center">
+            <img
+              src={vietQrUrl}
+              alt="Mã QR thanh toán ACB"
+              className="w-full h-full object-contain rounded-xl"
+            />
           </div>
-          <div>
-            <span className="text-xs font-black text-slate-900 block">Đang lắng nghe giao dịch SePay / ACB</span>
-            <span className="text-[11px] text-teal-700 font-medium">{statusMessage} (Tự động quét sau {pollingCountdown}s)</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={checkPaymentStatus}
-          disabled={isCheckingPayment}
-          className="px-3.5 py-2 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-        >
-          {isCheckingPayment ? (
-            <>
-              <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Đang kiểm tra...</span>
-            </>
-          ) : (
-            <span>Kiểm tra ngay</span>
-          )}
-        </button>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-        <div 
-          className="bg-gradient-to-r from-teal-500 to-[#007c76] h-full transition-all duration-1000 ease-linear rounded-full"
-          style={{ width: `${(pollingCountdown / 5) * 100}%` }}
-        ></div>
-      </div>
-
-      {/* QR Code and Instructions */}
-      <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 justify-center bg-gradient-to-br from-slate-50 to-teal-50/30 p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="relative w-52 h-52 sm:w-60 sm:h-60 bg-white p-3 rounded-2xl shadow-md border-2 border-[#007c76] shrink-0 flex items-center justify-center transition-transform duration-300 hover:scale-[1.02]">
-          <img
-            src={vietQrUrl}
-            alt="Mã QR thanh toán ACB"
-            className="w-full h-full object-contain rounded-xl"
-          />
-        </div>
-
-        <div className="text-left space-y-2.5 text-xs text-slate-700 flex-1 w-full">
-          <div className="font-black text-slate-900 uppercase tracking-wider text-xs border-b border-slate-200/80 pb-1.5 flex items-center justify-between">
-            <span>Thông tin chuyển khoản</span>
-            <span className="text-[10px] bg-teal-100 text-teal-900 px-2 py-0.5 rounded-md font-bold">{config.bankName}</span>
-          </div>
-          <p>
-            <strong>1.</strong> Mở ứng dụng ngân hàng ACB hoặc app bất kỳ.
-          </p>
-          <p>
-            <strong>2.</strong> Chọn <strong>"Quét mã QR"</strong> và quét mã bên cạnh.
-          </p>
-          <p>
-            <strong>3.</strong> Nội dung chuyển khoản bắt buộc:
-          </p>
-          <div className="flex items-center gap-2 pt-0.5">
-            <span className="bg-white px-3 py-2 rounded-xl border border-teal-200 font-mono font-black text-[#007c76] text-sm select-all shadow-xs">
-              {transferMemo}
-            </span>
-            <button
-              type="button"
-              onClick={() => copyText(transferMemo, 'memo')}
-              className="px-3 py-2 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-xl font-black text-[10px] uppercase transition-colors cursor-pointer"
-            >
-              {copiedField === 'memo' ? '✓ Đã chép' : 'Sao chép'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Bank Account Details Card */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 text-xs space-y-2.5 shadow-xs">
-        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-          <span className="text-slate-400 font-medium">Ngân hàng:</span>
-          <span className="font-extrabold text-slate-800">{config.bankName} (Á Châu)</span>
-        </div>
-        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-          <span className="text-slate-400 font-medium">Số tài khoản:</span>
-          <span className="font-mono font-black text-[#007c76] text-sm flex items-center gap-2">
-            {config.accountNo}
-            <button
-              type="button"
-              onClick={() => copyText(config.accountNo, 'accNo')}
-              className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-lg font-bold uppercase transition-colors cursor-pointer"
-            >
-              {copiedField === 'accNo' ? '✓ Đã chép' : 'Sao chép'}
-            </button>
+          <span className="text-[11px] font-black uppercase text-[#007c76] tracking-wider mt-3 bg-teal-50 px-3 py-1 rounded-full border border-teal-100">
+            Quét mã để tự động điền
           </span>
         </div>
-        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-          <span className="text-slate-400 font-medium">Chủ tài khoản:</span>
-          <span className="font-extrabold text-slate-800 uppercase">{config.accountName}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-slate-400 font-medium">Số tiền:</span>
-          <span className="font-black text-[#007c76] text-base flex items-center gap-2">
-            {formatVND(amount)}
-            <button
-              type="button"
-              onClick={() => copyText(String(amount), 'amount')}
-              className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-lg font-bold uppercase transition-colors cursor-pointer"
-            >
-              {copiedField === 'amount' ? '✓ Đã chép' : 'Sao chép'}
-            </button>
-          </span>
+
+        {/* Right Column: Bank Account Details Card */}
+        <div className="md:col-span-7 flex flex-col justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <span className="font-black uppercase text-xs text-slate-900 tracking-wider">Thông tin tài khoản</span>
+            <span className="text-xs font-bold text-[#007c76] bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200">ACB Bank</span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            {/* Bank Name */}
+            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium">Ngân hàng:</span>
+              <span className="font-extrabold text-slate-800">{config.bankName} (Á Châu)</span>
+            </div>
+
+            {/* Account Name */}
+            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium">Chủ tài khoản:</span>
+              <span className="font-extrabold text-slate-900 uppercase text-right truncate max-w-[200px]">{config.accountName}</span>
+            </div>
+
+            {/* Account Number */}
+            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium">Số tài khoản:</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-[#007c76] text-sm">{config.accountNo}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(config.accountNo, 'accNo')}
+                  className="text-[10px] bg-teal-100 hover:bg-teal-200 text-teal-900 px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer"
+                >
+                  {copiedField === 'accNo' ? '✓ Đã chép' : 'Sao chép'}
+                </button>
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
+              <span className="text-slate-500 font-medium">Số tiền thanh toán:</span>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-[#007c76] text-base">{formatVND(amount)}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(String(amount), 'amount')}
+                  className="text-[10px] bg-teal-100 hover:bg-teal-200 text-teal-900 px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer"
+                >
+                  {copiedField === 'amount' ? '✓ Đã chép' : 'Sao chép'}
+                </button>
+              </div>
+            </div>
+
+            {/* Transfer Memo */}
+            <div className="flex justify-between items-center bg-teal-50/60 p-2.5 rounded-xl border border-teal-200">
+              <span className="text-teal-900 font-bold">Nội dung chuyển khoản:</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-[#007c76] text-sm select-all">{transferMemo}</span>
+                <button
+                  type="button"
+                  onClick={() => copyText(transferMemo, 'memo')}
+                  className="text-[10px] bg-[#007c76] hover:bg-[#00605b] text-white px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer shadow-xs"
+                >
+                  {copiedField === 'memo' ? '✓ Đã chép' : 'Sao chép'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex justify-end pt-1">
         <button
           type="button"
           onClick={onBack}
-          className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs tracking-wider transition-all cursor-pointer"
+          className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
         >
           Quay lại
         </button>
-        <button
-          type="button"
-          onClick={checkPaymentStatus}
-          disabled={isCheckingPayment}
-          className="flex-1 py-3.5 bg-[#007c76] hover:bg-[#00605b] text-white rounded-2xl font-black uppercase text-xs tracking-wider transition-all shadow-md shadow-teal-700/20 active:scale-98 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {isCheckingPayment ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>Đang kiểm tra...</span>
-            </>
-          ) : (
-            'Đã chuyển khoản thành công'
-          )}
-        </button>
       </div>
-
-      <p className="text-[10px] text-center text-slate-400 font-medium">
-        Hệ thống tự động kích hoạt khóa học vào phòng học ngay khi giao dịch được hệ thống ACB ghi nhận.
-      </p>
     </div>
   );
 };

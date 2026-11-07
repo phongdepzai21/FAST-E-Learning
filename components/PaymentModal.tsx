@@ -358,7 +358,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
   return (
     <div className="fixed inset-0 z-[999999] w-screen h-screen min-h-screen grid place-items-center bg-slate-950/85 backdrop-blur-md px-4 overflow-y-auto py-6 animate-fade-in">
-      <div className="bg-white max-w-xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+      <div className={`bg-white ${showPaymentPolling ? 'max-w-3xl' : 'max-w-xl'} w-full rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100 transition-all`}>
         <button
           onClick={onClose}
           disabled={isVerifying || isCompleted}
