@@ -34,7 +34,6 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   // Safe State Guard: Prevent unmounted state updates
   const isMountedRef = useRef<boolean>(true);
 
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
   const [isTimeout, setIsTimeout] = useState<boolean>(false);
   const [activeErrorCode, setActiveErrorCode] = useState<string | null>(null);
@@ -64,14 +63,6 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
     memo: transferMemo,
     template: 'compact2',
   });
-
-  const copyText = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text);
-    safeSetState(setCopiedField, fieldName);
-    setTimeout(() => {
-      safeSetState(setCopiedField, null);
-    }, 2000);
-  };
 
   const checkPaymentStatus = async () => {
     if (isTimeout || !isMountedRef.current) return;
@@ -201,13 +192,19 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   }
 
   return (
-    <div className="space-y-5 animate-in fade-in zoom-in duration-300">
-      {/* Header */}
-      <div className="text-center space-y-1">
-        <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Thanh Toán Chuyển Khoản Mã QR</h3>
-        <p className="text-slate-500 font-medium text-xs sm:text-sm">
-          Sử dụng ứng dụng ngân hàng bất kỳ để quét mã và chuyển khoản
-        </p>
+    <div className="space-y-6 text-center animate-in fade-in zoom-in duration-300 py-2">
+      {/* Header Title */}
+      <div className="space-y-2">
+        <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Mã QR Thanh Toán Ngân Hàng</h3>
+        
+        {/* Animated Live Status Badge */}
+        <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-teal-50 border border-teal-200/80 rounded-full text-[#007c76] font-black text-xs sm:text-sm shadow-xs">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#007c76]"></span>
+          </span>
+          <span>Trạng thái: Đang tự động lắng nghe giao dịch SePay...</span>
+        </div>
       </div>
 
       {/* Error Banner if error code detected */}
@@ -223,107 +220,42 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
         </div>
       )}
 
-      {/* Horizontal Layout Container (Side-by-side QR + Bank Account Details) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch bg-slate-50/70 p-5 rounded-3xl border border-slate-200 shadow-xs">
-        {/* Left Column: Pure QR Code */}
-        <div className="md:col-span-5 flex flex-col items-center justify-center bg-white p-4 rounded-2xl border-2 border-[#007c76] shadow-md">
-          <div className="w-52 h-52 sm:w-60 sm:h-60 relative flex items-center justify-center">
+      {/* Centered Large QR Code Display */}
+      <div className="flex flex-col items-center justify-center">
+        <div className="p-5 sm:p-7 bg-white rounded-3xl border-3 border-[#007c76] shadow-xl max-w-sm sm:max-w-md w-full mx-auto space-y-4 relative group">
+          {/* Huge QR Code Image */}
+          <div className="w-full aspect-square relative flex items-center justify-center p-2 bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-inner">
             <img
               src={vietQrUrl}
               alt="Mã QR thanh toán ACB"
-              className="w-full h-full object-contain rounded-xl"
+              className="w-full h-full object-contain rounded-xl transform transition-transform group-hover:scale-102"
             />
           </div>
-          <span className="text-[11px] font-black uppercase text-[#007c76] tracking-wider mt-3 bg-teal-50 px-3 py-1 rounded-full border border-teal-100">
-            Quét mã để tự động điền
-          </span>
-        </div>
 
-        {/* Right Column: Bank Account Details Card */}
-        <div className="md:col-span-7 flex flex-col justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-            <span className="font-black uppercase text-xs text-slate-900 tracking-wider">Thông tin tài khoản</span>
-            <span className="text-xs font-bold text-[#007c76] bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200">ACB Bank</span>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            {/* Bank Name */}
-            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Ngân hàng:</span>
-              <span className="font-extrabold text-slate-800">{config.bankName} (Á Châu)</span>
-            </div>
-
-            {/* Account Name */}
-            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Chủ tài khoản:</span>
-              <span className="font-extrabold text-slate-900 uppercase text-right truncate max-w-[200px]">{config.accountName}</span>
-            </div>
-
-            {/* Account Number */}
-            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Số tài khoản:</span>
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-black text-[#007c76] text-sm">{config.accountNo}</span>
-                <button
-                  type="button"
-                  onClick={() => copyText(config.accountNo, 'accNo')}
-                  className="text-[10px] bg-teal-100 hover:bg-teal-200 text-teal-900 px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer"
-                >
-                  {copiedField === 'accNo' ? '✓ Đã chép' : 'Sao chép'}
-                </button>
-              </div>
-            </div>
-
-            {/* Amount */}
-            <div className="flex justify-between items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-              <span className="text-slate-500 font-medium">Số tiền thanh toán:</span>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-[#007c76] text-base">{formatVND(amount)}</span>
-                <button
-                  type="button"
-                  onClick={() => copyText(String(amount), 'amount')}
-                  className="text-[10px] bg-teal-100 hover:bg-teal-200 text-teal-900 px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer"
-                >
-                  {copiedField === 'amount' ? '✓ Đã chép' : 'Sao chép'}
-                </button>
-              </div>
-            </div>
-
-            {/* Transfer Memo */}
-            <div className="flex justify-between items-center bg-teal-50/60 p-2.5 rounded-xl border border-teal-200">
-              <span className="text-teal-900 font-bold">Nội dung chuyển khoản:</span>
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-black text-[#007c76] text-sm select-all">{transferMemo}</span>
-                <button
-                  type="button"
-                  onClick={() => copyText(transferMemo, 'memo')}
-                  className="text-[10px] bg-[#007c76] hover:bg-[#00605b] text-white px-2.5 py-1 rounded-lg font-bold uppercase transition-colors cursor-pointer shadow-xs"
-                >
-                  {copiedField === 'memo' ? '✓ Đã chép' : 'Sao chép'}
-                </button>
-              </div>
-            </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-slate-700 px-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[11px] font-black">Số tiền cần quét:</span>
+            <span className="font-black text-[#007c76] text-lg sm:text-2xl">{formatVND(amount)}</span>
           </div>
         </div>
       </div>
 
       {/* Collapsible Diagnostic State Transition Logs */}
-      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white text-xs">
+      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white text-xs max-w-md mx-auto">
         <button
           type="button"
           onClick={() => setShowLogs(prev => !prev)}
-          className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 flex items-center justify-between font-bold text-slate-700 transition-colors cursor-pointer"
+          className="w-full px-4 py-2 bg-slate-50 hover:bg-slate-100 flex items-center justify-between font-bold text-slate-700 transition-colors cursor-pointer"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-            Nhật ký chuyển trạng thái (Payment State Transitions)
+            Nhật ký hệ thống (Payment Logs)
           </span>
           <span className="text-[10px] text-slate-400 uppercase font-mono font-bold">
             {showLogs ? 'Ẩn nhật ký ▲' : 'Xem nhật ký ▼'}
           </span>
         </button>
         {showLogs && (
-          <div className="p-3 border-t border-slate-200 space-y-2 max-h-48 overflow-y-auto font-mono text-[11px] bg-slate-900 text-slate-200">
+          <div className="p-3 border-t border-slate-200 space-y-2 max-h-48 overflow-y-auto font-mono text-[11px] bg-slate-900 text-slate-200 text-left">
             {paymentLogger.getLogs().length === 0 ? (
               <p className="text-slate-500 italic">Chưa có bản ghi chuyển trạng thái...</p>
             ) : (
@@ -341,11 +273,11 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
         )}
       </div>
 
-      <div className="flex justify-end pt-1">
+      <div className="flex justify-center pt-1">
         <button
           type="button"
           onClick={onBack}
-          className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
+          className="px-8 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs tracking-wider transition-all cursor-pointer shadow-xs active:scale-98"
         >
           Quay lại
         </button>
@@ -353,3 +285,5 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
     </div>
   );
 };
+
+export default PaymentStatusPolling;
