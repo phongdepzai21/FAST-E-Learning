@@ -10,7 +10,6 @@ import { doc, setDoc, getDoc, collection, getDocs, onSnapshot } from 'firebase/f
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Course } from '../types';
 import PaymentModal from '../components/PaymentModal';
-import PurchaseModal from '../components/PurchaseModal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import Handbook from './Handbook';
 import { saveLastAccessedLesson, getCachedLastLessonIdx } from '../utils/lessonTracking';
@@ -55,7 +54,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [isAdmin, setIsAdmin] = useState(false);
   const [isVip, setIsVip] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   const latestFirestoreDataRef = useRef<any>(null);
 
@@ -226,7 +224,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
     const isFree = !course?.price || course.price.toLowerCase().includes('miễn phí') || course.price === '0' || course.price === '0đ' || isVip;
 
     if (!isFree) {
-        setShowPurchaseModal(true);
+        setShowPaymentModal(true);
         setIsActivating(false);
         return;
     }
@@ -956,25 +954,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
 
       {course && (
-        <>
-          <PurchaseModal
-              isOpen={showPurchaseModal}
-              onClose={() => setShowPurchaseModal(false)}
-              onSuccess={() => {
-                  setShowPurchaseModal(false);
-                  setShowPaymentModal(true);
-              }}
-              userEmail={currentUser?.email || ''}
-              userName={currentUser?.name || ''}
-              courseName={course?.title || ''}
-          />
-          <PaymentModal
-              course={course}
-              isOpen={showPaymentModal}
-              onClose={() => setShowPaymentModal(false)}
-              onSuccess={handlePaymentSuccess}
-          />
-        </>
+        <PaymentModal
+            course={course}
+            isOpen={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            onSuccess={handlePaymentSuccess}
+        />
       )}
     </main>
   );

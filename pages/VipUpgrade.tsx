@@ -6,7 +6,6 @@ import { doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc } from 
 import { Course } from '../types';
 import { getMergedCourses } from '../constants';
 import PaymentModal from '../components/PaymentModal';
-import PurchaseModal from '../components/PurchaseModal';
 import { useToast } from '../contexts/ToastContext';
 import { Lock, Sparkles, CheckCircle2, ChevronRight, Check, Award, Crown, Shield } from 'lucide-react';
 
@@ -51,7 +50,6 @@ const VipUpgrade: React.FC = () => {
   const [combos, setCombos] = useState<Combo[]>(DEFAULT_COMBOS);
   const [selectedComboForPurchase, setSelectedComboForPurchase] = useState<Combo | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   // Sync combos from Firestore
   useEffect(() => {
@@ -182,7 +180,7 @@ const VipUpgrade: React.FC = () => {
       return;
     }
     setSelectedComboForPurchase(combo);
-    setShowPurchaseModal(true);
+    setShowPaymentModal(true);
   };
 
   const handlePaymentSuccess = async () => {
@@ -540,32 +538,19 @@ const VipUpgrade: React.FC = () => {
 
       {/* Purchase & Payment Modals */}
       {selectedComboForPurchase && (
-        <>
-          <PurchaseModal
-            isOpen={showPurchaseModal}
-            onClose={() => setShowPurchaseModal(false)}
-            onSuccess={() => {
-              setShowPurchaseModal(false);
-              setShowPaymentModal(true);
-            }}
-            userEmail={currentUser?.email || ''}
-            userName={currentUser?.name || ''}
-            courseName={selectedComboForPurchase.title}
-          />
-          <PaymentModal
-            course={{
-              id: selectedComboForPurchase.id,
-              title: selectedComboForPurchase.title,
-              price: selectedComboForPurchase.price,
-              image: selectedComboForPurchase.image,
-              category: 'Gói Combo',
-              description: selectedComboForPurchase.description
-            }}
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            onSuccess={handlePaymentSuccess}
-          />
-        </>
+        <PaymentModal
+          course={{
+            id: selectedComboForPurchase.id,
+            title: selectedComboForPurchase.title,
+            price: selectedComboForPurchase.price,
+            image: selectedComboForPurchase.image,
+            category: 'Gói Combo',
+            description: selectedComboForPurchase.description
+          }}
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
       )}
 
     </div>
