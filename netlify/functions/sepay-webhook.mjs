@@ -15,6 +15,59 @@ function getHeader(headers, headerName) {
   return "";
 }
 
+/**
+ * Robust payment code extractor ensuring EXACTLY ONE 'FAST' prefix.
+ * Eliminates duplicate prefixes like FASTFAST3AGSF5K0R or FAST FAST3AGSF5K0R.
+ */
+function extractPaymentCode(bodyObj) {
+  // 1. Check direct 'code' field sent by SePay if present
+  let directCode = (bodyObj.code || "").toString().trim().toUpperCase();
+  if (directCode) {
+    directCode = directCode.replace(/\s+/g, "").replace(/^FAST[-_]+/, "FAST");
+    while (directCode.startsWith("FASTFAST")) {
+      directCode = directCode.substring(4);
+    }
+    if (!directCode.startsWith("FAST")) {
+      directCode = "FAST" + directCode;
+    }
+    return directCode;
+  }
+
+  // 2. Parse from transfer content / description / memo
+  const content = (bodyObj.content || bodyObj.description || bodyObj.memo || "").toString().trim().toUpperCase();
+  if (!content) return "";
+
+  // Tokenize content by whitespace
+  const tokens = content.split(/\s+/);
+  for (const token of tokens) {
+    let cleanToken = token.trim().toUpperCase().replace(/^FAST[-_]+/, "FAST");
+    while (cleanToken.startsWith("FASTFAST")) {
+      cleanToken = cleanToken.substring(4);
+    }
+
+    const match = cleanToken.match(/^FAST[-_]?([A-Z0-9]{6,12})$/i);
+    if (match) {
+      let suffix = match[1].trim().toUpperCase();
+      while (suffix.startsWith("FAST")) {
+        suffix = suffix.substring(4);
+      }
+      return `FAST${suffix}`;
+    }
+  }
+
+  // Fallback: If space was inserted between FAST and code, e.g. "FAST 3AGSF5K0R" or "FAST FAST3AGSF5K0R"
+  const spacedMatch = content.match(/FAST\s*[-_]?\s*(FAST)?([A-Z0-9]{6,12})/i);
+  if (spacedMatch) {
+    let suffix = (spacedMatch[2] || "").trim().toUpperCase();
+    while (suffix.startsWith("FAST")) {
+      suffix = suffix.substring(4);
+    }
+    return `FAST${suffix}`;
+  }
+
+  return "";
+}
+
 export async function handler(event, context) {
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -174,7 +227,6 @@ export async function handler(event, context) {
     };
   }
 
-  const content = (bodyObj.content || bodyObj.description || bodyObj.memo || "").toString().trim().toUpperCase();
   const transferAmount = Number(bodyObj.transferAmount || bodyObj.amount || 0);
   const txnId = (bodyObj.id || bodyObj.referenceCode || `TXN_${Date.now()}`).toString();
   const receivedAccount = (bodyObj.subAccount || bodyObj.accountNumber || bodyObj.bankAccount || "").toString().trim();
@@ -185,11 +237,11 @@ export async function handler(event, context) {
     console.warn(`[SePayWebhook] Account notice: received account ${receivedAccount}, configured primary ${expectedAccount}`);
   }
 
-  // Parse FAST payment code from transfer content (e.g. FAST8K2P91 or FAST-8K2P91)
-  const fastRegex = /FAST\s*[-_]?\s*([A-Z0-9]+)/i;
-  const match = content.match(fastRegex);
-  if (!match) {
-    console.log(`[SePayWebhook] Ignored: No FAST transaction code found in content: "${content}"`);
+  // Extract payment code ensuring single FAST prefix
+  const paymentCode = extractPaymentCode(bodyObj);
+  if (!paymentCode) {
+    const rawContent = (bodyObj.content || bodyObj.description || bodyObj.memo || "").toString();
+    console.log(`[SePayWebhook] Ignored: No FAST transaction code found in content: "${rawContent}"`);
     return {
       statusCode: 200,
       headers,
@@ -197,20 +249,24 @@ export async function handler(event, context) {
     };
   }
 
-  const codeSuffix = match[1].trim().toUpperCase();
-  const paymentCode = `FAST${codeSuffix}`;
+  const codeSuffix = paymentCode.replace(/^FAST/i, "").trim().toUpperCase();
 
-  console.log(`[SePayWebhook] HMAC Verified. Parsed paymentCode: "${paymentCode}" | Amount: ${transferAmount} | TxnId: ${txnId}`);
+  console.log(`[SePayWebhook] HMAC Verified. Parsed paymentCode: "${paymentCode}" | Suffix: "${codeSuffix}" | Amount: ${transferAmount} | TxnId: ${txnId}`);
 
   try {
-    // Find pending payment or order
-    const pendingRef = adminDb.collection("pending_payments").doc(codeSuffix);
-    const pendingSnap = await pendingRef.get();
-
+    // Multi-tier order lookup: try pending_payments doc by paymentCode & suffix, then orders query
     let targetEmail = "";
     let courseId = "";
     let orderId = "";
     let expectedAmount = 0;
+
+    // 1. Try pending_payments doc by paymentCode (e.g. FAST3AGSF5K0R)
+    let pendingSnap = await adminDb.collection("pending_payments").doc(paymentCode).get();
+    
+    // 2. Fallback to pending_payments doc by suffix (e.g. 3AGSF5K0R)
+    if (!pendingSnap.exists) {
+      pendingSnap = await adminDb.collection("pending_payments").doc(codeSuffix).get();
+    }
 
     if (pendingSnap.exists) {
       const pData = pendingSnap.data();
@@ -219,8 +275,14 @@ export async function handler(event, context) {
       orderId = pData.orderId;
       expectedAmount = Number(pData.amount || 0);
     } else {
-      // Fallback query by paymentCode in orders collection
-      const ordersSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode).limit(1).get();
+      // 3. Query orders collection by paymentCode
+      let ordersSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode).limit(1).get();
+      
+      // 4. Fallback query by codeSuffix in case stored under suffix
+      if (ordersSnap.empty) {
+        ordersSnap = await adminDb.collection("orders").where("paymentCode", "==", codeSuffix).limit(1).get();
+      }
+
       if (!ordersSnap.empty) {
         const oData = ordersSnap.docs[0].data();
         targetEmail = (oData.email || "").toLowerCase().trim();
@@ -307,9 +369,10 @@ export async function handler(event, context) {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: "Already processed" }) };
     }
 
-    // Clean up pending payment record
+    // Clean up pending payment record from both potential keys
     try {
       await adminDb.collection("pending_payments").doc(codeSuffix).delete();
+      await adminDb.collection("pending_payments").doc(paymentCode).delete();
     } catch (cleanErr) {
       console.warn("[SePayWebhook] Non-critical error removing pending payment:", cleanErr.message);
     }

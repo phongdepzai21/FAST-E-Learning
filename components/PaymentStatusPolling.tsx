@@ -54,7 +54,8 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
     }
   };
 
-  const transferMemo = `FAST ${paymentCode || 'TEST'}`;
+  const cleanPaymentCode = paymentCode ? paymentCode.trim().toUpperCase() : 'FASTTEST';
+  const transferMemo = cleanPaymentCode.startsWith('FAST') ? cleanPaymentCode : `FAST${cleanPaymentCode}`;
   const vietQrUrl = getVietQrUrl({
     bankId: config.bankId || 'acb',
     accountNo: config.accountNo,

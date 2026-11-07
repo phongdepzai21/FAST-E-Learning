@@ -190,7 +190,7 @@ export function getVietQrUrl(params: {
 export function generatePaymentMemo(courseId: string, courseTitle?: string): string {
   const cleanId = (courseId || 'KHOAHOC')
     .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 8)
+    .slice(0, 10)
     .toUpperCase();
-  return `FAST ${cleanId}`;
+  return cleanId.startsWith('FAST') ? cleanId : `FAST${cleanId}`;
 }

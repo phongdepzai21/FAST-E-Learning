@@ -36,7 +36,7 @@ export async function handler(event, context) {
     const numericAmount = Number(amount) || 0;
     const orderId = "ORD_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
     
-    // Generate unique payment code with FAST prefix and 8-10 alphanumeric characters suffix (letters and numbers)
+    // Generate unique payment code with single FAST prefix (e.g. FAST3AGSF5K0R)
     const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let paymentCode = "";
     let randomSuffix = "";
@@ -45,12 +45,12 @@ export async function handler(event, context) {
 
     while (!isUnique && attempts < 5) {
       attempts++;
-      // Suffix length between 8 and 10 characters (let's use 9 chars)
       const suffixLength = 9;
       randomSuffix = "";
       for (let i = 0; i < suffixLength; i++) {
         randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
       }
+      // Guaranteed single FAST prefix
       paymentCode = `FAST${randomSuffix}`;
 
       // Check uniqueness in Firestore orders collection
@@ -66,7 +66,7 @@ export async function handler(event, context) {
 
     const orderData = {
       orderId,
-      paymentCode,
+      paymentCode, // Exact code stored: FAST3AGSF5K0R
       courseId,
       courseTitle: courseTitle || "Khóa học FAST E-Learning",
       amount: numericAmount,
@@ -79,20 +79,27 @@ export async function handler(event, context) {
       bankAccountName,
     };
 
-    // Save to Firestore orders collection and pending_payments collection
-    const batch = adminDb.batch();
-    const orderRef = adminDb.collection("orders").doc(orderId);
-    batch.set(orderRef, orderData);
-
-    const pendingRef = adminDb.collection("pending_payments").doc(randomSuffix);
-    batch.set(pendingRef, {
+    const pendingData = {
       code: paymentCode,
+      suffix: randomSuffix,
       email: email.toLowerCase().trim(),
       courseId,
       amount: numericAmount,
       orderId,
       createdAt: new Date().toISOString(),
-    });
+    };
+
+    // Save to Firestore orders collection and pending_payments collection
+    const batch = adminDb.batch();
+    const orderRef = adminDb.collection("orders").doc(orderId);
+    batch.set(orderRef, orderData);
+
+    // Write to pending_payments using BOTH randomSuffix and paymentCode keys for 100% lookup resilience
+    const pendingRefSuffix = adminDb.collection("pending_payments").doc(randomSuffix);
+    batch.set(pendingRefSuffix, pendingData);
+
+    const pendingRefCode = adminDb.collection("pending_payments").doc(paymentCode);
+    batch.set(pendingRefCode, pendingData);
 
     await batch.commit();
 
@@ -104,7 +111,7 @@ export async function handler(event, context) {
       body: JSON.stringify({
         success: true,
         orderId,
-        paymentCode,
+        paymentCode, // Returns exact paymentCode: FAST3AGSF5K0R
         amount: numericAmount,
         bankCode,
         bankAccount,

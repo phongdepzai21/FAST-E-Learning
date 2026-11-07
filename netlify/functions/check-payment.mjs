@@ -1,5 +1,18 @@
 import { adminDb } from "./utils/firebaseAdmin.mjs";
 
+function normalizePaymentCode(codeStr) {
+  if (!codeStr) return "";
+  let clean = codeStr.toString().trim().toUpperCase().replace(/\s+/g, "");
+  clean = clean.replace(/^FAST[-_]+/, "FAST");
+  while (clean.startsWith("FASTFAST")) {
+    clean = clean.substring(4);
+  }
+  if (!clean.startsWith("FAST")) {
+    clean = "FAST" + clean;
+  }
+  return clean;
+}
+
 export async function handler(event, context) {
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -14,7 +27,7 @@ export async function handler(event, context) {
 
   try {
     const params = event.httpMethod === "GET" ? event.queryStringParameters : JSON.parse(event.body || "{}");
-    const { orderId, paymentCode, email } = params || {};
+    const { orderId, paymentCode } = params || {};
 
     if (!orderId && !paymentCode) {
       return {
@@ -31,8 +44,25 @@ export async function handler(event, context) {
       if (docSnap.exists) {
         orderDoc = docSnap.data();
       }
-    } else if (paymentCode) {
-      const qSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode.trim().toUpperCase()).limit(1).get();
+    }
+
+    if (!orderDoc && paymentCode) {
+      const cleanCode = normalizePaymentCode(paymentCode);
+      const codeSuffix = cleanCode.replace(/^FAST/i, "");
+
+      // 1. Query by exact normalized paymentCode (e.g. FAST3AGSF5K0R)
+      let qSnap = await adminDb.collection("orders").where("paymentCode", "==", cleanCode).limit(1).get();
+
+      // 2. Fallback query by codeSuffix (e.g. 3AGSF5K0R)
+      if (qSnap.empty) {
+        qSnap = await adminDb.collection("orders").where("paymentCode", "==", codeSuffix).limit(1).get();
+      }
+
+      // 3. Fallback query by raw paymentCode as provided
+      if (qSnap.empty) {
+        qSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode.trim().toUpperCase()).limit(1).get();
+      }
+
       if (!qSnap.empty) {
         orderDoc = qSnap.docs[0].data();
       }
