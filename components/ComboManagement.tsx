@@ -6,6 +6,7 @@ import { getMergedCourses } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { broadcastComboUpdate } from '../utils/courseSyncService';
 import { LivePriceQrPreview } from './LivePriceQrPreview';
+import { AnimatedPriceCounter } from './AnimatedPriceCounter';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Layers,
@@ -1253,6 +1254,37 @@ export const ComboManagement: React.FC = () => {
                             -{pct}%
                           </button>
                         ))}
+                      </div>
+
+                      {/* LIVE ANIMATED PRICE COUNTER PREVIEW STRIP */}
+                      <div className="pt-3 border-t border-teal-200/60 flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span>XEM TRƯỚC ĐẾM SỐ TỰ ĐỘNG:</span>
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <AnimatedPriceCounter
+                            label="Giá gốc"
+                            priceStr={originalPrice || '0đ'}
+                            variant="original"
+                            size="sm"
+                          />
+                          <span className="text-gray-300 font-black">➔</span>
+                          <AnimatedPriceCounter
+                            label="Giá khuyến mãi"
+                            priceStr={price || '0đ'}
+                            variant="sale"
+                            size="md"
+                            showBadge={discountPercent > 0}
+                            badgeText={`-${discountPercent}%`}
+                          />
+                          <AnimatedPriceCounter
+                            label="Tiết kiệm"
+                            priceStr={formatVndPrice(Math.max(0, parsePriceNumber(originalPrice) - parsePriceNumber(price)))}
+                            variant="savings"
+                            size="sm"
+                          />
+                        </div>
                       </div>
                     </div>
 
