@@ -17,6 +17,7 @@ interface PaymentStatusPollingProps {
   };
   onSuccess: () => void;
   onBack: () => void;
+  onRetry: () => void;
 }
 
 export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
@@ -27,11 +28,16 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   config,
   onSuccess,
   onBack,
+  onRetry,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [pollingCountdown, setPollingCountdown] = useState<number>(5);
   const [isCheckingPayment, setIsCheckingPayment] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('Đang chờ giao dịch từ ngân hàng ACB...');
+  
+  // Timeout / Payment Failed states (3 minutes / 180 seconds timeout)
+  const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
+  const [isTimeout, setIsTimeout] = useState<boolean>(false);
 
   const transferMemo = `FAST ${paymentCode || 'TEST'}`;
   const vietQrUrl = getVietQrUrl({
@@ -50,6 +56,7 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
   };
 
   const checkPaymentStatus = async () => {
+    if (isTimeout) return;
     setIsCheckingPayment(true);
     try {
       const queryParam = orderId ? `orderId=${encodeURIComponent(orderId)}` : `paymentCode=${encodeURIComponent(paymentCode)}`;
@@ -91,8 +98,10 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
     }
   };
 
-  // Poll every 5 seconds
+  // Poll every 5 seconds and track timeout (180 seconds)
   useEffect(() => {
+    if (isTimeout) return;
+
     const interval = setInterval(() => {
       setPollingCountdown(5);
       checkPaymentStatus();
@@ -100,13 +109,62 @@ export const PaymentStatusPolling: React.FC<PaymentStatusPollingProps> = ({
 
     const countdownTimer = setInterval(() => {
       setPollingCountdown(prev => (prev > 1 ? prev - 1 : 5));
+      setSecondsElapsed(prev => {
+        const next = prev + 1;
+        if (next >= 180) {
+          setIsTimeout(true);
+        }
+        return next;
+      });
     }, 1000);
 
     return () => {
       clearInterval(interval);
       clearInterval(countdownTimer);
     };
-  }, [orderId, paymentCode]);
+  }, [orderId, paymentCode, isTimeout]);
+
+  if (isTimeout) {
+    return (
+      <div className="space-y-6 text-center animate-in fade-in zoom-in duration-300 py-4">
+        <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-2 border-amber-200">
+          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Giao Dịch Hết Thời Gian Chờ</h3>
+          <p className="text-slate-600 font-medium text-sm max-w-sm mx-auto leading-relaxed">
+            Hệ thống chưa nhận được thông tin chuyển khoản từ ngân hàng trong thời gian quy định (3 phút). Đơn hàng tạm thời hết hạn.
+          </p>
+        </div>
+
+        <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 text-xs text-amber-900 font-medium">
+          Nếu bạn đã chuyển khoản thành công nhưng chưa được duyệt, vui lòng bấm <strong>Thử lại thanh toán</strong> để hệ thống tạo mã giao dịch mới hoặc liên hệ hỗ trợ.
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs tracking-wider transition-all cursor-pointer"
+          >
+            Quay lại
+          </button>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase text-xs tracking-wider transition-all shadow-md shadow-amber-600/20 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Thử lại thanh toán (Retry)</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">

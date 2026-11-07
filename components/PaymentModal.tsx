@@ -244,7 +244,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       if (verifyRes.success) {
         setOtpError('');
         setShowOtpForm(false);
-        // Seamlessly transition to PaymentStatusPolling component without forcing a page reload!
         setShowPaymentPolling(true);
       } else {
         setOtpError(verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn.");
@@ -253,6 +252,38 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       setOtpError("Lỗi kết nối khi xác thực mã OTP.");
     }
     setIsVerifying(false);
+  };
+
+  const handleRetryPayment = () => {
+    setShowPaymentPolling(false);
+    setShowOtpForm(false);
+    setUserInputOtp('');
+    const user = auth.currentUser;
+    const email = (user?.email || localStorage.getItem('user_email') || 'hocvien@gmail.com').trim().toLowerCase();
+    const amount = parseNumericPrice(course.price);
+    if (amount > 0) {
+      fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: course.id,
+          courseTitle: course.title,
+          amount,
+          email,
+          userId: user?.uid || ''
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.paymentCode) {
+          setPaymentCode(data.paymentCode);
+          if (data.orderId) setOrderId(data.orderId);
+        }
+      })
+      .catch(err => {
+        console.warn("Retry create order error:", err);
+      });
+    }
   };
 
   const handleInstantVipClaim = async () => {
@@ -311,7 +342,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         {!isCompleted ? (
           <div>
             {showPaymentPolling ? (
-              /* Seamlessly transition to PaymentStatusPolling component after OTP verification */
               <PaymentStatusPolling
                 course={course}
                 paymentCode={paymentCode}
@@ -331,6 +361,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                   }, 1200);
                 }}
                 onBack={() => setShowPaymentPolling(false)}
+                onRetry={handleRetryPayment}
               />
             ) : (
               <div className="space-y-6 relative z-10">
