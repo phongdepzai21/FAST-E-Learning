@@ -1775,6 +1775,132 @@ async function startServer() {
     }
   });
 
+  // Admin endpoint to permanently purge receipts and records matching course-1792154795450 across all systems
+  app.post("/api/admin/purge-target", async (req, res) => {
+    try {
+      const targetId = "course-1792154795450";
+      const targetNumeric = "1792154795450";
+      let deletedCount = 0;
+      const actions = [];
+      const db = getServerFirestore();
+
+      // 1. Delete from orders collection
+      try {
+        const ordersSnap = await db.collection("orders").get();
+        for (const doc of ordersSnap.docs) {
+          const data = doc.data();
+          if (
+            doc.id === targetId ||
+            data.orderId === targetId ||
+            data.courseId === targetId ||
+            data.paymentCode === targetId ||
+            (data.orderId && data.orderId.includes(targetNumeric)) ||
+            (data.paymentCode && data.paymentCode.includes(targetNumeric))
+          ) {
+            await db.collection("orders").doc(doc.id).delete();
+            deletedCount++;
+            actions.push(`Deleted order: ${doc.id}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn("Purge orders error:", err.message);
+      }
+
+      // 2. Delete from pending_payments collection
+      try {
+        const pendingSnap = await db.collection("pending_payments").get();
+        for (const doc of pendingSnap.docs) {
+          const data = doc.data();
+          if (
+            doc.id === targetId ||
+            doc.id.includes(targetNumeric) ||
+            data.orderId === targetId ||
+            data.courseId === targetId ||
+            data.code === targetId ||
+            (data.code && data.code.includes(targetNumeric))
+          ) {
+            await db.collection("pending_payments").doc(doc.id).delete();
+            deletedCount++;
+            actions.push(`Deleted pending_payment: ${doc.id}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn("Purge pending_payments error:", err.message);
+      }
+
+      // 3. Delete from payment_logs collection
+      try {
+        const logsSnap = await db.collection("payment_logs").get();
+        for (const doc of logsSnap.docs) {
+          const data = doc.data();
+          const str = JSON.stringify(data);
+          if (str.includes(targetId) || str.includes(targetNumeric)) {
+            await db.collection("payment_logs").doc(doc.id).delete();
+            deletedCount++;
+            actions.push(`Deleted payment_log: ${doc.id}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn("Purge payment_logs error:", err.message);
+      }
+
+      // 4. Delete from all users' purchased_courses subcollections
+      try {
+        const usersSnap = await db.collection("users").get();
+        for (const userDoc of usersSnap.docs) {
+          const purchasedSnap = await db.collection("users").doc(userDoc.id).collection("purchased_courses").get();
+          for (const pDoc of purchasedSnap.docs) {
+            const pData = pDoc.data();
+            if (
+              pDoc.id === targetId ||
+              pDoc.id.includes(targetNumeric) ||
+              pData.courseId === targetId ||
+              pData.orderId === targetId ||
+              JSON.stringify(pData).includes(targetNumeric)
+            ) {
+              await db.collection("users").doc(userDoc.id).collection("purchased_courses").doc(pDoc.id).delete();
+              deletedCount++;
+              actions.push(`Deleted purchased_course ${pDoc.id} for user ${userDoc.id}`);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn("Purge user purchased_courses error:", err.message);
+      }
+
+      // 5. Clean up local JSON files (ad_profile_crm.json, etc.)
+      try {
+        if (fs.existsSync(AD_PROFILES_FILE)) {
+          let profiles = loadAdProfilesFromDisk();
+          const initialLen = profiles.length;
+          profiles = profiles.filter((p: any) => {
+            const str = JSON.stringify(p);
+            return !str.includes(targetId) && !str.includes(targetNumeric);
+          });
+          if (profiles.length < initialLen) {
+            saveAdProfilesToDisk(profiles);
+            serverAdProfiles = profiles;
+            deletedCount += (initialLen - profiles.length);
+            actions.push(`Cleaned local ad profiles CRM matching target`);
+          }
+        }
+      } catch (err: any) {
+        console.warn("Purge local ad profiles error:", err.message);
+      }
+
+      console.log(`[PurgeTarget] Successfully purged target ${targetId}. Deleted records: ${deletedCount}`);
+      return res.json({
+        success: true,
+        message: `Permanently deleted all receipts and records matching ${targetId}`,
+        deletedCount,
+        actions
+      });
+    } catch (err: any) {
+      console.error("[PurgeTarget] Exception:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Gemini Chat Endpoint with Role Normalization & Streaming
   app.post("/api/gemini/chat", async (req, res) => {
     try {

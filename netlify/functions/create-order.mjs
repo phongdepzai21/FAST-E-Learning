@@ -36,13 +36,29 @@ export async function handler(event, context) {
     const numericAmount = Number(amount) || 0;
     const orderId = "ORD_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
     
-    // Generate unique payment code e.g. FAST7A9X2
+    // Generate unique payment code with FAST prefix and 8-10 alphanumeric characters suffix (letters and numbers)
     const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let paymentCode = "";
     let randomSuffix = "";
-    for (let i = 0; i < 6; i++) {
-      randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+      attempts++;
+      // Suffix length between 8 and 10 characters (let's use 9 chars)
+      const suffixLength = 9;
+      randomSuffix = "";
+      for (let i = 0; i < suffixLength; i++) {
+        randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      paymentCode = `FAST${randomSuffix}`;
+
+      // Check uniqueness in Firestore orders collection
+      const existingSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode).limit(1).get();
+      if (existingSnap.empty) {
+        isUnique = true;
+      }
     }
-    const paymentCode = `FAST${randomSuffix}`;
 
     const bankCode = process.env.BANK_CODE || "ACB";
     const bankAccount = process.env.BANK_ACCOUNT || "22888868";
