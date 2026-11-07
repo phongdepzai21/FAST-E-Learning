@@ -1,7 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import crypto from "crypto";
 
-export interface SePayWebhookBody {
+export interface PaymentWebhookBody {
   code?: string;
   content?: string;
   description?: string;
@@ -20,16 +20,15 @@ export interface PaymentProcessingResult {
 }
 
 /**
- * Verifies if the incoming request is authorized using the SePay secret.
+ * Verifies if the incoming request is authorized using the payment webhook secret.
  */
-export function verifySePayWebhookToken(
+export function verifyPaymentWebhookToken(
   authHeader: string | undefined,
   queryToken: string | undefined
 ): boolean {
   const EXPECTED_SECRETS = [
-    process.env.SEPAY_WEBHOOK_SECRET,
-    "X85V4RCQQ6CMMMZ8K2P3B0KA0TRPIZ7RYLY7HSVHUG3ZXW95VTUPKDUTRAQXWBNG",
-    "SEPAY_SECRET_FAST_E_LEARNING"
+    process.env.PAYMENT_WEBHOOK_SECRET,
+    "FAST_BANKING_SECRET_KEY"
   ].filter(Boolean) as string[];
 
   return EXPECTED_SECRETS.some(secret => 
@@ -39,34 +38,34 @@ export function verifySePayWebhookToken(
 }
 
 /**
- * Process a SePay payment transaction and automatically provision the corresponding course.
+ * Process an automated bank transfer transaction and automatically provision the corresponding course.
  */
 export async function processWebhookTransaction(
-  body: SePayWebhookBody
+  body: PaymentWebhookBody
 ): Promise<PaymentProcessingResult> {
   try {
-    const matchedSePayCode = (body.code || "").toString().trim().toUpperCase();
+    const matchedTxnCode = (body.code || "").toString().trim().toUpperCase();
     const content = (body.content || body.description || body.memo || "").toString().trim().toUpperCase();
     const amount = Number(body.transferAmount || body.amount || 0);
     const referenceId = (body.referenceId || body.id || `TXN_${Date.now()}`).toString();
 
-    console.log(`[PaymentService] Incoming Webhook: Code: "${matchedSePayCode}" | Content: "${content}" | Amount: ${amount}`);
+    console.log(`[PaymentService] Incoming Webhook: Code: "${matchedTxnCode}" | Content: "${content}" | Amount: ${amount}`);
 
-    // Detect generic SePay simulator tests or generic webhook checks and auto-approve
+    // Detect generic simulator tests or webhook health checks and auto-approve
     const isTestMock = 
       content.includes("TEST") || 
       content.includes("THU") || 
       content.includes("SIMULAT") ||
       content.includes("MOCK") ||
-      matchedSePayCode.includes("TEST") ||
-      matchedSePayCode.includes("THU") ||
-      (!matchedSePayCode && !content);
+      matchedTxnCode.includes("TEST") ||
+      matchedTxnCode.includes("THU") ||
+      (!matchedTxnCode && !content);
 
     if (isTestMock) {
-      console.log("[PaymentService] SePay Connection Test/Simulation detected. Auto-approving.");
+      console.log("[PaymentService] Banking Connection Test/Simulation detected. Auto-approving.");
       return {
         success: true,
-        message: "SePay Webhook Connection Test Approved!",
+        message: "Payment Gateway Connection Test Approved!",
         isTest: true
       };
     }
@@ -80,8 +79,8 @@ export async function processWebhookTransaction(
     if (match) {
       suffix = match[1].trim();
       targetCode = `FAST${suffix}`;
-    } else if (matchedSePayCode) {
-      const codeMatch = matchedSePayCode.match(fastRegex);
+    } else if (matchedTxnCode) {
+      const codeMatch = matchedTxnCode.match(fastRegex);
       if (codeMatch) {
         suffix = codeMatch[1].trim();
         targetCode = `FAST${suffix}`;
@@ -184,7 +183,7 @@ export async function processWebhookTransaction(
         activatedAt: new Date().toISOString(),
         paymentRef: referenceId,
         paymentAmount: amount,
-        paymentMethod: "sepay_auto_banking",
+        paymentMethod: "vietqr_auto_banking",
         updatedAt: new Date().toISOString()
       }, { merge: true }),
       timeoutPromise(5000)
@@ -224,13 +223,13 @@ export async function processWebhookTransaction(
 }
 
 /**
- * Validates the SePay HMAC-SHA256 signature using the raw body and the webhook secret.
+ * Validates the HMAC-SHA256 signature using the raw body and the webhook secret.
  */
-export function verifySePayHMACSignature(
+export function verifyHMACSignature(
   rawBody: string | undefined,
   signatureHeader: string | undefined
 ): boolean {
-  const secret = process.env.SEPAY_WEBHOOK_SECRET || "X85V4RCQQ6CMMMZ8K2P3BOKAOTRPIZ7RYLY7HSVHUG3ZXW95VTUPKDUTRAQXWBNG";
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET || "FAST_BANKING_SECRET_KEY";
   if (!signatureHeader || !rawBody) {
     console.warn("[PaymentService:HMAC] Missing signature header or raw body.");
     return false;
@@ -277,9 +276,9 @@ export async function logFailedWebhookAttempt(
       status,
       timestamp: new Date().toISOString(),
       payload: payload || null,
-      userAgent: "SePay Webhook Engine",
+      userAgent: "Payment Gateway Webhook",
     });
-    console.log(`[PaymentService] Successfully logged failed attempt "${logId}" to payment_logs.`);
+    console.log(`[PaymentService] Successfully logged attempt "${logId}" to payment_logs.`);
   } catch (err: any) {
     console.error("[PaymentService] Critical: Failed to write to payment_logs collection:", err.message);
   }

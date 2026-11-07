@@ -38,8 +38,8 @@ const CONTACT_PREFERENCES = [
 ];
 
 const Contact: React.FC = () => {
-  const phoneNumber = "0989 499 579";
-  const rawPhone = "0989499579";
+  const phoneNumber = "0927 002 668";
+  const rawPhone = "0927002668";
   const officialEmail = "hkc.qms@gmail.com";
   const supportEmail = "support@fastelearning.com.vn";
   const address = "Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam";
@@ -142,7 +142,7 @@ const Contact: React.FC = () => {
     <main className="min-h-screen bg-[#f8fafc] font-sans selection:bg-teal-500/20 selection:text-teal-800">
       <Helmet>
         <title>Liên Hệ &amp; Tư Vấn Trực Tiếp | FAST E-Learning</title>
-        <meta name="description" content="Liên hệ đội ngũ tư vấn chuyên gia FAST E-Learning. Hỗ trợ 24/7 qua Hotline 0989 499 579, email hkc.qms@gmail.com và support@fastelearning.com.vn." />
+        <meta name="description" content="Liên hệ đội ngũ tư vấn chuyên gia FAST E-Learning. Hỗ trợ 24/7 qua Hotline 0927 002 668, email hkc.qms@gmail.com và support@fastelearning.com.vn." />
       </Helmet>
 
       {/* Header Banner */}
@@ -374,7 +374,7 @@ const Contact: React.FC = () => {
                           name="phone"
                           value={formData.phone}
                           onChange={handleChange}
-                          placeholder="0989 499 579"
+                          placeholder="0927 002 668"
                           className={`w-full pl-10 pr-4 py-3 bg-slate-50 border rounded-2xl text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white transition-all ${
                             errors.phone ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200 focus:border-[#007c76] focus:ring-2 focus:ring-teal-100'
                           }`}

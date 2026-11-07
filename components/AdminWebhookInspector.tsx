@@ -34,7 +34,7 @@ export const AdminWebhookInspector: React.FC = () => {
           status: data.status || 'failed',
           timestamp: data.timestamp || new Date().toISOString(),
           payload: data.payload || null,
-          userAgent: data.userAgent || 'SePay Webhook Engine'
+          userAgent: data.userAgent || 'Payment Gateway Webhook'
         });
       });
       setLogs(fetched);
@@ -136,7 +136,7 @@ export const AdminWebhookInspector: React.FC = () => {
             </div>
             <p className="text-[10px] text-gray-500 font-semibold mt-1.5 leading-relaxed">
               {audit.hasHttpIssue 
-                ? "CẢNH BÁO: Phát hiện yêu cầu gửi qua HTTP thường! Điều này kích hoạt cơ chế Redirect 302 bảo mật của Google Cloud Run. Vui lòng đổi URL SePay sang HTTPS."
+                ? "CẢNH BÁO: Phát hiện yêu cầu gửi qua HTTP thường! Điều này kích hoạt cơ chế Redirect 302 bảo mật của Google Cloud Run. Vui lòng đổi URL Webhook sang HTTPS."
                 : "TỐT: Không phát hiện gói tin HTTP không an toàn. Mọi tín hiệu đều dùng SSL bảo mật."}
             </p>
           </div>

@@ -82,17 +82,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   const handleCourseOriginalPriceChange = (newOrigStr: string) => {
     setOriginalPrice(newOrigStr);
     const numOrig = parsePriceNumber(newOrigStr);
-    if (numOrig > 0) {
-      const discountedNum = Math.round(numOrig * (1 - (discountPercent || 0) / 100));
+    if (numOrig > 0 && discountPercent > 0 && discountPercent < 100) {
+      const discountedNum = Math.round(numOrig * (1 - discountPercent / 100));
       setPrice(formatVndPrice(discountedNum));
+    } else if (numOrig > 0) {
+      const numPrice = parsePriceNumber(price);
+      if (numPrice > 0 && numOrig >= numPrice) {
+        const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
+        setDiscountPercent(calculatedPct);
+      }
     }
   };
 
   const handleCourseDiscountPercentChange = (pct: number) => {
-    const clampedPct = Math.min(99, Math.max(0, pct));
+    const clampedPct = Math.min(99.9, Math.max(0, Number(pct)));
     setDiscountPercent(clampedPct);
+    const numPrice = parsePriceNumber(price);
     const numOrig = parsePriceNumber(originalPrice);
-    if (numOrig > 0) {
+
+    // Nếu đã nhập giá bán/khuyến mãi và chọn % sale off -> Tự động tính giá gốc
+    if (numPrice > 0 && clampedPct > 0 && clampedPct < 100) {
+      const calculatedOrig = Math.round(numPrice / (1 - clampedPct / 100));
+      setOriginalPrice(formatVndPrice(calculatedOrig));
+    } else if (numOrig > 0) {
       const discountedNum = Math.round(numOrig * (1 - clampedPct / 100));
       setPrice(formatVndPrice(discountedNum));
     }
@@ -100,10 +112,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
   const handleCourseDiscountedPriceChange = (newPriceStr: string) => {
     setPrice(newPriceStr);
-    const numOrig = parsePriceNumber(originalPrice);
     const numPrice = parsePriceNumber(newPriceStr);
-    if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
-      const calculatedPct = Math.round(((numOrig - numPrice) / numOrig) * 100);
+    const numOrig = parsePriceNumber(originalPrice);
+
+    // Khi nhập giá đã sale off và đã có % sale off -> Tự động tính giá gốc
+    if (discountPercent > 0 && discountPercent < 100 && numPrice > 0) {
+      const calculatedOrig = Math.round(numPrice / (1 - discountPercent / 100));
+      setOriginalPrice(formatVndPrice(calculatedOrig));
+    } else if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
+      const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
       setDiscountPercent(calculatedPct);
     }
   };
@@ -1630,15 +1647,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                   <div>
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
-                      % Sale Off (Khuyến Mãi)
+                      % Sale Off (Hỗ trợ số thập phân)
                     </label>
                     <div className="relative">
                       <input
                         type="number"
                         min={0}
-                        max={99}
-                        value={discountPercent}
-                        onChange={(e) => handleCourseDiscountPercentChange(Number(e.target.value))}
+                        max={99.9}
+                        step="0.1"
+                        value={discountPercent || ''}
+                        onChange={(e) => handleCourseDiscountPercentChange(parseFloat(e.target.value) || 0)}
+                        placeholder="VD: 15.5"
                         className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl font-extrabold text-red-600 text-xs focus:outline-none focus:border-[#007c76] pr-8"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-red-500">%</span>
@@ -1660,10 +1679,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   </div>
                 </div>
 
+                <div className="text-[11px] text-teal-800 bg-teal-50/80 px-3 py-1.5 rounded-xl border border-teal-200/60 font-medium">
+                  💡 <strong>Cách dùng thông minh:</strong> Bạn có thể nhập <strong>Giá Khuyến Mãi</strong> và chọn <strong>% Sale Off</strong> (hỗ trợ số lẻ như 12.5%, 15.5%) ➔ Hệ thống sẽ <strong>tự động tính ra Giá Gốc</strong> chuẩn xác!
+                </div>
+
                 {/* Quick % Sale Off Buttons */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Chọn % nhanh:</span>
-                  {[10, 20, 30, 40, 50, 60, 70, 80].map((pct) => (
+                  {[10, 12.5, 15.5, 20, 25.5, 30, 40, 50, 60, 70, 80].map((pct) => (
                     <button
                       key={pct}
                       type="button"

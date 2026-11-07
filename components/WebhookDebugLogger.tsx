@@ -34,7 +34,7 @@ export const WebhookDebugLogger: React.FC = () => {
           status: data.status || 'failed',
           timestamp: data.timestamp || new Date().toISOString(),
           payload: data.payload || null,
-          userAgent: data.userAgent || 'SePay Webhook Engine'
+          userAgent: data.userAgent || 'Payment Gateway Webhook'
         });
       });
       setLogs(fetched);
@@ -110,7 +110,7 @@ export const WebhookDebugLogger: React.FC = () => {
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800/60 space-y-1">
             <span className="text-purple-400 text-[10px] uppercase font-black tracking-wider block">Ký tự Slash "/"</span>
             <p className="text-[10px] text-slate-400 leading-normal">
-              Việc gọi URL kết thúc bằng dấu gạch chéo (ví dụ: <code className="text-rose-400 font-mono">/api/sepay/webhook/</code>) sẽ kích hoạt quy trình chuẩn hóa đường dẫn của router, phản hồi <strong className="text-amber-500">302 Redirect</strong> về bản không có dấu gạch chéo.
+              Việc gọi URL kết thúc bằng dấu gạch chéo (ví dụ: <code className="text-rose-400 font-mono">/api/payment/webhook/</code>) sẽ kích hoạt quy trình chuẩn hóa đường dẫn của router, phản hồi <strong className="text-amber-500">302 Redirect</strong> về bản không có dấu gạch chéo.
             </p>
           </div>
 
@@ -124,7 +124,7 @@ export const WebhookDebugLogger: React.FC = () => {
           <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800/60 space-y-1">
             <span className="text-purple-400 text-[10px] uppercase font-black tracking-wider block">Bản chất của Lỗi 302</span>
             <p className="text-[10px] text-slate-400 leading-normal">
-              Lỗi <strong className="text-rose-500">302</strong> xảy ra hoàn toàn ở các lớp cân bằng tải mạng (Proxy, Cloudflare, Netlify). <strong className="text-green-400">Yêu cầu SePay không bao giờ chạm tới code Express</strong> khi dính lỗi này!
+              Lỗi <strong className="text-rose-500">302</strong> xảy ra hoàn toàn ở các lớp cân bằng tải mạng (Proxy, Cloudflare, Netlify). <strong className="text-green-400">Yêu cầu Webhook không bao giờ chạm tới code Express</strong> khi dính lỗi này!
             </p>
           </div>
         </div>

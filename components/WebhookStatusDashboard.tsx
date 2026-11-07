@@ -33,7 +33,7 @@ export const WebhookStatusDashboard: React.FC = () => {
           status: (data.status || 'failed') as any,
           timestamp: data.timestamp || new Date().toISOString(),
           payload: data.payload || null,
-          userAgent: data.userAgent || 'SePay Webhook Engine'
+          userAgent: data.userAgent || 'Payment Gateway Webhook'
         });
       });
       setLogs(fetched);

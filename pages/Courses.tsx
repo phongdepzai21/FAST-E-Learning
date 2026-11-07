@@ -216,23 +216,17 @@ const Courses: React.FC = () => {
 
 
 
-  const [hideOwned, setHideOwned] = useState<boolean>(true);
+  const [hideOwned, setHideOwned] = useState<boolean>(false);
 
   // Logic lọc khóa học
   const filteredCourses = useMemo(() => {
+    const sourceCourses = allCourses.length > 0 ? allCourses : HARDCODED_COURSES;
     const seenIds = new Set<string>();
-    return allCourses.filter(course => {
+    return sourceCourses.filter(course => {
       if (!course || !course.id || seenIds.has(course.id)) return false;
       seenIds.add(course.id);
 
       const isDraft = course.status === 'draft' || course.status === 'inactive';
-      
-      // If a course is inactive, hide all courses in the same category
-      if (isDraft) {
-        const otherCoursesInSameCategory = allCourses.filter(c => c.category === course.category && (c.status === 'draft' || c.status === 'inactive'));
-        if (otherCoursesInSameCategory.some(c => c.id === course.id)) return false;
-      }
-      
       if (isDraft) return false; // Hide drafts & inactive courses for general view
 
       // Hide VIP package / Combos from regular single courses list
@@ -240,13 +234,13 @@ const Courses: React.FC = () => {
         return false;
       }
 
-      // Hide purchased courses from unbought course catalog if student already owns the course
+      // Hide purchased courses ONLY if user explicitly checked hideOwned (defaults to false)
       if (hideOwned && ownedCourseIds.includes(course.id)) {
         return false;
       }
 
       const term = searchTerm.toLowerCase();
-      const matchesSearch = course.title.toLowerCase().includes(term) || (course.category && course.category.toLowerCase().includes(term));
+      const matchesSearch = !term || course.title.toLowerCase().includes(term) || (course.category && course.category.toLowerCase().includes(term));
       
       let matchesCategory = false;
       if (activeCategory === 'Tất cả') {

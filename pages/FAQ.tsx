@@ -40,7 +40,7 @@ const FAQS: FaqItem[] = [
     category: 'payment',
     categoryLabel: 'Thanh toán & Kích hoạt',
     question: "Sau khi quét mã VietQR tự động, khóa học được kích hoạt trong bao lâu?",
-    answer: "Hệ thống FAST tích hợp cổng đối soát giao dịch tự động SePay. Ngay sau khi bạn hoàn tất lệnh chuyển khoản quét mã VietQR chuẩn xác, hệ thống sẽ tự động băm đối soát và kích hoạt khóa học vào tài khoản của bạn chỉ trong vòng 1 đến 3 giây mà không cần chờ duyệt thủ công."
+    answer: "Hệ thống FAST tích hợp cổng đối soát giao dịch ngân hàng tự động. Ngay sau khi bạn hoàn tất lệnh chuyển khoản quét mã VietQR chuẩn xác, hệ thống sẽ tự động đối soát và kích hoạt khóa học vào tài khoản của bạn chỉ trong vòng 1 đến 3 giây mà không cần chờ duyệt thủ công."
   },
   {
     id: 'faq-3',
@@ -96,7 +96,7 @@ const FAQS: FaqItem[] = [
     category: 'payment',
     categoryLabel: 'Thanh toán & Kích hoạt',
     question: "Nếu tôi chuyển khoản sai nội dung hoặc sai số tiền thì giải quyết như thế nào?",
-    answer: "Đừng lo lắng, dữ liệu chuyển khoản của bạn luôn được lưu trữ an toàn trong sổ cái ngân hàng. Bạn chỉ cần liên hệ Hotline/Zalo 0989 499 579 hoặc email hkc.qms@gmail.com, cung cấp ảnh biên lai chuyển khoản để tư vấn viên kích hoạt bổ sung cho bạn ngay lập tức."
+    answer: "Đừng lo lắng, dữ liệu chuyển khoản của bạn luôn được lưu trữ an toàn trong sổ cái ngân hàng. Bạn chỉ cần liên hệ Hotline/Zalo 0927 002 668 hoặc email hkc.qms@gmail.com, cung cấp ảnh biên lai chuyển khoản để tư vấn viên kích hoạt bổ sung cho bạn ngay lập tức."
   },
   {
     id: 'faq-11',
@@ -117,7 +117,7 @@ const FAQS: FaqItem[] = [
     category: 'technical',
     categoryLabel: 'Tài khoản & Hỗ trợ',
     question: "Tôi bị quên mã OTP hoặc gặp vấn đề đăng nhập thì cần làm gì?",
-    answer: "Hệ thống hỗ trợ gửi mã xác thực đăng nhập qua Email bảo mật. Nếu không thấy trong Hộp thư đến (Inbox), bạn vui lòng kiểm tra thêm mục Thư rác (Spam) hoặc liên hệ đội ngũ kỹ thuật qua hotline 0989 499 579 để được hỗ trợ trong vài phút."
+    answer: "Hệ thống hỗ trợ gửi mã xác thực đăng nhập qua Email bảo mật. Nếu không thấy trong Hộp thư đến (Inbox), bạn vui lòng kiểm tra thêm mục Thư rác (Spam) hoặc liên hệ đội ngũ kỹ thuật qua hotline 0927 002 668 để được hỗ trợ trong vài phút."
   },
   {
     id: 'faq-14',
@@ -363,9 +363,9 @@ const FAQ: React.FC = () => {
               </p>
               
               <div className="pt-2 flex flex-wrap gap-4 text-xs font-bold text-teal-200">
-                <a href="tel:0989499579" className="flex items-center gap-2 hover:text-white transition">
+                <a href="tel:0927002668" className="flex items-center gap-2 hover:text-white transition">
                   <PhoneCall className="w-4 h-4 text-teal-300" />
-                  <span>Hotline: 0989 499 579</span>
+                  <span>Hotline: 0927 002 668</span>
                 </a>
                 <a href="mailto:hkc.qms@gmail.com" className="flex items-center gap-2 hover:text-white transition">
                   <Mail className="w-4 h-4 text-teal-300" />

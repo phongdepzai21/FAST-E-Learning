@@ -20,7 +20,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
     { id: 'transaction', label: '3. Điều kiện giao dịch', category: 'Mua bán', keywords: 'quyền học phí 599k kích hoạt đơn hàng xác nhận tcvn haccp' },
     { id: 'payment', label: '4. Chính sách thanh toán', category: 'Giao dịch', keywords: 'vietqr qr ngân hàng đối soát sai nội dung thiếu thừa' },
     { id: 'refund', label: '5. Hoàn tiền & Hủy khóa', category: 'Giao dịch', keywords: 'bồi hoàn nhầm lẫn kích hoạt hủy đơn lỗi hệ thống' },
-    { id: 'data-protection', label: '6. Bảo vệ dữ liệu cá nhân', category: 'Riêng tư', keywords: '91/2025/qh15 luật 2026 google login firebase sepay thu thập' },
+    { id: 'data-protection', label: '6. Bảo vệ dữ liệu cá nhân', category: 'Riêng tư', keywords: '91/2025/qh15 luật 2026 google login firebase thu thập' },
     { id: 'security', label: '7. Chính sách bảo mật', category: 'Riêng tư', keywords: 'https ssl mã hóa phiên đăng nhập rò rỉ cơ sở dữ liệu' },
     { id: 'intellectual-property', label: '8. Sở hữu trí tuệ', category: 'Bản quyền', keywords: 'video slide bài giảng câu hỏi test bản quyền logo fast' },
     { id: 'complaints', label: '9. Giải quyết khiếu nại', category: 'Hỗ trợ', keywords: 'khiếu nại quy trình email phản hồi bồi thường 12 giờ' },
@@ -134,7 +134,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <p><strong>Tên quốc tế:</strong> FAST CONSULTING COMPANY LIMITED</p>
                     <p><strong>Tên viết tắt:</strong> FAST CONSULTING CO., LTD</p>
                     <p><strong>Địa chỉ:</strong> Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam</p>
-                    <p><strong>Điện thoại:</strong> 0989 499 579</p>
+                    <p><strong>Điện thoại:</strong> 0927 002 668</p>
                     <p><strong>Email chính thức:</strong> hkc.qms@gmail.com</p>
                     <p><strong>Email hỗ trợ học tập:</strong> support@fastelearning.com.vn</p>
                   </div>
@@ -212,7 +212,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">3.3. Quy trình mua hàng & Kích hoạt</h3>
                     <p>
-                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản tự động qua mã QR ➔ Hệ thống SePay băm khớp thông tin tự động trong 1-3 giây ➔ Khóa học được kích hoạt vĩnh viễn trên tài khoản.
+                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản qua mã QR ngân hàng ACB ➔ Hệ thống đối soát thông tin tự động trong 1-3 giây ➔ Khóa học được kích hoạt vĩnh viễn trên tài khoản.
                     </p>
                   </section>
                 </div>
@@ -230,7 +230,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                 <div className="space-y-4 text-xs md:text-sm text-slate-600">
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-slate-950 border-l-4 border-teal-500 pl-3">4.1. Cổng chuyển khoản ngân hàng tự động (VietQR)</h3>
-                    <p>Chúng tôi cung ứng hệ thống quét mã QR tự động từ đối tác SePay kết nối thẳng vào ngân hàng thụ hưởng của doanh nghiệp. Quá trình thanh toán diễn ra hoàn toàn khép kín và an toàn.</p>
+                    <p>Chúng tôi cung ứng hệ thống quét mã QR tự động kết nối thẳng vào ngân hàng thụ hưởng ACB của doanh nghiệp. Quá trình thanh toán diễn ra hoàn toàn khép kín và an toàn.</p>
                   </section>
 
                   <section className="space-y-2">
@@ -238,7 +238,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <div className="space-y-3 pt-1">
                       <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl">
                         <p className="font-extrabold text-slate-800 text-xs uppercase tracking-wide">● Thanh toán sai nội dung chuyển khoản:</p>
-                        <p className="text-xs text-gray-500 mt-1">Hệ thống SePay sẽ tự động ghi nhận vào mục log xử lý thủ công. Bạn vui lòng chụp hóa đơn và liên hệ trực tiếp cho Hotline 0903 456 789 để nhân viên kích hoạt khóa học thủ công cho bạn trong 5 phút.</p>
+                        <p className="text-xs text-gray-500 mt-1">Hệ thống sẽ tự động ghi nhận vào mục log xử lý thủ công. Bạn vui lòng chụp hóa đơn và liên hệ trực tiếp cho Hotline 0927 002 668 để nhân viên kích hoạt khóa học thủ công cho bạn trong 5 phút.</p>
                       </div>
                       
                       <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl">
@@ -334,7 +334,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <p>Để vận hành thực tế hệ thống, FAST Elearning chia sẻ dữ liệu cần thiết với các đơn vị hạ tầng uy tín bao gồm:</p>
                     <ul className="list-disc pl-5 space-y-1 text-xs text-slate-500">
                       <li><strong>Google / Firebase</strong>: Hạ tầng lưu trữ đám mây, Cơ sở dữ liệu Firestore và Cơ chế xác thực tài khoản an toàn toàn cầu.</li>
-                      <li><strong>SePay API Gateway</strong>: Đơn vị trung gian công nghệ hỗ trợ băm chữ ký đối soát dữ liệu ngân hàng tự động.</li>
+                      <li><strong>Cổng đối soát ngân hàng ACB / VietQR</strong>: Công nghệ hỗ trợ đối soát dữ liệu ngân hàng tự động.</li>
                       <li><strong>Các hệ thống Hosting, CDN lưu trữ video bài giảng</strong>.</li>
                     </ul>
                   </section>
@@ -422,7 +422,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection = 'terms'
                     <p>Mọi thắc mắc vui lòng gửi về hòm thư điện tử hỗ trợ hoặc đường dây nóng:</p>
                     <ul className="list-disc pl-5 space-y-1">
                       <li><strong>Email:</strong> support@fastelearning.com.vn</li>
-                      <li><strong>Điện thoại:</strong> 0903 456 789</li>
+                      <li><strong>Điện thoại:</strong> 0927 002 668</li>
                     </ul>
                   </section>
                 </div>

@@ -35,7 +35,7 @@ export const PaymentDebugLogTable: React.FC = () => {
           status: data.status || 'failed',
           timestamp: data.timestamp || new Date().toISOString(),
           payload: data.payload || null,
-          userAgent: data.userAgent || 'SePay Webhook Engine'
+          userAgent: data.userAgent || 'Payment Gateway Webhook'
         });
       });
 

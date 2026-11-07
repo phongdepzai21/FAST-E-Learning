@@ -126,6 +126,9 @@ const Home: React.FC = () => {
         list.push(c);
       }
     }
+    if (list.length === 0) {
+      return HARDCODED_COURSES;
+    }
     return list;
   }, [allCourses]);
 

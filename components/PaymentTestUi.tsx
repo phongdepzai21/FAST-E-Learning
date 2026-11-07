@@ -49,7 +49,7 @@ export const PaymentTestUi: React.FC = () => {
 
   // Initialize URL on client load
   useEffect(() => {
-    setTargetUrl(window.location.origin + '/api/sepay/webhook');
+    setTargetUrl(window.location.origin + '/api/payment/webhook');
   }, []);
 
   // Generate a mock reference ID on load
@@ -84,7 +84,7 @@ export const PaymentTestUi: React.FC = () => {
     setServerResponse(null);
     setServerStatus(null);
 
-    const activeUrl = targetUrl.trim() || (window.location.origin + '/api/sepay/webhook');
+    const activeUrl = targetUrl.trim() || (window.location.origin + '/api/payment/webhook');
 
     try {
       console.log(`[PaymentTestUi:Debug] Dispatching request to ${activeUrl} with signature ${calculatedSignature}`);
@@ -92,7 +92,7 @@ export const PaymentTestUi: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-sepay-signature": calculatedSignature
+          "x-payment-signature": calculatedSignature
         },
         body: rawPayload
       });
@@ -115,7 +115,7 @@ export const PaymentTestUi: React.FC = () => {
         success: false,
         error: "Connection Failed (Lỗi Kết Nối)",
         message: err.message || String(err),
-        diagnosticTip: "Không thể kết kết nối đến Endpoint đích. Nếu đây là lỗi CORS hoặc 'Failed to fetch', hãy chắc chắn địa chỉ đích khớp với Tên miền hiện tại trên thanh địa chỉ trình duyệt, hoặc thay thế bằng đường dẫn tương đối (ví dụ: '/api/sepay/webhook')."
+        diagnosticTip: "Không thể kết kết nối đến Endpoint đích. Nếu đây là lỗi CORS hoặc 'Failed to fetch', hãy chắc chắn địa chỉ đích khớp với Tên miền hiện tại trên thanh địa chỉ trình duyệt, hoặc thay thế bằng đường dẫn tương đối (ví dụ: '/api/payment/webhook')."
       });
     } finally {
       setIsSending(false);
@@ -135,7 +135,7 @@ export const PaymentTestUi: React.FC = () => {
             Giao diện Kiểm thử Webhook bảo mật HMAC-SHA256
           </h3>
           <p className="text-gray-500 text-xs font-semibold mt-1">
-            Mô phỏng quy trình xử lý ký số bảo mật đầu-cuối của SePay và kiểm thử tính toàn vẹn của thuật toán mã hóa trên Server.
+            Mô phỏng quy trình xử lý ký số bảo mật đầu-cuối và kiểm thử tính toàn vẹn của thuật toán mã hóa trên Server.
           </p>
         </div>
       </div>
@@ -155,21 +155,14 @@ export const PaymentTestUi: React.FC = () => {
                 type="text"
                 value={targetUrl}
                 onChange={(e) => setTargetUrl(e.target.value)}
-                placeholder="/api/sepay/webhook"
+                placeholder="/api/payment/webhook"
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-mono text-[10px] text-slate-700"
               />
               <div className="flex flex-wrap gap-1.5 pt-1.5">
                 <button
                   type="button"
-                  onClick={() => selectPresetEndpoint('/api/sepay/webhook')}
-                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-100 rounded-lg text-[9px] font-bold cursor-pointer"
-                >
-                  sepay/webhook
-                </button>
-                <button
-                  type="button"
                   onClick={() => selectPresetEndpoint('/api/payment/webhook')}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-lg text-[9px] font-bold cursor-pointer"
+                  className="px-2 py-1 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-100 rounded-lg text-[9px] font-bold cursor-pointer"
                 >
                   payment/webhook
                 </button>
@@ -246,7 +239,7 @@ export const PaymentTestUi: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-gray-400 font-bold">Mã tham chiếu SePay (Reference ID)</label>
+              <label className="text-gray-400 font-bold">Mã tham chiếu giao dịch (Reference ID)</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -318,7 +311,7 @@ export const PaymentTestUi: React.FC = () => {
                     <span>Đang truyền phát gói tin ký số...</span>
                   </>
                 ) : (
-                  <span>🚀 Phát thử yêu cầu giả lập SePay HMAC-SHA256</span>
+                  <span>🚀 Phát thử yêu cầu giả lập HMAC-SHA256</span>
                 )}
               </button>
             </div>

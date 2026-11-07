@@ -7,7 +7,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { verifySePayWebhookToken, processWebhookTransaction, verifySePayHMACSignature, logFailedWebhookAttempt } from "./utils/paymentService";
+import { verifyPaymentWebhookToken, processWebhookTransaction, verifyHMACSignature, logFailedWebhookAttempt } from "./utils/paymentService";
 
 const FIREBASE_PROJECT_ID = "fast-e-learning";
 const FIRESTORE_DATABASE_ID = "(default)";
@@ -563,23 +563,23 @@ async function startServer() {
     }
   });
 
-  // Unified Webhook Handler Function to process incoming SePay signals on both routes natively (no 307 redirects)
-  const sepayWebhookHandler = async (req: any, res: any) => {
+  // Unified Webhook Handler Function to process incoming banking signals natively
+  const paymentWebhookHandler = async (req: any, res: any) => {
     const origin = req.headers["origin"] || "No Origin Header";
     const referer = req.headers["referer"] || "No Referer Header";
     const contentType = req.headers["content-type"] || "No Content-Type Header";
-    const userAgent = req.headers["user-agent"] || "SePay Webhook Engine";
+    const userAgent = req.headers["user-agent"] || "Payment Gateway Webhook";
     
     const isParsedAsObject = typeof req.body === 'object' && req.body !== null;
     const bodyKeysCount = isParsedAsObject ? Object.keys(req.body).length : 0;
     const rawBodyLength = req.rawBody ? req.rawBody.length : 0;
 
-    console.log("[Unified-SePay-Webhook] Processing Incoming Webhook Signal:");
+    console.log("[Payment-Webhook] Processing Incoming Webhook Signal:");
     console.log(`  - Origin: ${origin} | Referer: ${referer}`);
     console.log(`  - Content-Type: ${contentType} | User-Agent: ${userAgent}`);
 
-    // Detect Security Flow (B2-B3 Verification Flow)
-    const signatureHeader = req.headers["x-sepay-signature"] || req.headers["x-signature"];
+    // Detect Security Flow (Verification Flow)
+    const signatureHeader = req.headers["x-payment-signature"] || req.headers["x-signature"];
     const authHeader = req.headers["authorization"] || req.headers["x-api-key"];
     const queryToken = req.query.token;
 
@@ -589,23 +589,23 @@ async function startServer() {
     if (signatureHeader) {
       // 1. HMAC Security Verification Flow
       authMethodUsed = "HMAC-SHA256";
-      isAuthorized = verifySePayHMACSignature(
+      isAuthorized = verifyHMACSignature(
         req.rawBody,
         signatureHeader.toString()
       );
     } else if (authHeader || queryToken) {
       // 2. Token Security Verification Flow
       authMethodUsed = "API-Token";
-      isAuthorized = verifySePayWebhookToken(
+      isAuthorized = verifyPaymentWebhookToken(
         authHeader ? authHeader.toString() : undefined,
         queryToken ? queryToken.toString() : undefined
       );
     } else {
-      console.warn("[Unified-SePay-Webhook:Security] Access denied: No authentication or HMAC signature headers provided.");
+      console.warn("[Payment-Webhook:Security] Access denied: No authentication or HMAC signature headers provided.");
     }
 
     if (!isAuthorized) {
-      console.warn(`[Unified-SePay-Webhook:Security] Unauthorized webhook attempt using method: ${authMethodUsed}`);
+      console.warn(`[Payment-Webhook:Security] Unauthorized webhook attempt using method: ${authMethodUsed}`);
       
       const debugPayload = {
         origin,
@@ -623,13 +623,13 @@ async function startServer() {
 
       await logFailedWebhookAttempt(
         debugPayload, 
-        `B2-B3 Webhook verification failed. Unauthorized attempt via ${authMethodUsed}.`, 
+        `Payment webhook verification failed. Unauthorized attempt via ${authMethodUsed}.`, 
         "failed"
       );
       
       return res.status(401).json({ 
         success: false, 
-        error: `B2-B3 Webhook Verification Failed (${authMethodUsed}). Access Denied.`,
+        error: `Payment Webhook Verification Failed (${authMethodUsed}). Access Denied.`,
         diagnostics: {
           contentType,
           isParsedAsObject,
@@ -640,26 +640,25 @@ async function startServer() {
 
     // Process valid authorized transaction
     try {
-      console.log(`[Unified-SePay-Webhook] Authorization check PASSED via ${authMethodUsed}. Processing transaction...`);
+      console.log(`[Payment-Webhook] Authorization check PASSED via ${authMethodUsed}. Processing transaction...`);
       const result = await processWebhookTransaction(req.body);
       
       if (result.success) {
-        console.log("[Unified-SePay-Webhook] Transaction processed and course provisioned successfully!");
+        console.log("[Payment-Webhook] Transaction processed and course provisioned successfully!");
         return res.status(200).json(result);
       } else {
-        console.warn("[Unified-SePay-Webhook] Processing completed with failure/ignored:", result.message || result.error);
+        console.warn("[Payment-Webhook] Processing completed with failure/ignored:", result.message || result.error);
         return res.status(result.error ? 400 : 200).json(result);
       }
     } catch (err: any) {
-      console.error("[Unified-SePay-Webhook] Server-side exception:", err);
+      console.error("[Payment-Webhook] Server-side exception:", err);
       await logFailedWebhookAttempt(req.body, `Server exception during webhook process: ${err.message}`, "exception");
       return res.status(500).json({ success: false, error: err.message });
     }
   };
 
-  // Register the exact same robust handler for both routes natively (no redirects)
-  app.post("/api/payment/webhook", sepayWebhookHandler);
-  app.post("/api/sepay/webhook", sepayWebhookHandler);
+  // Register the handler for payment webhook
+  app.post("/api/payment/webhook", paymentWebhookHandler);
 
   // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
   app.get("/api/courses/stream", (req, res) => {

@@ -110,7 +110,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                     <p><strong>Tên quốc tế:</strong> FAST CONSULTING COMPANY LIMITED</p>
                     <p><strong>Tên viết tắt:</strong> FAST CONSULTING CO., LTD</p>
                     <p><strong>Địa chỉ:</strong> Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam</p>
-                    <p><strong>Điện thoại:</strong> 0989 499 579</p>
+                    <p><strong>Điện thoại:</strong> 0927 002 668</p>
                     <p><strong>Email chính thức:</strong> hkc.qms@gmail.com</p>
                     <p><strong>Email hỗ trợ học tập:</strong> support@fastelearning.com.vn</p>
                   </div>
@@ -196,7 +196,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">3.3. Quy trình mua hàng & Kích hoạt</h3>
                     <p>
-                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản tự động qua mã QR ➔ Hệ thống SePay băm khớp thông tin tự động trong 1-3 giây ➔ Khóa học được kích hoạt vĩnh viễn trên tài khoản.
+                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản qua mã QR ngân hàng ACB ➔ Hệ thống đối soát thông tin tự động trong 1-3 giây ➔ Khóa học được kích hoạt vĩnh viễn trên tài khoản.
                     </p>
                   </section>
                 </div>
@@ -214,7 +214,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                 <div className="space-y-4 text-sm md:text-base text-slate-600">
                   <section className="space-y-2">
                     <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">4.1. Cổng chuyển khoản ngân hàng tự động (VietQR)</h3>
-                    <p>Chúng tôi cung ứng hệ thống quét mã QR tự động từ đối tác SePay kết nối thẳng vào ngân hàng thụ hưởng của doanh nghiệp. Quá trình thanh toán diễn ra hoàn toàn khép kín và an toàn.</p>
+                    <p>Chúng tôi cung ứng hệ thống quét mã QR tự động kết nối thẳng vào ngân hàng thụ hưởng ACB của doanh nghiệp. Quá trình thanh toán diễn ra hoàn toàn khép kín và an toàn.</p>
                   </section>
 
                   <section className="space-y-2">
@@ -223,7 +223,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                       {/* Sub-item 1 */}
                       <div className="p-3.5 bg-gray-50 border border-gray-150 rounded-2xl">
                         <p className="font-extrabold text-slate-800 text-xs uppercase tracking-wide">● Thanh toán sai nội dung chuyển khoản:</p>
-                        <p className="text-xs text-gray-500 mt-1">Hệ thống SePay sẽ tự động ghi nhận vào mục log xử lý thủ công. Bạn vui lòng chụp hóa đơn và liên hệ trực tiếp cho Hotline 0903 456 789 để nhân viên kích hoạt khóa học thủ công cho bạn trong 5 phút.</p>
+                        <p className="text-xs text-gray-500 mt-1">Hệ thống sẽ tự động ghi nhận vào mục log xử lý thủ công. Bạn vui lòng chụp hóa đơn và liên hệ trực tiếp cho Hotline 0927002668 để nhân viên kích hoạt khóa học thủ công cho bạn trong 5 phút.</p>
                       </div>
                       
                       {/* Sub-item 2 */}
@@ -325,7 +325,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                     <p>Để vận hành thực tế hệ thống, FAST Elearning chia sẻ dữ liệu cần thiết với các đơn vị hạ tầng uy tín bao gồm:</p>
                     <ul className="list-disc pl-5 space-y-1 text-xs">
                       <li><strong>Google / Firebase</strong>: Hạ tầng lưu trữ đám mây, Cơ sở dữ liệu Firestore và Cơ chế xác thực tài khoản an toàn toàn cầu.</li>
-                      <li><strong>SePay API Gateway</strong>: Đơn vị trung gian công nghệ hỗ trợ băm chữ ký đối soát dữ liệu ngân hàng tự động.</li>
+                      <li><strong>Cổng đối soát ngân hàng ACB / VietQR</strong>: Công nghệ hỗ trợ đối soát dữ liệu ngân hàng tự động.</li>
                       <li><strong>Các hệ thống Hosting, CDN lưu trữ video bài giảng</strong>.</li>
                     </ul>
                   </section>
@@ -419,7 +419,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                     <p>Mọi thắc mắc vui lòng gửi về hòm thư điện tử hỗ trợ hoặc đường dây nóng:</p>
                     <ul className="list-disc pl-5 space-y-1">
                       <li><strong>Email:</strong> support@fastelearning.com.vn</li>
-                      <li><strong>Điện thoại:</strong> 0903 456 789</li>
+                      <li><strong>Điện thoại:</strong> 0927 002 668</li>
                     </ul>
                   </section>
                 </div>

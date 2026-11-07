@@ -263,11 +263,11 @@ export const ViewedCoursesView: React.FC<ViewedCoursesViewProps> = ({ userEmail 
             <span>support@fastelearning.com.vn</span>
           </a>
           <a
-            href="tel:0989499579"
+            href="tel:0927002668"
             className="px-4 py-2.5 rounded-xl bg-[#007c76] hover:bg-[#00928b] text-white text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-sm"
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>0989 499 579</span>
+            <span>0927 002 668</span>
           </a>
         </div>
       </div>
