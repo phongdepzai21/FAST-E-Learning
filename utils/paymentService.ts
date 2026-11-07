@@ -223,28 +223,37 @@ export async function processWebhookTransaction(
 }
 
 /**
- * Validates the HMAC-SHA256 signature using the raw body and the webhook secret.
+ * Validates the HMAC-SHA256 signature using the raw body, timestamp, and the webhook secret.
+ * Formula: "sha256=" + HMAC-SHA256(secret, `${timestamp}.${rawBody}`)
  */
 export function verifyHMACSignature(
   rawBody: string | undefined,
-  signatureHeader: string | undefined
+  signatureHeader: string | undefined,
+  timestampHeader?: string | number | undefined
 ): boolean {
-  const secret = process.env.PAYMENT_WEBHOOK_SECRET || "FAST_BANKING_SECRET_KEY";
+  const secret = process.env.SEPAY_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || "FAST_BANKING_SECRET_KEY";
   if (!signatureHeader || !rawBody) {
     console.warn("[PaymentService:HMAC] Missing signature header or raw body.");
     return false;
   }
 
   try {
-    const computedSignature = crypto
+    // If timestamp is provided, follow official SePay formula: timestamp.rawBody
+    const payloadToSign = timestampHeader !== undefined && timestampHeader !== null
+      ? `${timestampHeader}.${rawBody}`
+      : rawBody;
+
+    const computedHash = crypto
       .createHmac("sha256", secret)
-      .update(rawBody)
+      .update(payloadToSign)
       .digest("hex");
 
-    console.log(`[PaymentService:HMAC] Computed Signature: "${computedSignature}" | Header: "${signatureHeader}"`);
-    
-    const bufComputed = Buffer.from(computedSignature, "hex");
-    const bufHeader = Buffer.from(signatureHeader, "hex");
+    const cleanHeader = signatureHeader.toString().trim();
+    const expectedSigWithPrefix = `sha256=${computedHash}`;
+    const targetToCompare = cleanHeader.startsWith("sha256=") ? expectedSigWithPrefix : computedHash;
+
+    const bufComputed = Buffer.from(targetToCompare, "utf-8");
+    const bufHeader = Buffer.from(cleanHeader, "utf-8");
 
     if (bufComputed.length !== bufHeader.length) {
       console.warn("[PaymentService:HMAC] Signature length mismatch.");

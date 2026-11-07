@@ -1,10 +1,24 @@
 import crypto from "crypto";
 import { adminDb } from "./utils/firebaseAdmin.mjs";
 
+/**
+ * Case-insensitive header value extraction helper
+ */
+function getHeader(headers, headerName) {
+  if (!headers || typeof headers !== "object") return "";
+  const target = headerName.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === target) {
+      return (value || "").toString().trim();
+    }
+  }
+  return "";
+}
+
 export async function handler(event, context) {
   const headers = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-sepay-signature, x-signature",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-SePay-Signature, X-SePay-Timestamp, x-sepay-signature, x-sepay-timestamp",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
@@ -21,99 +35,138 @@ export async function handler(event, context) {
     };
   }
 
-  const rawBody = event.body || "";
-  const signatureHeader = event.headers["x-sepay-signature"] || event.headers["x-signature"] || event.headers["X-SePay-Signature"];
-  const authHeader = event.headers["authorization"] || event.headers["x-api-key"];
-  const queryToken = event.queryStringParameters?.token;
-
-  const webhookSecret = process.env.SEPAY_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || "SEPAY_SECRET_FAST_E_LEARNING";
-
-  let isAuthorized = false;
-  let authMethod = "None";
-
-  // 1. Verify HMAC Signature if provided
-  if (signatureHeader) {
-    authMethod = "HMAC-SHA256";
+  // 1. Extract raw request body directly from Netlify event WITHOUT prior JSON parsing
+  let rawBody = "";
+  if (event.isBase64Encoded) {
     try {
-      const computedSig = crypto
-        .createHmac("sha256", webhookSecret)
-        .update(rawBody)
-        .digest("hex");
-
-      const cleanHeader = signatureHeader.toString().replace(/^sha256=/, "").trim();
-      const bufComputed = Buffer.from(computedSig, "hex");
-      const bufHeader = Buffer.from(cleanHeader, "hex");
-
-      if (bufComputed.length === bufHeader.length && crypto.timingSafeEqual(bufComputed, bufHeader)) {
-        isAuthorized = true;
-      }
-    } catch (hmacErr) {
-      console.error("[SePayWebhook] HMAC Verification error:", hmacErr);
+      rawBody = Buffer.from(event.body || "", "base64").toString("utf-8");
+    } catch (b64Err) {
+      console.error("[SePayWebhook:Security] Failed to decode base64 body:", b64Err.message);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success: false, error: "Invalid base64 payload" }),
+      };
     }
+  } else {
+    rawBody = event.body || "";
   }
 
-  // 2. Fallback to Token or API Key verification if HMAC wasn't used or failed
-  if (!isAuthorized) {
-    const expectedSecrets = [webhookSecret, process.env.SEPAY_API_KEY, "FAST_BANKING_SECRET_KEY"].filter(Boolean);
-    if (authHeader) {
-      authMethod = "Authorization-Header";
-      if (expectedSecrets.some(s => authHeader.includes(s))) {
-        isAuthorized = true;
-      }
-    } else if (queryToken) {
-      authMethod = "Query-Token";
-      if (expectedSecrets.includes(queryToken)) {
-        isAuthorized = true;
-      }
-    }
+  // 2. Read headers (case-insensitive)
+  const signatureHeader = getHeader(event.headers, "x-sepay-signature");
+  const timestampHeader = getHeader(event.headers, "x-sepay-timestamp");
+
+  // 3. Retrieve Secret from process.env.SEPAY_WEBHOOK_SECRET
+  const webhookSecret = process.env.SEPAY_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("[SePayWebhook:Security] Error: SEPAY_WEBHOOK_SECRET environment variable is not configured.");
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: "Server configuration error: SEPAY_WEBHOOK_SECRET is not set",
+      }),
+    };
   }
 
-  // For testing / simulation convenience if no strict headers configured yet or test mode
+  if (!signatureHeader || !timestampHeader) {
+    console.warn(
+      `[SePayWebhook:Security] Missing required headers. Has Signature: ${Boolean(signatureHeader)}, Has Timestamp: ${Boolean(timestampHeader)}`
+    );
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: "Unauthorized Webhook: Missing X-SePay-Signature or X-SePay-Timestamp header",
+      }),
+    };
+  }
+
+  // 4. Validate timestamp: max allowable drift 300 seconds (5 minutes)
+  const timestamp = parseInt(timestampHeader, 10);
+  if (isNaN(timestamp)) {
+    console.warn("[SePayWebhook:Security] Invalid timestamp format in X-SePay-Timestamp.");
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: "Unauthorized Webhook: Invalid X-SePay-Timestamp header",
+      }),
+    };
+  }
+
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const timeDifference = Math.abs(currentTimestamp - timestamp);
+  if (timeDifference > 300) {
+    console.warn(
+      `[SePayWebhook:Security] Timestamp drift too large (${timeDifference}s > 300s). Potential replay attack rejected.`
+    );
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: "Unauthorized Webhook: Timestamp drift exceeds 300 seconds",
+      }),
+    };
+  }
+
+  // 5. Calculate expected HMAC-SHA256 signature:
+  // Formula: "sha256=" + HMAC-SHA256(secret, `${timestamp}.${rawBody}`)
+  const payloadToSign = `${timestampHeader}.${rawBody}`;
+  const calculatedHex = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(payloadToSign)
+    .digest("hex");
+  const expectedSignatureWithPrefix = `sha256=${calculatedHex}`;
+
+  // 6. Compare signatures using constant-time comparison (crypto.timingSafeEqual)
+  const cleanReceived = signatureHeader.trim();
+  const targetExpected = cleanReceived.startsWith("sha256=")
+    ? expectedSignatureWithPrefix
+    : calculatedHex;
+
+  const bufExpected = Buffer.from(targetExpected, "utf-8");
+  const bufReceived = Buffer.from(cleanReceived, "utf-8");
+
+  const isSignatureValid =
+    bufExpected.length === bufReceived.length &&
+    crypto.timingSafeEqual(bufExpected, bufReceived);
+
+  if (!isSignatureValid) {
+    console.warn(
+      `[SePayWebhook:Security] HMAC-SHA256 verification failed. Received length: ${cleanReceived.length}. Access Denied.`
+    );
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: "Unauthorized Webhook (HMAC-SHA256). Access Denied.",
+      }),
+    };
+  }
+
+  // 7. Parse JSON ONLY AFTER HMAC verification succeeds
   let bodyObj = {};
   try {
     bodyObj = JSON.parse(rawBody);
   } catch (parseErr) {
+    console.error("[SePayWebhook] Invalid JSON body despite valid HMAC signature:", parseErr.message);
     return {
       statusCode: 400,
       headers,
-      body: JSON.stringify({ success: false, error: "Invalid JSON body" }),
+      body: JSON.stringify({ success: false, error: "Invalid JSON body format" }),
     };
   }
 
-  const content = (bodyObj.content || bodyObj.description || bodyObj.memo || "").toString().trim().toUpperCase();
-  const transferAmount = Number(bodyObj.transferAmount || bodyObj.amount || 0);
   const transferType = (bodyObj.transferType || "in").toString().toLowerCase();
-  const txnId = (bodyObj.id || bodyObj.referenceCode || `TXN_${Date.now()}`).toString();
-
-  // Allow test / mock signals
-  const isTestMock = content.includes("TEST") || content.includes("SIMULAT") || content.includes("MOCK");
-  if (isTestMock) {
-    console.log("[SePayWebhook] Test/Simulation signal detected. Auto-approving.");
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ success: true, message: "Webhook Test Approved", isTest: true }),
-    };
-  }
-
-  if (!isAuthorized) {
-    console.warn(`[SePayWebhook:Security] Unauthorized webhook attempt using method: ${authMethod}`);
-    await adminDb.collection("payment_logs").add({
-      error: `Unauthorized webhook attempt via ${authMethod}`,
-      status: "failed",
-      timestamp: new Date().toISOString(),
-      payload: bodyObj,
-      userAgent: event.headers["user-agent"] || "SePay Webhook Engine",
-    });
-
-    return {
-      statusCode: 401,
-      headers,
-      body: JSON.stringify({ success: false, error: `Unauthorized Webhook (${authMethod}). Access Denied.` }),
-    };
-  }
-
   if (transferType !== "in") {
+    console.log(`[SePayWebhook] Ignored transaction: transferType is '${transferType}' (not 'in')`);
     return {
       statusCode: 200,
       headers,
@@ -121,7 +174,18 @@ export async function handler(event, context) {
     };
   }
 
-  // Parse FAST code from content e.g. FAST8K2P91
+  const content = (bodyObj.content || bodyObj.description || bodyObj.memo || "").toString().trim().toUpperCase();
+  const transferAmount = Number(bodyObj.transferAmount || bodyObj.amount || 0);
+  const txnId = (bodyObj.id || bodyObj.referenceCode || `TXN_${Date.now()}`).toString();
+  const receivedAccount = (bodyObj.subAccount || bodyObj.accountNumber || bodyObj.bankAccount || "").toString().trim();
+  const expectedAccount = (process.env.BANK_ACCOUNT || "22888868").toString().trim();
+
+  // Validate receiving account if specified in payload
+  if (receivedAccount && expectedAccount && receivedAccount !== expectedAccount && receivedAccount !== "989499568") {
+    console.warn(`[SePayWebhook] Account notice: received account ${receivedAccount}, configured primary ${expectedAccount}`);
+  }
+
+  // Parse FAST payment code from transfer content (e.g. FAST8K2P91 or FAST-8K2P91)
   const fastRegex = /FAST\s*[-_]?\s*([A-Z0-9]+)/i;
   const match = content.match(fastRegex);
   if (!match) {
@@ -136,7 +200,7 @@ export async function handler(event, context) {
   const codeSuffix = match[1].trim().toUpperCase();
   const paymentCode = `FAST${codeSuffix}`;
 
-  console.log(`[SePayWebhook] Parsed paymentCode: "${paymentCode}" | Amount: ${transferAmount} | TxnId: ${txnId}`);
+  console.log(`[SePayWebhook] HMAC Verified. Parsed paymentCode: "${paymentCode}" | Amount: ${transferAmount} | TxnId: ${txnId}`);
 
   try {
     // Find pending payment or order
@@ -146,25 +210,28 @@ export async function handler(event, context) {
     let targetEmail = "";
     let courseId = "";
     let orderId = "";
+    let expectedAmount = 0;
 
     if (pendingSnap.exists) {
       const pData = pendingSnap.data();
-      targetEmail = pData.email;
+      targetEmail = (pData.email || "").toLowerCase().trim();
       courseId = pData.courseId;
       orderId = pData.orderId;
+      expectedAmount = Number(pData.amount || 0);
     } else {
       // Fallback query by paymentCode in orders collection
       const ordersSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode).limit(1).get();
       if (!ordersSnap.empty) {
         const oData = ordersSnap.docs[0].data();
-        targetEmail = oData.email;
+        targetEmail = (oData.email || "").toLowerCase().trim();
         courseId = oData.courseId;
         orderId = ordersSnap.docs[0].id;
+        expectedAmount = Number(oData.amount || 0);
       }
     }
 
     if (!targetEmail || !courseId) {
-      console.warn(`[SePayWebhook] No matching order found for code "${paymentCode}"`);
+      console.warn(`[SePayWebhook] No matching order or pending payment found for code "${paymentCode}"`);
       return {
         statusCode: 200,
         headers,
@@ -172,9 +239,14 @@ export async function handler(event, context) {
       };
     }
 
+    // Amount sanity check: warn if transferred amount is less than expected
+    if (expectedAmount > 0 && transferAmount < expectedAmount) {
+      console.warn(`[SePayWebhook] Warning: Transfer amount (${transferAmount}) is less than expected (${expectedAmount}) for ${paymentCode}`);
+    }
+
     // Use Firestore Transaction for idempotency and atomic updates
     const result = await adminDb.runTransaction(async (transaction) => {
-      // Check if transaction was already processed
+      // Idempotency: Check if transaction was already processed
       const txnLogRef = adminDb.collection("processed_transactions").doc(txnId);
       const txnLogSnap = await transaction.get(txnLogRef);
       if (txnLogSnap.exists) {
@@ -185,36 +257,47 @@ export async function handler(event, context) {
       transaction.set(txnLogRef, {
         txnId,
         paymentCode,
+        transferAmount,
+        receivedAccount,
         processedAt: new Date().toISOString(),
       });
 
       // Update order status if orderId exists
       if (orderId) {
         const orderRef = adminDb.collection("orders").doc(orderId);
-        transaction.set(orderRef, {
-          status: "PAID",
-          paidAt: new Date().toISOString(),
-          transactionId: txnId,
-          transferAmount,
-        }, { merge: true });
+        transaction.set(
+          orderRef,
+          {
+            status: "PAID",
+            paidAt: new Date().toISOString(),
+            transactionId: txnId,
+            transferAmount,
+            accountNumber: receivedAccount || expectedAccount,
+          },
+          { merge: true }
+        );
       }
 
-      // Provision course in user's purchased_courses
+      // Provision course in user's purchased_courses collection
       const courseDocRef = adminDb
         .collection("users")
         .doc(targetEmail)
         .collection("purchased_courses")
         .doc(courseId);
 
-      transaction.set(courseDocRef, {
-        courseId,
-        status: "active",
-        purchasedAt: new Date().toISOString(),
-        paymentRef: txnId,
-        price: `${transferAmount}đ`,
-        claimedVia: "SEPAY_AUTO_BANKING",
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      transaction.set(
+        courseDocRef,
+        {
+          courseId,
+          status: "active",
+          purchasedAt: new Date().toISOString(),
+          paymentRef: txnId,
+          price: `${transferAmount}đ`,
+          claimedVia: "SEPAY_AUTO_BANKING",
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
 
       return { success: true, targetEmail, courseId };
     });
@@ -224,10 +307,12 @@ export async function handler(event, context) {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: "Already processed" }) };
     }
 
-    // Clean up pending payment
+    // Clean up pending payment record
     try {
       await adminDb.collection("pending_payments").doc(codeSuffix).delete();
-    } catch (e) {}
+    } catch (cleanErr) {
+      console.warn("[SePayWebhook] Non-critical error removing pending payment:", cleanErr.message);
+    }
 
     console.log(`[SePayWebhook] SUCCESS: Course "${courseId}" provisioned for user "${targetEmail}" via SePay transaction ${txnId}!`);
 
@@ -237,17 +322,20 @@ export async function handler(event, context) {
       body: JSON.stringify({
         success: true,
         message: `Successfully provisioned course "${courseId}" for "${targetEmail}"`,
+        txnId,
       }),
     };
   } catch (err) {
-    console.error("[SePayWebhook] Transaction processing exception:", err);
-    await adminDb.collection("payment_logs").add({
-      error: err.message || String(err),
-      status: "exception",
-      timestamp: new Date().toISOString(),
-      payload: bodyObj,
-      userAgent: event.headers["user-agent"] || "SePay Webhook Engine",
-    });
+    console.error("[SePayWebhook] Transaction processing exception:", err.message);
+    try {
+      await adminDb.collection("payment_logs").add({
+        error: err.message || String(err),
+        status: "exception",
+        timestamp: new Date().toISOString(),
+        paymentCode,
+        txnId,
+      });
+    } catch (logErr) {}
 
     return {
       statusCode: 500,

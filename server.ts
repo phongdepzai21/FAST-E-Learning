@@ -579,7 +579,8 @@ async function startServer() {
     console.log(`  - Content-Type: ${contentType} | User-Agent: ${userAgent}`);
 
     // Detect Security Flow (Verification Flow)
-    const signatureHeader = req.headers["x-payment-signature"] || req.headers["x-signature"];
+    const signatureHeader = req.headers["x-sepay-signature"] || req.headers["x-payment-signature"] || req.headers["x-signature"];
+    const timestampHeader = req.headers["x-sepay-timestamp"] || req.headers["x-timestamp"];
     const authHeader = req.headers["authorization"] || req.headers["x-api-key"];
     const queryToken = req.query.token;
 
@@ -591,7 +592,8 @@ async function startServer() {
       authMethodUsed = "HMAC-SHA256";
       isAuthorized = verifyHMACSignature(
         req.rawBody,
-        signatureHeader.toString()
+        signatureHeader.toString(),
+        timestampHeader ? timestampHeader.toString() : undefined
       );
     } else if (authHeader || queryToken) {
       // 2. Token Security Verification Flow
