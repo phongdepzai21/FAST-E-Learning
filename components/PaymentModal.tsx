@@ -87,27 +87,48 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
     setOtpCountdown(0);
 
     if (isOpen) {
-      const chars = '0123456789';
-      let result = '';
-      for (let i = 0; i < 6; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      setPaymentCode(result);
-
       const user = auth.currentUser;
       const email = (user?.email || (typeof localStorage !== 'undefined' ? localStorage.getItem('user_email') : '') || 'hocvien@gmail.com').trim().toLowerCase();
       const amount = parseNumericPrice(course.price);
 
-      const pendingRef = doc(db, 'pending_payments', result);
-      setDoc(pendingRef, {
-        code: result,
-        email,
-        courseId: course.id,
-        amount,
-        createdAt: new Date().toISOString()
-      }).catch((err) => {
-        console.warn("[PaymentModal] Failed to create pending_payment doc:", err);
-      });
+      if (amount > 0) {
+        fetch('/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            courseId: course.id,
+            courseTitle: course.title,
+            amount,
+            email,
+            userId: user?.uid || ''
+          })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.paymentCode) {
+            setPaymentCode(data.paymentCode);
+            if (data.bankAccount) {
+              setConfig(prev => ({
+                ...prev,
+                accountNo: data.bankAccount,
+                bankName: data.bankCode || 'ACB',
+                accountName: data.bankAccountName || prev.accountName
+              }));
+            }
+          }
+        })
+        .catch(err => {
+          console.warn("[PaymentModal] Create order API error, fallback to random code:", err);
+          const chars = '0123456789';
+          let result = '';
+          for (let i = 0; i < 6; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          setPaymentCode(result);
+        });
+      } else {
+        setPaymentCode('FREE');
+      }
     }
   }, [isOpen, course.id, course.price]);
 
@@ -571,92 +592,106 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 </button>
               </div>
             ) : (
-              /* Payment Temporarily Locked Screen */
-              <div className="bg-gradient-to-br from-slate-50 via-amber-50/40 to-slate-100/70 p-5 sm:p-6 rounded-2xl border border-amber-200/80 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-amber-200">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <span className="inline-block px-2 py-0.5 bg-amber-200/80 text-amber-900 text-[10px] font-black uppercase tracking-wider rounded-md mb-0.5">
-                      Thông Báo Bảo Trì
-                    </span>
-                    <h4 className="font-black text-slate-800 text-sm sm:text-base leading-snug">
-                      Cổng thanh toán tự động đang tạm thời khóa
-                    </h4>
-                  </div>
+              /* Dynamic QR Payment Box with SePay Auto-Confirmation */
+              <div className="bg-gradient-to-br from-teal-50/60 via-slate-50 to-pink-50/40 p-4 sm:p-5 rounded-2xl border border-teal-200/70 space-y-4">
+                <div className="flex items-center justify-between bg-teal-100/60 px-3 py-2 rounded-xl border border-teal-200">
+                  <span className="text-[11px] font-black uppercase text-teal-900 tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Hệ thống quét mã tự động ACB
+                  </span>
+                  <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">1-3 giây</span>
                 </div>
 
-                <div className="text-xs text-slate-600 leading-relaxed bg-white/80 p-3.5 rounded-xl border border-amber-100 space-y-2">
-                  <p>
-                    Hệ thống thanh toán tự động đang được <strong>tạm khóa để nâng cấp hạ tầng kết nối ngân hàng ACB</strong> nhằm mang lại trải nghiệm nhanh và an toàn tuyệt đối cho học viên.
-                  </p>
-                  <p className="text-slate-700 font-semibold">
-                    Để đăng ký khóa học <span className="text-[#007c76]">"{course.title}"</span> với mức giá ưu đãi <span className="text-rose-600 font-black">{formatVND(numericAmount)}</span>, quý học viên vui lòng liên hệ trực tiếp để được kích hoạt thủ công trong 2 phút:
-                  </p>
-                </div>
+                {/* QR Code and Instructions */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 justify-center">
+                  <div className="relative w-52 h-52 sm:w-60 sm:h-60 bg-white p-2.5 rounded-3xl shadow-lg border-2 border-[#007c76] shrink-0 flex items-center justify-center transition-transform duration-300 hover:scale-[1.03]">
+                    <img
+                      src={currentQrUrl}
+                      alt={`Mã QR ${formatVND(numericAmount)}`}
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                  </div>
 
-                {/* Direct Contact Channels */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                      <span>📞</span> Hotline / Zalo:
-                    </span>
+                  <div className="text-left space-y-2 text-xs text-slate-700 flex-1 w-full">
+                    <p>
+                      <strong>Bước 1:</strong> Mở app Ngân hàng (ACB hoặc ngân hàng bất kỳ).
+                    </p>
+                    <p>
+                      <strong>Bước 2:</strong> Chọn <strong>"Quét Mã QR"</strong> và quét mã bên cạnh.
+                    </p>
+                    <p>
+                      <strong>Bước 3:</strong> Số tiền <strong>{formatVND(numericAmount)}</strong> và nội dung chuyển khoản được điền tự động:
+                    </p>
                     <div className="flex items-center gap-2">
-                      <span className="font-black font-mono text-[#007c76] text-sm">0927 002 668</span>
+                      <span className="bg-white px-2.5 py-1.5 rounded-lg border border-teal-200 font-mono font-bold text-[#007c76] text-xs">
+                        {transferMemo}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => copyText('0927002668', 'phone')}
-                        className="text-[10px] bg-teal-50 text-[#007c76] px-2 py-0.5 rounded font-bold hover:bg-teal-100 cursor-pointer"
+                        onClick={() => copyText(transferMemo, 'memo')}
+                        className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded font-semibold text-[10px] hover:bg-teal-200 cursor-pointer"
                       >
-                        {copiedField === 'phone' ? '✓ Đã chép' : 'Sao chép'}
+                        {copiedField === 'memo' ? '✓ Đã chép' : 'Sao chép'}
                       </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                      <span>✉️</span> Email tư vấn:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-800 text-xs">support@fastelearning.com.vn</span>
-                      <button
-                        type="button"
-                        onClick={() => copyText('support@fastelearning.com.vn', 'email')}
-                        className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold hover:bg-slate-200 cursor-pointer"
-                      >
-                        {copiedField === 'email' ? '✓ Đã chép' : 'Sao chép'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-500 font-medium flex items-center gap-1.5">
-                      <span>⏰</span> Giờ hỗ trợ:
-                    </span>
-                    <span className="font-semibold text-slate-700">08:00 - 22:00 hàng ngày (Cả T7, CN)</span>
-                  </div>
                 </div>
 
-                <div className="flex gap-2.5 pt-1">
+                {/* Account Details Box */}
+                <div className="bg-white/90 p-3.5 rounded-xl border border-teal-100 text-xs space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Ngân hàng:</span>
+                        <span className="font-bold text-slate-800">{config.bankName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Số tài khoản:</span>
+                        <span className="font-mono font-bold text-[#007c76] flex items-center gap-1.5">
+                          {config.accountNo}
+                          <button
+                            type="button"
+                            onClick={() => copyText(config.accountNo, 'accNo')}
+                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          >
+                            {copiedField === 'accNo' ? '✓ Đã chép' : 'Copy'}
+                          </button>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Chủ tài khoản:</span>
+                        <span className="font-bold text-slate-800 uppercase">{config.accountName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Số tiền:</span>
+                        <span className="font-bold text-[#007c76] flex items-center gap-1.5">
+                          {formatVND(numericAmount)}
+                          <button
+                            type="button"
+                            onClick={() => copyText(String(numericAmount), 'amount')}
+                            className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          >
+                            {copiedField === 'amount' ? '✓ Đã chép' : 'Copy'}
+                          </button>
+                        </span>
+                      </div>
+                </div>
+
+                <div className="p-3 bg-teal-50 border border-teal-200/60 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-[#007c76] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="font-bold text-teal-900">Đang chờ hệ thống SePay tự động xác nhận chuyển khoản...</span>
+                  </div>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-white border border-teal-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 cursor-pointer"
                   >
                     Đóng lại
                   </button>
-                  <a
-                    href="https://zalo.me/0927002668"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 py-3 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl font-black uppercase text-xs tracking-wider transition-all shadow-md active:scale-98 text-center flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <span>💬 Nhắn Zalo kích hoạt</span>
-                  </a>
                 </div>
+
+                <p className="text-[10px] text-center text-gray-400 font-medium">
+                  Hệ thống tự động kích hoạt khóa học vào phòng học ngay sau khi giao dịch chuyển khoản thành công.
+                </p>
               </div>
             )}
             </>
