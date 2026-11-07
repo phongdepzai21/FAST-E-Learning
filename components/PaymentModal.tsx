@@ -8,6 +8,7 @@ import { parseNumericPrice, formatVND, getPaymentConfig } from '../utils/qrServi
 import { sendOtp, verifyOtp } from '../utils/otpService';
 import { PaymentStatusPolling } from './PaymentStatusPolling';
 import { authDebugger } from '../utils/authDebugger';
+import { paymentLogger } from '../utils/paymentLogger';
 
 interface PaymentModalProps {
   course: Course;
@@ -195,6 +196,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
   const isFreeCourse = numericAmount === 0;
 
   const handleConfirmTransfer = async () => {
+    paymentLogger.logTransition('OTP_VERIFYING', 'Yêu cầu gửi mã OTP xác thực email');
     safeSetState(setIsVerifying, true);
     safeSetState(setOtpError, '');
     safeSetState(setOtpNotice, '');
@@ -228,6 +230,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
   const handleResendOtp = async () => {
     if (otpCountdown > 0) return;
+    paymentLogger.logTransition('OTP_VERIFYING', 'Gửi lại mã OTP xác thực email mới');
     safeSetState(setOtpError, '');
     safeSetState(setOtpNotice, '');
     safeSetState(setIsVerifying, true);
@@ -259,6 +262,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
 
   const handleVerifyOtp = async () => {
     if (userInputOtp.length !== 6) {
+      paymentLogger.logTransition('FAILED', 'Nhập thiếu 6 chữ số OTP', 'ERR_INVALID_OTP_400');
       safeSetState(setOtpError, "Vui lòng nhập đầy đủ mã OTP 6 chữ số từ email của bạn.");
       return;
     }
@@ -276,13 +280,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
       });
 
       if (verifyRes.success) {
+        paymentLogger.logTransition('PROCESSING', 'Xác thực mã OTP thành công ➔ Chuyển sang màn hình quét QR thanh toán');
         safeSetState(setOtpError, '');
         safeSetState(setShowOtpForm, false);
         safeSetState(setShowPaymentPolling, true);
       } else {
+        paymentLogger.logTransition('FAILED', 'Mã OTP không hợp lệ hoặc đã hết hạn', 'ERR_INVALID_OTP_400');
         safeSetState(setOtpError, verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn.");
       }
     } catch (err: any) {
+      paymentLogger.logTransition('FAILED', `Lỗi kết nối khi xác thực OTP: ${err.message}`, 'ERR_NETWORK_DISCONNECTED_503');
       safeSetState(setOtpError, "Lỗi kết nối khi xác thực mã OTP.");
       authDebugger.logOtpModalState({ componentName: "PaymentModal", event: "VerifyOtpError", error: err?.message });
     }
