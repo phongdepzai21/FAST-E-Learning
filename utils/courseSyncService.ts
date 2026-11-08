@@ -536,8 +536,21 @@ export async function broadcastComboUpdate(
 
     if ((action === 'save' || action === 'upsert') && (payload.combo || payload.comboId)) {
       const cId = payload.combo?.id || payload.comboId;
+
+      // Unmark from deleted_combo_ids if previously deleted
+      try {
+        const delStr = localStorage.getItem('deleted_combo_ids');
+        if (delStr) {
+          const delList: string[] = JSON.parse(delStr);
+          if (Array.isArray(delList)) {
+            const cleanedDel = delList.filter(id => id !== cId);
+            localStorage.setItem('deleted_combo_ids', JSON.stringify(cleanedDel));
+          }
+        }
+      } catch (e) {}
+
       const idx = localList.findIndex((c) => c.id === cId);
-      const updatedItem = { ...(idx >= 0 ? localList[idx] : {}), ...(payload.combo || {}), id: cId, updatedAt: now };
+      const updatedItem = { ...(idx >= 0 ? localList[idx] : {}), ...(payload.combo || {}), id: cId, status: payload.combo?.status || 'active', updatedAt: now };
       if (idx >= 0) {
         localList[idx] = updatedItem;
       } else {
@@ -565,6 +578,7 @@ export async function broadcastComboUpdate(
     }
 
     localStorage.setItem('combo_cache_all', JSON.stringify(localList));
+    localStorage.setItem('fast_custom_combos_backup', JSON.stringify(localList));
   } catch (err) {
     console.warn('Local storage update error in broadcastComboUpdate:', err);
   }

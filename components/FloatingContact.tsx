@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { Bot } from 'lucide-react';
 import { db } from '../firebase';
 import { CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
 import { Course } from '../types';
@@ -395,12 +396,7 @@ export const FloatingContact: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
             </svg>
           ) : (
-            <div className="flex items-center justify-center gap-1 font-black text-white text-sm">
-              <svg className="w-5 h-5 text-amber-300" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L14.4 7.6L20 8.4L15.8 12.5L17 18.2L12 15.2L7 18.2L8.2 12.5L4 8.4L9.6 7.6L12 2Z"/>
-              </svg>
-              <span>AI</span>
-            </div>
+            <Bot className="w-7 h-7 text-white" />
           )}
         </button>
       </div>

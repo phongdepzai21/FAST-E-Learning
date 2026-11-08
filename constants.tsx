@@ -942,6 +942,22 @@ export function getMergedCombos(firestoreCombos?: any[], options: { includeInact
     }
   } catch (e) {}
 
+  // 2b. Read fast_custom_combos_backup
+  try {
+    const backup = localStorage.getItem('fast_custom_combos_backup');
+    if (backup) {
+      const parsed = JSON.parse(backup);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((c: any) => {
+          if (c && c.id && !delSet.has(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip') {
+            const prev = comboMap.get(c.id);
+            comboMap.set(c.id, prev ? { ...prev, ...c } : c);
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
   // 3. Overlay Firestore combos if provided
   if (Array.isArray(firestoreCombos) && firestoreCombos.length > 0) {
     firestoreCombos.forEach((fc: any) => {

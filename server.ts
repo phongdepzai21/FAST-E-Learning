@@ -930,19 +930,21 @@ async function startServer() {
       const { action, combo, comboId, status, combos } = req.body;
       const now = new Date().toISOString();
 
-      if (action === "upsert" && combo && combo.id) {
+      if ((action === "upsert" || action === "save" || action === "create" || action === "edit") && combo && combo.id) {
         serverCombos[combo.id] = {
           ...serverCombos[combo.id],
           ...combo,
+          status: combo.status || 'active',
           updatedAt: combo.updatedAt || now
         };
         serverDeletedComboIds.delete(combo.id);
 
         try {
-          const db = getFirestore();
+          const db = getServerFirestore();
           db.collection("combos").doc(combo.id).set(serverCombos[combo.id], { merge: true }).catch((err) => {
             console.warn("[Firestore] Failed to save combo doc:", err.message);
           });
+          db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
       } else if (action === "status" && comboId && status) {
         if (serverCombos[comboId]) {
@@ -961,33 +963,39 @@ async function startServer() {
         serverDeletedComboIds.delete(comboId);
 
         try {
-          const db = getFirestore();
+          const db = getServerFirestore();
           db.collection("combos").doc(comboId).set({ status, updatedAt: now }, { merge: true }).catch((err) => {
             console.warn("[Firestore] Failed to update combo status doc:", err.message);
           });
+          db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
       } else if (action === "delete" && comboId) {
         delete serverCombos[comboId];
         serverDeletedComboIds.add(comboId);
 
         try {
-          const db = getFirestore();
+          const db = getServerFirestore();
           db.collection("combos").doc(comboId).delete().catch((err) => {
             console.warn("[Firestore] Failed to delete combo doc:", err.message);
           });
+          db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
       } else if (action === "sync_all" && Array.isArray(combos)) {
         combos.forEach((c: any) => {
           if (c && c.id) {
-            serverCombos[c.id] = { ...serverCombos[c.id], ...c, updatedAt: c.updatedAt || now };
+            serverCombos[c.id] = { ...serverCombos[c.id], ...c, status: c.status || 'active', updatedAt: c.updatedAt || now };
             serverDeletedComboIds.delete(c.id);
 
             try {
-              const db = getFirestore();
+              const db = getServerFirestore();
               db.collection("combos").doc(c.id).set(serverCombos[c.id], { merge: true }).catch(() => {});
             } catch (e) {}
           }
         });
+        try {
+          const db = getServerFirestore();
+          db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
+        } catch (e) {}
       }
 
       saveCombosToDisk(serverCombos, serverDeletedComboIds);
