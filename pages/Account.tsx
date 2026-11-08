@@ -19,6 +19,7 @@ import { PurchaseHistory } from '../components/PurchaseHistory';
 import { ViewedCoursesView } from '../components/ViewedCoursesView';
 import { FastCodeLookup } from '../components/FastCodeLookup';
 import { NotificationDropdown } from '../components/NotificationDropdown';
+import { AdminDiagnosticConsole } from '../components/AdminDiagnosticConsole';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
