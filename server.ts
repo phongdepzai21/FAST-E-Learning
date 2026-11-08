@@ -2012,28 +2012,39 @@ async function startServer() {
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders?.();
 
-      // Fast models priority: gemini-3.1-flash-lite (instant time-to-first-token) then gemini-3.8-flash
-      const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+      // Fast models priority: gemini-3.8-flash then gemini-flash-latest then gemini-3.1-flash-lite
+      const modelsToTry = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
       let streamResult = null;
       let lastErr = null;
 
       for (const modelName of modelsToTry) {
         try {
-          const config: any = {
-            systemInstruction: systemContext || undefined,
-          };
+          const config: any = {};
+          if (systemContext) {
+            config.systemInstruction = systemContext;
+          }
           if (modelName === 'gemini-3.8-flash') {
-            config.thinkingConfig = { thinkingLevel: 'low' };
+            try {
+              config.thinkingConfig = { thinkingLevel: 'low' };
+            } catch (e) {}
           }
           streamResult = await ai.models.generateContentStream({
             model: modelName,
             contents: historyContents,
-            config
+            config: Object.keys(config).length > 0 ? config : undefined
           });
           if (streamResult) break;
         } catch (err: any) {
           lastErr = err;
           console.warn(`[Gemini API] Failed with model ${modelName}, trying fallback...`, err?.message || err);
+          // Try without config if config failed
+          try {
+            streamResult = await ai.models.generateContentStream({
+              model: modelName,
+              contents: historyContents
+            });
+            if (streamResult) break;
+          } catch (innerErr) {}
         }
       }
 
