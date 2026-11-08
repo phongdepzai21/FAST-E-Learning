@@ -359,7 +359,11 @@ export const ComboManagement: React.FC = () => {
 
       await broadcastComboUpdate('upsert', { comboId: targetId, combo: comboData });
 
-      const firestorePromise = setDoc(doc(db, 'combos', targetId), comboData, { merge: true });
+      const firestorePromise = Promise.all([
+        setDoc(doc(db, 'combos', targetId), comboData, { merge: true }),
+        setDoc(doc(db, 'customCombos', targetId), comboData, { merge: true }),
+        setDoc(doc(db, 'sync_control', 'combos'), { updatedAt: now }, { merge: true })
+      ]);
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
 
       try {
@@ -384,12 +388,17 @@ export const ComboManagement: React.FC = () => {
 
     const newStatus: 'active' | 'inactive' = combo.status === 'inactive' ? 'active' : 'inactive';
     const comboId = combo.id;
+    const now = new Date().toISOString();
 
     setCombos(prev => prev.map(c => c.id === comboId ? { ...c, status: newStatus } : c));
     await broadcastComboUpdate('status', { comboId, status: newStatus });
 
     try {
-      await setDoc(doc(db, 'combos', comboId), { status: newStatus, updatedAt: new Date().toISOString() }, { merge: true });
+      await Promise.all([
+        setDoc(doc(db, 'combos', comboId), { status: newStatus, updatedAt: now }, { merge: true }),
+        setDoc(doc(db, 'customCombos', comboId), { status: newStatus, updatedAt: now }, { merge: true }),
+        setDoc(doc(db, 'sync_control', 'combos'), { updatedAt: now }, { merge: true })
+      ]);
       toast.success(`Đã đổi trạng thái gói "${combo.title}" sang: ${newStatus === 'active' ? 'Đang hiện' : 'Đã ẩn'}`);
     } catch (err) {
       console.warn("Lỗi lưu trạng thái combo Firestore:", err);
@@ -400,14 +409,21 @@ export const ComboManagement: React.FC = () => {
   const handleBulkStatusChange = async (targetStatus: 'active' | 'inactive') => {
     const updatedCombos = combos.map(c => ({ ...c, status: targetStatus }));
     setCombos(updatedCombos);
+    const now = new Date().toISOString();
 
     await broadcastComboUpdate('sync_all', { combos: updatedCombos });
 
     for (const c of combos) {
       try {
-        await setDoc(doc(db, 'combos', c.id), { status: targetStatus, updatedAt: new Date().toISOString() }, { merge: true });
+        await Promise.all([
+          setDoc(doc(db, 'combos', c.id), { status: targetStatus, updatedAt: now }, { merge: true }),
+          setDoc(doc(db, 'customCombos', c.id), { status: targetStatus, updatedAt: now }, { merge: true })
+        ]);
       } catch (e) {}
     }
+    try {
+      await setDoc(doc(db, 'sync_control', 'combos'), { updatedAt: now }, { merge: true });
+    } catch (e) {}
 
     toast.success(`Đã ${targetStatus === 'active' ? 'kích hoạt hiện tất cả' : 'ẩn tất cả'} gói combo!`);
   };
@@ -428,10 +444,15 @@ export const ComboManagement: React.FC = () => {
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setIsSaving(true);
+        const now = new Date().toISOString();
         try {
           setCombos(prev => prev.filter(c => c.id !== combo.id));
           await broadcastComboUpdate('delete', { comboId: combo.id });
-          await deleteDoc(doc(db, 'combos', combo.id));
+          await Promise.all([
+            deleteDoc(doc(db, 'combos', combo.id)).catch(() => {}),
+            deleteDoc(doc(db, 'customCombos', combo.id)).catch(() => {}),
+            setDoc(doc(db, 'sync_control', 'combos'), { updatedAt: now }, { merge: true }).catch(() => {})
+          ]);
 
           toast.success(`Đã xóa thành công gói combo "${combo.title}"!`);
           if (activeTab === 'edit' && editingComboId === combo.id) {

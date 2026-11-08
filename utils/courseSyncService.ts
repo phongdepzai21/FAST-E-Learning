@@ -400,18 +400,31 @@ export function initCourseSyncService() {
     }
   });
 
-  // 5. Direct Firestore Real-Time Snapshot Listener for Combos with Detailed Debug Logs
+  // 5. Direct Firestore Real-Time Snapshot Listener for Combos & customCombos with Detailed Debug Logs
   try {
-    onSnapshot(collection(db, 'combos'), (snapshot) => {
+    const handleSnapshotDocs = (snapshot: any, sourceName: string) => {
       const fsCombos: any[] = [];
-      snapshot.forEach(docSnap => {
+      snapshot.docChanges().forEach((change: any) => {
+        console.log(`[Firestore Sync Debug] [${sourceName} snapshot change] Type: ${change.type}, Doc ID: ${change.doc.id}`, change.doc.data());
+      });
+      snapshot.forEach((docSnap: any) => {
         fsCombos.push({ id: docSnap.id, ...docSnap.data() });
       });
-      console.log('[Firestore Sync Debug] Received combos snapshot from Firestore in initCourseSyncService:', fsCombos.length, fsCombos);
+      console.log(`[Firestore Sync Debug] Received ${sourceName} snapshot: total items = ${fsCombos.length}`, fsCombos);
       updateStoredCombos(fsCombos);
-      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'firestore_snapshot', combos: fsCombos } }));
+      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: `${sourceName}_snapshot`, combos: fsCombos } }));
+    };
+
+    onSnapshot(collection(db, 'customCombos'), (snapshot) => {
+      handleSnapshotDocs(snapshot, 'customCombos');
     }, (err) => {
-      console.warn('[Firestore Sync Debug] Combos snapshot error in initCourseSyncService:', err);
+      console.warn('[Firestore Sync Debug] customCombos snapshot error:', err);
+    });
+
+    onSnapshot(collection(db, 'combos'), (snapshot) => {
+      handleSnapshotDocs(snapshot, 'combos');
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] combos snapshot error:', err);
     });
 
     onSnapshot(doc(db, 'sync_control', 'combos'), (docSnap) => {
