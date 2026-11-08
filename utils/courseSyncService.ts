@@ -1,4 +1,6 @@
 import { Course } from '../types';
+import { db } from '../firebase';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 
 // BroadcastChannel for instant (0ms) same-browser multi-tab synchronization
 const CHANNEL_NAME = 'fast_elearning_courses_sync';
@@ -393,10 +395,36 @@ export function initCourseSyncService() {
     if (e.key === 'local_custom_courses' || e.key === 'server_custom_courses') {
       window.dispatchEvent(new CustomEvent('courses_updated'));
     }
-    if (e.key === 'combo_cache_all') {
+    if (e.key === 'combo_cache_all' || e.key === 'fast_custom_combos_backup') {
       window.dispatchEvent(new CustomEvent('combos_updated'));
     }
   });
+
+  // 5. Direct Firestore Real-Time Snapshot Listener for Combos with Detailed Debug Logs
+  try {
+    onSnapshot(collection(db, 'combos'), (snapshot) => {
+      const fsCombos: any[] = [];
+      snapshot.forEach(docSnap => {
+        fsCombos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      console.log('[Firestore Sync Debug] Received combos snapshot from Firestore in initCourseSyncService:', fsCombos.length, fsCombos);
+      updateStoredCombos(fsCombos);
+      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'firestore_snapshot', combos: fsCombos } }));
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] Combos snapshot error in initCourseSyncService:', err);
+    });
+
+    onSnapshot(doc(db, 'sync_control', 'combos'), (docSnap) => {
+      if (docSnap.exists()) {
+        console.log('[Firestore Sync Debug] sync_control/combos updated at:', docSnap.data().updatedAt);
+        fetchLatestCombosFromServer();
+      }
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] sync_control/combos error:', err);
+    });
+  } catch (e) {
+    console.warn('[Firestore Sync Debug] Failed to attach Firestore listeners in courseSyncService:', e);
+  }
 }
 
 /**
