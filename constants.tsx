@@ -862,3 +862,76 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
 
   return Array.from(combinedMap.values()).filter(c => !isUnwantedGlobal(c));
 };
+
+export interface ComboItem {
+  id: string;
+  title: string;
+  price: string;
+  originalPrice?: string;
+  savings?: string;
+  image: string;
+  description: string;
+  courseIds: string[];
+  benefits?: string[];
+  status?: 'active' | 'inactive';
+  updatedAt?: string;
+}
+
+export const DEFAULT_COMBOS: ComboItem[] = [
+  {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    originalPrice: '2.400.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ giải đáp 24/7'],
+    status: 'active'
+  },
+  {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    originalPrice: '3.600.000đ',
+    savings: 'Tiết kiệm 50%',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ trực tiếp từ Chuyên gia', 'Truy cập khóa học trọn đời'],
+    status: 'active'
+  }
+];
+
+export function getMergedCombos(firestoreCombos?: any[], options: { includeInactive?: boolean } = {}): ComboItem[] {
+  let deletedIds: string[] = [];
+  try {
+    const delStr = localStorage.getItem('deleted_combo_ids');
+    if (delStr) deletedIds = JSON.parse(delStr);
+  } catch (e) {}
+
+  let currentList = firestoreCombos;
+  if (!currentList || currentList.length === 0) {
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) currentList = JSON.parse(cached);
+    } catch (e) {}
+  }
+
+  const mergedDefaults = DEFAULT_COMBOS.map(def => {
+    const found = (currentList || []).find((c: any) => c && c.id === def.id);
+    return found ? { ...def, ...found } : def;
+  });
+
+  const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+  const customCombos = (currentList || []).filter((c: any) => c && c.id && !defaultIds.includes(c.id));
+
+  let all = [...mergedDefaults, ...customCombos].filter(c => c && c.id && !deletedIds.includes(c.id));
+
+  if (!options.includeInactive) {
+    all = all.filter(c => (c as any).status !== 'inactive');
+  }
+
+  return all;
+}
