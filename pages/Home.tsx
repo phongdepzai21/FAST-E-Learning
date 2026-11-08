@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from "react-router-dom";
 import Hero from '../components/Hero';
-import { COURSES as HARDCODED_COURSES, getMergedCourses, extractLessonsFlat } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, extractLessonsFlat } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
@@ -70,17 +70,6 @@ const DEFAULT_COMBOS_HOME = [
     description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư & quản lý vận hành nhà máy gồm trọn bộ ISO 9001, ISO 14001 & ISO 22000.',
     courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
     benefits: ['Tài liệu hướng dẫn chuyên sâu', 'Hỗ trợ giải đáp chuyên gia 24/7']
-  },
-  {
-    id: 'combo-vip',
-    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
-    price: '2.500.000đ',
-    originalPrice: '5.000.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP: Độc quyền mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm cố vấn 1-1 và nhận chứng nhận ngay & liền.',
-    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
-    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Nhận chứng nhận ngay & liền']
   }
 ];
 
@@ -315,27 +304,32 @@ const Home: React.FC = () => {
     };
   }, []);
 
-  // Sync combos real-time
+  // Sync combos real-time from Firestore and local caches
   useEffect(() => {
-    const loadCombos = async () => {
-      try {
-        const response = await fetch('/api/combos');
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data.combos) && data.combos.length > 0) {
-            setHomeCombos(data.combos);
-          }
-        }
-      } catch (e) {}
+    let latestFsCombos: any[] = [];
+    const syncCombos = (fsList?: any[]) => {
+      if (fsList) latestFsCombos = fsList;
+      const merged = getMergedCombos(latestFsCombos, { includeInactive: false })
+        .filter(c => c.id !== 'combo-vip' && c.id !== 'khoa-vip');
+      setHomeCombos(merged);
     };
 
-    loadCombos();
+    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
+      const dbCombos: any[] = [];
+      snapshot.forEach(docSnap => {
+        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      syncCombos(dbCombos);
+    }, () => {
+      syncCombos();
+    });
 
-    const handleSync = () => loadCombos();
+    const handleSync = () => syncCombos();
     window.addEventListener('combos_updated', handleSync);
     window.addEventListener('storage', handleSync);
 
     return () => {
+      unsub();
       window.removeEventListener('combos_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };

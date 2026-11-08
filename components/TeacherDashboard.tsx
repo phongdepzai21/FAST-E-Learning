@@ -239,8 +239,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
       const fsMap = new Map(currentFsList.map(c => [c.id, c]));
       let syncedCount = 0;
 
+      let delList: string[] = [];
+      try {
+        const delStr = localStorage.getItem('deleted_course_ids');
+        if (delStr) delList = JSON.parse(delStr);
+      } catch (e) {}
+
       for (const localCourse of localList) {
-        if (!localCourse || !localCourse.id || localCourse.id === 'khoa-vip' || localCourse.id === 'vip-lifetime-access' || localCourse.id === 'vip-course') continue;
+        if (!localCourse || !localCourse.id || delList.includes(localCourse.id) || localCourse.id === 'khoa-vip' || localCourse.id === 'vip-lifetime-access' || localCourse.id === 'vip-course') continue;
         const fsCourse = fsMap.get(localCourse.id);
 
         // ONLY upload if the custom course does NOT exist in Firestore at all (brand new offline course)

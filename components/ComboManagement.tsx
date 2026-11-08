@@ -251,7 +251,8 @@ export const ComboManagement: React.FC = () => {
       const defaultIds = DEFAULT_COMBOS.map(d => d.id);
       const customCombos = (currentList || []).filter(c => !defaultIds.includes(c.id));
 
-      const all = [...mergedDefaults, ...customCombos].filter(c => !deletedIds.includes(c.id));
+      const all = [...mergedDefaults, ...customCombos]
+        .filter(c => c && c.id && !deletedIds.includes(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip');
       setCombos(all);
       setIsLoading(false);
     };

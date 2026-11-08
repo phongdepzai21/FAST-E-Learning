@@ -89,43 +89,73 @@ function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
  * Apply deleted combo IDs to localStorage
  */
 export function applyDeletedCombos(deletedIds: string[]) {
-  if (!Array.isArray(deletedIds) || deletedIds.length === 0) return;
   try {
     const delStr = localStorage.getItem('deleted_combo_ids');
-    const delList: string[] = delStr ? JSON.parse(delStr) : [];
-    let changed = false;
-    deletedIds.forEach((id) => {
-      if (id && !delList.includes(id)) {
-        delList.push(id);
-        changed = true;
-      }
-    });
-    if (changed) {
-      localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+    let delList: string[] = ['combo-vip', 'khoa-vip'];
+    if (delStr) {
+      const parsed = JSON.parse(delStr);
+      if (Array.isArray(parsed)) delList = Array.from(new Set([...delList, ...parsed]));
     }
-  } catch (e) {}
-}
-
-/**
- * Apply updated combos into localStorage safely
- */
-function updateStoredCombos(combos: any[], deletedIds?: string[]) {
-  if (!Array.isArray(combos)) return;
-  try {
-    let delList: string[] = [];
-    try {
-      const delStr = localStorage.getItem('deleted_combo_ids');
-      if (delStr) delList = JSON.parse(delStr);
-    } catch (e) {}
     if (Array.isArray(deletedIds)) {
       deletedIds.forEach((id) => {
         if (id && !delList.includes(id)) delList.push(id);
       });
-      localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+    }
+    localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+  } catch (e) {}
+}
+
+/**
+ * Apply updated combos into localStorage safely with merging
+ */
+function updateStoredCombos(incomingCombos: any[], deletedIds?: string[]) {
+  if (!Array.isArray(incomingCombos)) return;
+  try {
+    let delList: string[] = ['combo-vip', 'khoa-vip'];
+    try {
+      const delStr = localStorage.getItem('deleted_combo_ids');
+      if (delStr) {
+        const parsed = JSON.parse(delStr);
+        if (Array.isArray(parsed)) delList = Array.from(new Set([...delList, ...parsed]));
+      }
+    } catch (e) {}
+
+    if (Array.isArray(deletedIds)) {
+      deletedIds.forEach((id) => {
+        if (id && !delList.includes(id)) delList.push(id);
+      });
+    }
+    localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+    const delSet = new Set<string>(delList);
+
+    // Read existing cached combos
+    let existingList: any[] = [];
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) existingList = JSON.parse(cached);
+    } catch (e) {}
+
+    const comboMap = new Map<string, any>();
+
+    // 1. Put existing custom combos into Map
+    if (Array.isArray(existingList)) {
+      existingList.forEach((c) => {
+        if (c && c.id && !delSet.has(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip') {
+          comboMap.set(c.id, c);
+        }
+      });
     }
 
-    const filtered = combos.filter((c) => c && c.id && !delList.includes(c.id));
-    localStorage.setItem('combo_cache_all', JSON.stringify(filtered));
+    // 2. Overlay incoming combos from server/SSE
+    incomingCombos.forEach((c) => {
+      if (c && c.id && !delSet.has(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip') {
+        const prev = comboMap.get(c.id);
+        comboMap.set(c.id, prev ? { ...prev, ...c } : c);
+      }
+    });
+
+    const merged = Array.from(comboMap.values());
+    localStorage.setItem('combo_cache_all', JSON.stringify(merged));
   } catch (err) {
     console.warn('Error saving combos to local storage:', err);
   }

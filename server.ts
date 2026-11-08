@@ -154,19 +154,6 @@ const DEFAULT_SERVER_COMBOS: Record<string, any> = {
     benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành'],
     status: 'active',
     updatedAt: new Date().toISOString()
-  },
-  'combo-vip': {
-    id: 'combo-vip',
-    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
-    price: '2.500.000đ',
-    originalPrice: '5.000.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
-    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
-    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền'],
-    status: 'active',
-    updatedAt: new Date().toISOString()
   }
 };
 
@@ -285,7 +272,9 @@ const serverCourses: Record<string, any> = initialCoursesData.courses;
 const serverDeletedCourseIds: Set<string> = new Set<string>(initialCoursesData.deletedIds);
 const initialCombosData = loadCombosDataFromDisk();
 const serverCombos: Record<string, any> = initialCombosData.combos;
-const serverDeletedComboIds: Set<string> = new Set<string>(initialCombosData.deletedIds);
+const serverDeletedComboIds: Set<string> = new Set<string>(['combo-vip', 'khoa-vip', ...(initialCombosData.deletedIds || [])]);
+delete serverCombos['combo-vip'];
+delete serverCombos['khoa-vip'];
 // Set of active SSE subscribers
 const sseClients = new Set<express.Response>();
 

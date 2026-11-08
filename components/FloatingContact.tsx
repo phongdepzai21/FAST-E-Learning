@@ -378,56 +378,29 @@ export const FloatingContact: React.FC = () => {
         </form>
       </div>
 
-      {/* Floating Toggle Button & Prominent Highlight Pill */}
-      <div className="pointer-events-auto flex items-center gap-2.5">
-        {!isOpen && (
-          <button
-            type="button"
-            onClick={() => setIsOpen(true)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-md text-[#007c76] rounded-full shadow-xl border-2 border-teal-300/80 text-xs font-black cursor-pointer hover:bg-teal-50 hover:border-[#007c76] transition-all hover:scale-105 active:scale-95 animate-bounce [animation-duration:3.5s] group"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span className="tracking-tight text-gray-800 group-hover:text-[#007c76]">Trợ lý ảo Trần Hạnh (AI)</span>
-            <span className="bg-gradient-to-r from-[#007c76] to-teal-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-xs">Hỏi ngay</span>
-          </button>
-        )}
-
+      {/* Simple Clean Floating Round AI Button */}
+      <div className="pointer-events-auto">
         <button 
           type="button"
           onClick={() => setIsOpen(!isOpen)} 
-          title={isOpen ? "Đóng hộp thoại AI" : "Mở Trợ lý ảo Trần Hạnh (AI)"}
-          className={`relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-[0_10px_30px_rgba(0,124,118,0.5)] transition-all duration-300 hover:scale-110 active:scale-95 z-[9999] border-2 border-white cursor-pointer ${
+          title={isOpen ? "Đóng Trợ lý AI" : "Mở Trợ lý AI"}
+          className={`flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 z-[9999] border-2 border-white cursor-pointer ${
             isOpen 
-              ? 'rotate-90 bg-red-500 hover:bg-red-600 ring-4 ring-red-300/50' 
-              : 'bg-gradient-to-tr from-[#005c56] via-[#007c76] to-teal-500 hover:brightness-110 ring-4 ring-teal-400/50 ring-offset-2 animate-pulse [animation-duration:2.5s]'
+              ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20' 
+              : 'bg-[#007c76] hover:bg-[#005f5b] text-white shadow-[#007c76]/30'
           }`}
         >
-          {/* Subtle Outer Glow Aura */}
-          {!isOpen && (
-            <span className="absolute -inset-1 rounded-full bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 opacity-70 blur-md pointer-events-none -z-10 animate-pulse"></span>
-          )}
-
           {isOpen ? (
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           ) : (
-              <div className="relative flex flex-col items-center justify-center select-none">
-                  {/* Ping status notification dot */}
-                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-80"></span>
-                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-yellow-400 border-2 border-white shadow-xs"></span>
-                  </span>
-                  
-                  <div className="flex items-center gap-0.5">
-                    <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-yellow-300 drop-shadow" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2L14.4 7.6L20 8.4L15.8 12.5L17 18.2L12 15.2L7 18.2L8.2 12.5L4 8.4L9.6 7.6L12 2Z"/>
-                    </svg>
-                    <span className="text-white font-black text-sm tracking-tight drop-shadow">AI</span>
-                  </div>
-                  <span className="text-[9px] font-black uppercase text-teal-100 tracking-wider -mt-0.5 drop-shadow-xs">HẠNH</span>
-              </div>
+            <div className="flex items-center justify-center gap-1 font-black text-white text-sm">
+              <svg className="w-5 h-5 text-amber-300" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L14.4 7.6L20 8.4L15.8 12.5L17 18.2L12 15.2L7 18.2L8.2 12.5L4 8.4L9.6 7.6L12 2Z"/>
+              </svg>
+              <span>AI</span>
+            </div>
           )}
         </button>
       </div>

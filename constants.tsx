@@ -905,10 +905,15 @@ export const DEFAULT_COMBOS: ComboItem[] = [
 ];
 
 export function getMergedCombos(firestoreCombos?: any[], options: { includeInactive?: boolean } = {}): ComboItem[] {
-  let deletedIds: string[] = [];
+  let deletedIds: string[] = ['combo-vip', 'khoa-vip'];
   try {
     const delStr = localStorage.getItem('deleted_combo_ids');
-    if (delStr) deletedIds = JSON.parse(delStr);
+    if (delStr) {
+      const parsed = JSON.parse(delStr);
+      if (Array.isArray(parsed)) {
+        deletedIds = Array.from(new Set([...deletedIds, ...parsed]));
+      }
+    }
   } catch (e) {}
 
   let currentList = firestoreCombos;
@@ -927,7 +932,8 @@ export function getMergedCombos(firestoreCombos?: any[], options: { includeInact
   const defaultIds = DEFAULT_COMBOS.map(d => d.id);
   const customCombos = (currentList || []).filter((c: any) => c && c.id && !defaultIds.includes(c.id));
 
-  let all = [...mergedDefaults, ...customCombos].filter(c => c && c.id && !deletedIds.includes(c.id));
+  let all = [...mergedDefaults, ...customCombos]
+    .filter(c => c && c.id && !deletedIds.includes(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip');
 
   if (!options.includeInactive) {
     all = all.filter(c => (c as any).status !== 'inactive');
