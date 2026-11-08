@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
-import { getMergedCourses } from '../constants';
+import { getMergedCourses, getMergedCombos, DEFAULT_COMBOS, ComboItem } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { broadcastComboUpdate } from '../utils/courseSyncService';
 import { LivePriceQrPreview } from './LivePriceQrPreview';
@@ -35,42 +35,7 @@ import {
   Tag
 } from 'lucide-react';
 
-export interface ComboItem {
-  id: string;
-  title: string;
-  price: string;
-  originalPrice?: string;
-  savings?: string;
-  image: string;
-  description: string;
-  courseIds: string[];
-  benefits?: string[];
-  status?: 'active' | 'inactive';
-  updatedAt?: string;
-}
 
-const DEFAULT_COMBOS: ComboItem[] = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ giải đáp 24/7'],
-    status: 'active'
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ trực tiếp từ Chuyên gia', 'Truy cập khóa học trọn đời'],
-    status: 'active'
-  }
-];
 
 const PRESET_BENEFITS = [
   'Tài liệu hướng dẫn chuyên sâu đính kèm',
@@ -92,16 +57,7 @@ export const ComboManagement: React.FC = () => {
 
   // Main data states
   const [courses, setCourses] = useState<Course[]>([]);
-  const [combos, setCombos] = useState<ComboItem[]>(() => {
-    try {
-      const cached = localStorage.getItem('combo_cache_all');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return DEFAULT_COMBOS;
-  });
+  const [combos, setCombos] = useState<ComboItem[]>(() => getMergedCombos([], { includeInactive: true }));
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -235,24 +191,7 @@ export const ComboManagement: React.FC = () => {
     } catch (e) {}
 
     const syncCombosData = (fsCombos?: ComboItem[]) => {
-      let currentList = fsCombos;
-      if (!currentList) {
-        try {
-          const cached = localStorage.getItem('combo_cache_all');
-          if (cached) currentList = JSON.parse(cached);
-        } catch (e) {}
-      }
-
-      const mergedDefaults = DEFAULT_COMBOS.map(def => {
-        const found = (currentList || []).find(c => c.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = (currentList || []).filter(c => !defaultIds.includes(c.id));
-
-      const all = [...mergedDefaults, ...customCombos]
-        .filter(c => c && c.id && !deletedIds.includes(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip');
+      const all = getMergedCombos(fsCombos, { includeInactive: true });
       setCombos(all);
       setIsLoading(false);
     };

@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import CourseCard from '../components/CourseCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, DEFAULT_COMBOS } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
@@ -15,42 +15,6 @@ import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificatio
 import { trackCourseView } from '../utils/courseTrackingService';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
-
-const DEFAULT_COMBOS = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    originalPrice: '2.400.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    originalPrice: '3.600.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'combo-vip',
-    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
-    price: '2.500.000đ',
-    originalPrice: '5.000.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
-    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
-    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền']
-  }
-];
 
 const Courses: React.FC = () => {
   const toast = useToast();
@@ -64,7 +28,7 @@ const Courses: React.FC = () => {
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [combos, setCombos] = useState<any[]>(DEFAULT_COMBOS);
+  const [combos, setCombos] = useState<any[]>(() => getMergedCombos([], { includeInactive: false }));
   const [expandedComboIds, setExpandedComboIds] = useState<{ [id: string]: boolean }>({});
   const toggleComboExpand = (id: string) => {
     setExpandedComboIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -72,33 +36,8 @@ const Courses: React.FC = () => {
 
   // --- REAL-TIME SYNC ALL COMBOS FROM FIRESTORE & API ---
   useEffect(() => {
-    let deletedIds: string[] = [];
-    try {
-      const delStr = localStorage.getItem('deleted_combo_ids');
-      if (delStr) deletedIds = JSON.parse(delStr);
-    } catch (e) {}
-
     const syncCombosList = (fsCombos?: any[]) => {
-      let currentList = fsCombos;
-      if (!currentList) {
-        try {
-          const cached = localStorage.getItem('combo_cache_all');
-          if (cached) currentList = JSON.parse(cached);
-        } catch (e) {}
-      }
-
-      const mergedDefaults = DEFAULT_COMBOS.map(def => {
-        const found = (currentList || []).find((c: any) => c && c.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = (currentList || []).filter((c: any) => c && c.id && !defaultIds.includes(c.id));
-
-      const all = [...mergedDefaults, ...customCombos]
-        .filter(c => c && c.id && !deletedIds.includes(c.id))
-        .filter(c => (c as any).status !== 'inactive');
-
+      const all = getMergedCombos(fsCombos, { includeInactive: false });
       setCombos(all);
     };
 
@@ -116,10 +55,6 @@ const Courses: React.FC = () => {
 
     // 2. Also listen for custom combo events
     const handleSync = () => {
-      try {
-        const delStr = localStorage.getItem('deleted_combo_ids');
-        if (delStr) deletedIds = JSON.parse(delStr);
-      } catch (e) {}
       syncCombosList();
     };
 

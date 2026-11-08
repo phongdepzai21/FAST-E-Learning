@@ -916,24 +916,43 @@ export function getMergedCombos(firestoreCombos?: any[], options: { includeInact
     }
   } catch (e) {}
 
-  let currentList = firestoreCombos;
-  if (!currentList || currentList.length === 0) {
-    try {
-      const cached = localStorage.getItem('combo_cache_all');
-      if (cached) currentList = JSON.parse(cached);
-    } catch (e) {}
-  }
+  const delSet = new Set(deletedIds);
+  const comboMap = new Map<string, any>();
 
-  const mergedDefaults = DEFAULT_COMBOS.map(def => {
-    const found = (currentList || []).find((c: any) => c && c.id === def.id);
-    return found ? { ...def, ...found } : def;
+  // 1. Initialize with DEFAULT_COMBOS
+  DEFAULT_COMBOS.forEach(def => {
+    if (!delSet.has(def.id) && def.id !== 'combo-vip' && def.id !== 'khoa-vip') {
+      comboMap.set(def.id, { ...def });
+    }
   });
 
-  const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-  const customCombos = (currentList || []).filter((c: any) => c && c.id && !defaultIds.includes(c.id));
+  // 2. Read local cached combos (combo_cache_all) which has custom & server-synced combos
+  try {
+    const cached = localStorage.getItem('combo_cache_all');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((c: any) => {
+          if (c && c.id && !delSet.has(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip') {
+            const prev = comboMap.get(c.id);
+            comboMap.set(c.id, prev ? { ...prev, ...c } : c);
+          }
+        });
+      }
+    }
+  } catch (e) {}
 
-  let all = [...mergedDefaults, ...customCombos]
-    .filter(c => c && c.id && !deletedIds.includes(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip');
+  // 3. Overlay Firestore combos if provided
+  if (Array.isArray(firestoreCombos) && firestoreCombos.length > 0) {
+    firestoreCombos.forEach((fc: any) => {
+      if (fc && fc.id && !delSet.has(fc.id) && fc.id !== 'combo-vip' && fc.id !== 'khoa-vip') {
+        const prev = comboMap.get(fc.id);
+        comboMap.set(fc.id, prev ? { ...prev, ...fc } : fc);
+      }
+    });
+  }
+
+  let all = Array.from(comboMap.values());
 
   if (!options.includeInactive) {
     all = all.filter(c => (c as any).status !== 'inactive');

@@ -378,12 +378,14 @@ export function initCourseSyncService() {
   setInterval(() => {
     if (typeof document !== 'undefined' && !document.hidden) {
       fetchLatestCoursesFromServer();
+      fetchLatestCombosFromServer();
     }
   }, 4000);
 
   // Instant refresh when user returns to window / tab
   window.addEventListener('focus', () => {
     fetchLatestCoursesFromServer();
+    fetchLatestCombosFromServer();
   });
 
   // 4. Also listen to native storage events
