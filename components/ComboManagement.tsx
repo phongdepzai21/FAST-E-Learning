@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
-import { getMergedCourses, getMergedCombos, DEFAULT_COMBOS, ComboItem } from '../constants';
+import { getMergedCourses } from '../constants';
 import { useToast } from '../contexts/ToastContext';
 import { broadcastComboUpdate } from '../utils/courseSyncService';
 import { LivePriceQrPreview } from './LivePriceQrPreview';
@@ -35,6 +35,43 @@ import {
   Tag
 } from 'lucide-react';
 
+export interface ComboItem {
+  id: string;
+  title: string;
+  price: string;
+  originalPrice?: string;
+  savings?: string;
+  image: string;
+  description: string;
+  courseIds: string[];
+  benefits?: string[];
+  status?: 'active' | 'inactive';
+  updatedAt?: string;
+}
+
+const DEFAULT_COMBOS: ComboItem[] = [
+  {
+    id: 'combo-basic',
+    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
+    price: '1.200.000đ',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
+    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ giải đáp 24/7'],
+    status: 'active'
+  },
+  {
+    id: 'combo-pro',
+    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
+    price: '1.800.000đ',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
+    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
+    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ trực tiếp từ Chuyên gia', 'Truy cập khóa học trọn đời'],
+    status: 'active'
+  }
+];
+
 const PRESET_BENEFITS = [
   'Tài liệu hướng dẫn chuyên sâu đính kèm',
   'Cấp chứng nhận hoàn thành',
@@ -43,6 +80,8 @@ const PRESET_BENEFITS = [
   'Tặng kèm toàn bộ slide bài giảng',
   'Bộ video bài giảng thực tế HD'
 ];
+
+
 
 export const ComboManagement: React.FC = () => {
   const toast = useToast();
@@ -53,7 +92,16 @@ export const ComboManagement: React.FC = () => {
 
   // Main data states
   const [courses, setCourses] = useState<Course[]>([]);
-  const [combos, setCombos] = useState<ComboItem[]>(() => getMergedCombos([], { includeInactive: true }));
+  const [combos, setCombos] = useState<ComboItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('combo_cache_all');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_COMBOS;
+  });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -63,8 +111,7 @@ export const ComboManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [expandedComboIds, setExpandedComboIds] = useState<Record<string, boolean>>({
     'combo-basic': true,
-    'combo-pro': true,
-    'combo-vip': true
+    'combo-pro': true
   });
 
   // Editing / Creating states
@@ -112,17 +159,16 @@ export const ComboManagement: React.FC = () => {
   const handleDiscountPercentChange = (pct: number) => {
     const clampedPct = Math.min(99.9, Math.max(0, Number(pct)));
     setDiscountPercent(clampedPct);
-    const numOrig = parsePriceNumber(originalPrice);
     const numPrice = parsePriceNumber(price);
+    const numOrig = parsePriceNumber(originalPrice);
 
-    // Khi chọn hoặc đổi % sale off:
-    // Nếu đã có Giá Gốc -> Tính Giá Bán = Giá Gốc * (1 - % Sale Off)
-    if (numOrig > 0) {
-      const discountedNum = Math.round(numOrig * (1 - clampedPct / 100));
-      setPrice(formatVndPrice(discountedNum));
-    } else if (numPrice > 0 && clampedPct > 0 && clampedPct < 100) {
+    // Nếu đã nhập giá bán/khuyến mãi và chọn % sale off -> Tự động tính giá gốc
+    if (numPrice > 0 && clampedPct > 0 && clampedPct < 100) {
       const calculatedOrig = Math.round(numPrice / (1 - clampedPct / 100));
       setOriginalPrice(formatVndPrice(calculatedOrig));
+    } else if (numOrig > 0) {
+      const discountedNum = Math.round(numOrig * (1 - clampedPct / 100));
+      setPrice(formatVndPrice(discountedNum));
     }
   };
 
@@ -131,19 +177,13 @@ export const ComboManagement: React.FC = () => {
     const numPrice = parsePriceNumber(newPriceStr);
     const numOrig = parsePriceNumber(originalPrice);
 
-    // Khi sửa Giá Bán Khuyến Mãi:
-    // Tự động tính toán lại % Sale Off thực tế so với Giá Gốc
-    if (numOrig > 0 && numPrice > 0) {
-      if (numPrice <= numOrig) {
-        const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
-        setDiscountPercent(calculatedPct);
-      } else {
-        setOriginalPrice(newPriceStr);
-        setDiscountPercent(0);
-      }
-    } else if (numOrig === 0 && numPrice > 0 && discountPercent > 0 && discountPercent < 100) {
+    // Khi nhập giá đã sale off và đã có % sale off -> Tự động tính giá gốc
+    if (discountPercent > 0 && discountPercent < 100 && numPrice > 0) {
       const calculatedOrig = Math.round(numPrice / (1 - discountPercent / 100));
       setOriginalPrice(formatVndPrice(calculatedOrig));
+    } else if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
+      const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
+      setDiscountPercent(calculatedPct);
     }
   };
 
@@ -184,7 +224,7 @@ export const ComboManagement: React.FC = () => {
   useEffect(() => {
     const allCoursesList = getMergedCourses([]);
     const selectable = allCoursesList.filter(
-      c => !c.id.startsWith('combo-') && c.id !== 'khoa-vip' && c.category !== 'Gói VIP' && c.status !== 'inactive' && c.status !== 'draft'
+      c => c.id !== 'khoa-vip' && c.id !== 'combo-basic' && c.id !== 'combo-pro' && c.category !== 'Gói VIP' && c.status !== 'inactive' && c.status !== 'draft'
     );
     setCourses(selectable);
 
@@ -195,20 +235,26 @@ export const ComboManagement: React.FC = () => {
     } catch (e) {}
 
     const syncCombosData = (fsCombos?: ComboItem[]) => {
-      const all = getMergedCombos(fsCombos, { includeInactive: true });
+      let currentList = fsCombos;
+      if (!currentList) {
+        try {
+          const cached = localStorage.getItem('combo_cache_all');
+          if (cached) currentList = JSON.parse(cached);
+        } catch (e) {}
+      }
+
+      const mergedDefaults = DEFAULT_COMBOS.map(def => {
+        const found = (currentList || []).find(c => c.id === def.id);
+        return found ? { ...def, ...found } : def;
+      });
+
+      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
+      const customCombos = (currentList || []).filter(c => !defaultIds.includes(c.id));
+
+      const all = [...mergedDefaults, ...customCombos].filter(c => !deletedIds.includes(c.id));
       setCombos(all);
       setIsLoading(false);
     };
-
-    // Initial snapshot from server API
-    fetch('/api/combos')
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data.combos)) {
-          syncCombosData(data.combos);
-        }
-      })
-      .catch(() => {});
 
     const syncLocalCombosToFirestore = async (currentFsList: ComboItem[]) => {
       try {
@@ -430,7 +476,7 @@ export const ComboManagement: React.FC = () => {
   const promptDeleteCombo = (combo: ComboItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    const isSystemCombo = ['combo-basic', 'combo-pro', 'combo-vip', 'khoa-vip'].includes(combo.id);
+    const isSystemCombo = ['combo-basic', 'combo-pro', 'khoa-vip'].includes(combo.id);
 
     setConfirmModal({
       isOpen: true,
@@ -443,15 +489,6 @@ export const ComboManagement: React.FC = () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setIsSaving(true);
         try {
-          try {
-            const delStr = localStorage.getItem('deleted_combo_ids');
-            const delList: string[] = delStr ? JSON.parse(delStr) : [];
-            if (!delList.includes(combo.id)) {
-              delList.push(combo.id);
-              localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
-            }
-          } catch (e) {}
-
           setCombos(prev => prev.filter(c => c.id !== combo.id));
           await broadcastComboUpdate('delete', { comboId: combo.id });
           await deleteDoc(doc(db, 'combos', combo.id));
@@ -1215,7 +1252,7 @@ export const ComboManagement: React.FC = () => {
                       </div>
 
                       <div className="text-[11px] text-teal-800 bg-teal-50/80 px-3 py-1.5 rounded-xl border border-teal-200/60 font-medium">
-                        💡 <strong>Cách dùng:</strong> Nhập <strong>Giá Gốc</strong> và chọn <strong>% Sale Off</strong> ➔ Hệ thống tự động tính <strong>Giá Khuyến Mãi Bán Ra</strong> hoặc tự nhập giá bán để tính % giảm giá!
+                        💡 <strong>Cách dùng thông minh:</strong> Bạn có thể nhập <strong>Giá Khuyến Mãi</strong> và chọn <strong>% Sale Off</strong> (hỗ trợ số lẻ như 12.5%, 15.5%) ➔ Hệ thống sẽ <strong>tự động tính ra Giá Gốc</strong> chuẩn xác!
                       </div>
 
                       {/* Quick % Sale Off Buttons */}
@@ -1311,6 +1348,8 @@ export const ComboManagement: React.FC = () => {
                           </div>
                         )}
                       </div>
+
+
                     </div>
 
                     {/* Description */}

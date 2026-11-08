@@ -27,12 +27,23 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'Tài khoản', path: '/account' },
 ];
 
+export interface ServiceAttachment {
+  id: string;
+  name: string;
+  size: string;
+  type: 'html' | 'pdf' | 'docx' | 'xlsx' | 'zip';
+  url?: string;
+  description: string;
+  isInteractive?: boolean;
+}
+
 export interface ConsultingService {
   id: string;
   title: string;
   description: string;
   icon: string;
   features: string[];
+  attachments?: ServiceAttachment[];
 }
 
 export const CONSULTING_SERVICES: ConsultingService[] = [
@@ -46,18 +57,51 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
       'Chuẩn hóa kiến thức An toàn thực phẩm cho nhân sự',
       'Tư vấn thiết kế bếp ăn một chiều chuẩn quy định',
       'Kiểm soát nguồn gốc nguyên liệu đầu vào'
+    ],
+    attachments: [
+      {
+        id: 'iso22000-full-checklist',
+        name: 'Checklist Đánh Giá Tiêu Chuẩn ISO 22000:2018 (Full Audit Checklist)',
+        size: '1.2 MB',
+        type: 'html',
+        description: 'Bảng kiểm tra trực tuyến toàn bộ điều khoản 4 đến 10 chuẩn mực FAST CONSULTING, tích hợp chấm điểm NCR & CAPA.',
+        isInteractive: true
+      },
+      {
+        id: 'attp-registration-form',
+        name: 'Mẫu Hồ Sơ Xin Cấp Giấy Chứng Nhận Cơ Sở Đủ Điều Kiện ATTP',
+        size: '480 KB',
+        type: 'docx',
+        description: 'Mẫu đơn đề nghị, thuyết minh cơ sở vật chất và bản cam kết ATTP chuẩn Bộ Y tế.'
+      }
     ]
   },
   {
     id: 'haccp-tcvn',
-    title: 'Tư vấn HACCP / TCVN',
+    title: 'Tư vấn HACCP / TCVN / ISO 22000',
     description: 'Xây dựng hệ thống quản lý chất lượng theo tiêu chuẩn quốc tế HACCP và tiêu chuẩn Việt Nam (TCVN) cho mọi loại hình doanh nghiệp thực phẩm.',
     icon: 'clipboard',
     features: [
-      'Phân tích mối nguy và điểm kiểm soát tới hạn',
-      'Xây dựng kế hoạch HACCP chi tiết',
+      'Phân tích mối nguy và điểm kiểm soát tới hạn (CCP)',
+      'Xây dựng kế hoạch HACCP & Hệ thống biểu mẫu SOP chi tiết',
       'Chuẩn hóa quy trình vận hành kiểm soát chất lượng',
       'Hỗ trợ đánh giá và công nhận đạt chuẩn quốc tế'
+    ],
+    attachments: [
+      {
+        id: 'haccp-ccp-template',
+        name: 'Bộ Mẫu Biểu Quy Trình Chuẩn SOP & Kế Hoạch HACCP (CCP Template)',
+        size: '850 KB',
+        type: 'pdf',
+        description: 'Sơ đồ cây quyết định CCP, bảng phân tích mối nguy sinh học/hóa học/vật lý chuẩn hóa.'
+      },
+      {
+        id: 'iso-gap-analysis',
+        name: 'Bảng Tự Đánh Giá Khảo Sát Hiện Trạng Cơ Sở ISO/FSSC 22000',
+        size: '620 KB',
+        type: 'xlsx',
+        description: 'Bảng tính tự kiểm tra khoảng cách hiện trạng nhà máy trước khi đăng ký chứng nhận.'
+      }
     ]
   }
 ];
@@ -818,115 +862,3 @@ export const getMergedCourses = (firestoreCourses: Course[] = []): Course[] => {
 
   return Array.from(combinedMap.values()).filter(c => !isUnwantedGlobal(c));
 };
-
-export interface ComboItem {
-  id: string;
-  title: string;
-  price: string;
-  originalPrice?: string;
-  savings?: string;
-  image: string;
-  description: string;
-  courseIds: string[];
-  benefits?: string[];
-  status?: 'active' | 'inactive';
-  updatedAt?: string;
-}
-
-export const DEFAULT_COMBOS: ComboItem[] = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    originalPrice: '2.400.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ giải đáp 24/7'],
-    status: 'active'
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    originalPrice: '3.600.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận hoàn thành', 'Hỗ trợ trực tiếp từ Chuyên gia', 'Truy cập khóa học trọn đời'],
-    status: 'active'
-  },
-  {
-    id: 'combo-vip',
-    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
-    price: '2.500.000đ',
-    originalPrice: '5.000.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
-    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
-    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền', 'Truy cập trọn đời tất cả khóa'],
-    status: 'active'
-  }
-];
-
-export const getMergedCombos = (
-  externalCombos?: ComboItem[],
-  options?: { includeInactive?: boolean }
-): ComboItem[] => {
-  let deletedIds: string[] = [];
-  try {
-    const delStr = localStorage.getItem('deleted_combo_ids');
-    if (delStr) deletedIds = JSON.parse(delStr);
-  } catch (e) {}
-
-  let localCacheList: ComboItem[] = [];
-  try {
-    const cached = localStorage.getItem('combo_cache_all');
-    if (cached) localCacheList = JSON.parse(cached);
-  } catch (e) {}
-
-  const map = new Map<string, ComboItem>();
-
-  // 1. Load base defaults
-  DEFAULT_COMBOS.forEach(combo => {
-    map.set(combo.id, { ...combo });
-  });
-
-  // 2. Merge local cache
-  if (Array.isArray(localCacheList)) {
-    localCacheList.forEach(c => {
-      if (c && c.id) {
-        const existing = map.get(c.id);
-        map.set(c.id, { ...existing, ...c });
-      }
-    });
-  }
-
-  // 3. Merge external/database combos
-  if (Array.isArray(externalCombos)) {
-    externalCombos.forEach(c => {
-      if (c && c.id) {
-        const existing = map.get(c.id);
-        map.set(c.id, { ...existing, ...c });
-      }
-    });
-  }
-
-  // 4. Filter deleted combos
-  deletedIds.forEach(id => {
-    map.delete(id);
-  });
-
-  let result = Array.from(map.values());
-
-  // 5. Filter inactive if not requested
-  if (!options?.includeInactive) {
-    result = result.filter(c => c.status !== 'inactive');
-  }
-
-  return result;
-};
-

@@ -1,10 +1,16 @@
-import React from 'react'; 
+import React, { useState } from 'react'; 
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CONSULTING_SERVICES } from '../constants';
 import { Link } from "react-router-dom";
+import { Download, FileText } from 'lucide-react';
+import Iso22000ChecklistModal from '../components/Iso22000ChecklistModal';
+import { useToast } from '../contexts/ToastContext';
 
 const Consulting: React.FC = () => {
+  const toast = useToast();
+  const [showIsoChecklistModal, setShowIsoChecklistModal] = useState(false);
+
   const steps = [
     { step: '01', label: 'Khảo sát thực tế', desc: 'Đánh giá hiện trạng cơ sở, nhận diện khoảng cách so với các tiêu chuẩn chuẩn mực.' },
     { step: '02', label: 'Lập phương án', desc: 'Xây dựng kế hoạch tối ưu chi phí, thời gian và thiết lập lộ trình cho nhân sự.' },
@@ -109,6 +115,60 @@ const Consulting: React.FC = () => {
                           </div>
                         ))}
                       </div>
+
+                      {/* Attachments Section */}
+                      {service.attachments && service.attachments.length > 0 && (
+                        <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
+                          <span className="text-xs font-black uppercase tracking-wider text-teal-700 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-teal-600" />
+                            Tài liệu &amp; File đính kèm mẫu ({service.attachments.length})
+                          </span>
+
+                          <div className="space-y-2.5">
+                            {service.attachments.map((att) => (
+                              <div
+                                key={att.id}
+                                className="p-3.5 bg-slate-50 hover:bg-teal-50/60 rounded-2xl border border-slate-200/80 hover:border-teal-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group/att"
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                      att.type === 'html' ? 'bg-amber-100 text-amber-800' : att.type === 'docx' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                                    }`}>
+                                      {att.type}
+                                    </span>
+                                    <h4 className="text-xs sm:text-sm font-black text-slate-900 line-clamp-1">{att.name}</h4>
+                                  </div>
+                                  <p className="text-xs text-slate-500 font-medium">{att.description} ({att.size})</p>
+                                </div>
+
+                                {att.isInteractive ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowIsoChecklistModal(true)}
+                                    className="px-4 py-2 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                                  >
+                                    <span>Mở Checklist</span>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                  </button>
+                                ) : (
+                                  <a
+                                    href={`#download-${att.id}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      toast.success(`Đã chuẩn bị tải về file "${att.name}"`);
+                                    }}
+                                    className="px-3.5 py-2 bg-slate-200 hover:bg-teal-100 text-slate-700 hover:text-teal-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                                  >
+                                    <Download className="w-3.5 h-3.5 text-teal-700" />
+                                    <span>Tải file</span>
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -191,6 +251,12 @@ const Consulting: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* ISO 22000 Full Audit Checklist Modal */}
+      <Iso22000ChecklistModal
+        isOpen={showIsoChecklistModal}
+        onClose={() => setShowIsoChecklistModal(false)}
+      />
     </main>
   );
 };
