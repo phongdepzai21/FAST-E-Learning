@@ -49,9 +49,13 @@ function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
 
   if (!Array.isArray(courses)) return;
   try {
-    localStorage.setItem('server_custom_courses', JSON.stringify(courses));
+    const delStr = localStorage.getItem('deleted_course_ids');
+    const delList: string[] = delStr ? JSON.parse(delStr) : [];
+    const delSet = new Set<string>(delList);
 
-    // Merge into local_custom_courses so existing components get latest data
+    const validCourses = courses.filter(c => c && c.id && !delSet.has(c.id));
+    localStorage.setItem('server_custom_courses', JSON.stringify(validCourses));
+
     const localStr = localStorage.getItem('local_custom_courses');
     let localList: Course[] = [];
     if (localStr) {
@@ -65,11 +69,11 @@ function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
 
     const mergedMap = new Map<string, Course>();
     localList.forEach(c => {
-      if (c && c.id) mergedMap.set(c.id, c);
+      if (c && c.id && !delSet.has(c.id)) mergedMap.set(c.id, c);
     });
 
-    courses.forEach(c => {
-      if (c && c.id) {
+    validCourses.forEach(c => {
+      if (c && c.id && !delSet.has(c.id)) {
         const existing = mergedMap.get(c.id);
         mergedMap.set(c.id, existing ? { ...existing, ...c } : c);
       }
@@ -82,15 +86,71 @@ function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
 }
 
 /**
+ * Apply deleted combo IDs to localStorage
+ */
+export function applyDeletedCombos(deletedIds: string[]) {
+  if (!Array.isArray(deletedIds) || deletedIds.length === 0) return;
+  try {
+    const delStr = localStorage.getItem('deleted_combo_ids');
+    const delList: string[] = delStr ? JSON.parse(delStr) : [];
+    let changed = false;
+    deletedIds.forEach((id) => {
+      if (id && !delList.includes(id)) {
+        delList.push(id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+    }
+  } catch (e) {}
+}
+
+/**
  * Apply updated combos into localStorage safely
  */
-function updateStoredCombos(combos: any[]) {
+function updateStoredCombos(combos: any[], deletedIds?: string[]) {
   if (!Array.isArray(combos)) return;
   try {
-    localStorage.setItem('combo_cache_all', JSON.stringify(combos));
+    let delList: string[] = [];
+    try {
+      const delStr = localStorage.getItem('deleted_combo_ids');
+      if (delStr) delList = JSON.parse(delStr);
+    } catch (e) {}
+    if (Array.isArray(deletedIds)) {
+      deletedIds.forEach((id) => {
+        if (id && !delList.includes(id)) delList.push(id);
+      });
+      localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+    }
+
+    const filtered = combos.filter((c) => c && c.id && !delList.includes(c.id));
+    localStorage.setItem('combo_cache_all', JSON.stringify(filtered));
   } catch (err) {
     console.warn('Error saving combos to local storage:', err);
   }
+}
+
+/**
+ * Fetch latest combos directly from backend server (used for on-demand sync)
+ */
+export async function fetchLatestCombosFromServer(): Promise<any[]> {
+  try {
+    const res = await fetch('/api/combos');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data && Array.isArray(data.deletedComboIds) && data.deletedComboIds.length > 0) {
+      applyDeletedCombos(data.deletedComboIds);
+    }
+    if (data && Array.isArray(data.combos)) {
+      updateStoredCombos(data.combos, data.deletedComboIds);
+      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'poll', combos: data.combos, deletedComboIds: data.deletedComboIds } }));
+      return data.combos;
+    }
+  } catch (e) {
+    // Silent fallback
+  }
+  return [];
 }
 
 /**
@@ -151,8 +211,11 @@ export function initCourseSyncService() {
         }
         window.dispatchEvent(new CustomEvent('courses_updated', { detail: data }));
       } else if (data && data.type === 'combos_updated') {
+        if (data.deletedComboIds && Array.isArray(data.deletedComboIds)) {
+          applyDeletedCombos(data.deletedComboIds);
+        }
         if (data.combos && Array.isArray(data.combos)) {
-          updateStoredCombos(data.combos);
+          updateStoredCombos(data.combos, data.deletedComboIds);
         }
         window.dispatchEvent(new CustomEvent('combos_updated', { detail: data }));
       }
@@ -161,18 +224,7 @@ export function initCourseSyncService() {
 
   // 2. Fetch initial courses & combos snapshot from backend API
   fetchLatestCoursesFromServer();
-
-  fetch('/api/combos')
-    .then((res) => res.json())
-    .then((data) => {
-      if (data && Array.isArray(data.combos) && data.combos.length > 0) {
-        updateStoredCombos(data.combos);
-        window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'init', combos: data.combos } }));
-      }
-    })
-    .catch((err) => {
-      console.warn('Could not fetch initial /api/combos snapshot:', err);
-    });
+  fetchLatestCombosFromServer();
 
   // 3. Connect to Server-Sent Events stream for real-time push from server
   function connectSSE() {
@@ -200,8 +252,11 @@ export function initCourseSyncService() {
             updateStoredCourses(payload.courses, payload.deletedCourseIds);
             window.dispatchEvent(new CustomEvent('courses_updated', { detail: payload }));
           }
+          if (payload && Array.isArray(payload.deletedComboIds)) {
+            applyDeletedCombos(payload.deletedComboIds);
+          }
           if (payload && Array.isArray(payload.combos) && payload.combos.length > 0) {
-            updateStoredCombos(payload.combos);
+            updateStoredCombos(payload.combos, payload.deletedComboIds);
             window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));
           }
         } catch (err) {
@@ -243,8 +298,11 @@ export function initCourseSyncService() {
       eventSource.addEventListener('combos_updated', (e: MessageEvent) => {
         try {
           const payload = JSON.parse(e.data);
+          if (payload && Array.isArray(payload.deletedComboIds)) {
+            applyDeletedCombos(payload.deletedComboIds);
+          }
           if (payload && Array.isArray(payload.combos)) {
-            updateStoredCombos(payload.combos);
+            updateStoredCombos(payload.combos, payload.deletedComboIds);
           }
           // Notify current tab's components
           window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));

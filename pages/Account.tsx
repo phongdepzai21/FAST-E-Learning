@@ -14,6 +14,7 @@ import FastStandardsAudit from '../components/FastStandardsAudit';
 import AdProfileManagement from '../components/AdProfileManagement';
 import FastFoodSafetyManagement from '../components/FastFoodSafetyManagement';
 import FastHaccpChecklist from '../components/FastHaccpChecklist';
+import FastIso22kChecklist from '../components/FastIso22kChecklist';
 import { PurchaseHistory } from '../components/PurchaseHistory';
 import { ViewedCoursesView } from '../components/ViewedCoursesView';
 import { FastCodeLookup } from '../components/FastCodeLookup';
@@ -355,8 +356,8 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center'>('dashboard');
-  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'student'>('student');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center'>('dashboard');
+  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'student'>('student');
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
   const [qcClients, setQcClients] = useState<any[]>([]);
@@ -2003,6 +2004,7 @@ const Account: React.FC = () => {
                 {[
                   { id: 'fsa', label: 'Food Safety Audit Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
                   { id: 'haccp', label: 'HACCP Checklist', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                  { id: 'iso22k', label: 'ISO 22000:2018 Full Checklist', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
                   { id: 'attp', label: 'Hồ Sơ An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
                   { id: 'hsqc', label: 'Hồ Sơ Quảng Cáo', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
@@ -2086,6 +2088,7 @@ const Account: React.FC = () => {
                 >
                   <option value="fsa">Food Safety Audit + Checklist</option>
                   <option value="haccp">HACCP Checklist</option>
+                  <option value="iso22k">ISO 22000:2018 Full Checklist</option>
                   <option value="attp">Hồ Sơ An Toàn Thực Phẩm</option>
                   <option value="hsqc">Hồ Sơ Quảng Cáo</option>
                   <option value="student">Quay lại Học viên</option>
@@ -2110,6 +2113,19 @@ const Account: React.FC = () => {
                       <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                     </div>
                     <FastHaccpChecklist />
+                  </div>
+                )}
+
+                {adminViewMode === 'iso22k' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                      <div>
+                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">ISO 22000:2018 Full Audit Checklist</h4>
+                        <p className="text-xs text-gray-500 font-medium">Bảng đánh giá toàn diện 43 điều khoản (Điều 4 đến Điều 10), phân loại Major/Minor/Observation, quản trị CRM và xuất báo cáo NCR & CAPA.</p>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                    </div>
+                    <FastIso22kChecklist />
                   </div>
                 )}
 
@@ -2358,6 +2374,8 @@ const Account: React.FC = () => {
                   <FastStandardsAudit />
                 ) : activeTab === 'fast-haccp-checklist' && isAdmin ? (
                   <FastHaccpChecklist />
+                ) : activeTab === 'fast-iso22k-checklist' && isAdmin ? (
+                  <FastIso22kChecklist />
                 ) : activeTab === 'ad-profile-management' && isAdmin ? (
                   <AdProfileManagement />
                 ) : activeTab === 'fast-food-safety' && isAdmin ? (

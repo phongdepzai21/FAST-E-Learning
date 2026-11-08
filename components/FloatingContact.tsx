@@ -1,39 +1,56 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { COURSES, CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
+import { CONSULTING_SERVICES, TEAM, getMergedCourses } from '../constants';
 import { Course } from '../types';
 
 interface Message {
   role: 'user' | 'model';
   text: string;
   isError?: boolean;
+  timestamp?: string;
 }
 
-const FloatingContact: React.FC = () => {
+const INITIAL_GREETING = `Xin chào! Tôi là **Trợ lý ảo Trần Hạnh** của FAST E-Learning. 🌸\n\nBạn cần hỗ trợ gì về các khóa học ISO, HACCP hay dịch vụ tư vấn?`;
+
+export const FloatingContact: React.FC = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'model', 
-      text: 'Chào bạn! Tôi là trợ lí ảo Trần Hạnh của FAST E-Learning. 🤖\n\nTôi có thể giúp bạn tìm hiểu về **các khóa học ISO/HACCP**, **dịch vụ tư vấn**, hoặc giải đáp thắc mắc về **An toàn thực phẩm**. \n\nBạn đang quan tâm đến nội dung nào?'
+      text: INITIAL_GREETING,
+      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Tự động cuộn xuống tin nhắn mới nhất
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Auto scroll to bottom
+  const scrollToBottom = (smooth = false) => {
+    if (messagesContainerRef.current) {
+      if (smooth) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading, isOpen]);
+    if (isOpen) {
+      scrollToBottom(false);
+    }
+  }, [isOpen]);
 
   const [liveCourses, setLiveCourses] = useState<Course[]>(() => getMergedCourses([]));
 
@@ -57,26 +74,24 @@ const FloatingContact: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Focus vào ô nhập liệu khi mở chat
+  // Focus input field when chat opens
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [isOpen]);
 
-  // Render nội dung tin nhắn (Hỗ trợ Markdown cơ bản: In đậm, Xuống dòng)
+  // Render markdown content (Bold, bullet lists, breaks)
   const renderMessageContent = (text: string) => {
     return text.split('\n').map((line, i) => {
-      // Xử lý list item
       const isBullet = line.trim().startsWith('- ') || line.trim().startsWith('* ');
       const cleanLine = isBullet ? line.trim().substring(2) : line;
       
-      // Xử lý in đậm (**text**)
       const parts = cleanLine.split(/(\*\*.*?\*\*)/g);
       
       const content = parts.map((part, j) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={j} className="font-bold text-inherit">{part.slice(2, -2)}</strong>;
+          return <strong key={j} className="font-extrabold text-slate-900 dark:text-white">{part.slice(2, -2)}</strong>;
         }
         return <span key={j}>{part}</span>;
       });
@@ -84,55 +99,46 @@ const FloatingContact: React.FC = () => {
       if (isBullet) {
         return (
           <div key={i} className="flex items-start gap-2 mb-1 pl-1">
-            <span className="text-current opacity-70 mt-1.5 w-1.5 h-1.5 rounded-full bg-current shrink-0"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#007c76] shrink-0 mt-1.5"></span>
             <span className="leading-relaxed">{content}</span>
           </div>
         );
       }
       
-      // Xử lý dòng trống
-      if (line.trim() === '') return <div key={i} className="h-2"></div>;
+      if (line.trim() === '') return <div key={i} className="h-1.5"></div>;
 
       return <p key={i} className="mb-1 leading-relaxed">{content}</p>;
     });
   };
 
-  // Tạo System Prompt thông minh dựa trên dữ liệu thật
+  // Build System Prompt for Trợ lý ảo Trần Hạnh (Gemini style: concise, direct, short answers)
   const systemContext = useMemo(() => {
     const courseData = liveCourses
       .filter(c => c && c.status !== 'inactive' && c.status !== 'draft')
-      .map(c => `- Khóa học: "${c.title}" (Giá: ${c.price}). Danh mục: ${c.category}. Mô tả: ${c.description || 'Chưa cập nhật'}.`)
+      .map(c => `- Khóa học: "${c.title}" | Học phí: ${c.price} | Danh mục: ${c.category} | Mô tả: ${c.description || 'Chưa cập nhật'}.`)
       .join('\n');
-    const serviceData = CONSULTING_SERVICES.map(s => `- Dịch vụ tư vấn: "${s.title}". Mô tả: ${s.description}.`).join('\n');
+    const serviceData = CONSULTING_SERVICES.map(s => `- Dịch vụ: "${s.title}" - ${s.description}`).join('\n');
     const teamData = TEAM.map(t => `- Chuyên gia: ${t.name} (${t.role})`).join('\n');
     
     return `
-      Bạn là Trợ lí ảo Trần Hạnh chuyên nghiệp của FAST E-Learning (Website: 2fast.com.vn).
-      Nhiệm vụ của bạn là tư vấn bán hàng, giải đáp thắc mắc về khóa học và dịch vụ tư vấn ISO/HACCP/QA-QC.
+      Bạn là Trợ lý ảo Trần Hạnh của FAST E-Learning.
+      PHONG CÁCH TRẢ LỜI: Giống như Gemini - cực kỳ súc tích, ngắn gọn, đi thẳng vào trọng tâm câu hỏi ("nhỏ gì trả lời đó", hỏi gì đáp nấy), không dùng lời chào rườm rà hay văn phong quảng cáo dài dòng.
+      Tối đa 2-3 câu hoặc các gạch đầu dòng ngắn gọn.
+      Nếu hỏi học phí hay nội dung khóa học, nêu ngay số liệu cụ thể.
 
-      THÔNG TIN LIÊN HỆ CÔNG TY:
+      THÔNG TIN CƠ SỞ:
       - Hotline/Zalo: 0927 002 668
-      - Email hỗ trợ: support@fastelearning.com.vn & hkc.qms@gmail.com
-      - Địa chỉ: Cityland Park Hills, Gò Vấp, TP.HCM
+      - Website: 2fast.com.vn
 
-      DANH SÁCH KHÓA HỌC HIỆN CÓ:
+      DANH SÁCH KHÓA HỌC:
       ${courseData}
 
-      DỊCH VỤ TƯ VẤN DOANH NGHIỆP:
+      DỊCH VỤ TƯ VẤN:
       ${serviceData}
 
-      ĐỘI NGŨ CHUYÊN GIA:
+      ĐỘI NGŨ:
       ${teamData}
-
-      QUY TẮC TRẢ LỜI:
-      1. Trả lời NGẮN GỌN, SÚC TÍCH, đi thẳng vào vấn đề.
-      2. Luôn lịch sự, xưng "mình" hoặc "FAST" và gọi khách là "bạn".
-      3. Nếu khách hỏi giá, hãy cung cấp giá chính xác từ dữ liệu trên.
-      4. Nếu khách hỏi vấn đề chuyên môn sâu không có trong dữ liệu, hãy gợi ý họ liên hệ Hotline hoặc Zalo.
-      5. Sử dụng định dạng **in đậm** cho các thông tin quan trọng (Tên khóa học, Giá, Số điện thoại).
-      6. Không bịa đặt thông tin không có trong dữ liệu.
-      7. Nếu học viên hỏi về cách học: Hướng dẫn họ chọn bài học trong chương trình, video sẽ tự động phát. Có thể thả tim (Like) bài học. Tiến độ sẽ tự động cập nhật khi xem hết video.
-    `;
+    `.trim();
   }, [liveCourses]);
 
   const handleSend = async (customText?: string) => {
@@ -140,9 +146,12 @@ const FloatingContact: React.FC = () => {
     if (!textToSend || isLoading) return;
     
     setInput('');
-    const updatedMessages = [...messages, { role: 'user' as const, text: textToSend }];
+    const userTimestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const updatedMessages = [...messages, { role: 'user' as const, text: textToSend, timestamp: userTimestamp }];
     setMessages(updatedMessages);
     setIsLoading(true);
+
+    setTimeout(() => scrollToBottom(false), 50);
 
     try {
       const response = await fetch('/api/gemini/chat', {
@@ -158,20 +167,24 @@ const FloatingContact: React.FC = () => {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder('utf-8');
       let fullText = "";
+      let buffer = "";
 
-      // Tạo tin nhắn placeholder cho model
-      setMessages(prev => [...prev, { role: 'model', text: '' }]);
+      const modelTimestamp = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      setMessages(prev => [...prev, { role: 'model', text: '', timestamp: modelTimestamp }]);
 
       while (reader) {
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n\n');
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || "";
         
-        for (const line of lines) {
+        let hasNewContent = false;
+        for (const part of parts) {
+          const line = part.trim();
           if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6);
+            const dataStr = line.slice(6).trim();
             if (dataStr === '[DONE]') continue;
             
             try {
@@ -181,40 +194,59 @@ const FloatingContact: React.FC = () => {
               }
               if (data.text) {
                 fullText += data.text;
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const lastMsg = updated[updated.length - 1];
-                  if (lastMsg.role === 'model') {
-                    updated[updated.length - 1] = { ...lastMsg, text: fullText };
-                  }
-                  return updated;
-                });
+                hasNewContent = true;
               }
             } catch (e) {
-              // ignore parse errors
+              // ignore json parse chunk errors
             }
+          }
+        }
+
+        if (hasNewContent) {
+          setMessages(prev => {
+            const updated = [...prev];
+            const lastMsg = updated[updated.length - 1];
+            if (lastMsg && lastMsg.role === 'model') {
+              updated[updated.length - 1] = { ...lastMsg, text: fullText };
+            }
+            return updated;
+          });
+          // Instant direct scroll prevents text jumping/jitter
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
           }
         }
       }
     } catch (error: any) {
-      console.error("AI Chat Error Full Details:", error);
+      console.error("Trợ lý Trần Hạnh Error:", error);
       
-      let errorMessage = "Xin lỗi, hệ thống đang bận. Vui lòng nhắn Zalo **0927 002 668** để được hỗ trợ tức thì!";
+      let errorMessage = "Hệ thống bận. Vui lòng liên hệ Zalo 0927 002 668.";
       if (error.message?.includes('fetch') || error.message?.includes('network')) {
-        errorMessage = "Lỗi kết nối mạng. Vui lòng kiểm tra đường truyền.";
+        errorMessage = "Lỗi kết nối mạng.";
       }
 
       setMessages(prev => [...prev, { role: 'model', text: errorMessage, isError: true }]);
+      setTimeout(() => scrollToBottom(false), 50);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleResetChat = () => {
+    setMessages([
+      {
+        role: 'model', 
+        text: INITIAL_GREETING,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  };
+
   const SUGGESTED_PROMPTS = [
-    "Khóa học ISO 22000 gồm nội dung gì?",
-    "Tư vấn thủ tục An toàn thực phẩm",
-    "Gói Combo học tập có ưu đãi gì?",
-    "Liên hệ Chuyên gia tư vấn"
+    "Khóa học ISO 22000 gồm gì?",
+    "Học phí các khóa HACCP",
+    "Tư vấn An toàn thực phẩm",
+    "Gói Combo ưu đãi"
   ];
 
   if (location.pathname.startsWith('/account')) {
@@ -222,76 +254,99 @@ const FloatingContact: React.FC = () => {
   }
 
   return (
-    // Z-index adjusted to 90 to sit below PaymentModal (100) but above content
     <div className="print:hidden fixed bottom-6 right-4 md:right-8 z-[90] font-sans flex flex-col items-end pointer-events-none">
       
       {/* Chat Window */}
-      <div className={`pointer-events-auto w-[92vw] md:w-[380px] bg-white rounded-[24px] shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300 origin-bottom-right mb-4 flex flex-col ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90 h-0 invisible'}`}>
+      <div className={`pointer-events-auto w-[92vw] sm:w-[390px] bg-white rounded-3xl shadow-2xl border border-teal-100 overflow-hidden transition-all duration-300 origin-bottom-right mb-3 flex flex-col ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-90 h-0 invisible'}`}>
         
         {/* Header */}
-        <div className="bg-[#007c76] p-4 flex items-center justify-between text-white shadow-md z-10">
+        <div className="bg-gradient-to-r from-[#007c76] to-teal-700 p-4 flex items-center justify-between text-white shadow-md relative z-10">
            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-white text-[#007c76] font-black text-sm flex items-center justify-center border-2 border-teal-200 shadow-md">
+                  TH
+                </div>
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full"></span>
               </div>
               <div>
-                <h3 className="font-bold text-sm leading-tight">Trợ lí ảo Trần Hạnh</h3>
-                <div className="flex items-center gap-1.5">
-                   <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                   <span className="text-[10px] text-white/90 font-medium">Đang hoạt động</span>
-                </div>
+                <h3 className="font-extrabold text-sm leading-tight flex items-center gap-1.5">
+                  <span>Trợ lý ảo Trần Hạnh</span>
+                  <span className="text-[10px] bg-teal-800/60 text-teal-100 px-1.5 py-0.5 rounded font-mono">AI</span>
+                </h3>
+                <p className="text-[11px] text-teal-100/90 font-medium">Hỏi đáp trực tuyến</p>
               </div>
            </div>
-           <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/10 rounded-full transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-           </button>
+
+           <div className="flex items-center gap-1">
+              <button 
+                type="button"
+                onClick={handleResetChat} 
+                title="Làm mới cuộc trò chuyện"
+                className="p-1.5 hover:bg-white/15 rounded-full transition-colors text-teal-100 hover:text-white cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </button>
+              <button 
+                type="button"
+                onClick={() => setIsOpen(false)} 
+                className="p-1.5 hover:bg-white/15 rounded-full transition-colors text-white cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+           </div>
         </div>
 
         {/* Message List */}
-        <div className="h-[400px] overflow-y-auto p-4 space-y-4 bg-[#f8fafc] scroll-smooth custom-scrollbar">
+        <div ref={messagesContainerRef} className="h-[390px] overflow-y-auto p-4 space-y-4 bg-slate-50/80 custom-scrollbar">
             {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 
                 {msg.role === 'model' && (
-                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[9px] font-black mr-2 shrink-0 mt-1 shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-[#007c76] text-white flex items-center justify-center text-[10px] font-black mr-2 shrink-0 mt-0.5 shadow-xs border border-teal-600">
                     TH
                   </div>
                 )}
 
-                <div className={`max-w-[85%] p-3.5 text-sm shadow-sm ${
+                <div className={`max-w-[85%] text-xs sm:text-sm shadow-xs ${
                     msg.role === 'user' 
-                    ? 'bg-[#007c76] text-white rounded-2xl rounded-br-none' 
+                    ? 'bg-[#007c76] text-white p-3.5 rounded-2xl rounded-br-none font-medium' 
                     : msg.isError 
-                        ? 'bg-red-50 text-red-600 border border-red-100 rounded-2xl rounded-bl-none'
-                        : 'bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-bl-none'
+                        ? 'bg-red-50 text-red-600 border border-red-200 p-3.5 rounded-2xl rounded-bl-none'
+                        : 'bg-white text-slate-800 border border-slate-200/80 p-3.5 rounded-2xl rounded-bl-none'
                   }`}>
                   {renderMessageContent(msg.text)}
+                  {msg.timestamp && (
+                    <div className={`text-[9px] mt-1 text-right font-mono ${msg.role === 'user' ? 'text-teal-200' : 'text-slate-400'}`}>
+                      {msg.timestamp}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
             
             {isLoading && (
                <div className="flex justify-start animate-pulse">
-                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#007c76] flex items-center justify-center text-white text-[9px] font-black mr-2 shrink-0 mt-1">TH</div>
-                  <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-none p-3.5 flex items-center gap-1 shadow-sm">
-                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                     <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                  <div className="w-8 h-8 rounded-full bg-[#007c76] text-white flex items-center justify-center text-[10px] font-black mr-2 shrink-0 mt-0.5">TH</div>
+                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none p-3.5 flex items-center gap-1.5 shadow-xs">
+                     <span className="text-xs text-slate-400 font-medium mr-1">Đang trả lời</span>
+                     <div className="w-1.5 h-1.5 bg-[#007c76] rounded-full animate-bounce"></div>
+                     <div className="w-1.5 h-1.5 bg-[#007c76] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                     <div className="w-1.5 h-1.5 bg-[#007c76] rounded-full animate-bounce [animation-delay:0.4s]"></div>
                   </div>
                </div>
             )}
             <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggested Quick Prompts */}
-        {messages.length <= 3 && !isLoading && (
-          <div className="px-3 pt-2 bg-[#f8fafc] flex flex-wrap gap-1.5 border-t border-gray-100">
+        {/* Quick Suggestion Chips */}
+        {messages.length <= 4 && !isLoading && (
+          <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200/60 flex flex-wrap gap-1.5">
             {SUGGESTED_PROMPTS.map((promptText, pIdx) => (
               <button
                 key={pIdx}
                 type="button"
                 onClick={() => handleSend(promptText)}
-                className="px-2.5 py-1 bg-white hover:bg-teal-50 text-teal-800 hover:text-[#007c76] border border-teal-200/60 rounded-full text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white hover:bg-teal-50 text-teal-900 hover:text-[#007c76] border border-teal-200/80 rounded-xl text-[11px] font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
               >
                 💡 {promptText}
               </button>
@@ -299,47 +354,83 @@ const FloatingContact: React.FC = () => {
           </div>
         )}
 
-        {/* Input Area */}
-        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+        {/* Input Form Area (Zalo button removed as requested) */}
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-3 bg-white border-t border-slate-200/80 flex items-center gap-2">
            <input 
               ref={inputRef}
               value={input} 
               onChange={(e) => setInput(e.target.value)} 
               placeholder="Nhập câu hỏi..." 
               disabled={isLoading}
-              className="flex-1 bg-gray-50 text-gray-800 rounded-xl px-4 py-3 border border-transparent focus:bg-white focus:border-[#007c76] outline-none text-sm transition-all" 
+              className="flex-1 bg-slate-50 text-slate-900 rounded-xl px-4 py-2.5 border border-slate-200 focus:bg-white focus:border-[#007c76] outline-none text-xs sm:text-sm transition-all" 
            />
            <button 
               type="submit" 
               disabled={!input.trim() || isLoading}
-              className="text-white bg-[#007c76] hover:bg-[#00605b] disabled:bg-gray-300 disabled:cursor-not-allowed p-3 rounded-xl transition-all shadow-md active:scale-95"
+              className="text-white bg-[#007c76] hover:bg-[#00605b] disabled:bg-slate-300 disabled:cursor-not-allowed p-2.5 rounded-xl transition-all shadow-md active:scale-95 shrink-0 cursor-pointer"
            >
               {isLoading ? (
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               ) : (
-                  <svg className="w-5 h-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                  <svg className="w-5 h-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
               )}
            </button>
         </form>
       </div>
 
-      {/* Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className={`pointer-events-auto flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-[#007c76] rounded-full shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-[#007c76]/40 z-[9999] ${isOpen ? 'rotate-90 bg-red-500 hover:bg-red-600' : ''}`}
-      >
-        {isOpen ? (
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        ) : (
-            <div className="relative">
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                </span>
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-            </div>
+      {/* Floating Toggle Button & Prominent Highlight Pill */}
+      <div className="pointer-events-auto flex items-center gap-2.5">
+        {!isOpen && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-md text-[#007c76] rounded-full shadow-xl border-2 border-teal-300/80 text-xs font-black cursor-pointer hover:bg-teal-50 hover:border-[#007c76] transition-all hover:scale-105 active:scale-95 animate-bounce [animation-duration:3.5s] group"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="tracking-tight text-gray-800 group-hover:text-[#007c76]">Trợ lý ảo Trần Hạnh (AI)</span>
+            <span className="bg-gradient-to-r from-[#007c76] to-teal-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-xs">Hỏi ngay</span>
+          </button>
         )}
-      </button>
+
+        <button 
+          type="button"
+          onClick={() => setIsOpen(!isOpen)} 
+          title={isOpen ? "Đóng hộp thoại AI" : "Mở Trợ lý ảo Trần Hạnh (AI)"}
+          className={`relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-[0_10px_30px_rgba(0,124,118,0.5)] transition-all duration-300 hover:scale-110 active:scale-95 z-[9999] border-2 border-white cursor-pointer ${
+            isOpen 
+              ? 'rotate-90 bg-red-500 hover:bg-red-600 ring-4 ring-red-300/50' 
+              : 'bg-gradient-to-tr from-[#005c56] via-[#007c76] to-teal-500 hover:brightness-110 ring-4 ring-teal-400/50 ring-offset-2 animate-pulse [animation-duration:2.5s]'
+          }`}
+        >
+          {/* Subtle Outer Glow Aura */}
+          {!isOpen && (
+            <span className="absolute -inset-1 rounded-full bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 opacity-70 blur-md pointer-events-none -z-10 animate-pulse"></span>
+          )}
+
+          {isOpen ? (
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+          ) : (
+              <div className="relative flex flex-col items-center justify-center select-none">
+                  {/* Ping status notification dot */}
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-300 opacity-80"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-yellow-400 border-2 border-white shadow-xs"></span>
+                  </span>
+                  
+                  <div className="flex items-center gap-0.5">
+                    <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-yellow-300 drop-shadow" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L14.4 7.6L20 8.4L15.8 12.5L17 18.2L12 15.2L7 18.2L8.2 12.5L4 8.4L9.6 7.6L12 2Z"/>
+                    </svg>
+                    <span className="text-white font-black text-sm tracking-tight drop-shadow">AI</span>
+                  </div>
+                  <span className="text-[9px] font-black uppercase text-teal-100 tracking-wider -mt-0.5 drop-shadow-xs">HẠNH</span>
+              </div>
+          )}
+        </button>
+      </div>
     </div>
   );
 };

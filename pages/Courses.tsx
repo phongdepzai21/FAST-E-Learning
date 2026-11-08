@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import CourseCard from '../components/CourseCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { COURSES as HARDCODED_COURSES, getMergedCourses } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, DEFAULT_COMBOS, ComboItem } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
@@ -15,42 +15,6 @@ import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificatio
 import { trackCourseView } from '../utils/courseTrackingService';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
-
-const DEFAULT_COMBOS = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    originalPrice: '2.400.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    originalPrice: '3.600.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000'],
-    benefits: ['Tài liệu hướng dẫn chuyên sâu đính kèm', 'Cấp chứng nhận hoàn thành']
-  },
-  {
-    id: 'combo-vip',
-    title: 'Gói Combo VIP (Chuyên Gia Toàn Diện & ISO Quốc Tế)',
-    price: '2.500.000đ',
-    originalPrice: '5.000.000đ',
-    savings: 'Tiết kiệm 50%',
-    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo VIP: Mở khóa toàn bộ kho khóa học ISO, HACCP & VietGAP, tặng kèm tài liệu chuẩn hóa SOP và hỗ trợ chuyên gia 1-1.',
-    courseIds: ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'],
-    benefits: ['Đặc quyền VIP & Cố vấn 1-1', 'Tài liệu biểu mẫu SOP đính kèm', 'Cấp chứng nhận ngay & liền']
-  }
-];
 
 const Courses: React.FC = () => {
   const toast = useToast();
@@ -64,36 +28,67 @@ const Courses: React.FC = () => {
   const [isVipOrAdmin, setIsVipOrAdmin] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [combos, setCombos] = useState<any[]>(DEFAULT_COMBOS);
+  const [combos, setCombos] = useState<ComboItem[]>(() => getMergedCombos([], { includeInactive: false }));
   const [expandedComboIds, setExpandedComboIds] = useState<{ [id: string]: boolean }>({});
   const toggleComboExpand = (id: string) => {
     setExpandedComboIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // --- FETCH ALL COMBOS FROM SERVER API ---
-  useEffect(() => {
-    const loadCombos = async () => {
-      try {
-        const response = await fetch('/api/combos');
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data.combos)) {
-            setCombos(data.combos);
-          }
-        }
-      } catch (error) {
-        console.warn("Lỗi đồng bộ danh sách combo từ API:", error);
+  const displayCategories = useMemo(() => {
+    const set = new Set<string>(Categories);
+    allCourses.forEach(c => {
+      if (c.category && c.category.trim() && c.category !== 'Gói VIP' && !c.id.startsWith('combo-')) {
+        set.add(c.category.trim());
       }
+    });
+    try {
+      const custom = localStorage.getItem('custom_course_categories');
+      if (custom) {
+        JSON.parse(custom).forEach((cat: string) => {
+          if (cat && cat.trim()) set.add(cat.trim());
+        });
+      }
+    } catch (e) {}
+    return Array.from(set);
+  }, [allCourses]);
+
+  // --- FETCH & REALTIME SYNC ALL COMBOS (API + FIRESTORE + CROSS-TAB) ---
+  useEffect(() => {
+    const syncCombos = (fsList?: ComboItem[]) => {
+      setCombos(getMergedCombos(fsList, { includeInactive: false }));
     };
 
-    loadCombos();
+    // 1. Initial snapshot from backend API
+    fetch('/api/combos')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.combos)) {
+          syncCombos(data.combos);
+        }
+      })
+      .catch(error => {
+        console.warn("Lỗi đồng bộ danh sách combo từ API:", error);
+      });
 
-    const handleSync = () => loadCombos();
+    // 2. Real-time Firestore snapshot for instant cloud updates
+    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
+      const dbCombos: ComboItem[] = [];
+      snapshot.forEach(docSnap => {
+        dbCombos.push({ id: docSnap.id, ...docSnap.data() } as ComboItem);
+      });
+      syncCombos(dbCombos);
+    }, (error) => {
+      console.warn("Lỗi onSnapshot combos ở Courses.tsx:", error);
+      syncCombos();
+    });
+
+    const handleSync = () => syncCombos();
 
     window.addEventListener('combos_updated', handleSync);
     window.addEventListener('storage', handleSync);
 
     return () => {
+      unsub();
       window.removeEventListener('combos_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
@@ -302,7 +297,7 @@ const Courses: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-20">
         {/* Category Pills */}
         <div className="flex overflow-x-auto no-scrollbar gap-3 mb-12 py-2">
-            {Categories.map((cat) => {
+            {displayCategories.map((cat) => {
                 const isNewTab = cat === 'Mới cập nhật';
                 const isSelected = activeCategory === cat;
                 return (

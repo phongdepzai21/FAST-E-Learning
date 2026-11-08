@@ -89,6 +89,22 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
     hours: Math.floor(Math.random() * 5) + 3
   }), [course.id]);
 
+  const calculatedDiscount = useMemo(() => {
+    if (typeof course.discountPercent === 'number' && course.discountPercent > 0) {
+      return course.discountPercent;
+    }
+    const parsePrice = (str?: string) => {
+      if (!str) return 0;
+      return parseInt(str.replace(/[^\d]/g, ''), 10) || 0;
+    };
+    const orig = parsePrice(course.originalPrice);
+    const cur = parsePrice(course.price);
+    if (orig > 0 && cur > 0 && orig > cur) {
+      return Math.round(((orig - cur) / orig) * 100);
+    }
+    return 0;
+  }, [course.discountPercent, course.originalPrice, course.price]);
+
   const handleClick = (e: React.MouseEvent) => {
     markCourseAsSeen(course.id);
     const isHidden = course.status === 'inactive' || course.status === 'draft';
@@ -256,9 +272,9 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                                 <p className="text-[#007c76] font-black text-lg md:text-xl">
                                     {course.price || 'Miễn phí'}
                                 </p>
-                                {course.originalPrice && course.originalPrice !== course.price && (
+                                {course.originalPrice && course.originalPrice !== course.price && calculatedDiscount > 0 && (
                                     <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-md">
-                                        -{course.discountPercent || 50}%
+                                        -{calculatedDiscount}%
                                     </span>
                                 )}
                             </div>

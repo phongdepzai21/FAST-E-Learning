@@ -170,7 +170,7 @@ const DEFAULT_SERVER_COMBOS: Record<string, any> = {
   }
 };
 
-function loadCombosFromDisk(): Record<string, any> {
+function loadCombosDataFromDisk(): { combos: Record<string, any>; deletedIds: string[] } {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -178,22 +178,29 @@ function loadCombosFromDisk(): Record<string, any> {
     if (fs.existsSync(COMBOS_FILE)) {
       const content = fs.readFileSync(COMBOS_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      return { ...DEFAULT_SERVER_COMBOS, ...(parsed.combos || {}) };
+      const deletedIds: string[] = Array.isArray(parsed.deletedComboIds) ? parsed.deletedComboIds : [];
+      const baseMap = { ...DEFAULT_SERVER_COMBOS, ...(parsed.combos || {}) };
+      // Strip any combo that was deleted
+      for (const delId of deletedIds) {
+        delete baseMap[delId];
+      }
+      return { combos: baseMap, deletedIds };
     }
   } catch (err) {
     console.warn("Failed to read combos from disk:", err);
   }
-  return { ...DEFAULT_SERVER_COMBOS };
+  return { combos: { ...DEFAULT_SERVER_COMBOS }, deletedIds: [] };
 }
 
-function saveCombosToDisk(combos: Record<string, any>) {
+function saveCombosToDisk(combos: Record<string, any>, deletedIds?: Set<string> | string[]) {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
+    const delArr = deletedIds ? (Array.isArray(deletedIds) ? deletedIds : Array.from(deletedIds)) : [];
     fs.writeFileSync(
       COMBOS_FILE,
-      JSON.stringify({ combos, updatedAt: new Date().toISOString() }, null, 2),
+      JSON.stringify({ combos, deletedComboIds: delArr, updatedAt: new Date().toISOString() }, null, 2),
       "utf-8"
     );
   } catch (err) {
@@ -276,7 +283,9 @@ function saveCoursesToDisk(courses: Record<string, any>, deletedCourseIds: Set<s
 const initialCoursesData = loadCoursesDataFromDisk();
 const serverCourses: Record<string, any> = initialCoursesData.courses;
 const serverDeletedCourseIds: Set<string> = new Set<string>(initialCoursesData.deletedIds);
-const serverCombos: Record<string, any> = loadCombosFromDisk();
+const initialCombosData = loadCombosDataFromDisk();
+const serverCombos: Record<string, any> = initialCombosData.combos;
+const serverDeletedComboIds: Set<string> = new Set<string>(initialCombosData.deletedIds);
 // Set of active SSE subscribers
 const sseClients = new Set<express.Response>();
 
@@ -376,7 +385,10 @@ async function startServer() {
   });
 
   app.get("/api/combos", (req, res) => {
-    res.json({ combos: Object.values(serverCombos) });
+    res.json({
+      combos: Object.values(serverCombos),
+      deletedComboIds: Array.from(serverDeletedComboIds)
+    });
   });
 
   // Endpoint to debug incoming headers and protocol forwarders
@@ -675,6 +687,7 @@ async function startServer() {
         courses: Object.values(serverCourses),
         combos: Object.values(serverCombos),
         deletedCourseIds: Array.from(serverDeletedCourseIds),
+        deletedComboIds: Array.from(serverDeletedComboIds),
         timestamp: Date.now()
       })}\n\n`
     );
@@ -870,6 +883,13 @@ async function startServer() {
       } else if (action === "delete" && courseId) {
         delete serverCourses[courseId];
         serverDeletedCourseIds.add(courseId);
+        try {
+          const db = getServerFirestore();
+          await db.collection("courses").doc(courseId).delete();
+          console.log(`[Sync] Successfully deleted course "${courseId}" from server Firestore.`);
+        } catch (fErr: any) {
+          console.warn("[Sync] Server Firestore delete course exception:", fErr.message);
+        }
       } else if (action === "sync_all" && Array.isArray(courses)) {
         courses.forEach((c: any) => {
           if (c && c.id) {
@@ -927,6 +947,14 @@ async function startServer() {
           ...combo,
           updatedAt: combo.updatedAt || now
         };
+        serverDeletedComboIds.delete(combo.id);
+
+        try {
+          const db = getFirestore();
+          db.collection("combos").doc(combo.id).set(serverCombos[combo.id], { merge: true }).catch((err) => {
+            console.warn("[Firestore] Failed to save combo doc:", err.message);
+          });
+        } catch (e) {}
       } else if (action === "status" && comboId && status) {
         if (serverCombos[comboId]) {
           serverCombos[comboId] = {
@@ -941,17 +969,39 @@ async function startServer() {
             updatedAt: now
           };
         }
+        serverDeletedComboIds.delete(comboId);
+
+        try {
+          const db = getFirestore();
+          db.collection("combos").doc(comboId).set({ status, updatedAt: now }, { merge: true }).catch((err) => {
+            console.warn("[Firestore] Failed to update combo status doc:", err.message);
+          });
+        } catch (e) {}
       } else if (action === "delete" && comboId) {
         delete serverCombos[comboId];
+        serverDeletedComboIds.add(comboId);
+
+        try {
+          const db = getFirestore();
+          db.collection("combos").doc(comboId).delete().catch((err) => {
+            console.warn("[Firestore] Failed to delete combo doc:", err.message);
+          });
+        } catch (e) {}
       } else if (action === "sync_all" && Array.isArray(combos)) {
         combos.forEach((c: any) => {
           if (c && c.id) {
             serverCombos[c.id] = { ...serverCombos[c.id], ...c, updatedAt: c.updatedAt || now };
+            serverDeletedComboIds.delete(c.id);
+
+            try {
+              const db = getFirestore();
+              db.collection("combos").doc(c.id).set(serverCombos[c.id], { merge: true }).catch(() => {});
+            } catch (e) {}
           }
         });
       }
 
-      saveCombosToDisk(serverCombos);
+      saveCombosToDisk(serverCombos, serverDeletedComboIds);
 
       const allList = Object.values(serverCombos);
 
@@ -962,10 +1012,11 @@ async function startServer() {
         comboId,
         status,
         combos: allList,
+        deletedComboIds: Array.from(serverDeletedComboIds),
         timestamp: Date.now()
       });
 
-      res.json({ success: true, combos: allList });
+      res.json({ success: true, combos: allList, deletedComboIds: Array.from(serverDeletedComboIds) });
     } catch (err: any) {
       console.error("Combo sync error:", err);
       res.status(500).json({ error: err.message });
@@ -1957,25 +2008,30 @@ async function startServer() {
         }
       }
 
-      // Streaming headers
+      // Streaming headers for instant, unbuffered SSE delivery
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders?.();
 
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      // Fast models priority: gemini-3.1-flash-lite (instant time-to-first-token) then gemini-3.8-flash
+      const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
       let streamResult = null;
       let lastErr = null;
 
       for (const modelName of modelsToTry) {
         try {
+          const config: any = {
+            systemInstruction: systemContext || undefined,
+          };
+          if (modelName === 'gemini-3.8-flash') {
+            config.thinkingConfig = { thinkingLevel: 'low' };
+          }
           streamResult = await ai.models.generateContentStream({
             model: modelName,
             contents: historyContents,
-            config: {
-              systemInstruction: systemContext || undefined,
-              temperature: 0.7,
-              maxOutputTokens: 1000,
-            }
+            config
           });
           if (streamResult) break;
         } catch (err: any) {
@@ -1991,9 +2047,11 @@ async function startServer() {
       for await (const chunk of streamResult) {
         if (chunk.text) {
           res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+          (res as any).flush?.();
         }
       }
       res.write(`data: [DONE]\n\n`);
+      (res as any).flush?.();
       res.end();
 
     } catch (error: any) {
@@ -2030,16 +2088,57 @@ async function startServer() {
       const snap = await db.collection("courses").get();
       const firestoreCourses: Record<string, any> = {};
       snap.forEach(doc => {
-        firestoreCourses[doc.id] = { id: doc.id, ...doc.data() };
+        if (serverDeletedCourseIds.has(doc.id)) {
+          // Clean up document from Firestore if marked as deleted
+          db.collection("courses").doc(doc.id).delete().catch(() => {});
+        } else {
+          firestoreCourses[doc.id] = { id: doc.id, ...doc.data() };
+        }
       });
+
+      // Ensure deleted courses are completely purged from serverCourses map
+      for (const delId of serverDeletedCourseIds) {
+        delete serverCourses[delId];
+      }
+
       Object.assign(serverCourses, firestoreCourses);
       saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
       broadcastCoursesUpdate("courses_updated", {
         action: "sync_all",
         courses: Object.values(serverCourses),
+        deletedCourseIds: Array.from(serverDeletedCourseIds),
         timestamp: Date.now()
       });
       console.log("[Sync] Synchronized courses from Firestore to disk.");
+
+      // Sync combos from Firestore periodically
+      try {
+        const comboSnap = await db.collection("combos").get();
+        const firestoreCombos: Record<string, any> = {};
+        comboSnap.forEach(doc => {
+          if (serverDeletedComboIds.has(doc.id)) {
+            db.collection("combos").doc(doc.id).delete().catch(() => {});
+          } else {
+            firestoreCombos[doc.id] = { id: doc.id, ...doc.data() };
+          }
+        });
+
+        for (const delId of serverDeletedComboIds) {
+          delete serverCombos[delId];
+        }
+
+        Object.assign(serverCombos, firestoreCombos);
+        saveCombosToDisk(serverCombos, serverDeletedComboIds);
+        broadcastCombosUpdate("combos_updated", {
+          action: "sync_all",
+          combos: Object.values(serverCombos),
+          deletedComboIds: Array.from(serverDeletedComboIds),
+          timestamp: Date.now()
+        });
+        console.log("[Sync] Synchronized combos from Firestore to disk.");
+      } catch (comboErr) {
+        console.error("[Sync] Error syncing combos from Firestore:", comboErr);
+      }
     } catch (err) {
       console.error("[Sync] Error syncing from Firestore:", err);
     }
@@ -2053,30 +2152,4 @@ async function startServer() {
 }
 
 startServer();
-  // 1. Sync courses from Firestore periodically
-  const syncFromFirestore = async () => {
-    try {
-      const db = getFirestore();
-      const snap = await db.collection("courses").get();
-      const firestoreCourses: Record<string, any> = {};
-      snap.forEach(doc => {
-        firestoreCourses[doc.id] = { id: doc.id, ...doc.data() };
-      });
-      Object.assign(serverCourses, firestoreCourses);
-      saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
-      broadcastCoursesUpdate("courses_updated", {
-        action: "sync_all",
-        courses: Object.values(serverCourses),
-        timestamp: Date.now()
-      });
-      console.log("[Sync] Synchronized courses from Firestore to disk.");
-    } catch (err) {
-      console.error("[Sync] Error syncing from Firestore:", err);
-    }
-  };
 
-  // Sync every 5 minutes
-  setInterval(syncFromFirestore, 5 * 60 * 1000);
-  
-  // Initial sync
-  syncFromFirestore();

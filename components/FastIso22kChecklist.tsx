@@ -2,86 +2,110 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// Checklist Data Structure for ISO 22000:2018 (FSMS - Hệ Thống Quản Lý An Toàn Thực Phẩm)
-export const ISO22K_CHECKLIST_DATA = [
+export interface ChecklistItem {
+  id: string;
+  clause: string;
+  text: string;
+}
+
+export interface ChecklistSection {
+  section: string;
+  items: ChecklistItem[];
+}
+
+// Complete 43 standard clauses from the user's attached ISO 22000:2018 checklist
+export const ISO22K_CHECKLIST_DATA: ChecklistSection[] = [
   {
-    section: "4. BỐI CẢNH CỦA TỔ CHỨC (CONTEXT OF THE ORGANIZATION)",
+    section: "ĐIỀU KHOẢN 4: BỐI CẢNH CỦA TỔ CHỨC",
     items: [
-      { id: "4.1", text: "Tổ chức đã xác định các vấn đề bên ngoài và nội bộ liên quan đến mục đích và ảnh hưởng đến khả năng đạt được kết quả dự kiến của FSMS." },
-      { id: "4.2", text: "Xác định các bên quan tâm (Cơ quan quản lý, khách hàng, đối tác, người tiêu dùng) và các yêu cầu liên quan của họ đối với an toàn thực phẩm." },
-      { id: "4.3", text: "Xác định phạm vi của hệ thống FSMS (sản phẩm, quá trình, địa điểm sản xuất) được lưu giữ dưới dạng thông tin văn bản." },
-      { id: "4.4", text: "Thiết lập, áp dụng, duy trì, cập nhật và cải tiến liên tục hệ thống quản lý an toàn thực phẩm theo các yêu cầu của tiêu chuẩn ISO 22000:2018." }
+      { id: "4.1", clause: "Điều khoản 4.1", text: "Hiểu tổ chức và bối cảnh của tổ chức. Tổ chức đã xác định các vấn đề nội bộ và bên ngoài liên quan đến mục đích của mình và ảnh hưởng đến khả năng đạt được kết quả dự kiến của FSMS chưa?" },
+      { id: "4.2.a", clause: "Điều khoản 4.2", text: "Hiểu nhu cầu và mong đợi của các bên quan tâm. Tổ chức đã xác định các bên quan tâm có liên quan đến FSMS chưa?" },
+      { id: "4.2.b", clause: "Điều khoản 4.2", text: "Tổ chức đã xác định các yêu cầu có liên quan của các bên quan tâm đối với FSMS chưa?" },
+      { id: "4.3", clause: "Điều khoản 4.3", text: "Xác định phạm vi của FSMS. Phạm vi có xác định rõ các sản phẩm, dịch vụ, quá trình và địa điểm sản xuất được bao gồm trong FSMS không?" },
+      { id: "4.4", clause: "Điều khoản 4.4", text: "Hệ thống quản lý an toàn thực phẩm. Tổ chức đã thiết lập, thực hiện, duy trì, cập nhật và cải tiến liên tục FSMS, bao gồm các quá trình cần thiết và sự tương tác của chúng chưa?" }
     ]
   },
   {
-    section: "5. SỰ LÃNH ĐẠO (LEADERSHIP & COMMITMENT)",
+    section: "ĐIỀU KHOẢN 5: SỰ LÃNH ĐẠO",
     items: [
-      { id: "5.1", text: "Lãnh đạo cao nhất thể hiện sự cam kết đối với FSMS: đảm bảo nguồn lực, truyền đạt tầm quan trọng của an toàn thực phẩm và hỗ trợ các vai trò liên quan." },
-      { id: "5.2.1", text: "Thiết lập, thực hiện và duy trì chính sách an toàn thực phẩm phù hợp với mục đích và bối cảnh của tổ chức, tạo khung cho các mục tiêu ATTP." },
-      { id: "5.2.2", text: "Chính sách an toàn thực phẩm được truyền đạt, thấu hiểu và áp dụng ở mọi cấp trong tổ chức; sẵn có cho các bên quan tâm thích hợp." },
-      { id: "5.3", text: "Lãnh đạo cao nhất phân công trách nhiệm, quyền hạn và chỉ định Trưởng nhóm an toàn thực phẩm (Food Safety Team Leader)." }
+      { id: "5.1.a", clause: "Điều khoản 5.1", text: "Sự lãnh đạo và cam kết. Lãnh đạo cao nhất có thể hiện sự cam kết đối với FSMS bằng cách đảm bảo chính sách an toàn thực phẩm và các mục tiêu được thiết lập không?" },
+      { id: "5.1.b", clause: "Điều khoản 5.1", text: "Lãnh đạo cao nhất có đảm bảo sự tích hợp các yêu cầu của FSMS vào các quá trình kinh doanh của tổ chức không?" },
+      { id: "5.2.1", clause: "Điều khoản 5.2.1", text: "Chính sách an toàn thực phẩm. Chính sách có phù hợp với mục đích và bối cảnh của tổ chức, cung cấp khuôn khổ để thiết lập và xem xét các mục tiêu FSMS không?" },
+      { id: "5.2.2", clause: "Điều khoản 5.2.2", text: "Truyền đạt chính sách an toàn thực phẩm. Chính sách có được truyền đạt, thấu hiểu và áp dụng ở mọi cấp trong tổ chức cũng như có sẵn cho các bên quan tâm liên quan không?" },
+      { id: "5.3", clause: "Điều khoản 5.3", text: "Vai trò, trách nhiệm và quyền hạn. Lãnh đạo cao nhất đã phân công, truyền đạt trách nhiệm và quyền hạn chưa? Có bổ nhiệm Trưởng nhóm an toàn thực phẩm không?" }
     ]
   },
   {
-    section: "6. HOẠCH ĐỊNH (PLANNING FOR THE FSMS)",
+    section: "ĐIỀU KHOẢN 6: HOẠCH ĐỊNH",
     items: [
-      { id: "6.1", text: "Hoạch định các hành động giải quyết các rủi ro và cơ hội để đảm bảo FSMS đạt kết quả dự kiến, ngăn ngừa tác động tiêu cực và đạt cải tiến liên tục." },
-      { id: "6.2", text: "Thiết lập các mục tiêu an toàn thực phẩm đo lường được tại các phòng ban, chức năng liên quan và lập kế hoạch thực hiện để đạt được mục tiêu." },
-      { id: "6.3", text: "Hoạch định các thay đổi đối với FSMS một cách có hệ thống, duy trì tính toàn vẹn của hệ thống khi có sự thay đổi." }
+      { id: "6.1.1", clause: "Điều khoản 6.1.1", text: "Hành động giải quyết rủi ro và cơ hội. Khi hoạch định FSMS, tổ chức đã xem xét các vấn đề nội bộ/bên ngoài và các bên quan tâm để xác định rủi ro và cơ hội cần giải quyết chưa?" },
+      { id: "6.1.2", clause: "Điều khoản 6.1.2", text: "Tổ chức đã lên kế hoạch hành động để giải quyết các rủi ro và cơ hội này, cũng như cách thức tích hợp, thực hiện và đánh giá tính hiệu lực của chúng chưa?" },
+      { id: "6.2.1", clause: "Điều khoản 6.2.1", text: "Mục tiêu FSMS. Tổ chức đã thiết lập các mục tiêu an toàn thực phẩm nhất quán với chính sách, có thể đo lường, được theo dõi và cập nhật không?" },
+      { id: "6.2.2", clause: "Điều khoản 6.2.2", text: "Khi hoạch định cách thức đạt được mục tiêu, tổ chức đã xác định: cần làm gì, nguồn lực nào, ai chịu trách nhiệm, thời hạn và cách thức đánh giá kết quả chưa?" },
+      { id: "6.3", clause: "Điều khoản 6.3", text: "Hoạch định sự thay đổi. Khi có sự thay đổi đối với FSMS, tổ chức có thực hiện thay đổi một cách có kế hoạch không?" }
     ]
   },
   {
-    section: "7. HỖ TRỢ (SUPPORT - NGUỒN LỰC, NĂNG LỰC & TRUYỀN THÔNG)",
+    section: "ĐIỀU KHOẢN 7: HỖ TRỢ",
     items: [
-      { id: "7.1.1", text: "Xác định và cung cấp đầy đủ nguồn lực cần thiết (nhân lực, cơ sở hạ tầng, môi trường làm việc) để vận hành và cải tiến FSMS." },
-      { id: "7.1.5", text: "Kiểm soát các yếu tố và quá trình được cung cấp từ bên ngoài (nhà cung cấp nguyên liệu, dịch vụ thuê ngoài, gia công)." },
-      { id: "7.2", text: "Xác định năng lực cần thiết của nhân sự ảnh hưởng đến ATTP; tổ chức đào tạo hoặc các biện pháp nâng cao năng lực và lưu giữ hồ sơ." },
-      { id: "7.3", text: "Đảm bảo nhân sự nhận thức được chính sách ATTP, mục tiêu cá nhân, sự đóng góp vào hiệu lực FSMS và hậu quả của việc không tuân thủ." },
-      { id: "7.4", text: "Thiết lập cơ chế trao đổi thông tin bên ngoài (nhà cung cấp, khách hàng, cơ quan chức năng) và trao đổi thông tin nội bộ kịp thời." },
-      { id: "7.5", text: "Kiểm soát thông tin dạng văn bản (quy trình, hướng dẫn, biểu mẫu hồ sơ): phê duyệt, phân phối, lưu trữ, bảo vệ và kiểm soát thay đổi." }
+      { id: "7.1.1", clause: "Điều khoản 7.1.1", text: "Nguồn lực chung. Tổ chức đã xác định và cung cấp nguồn lực cần thiết cho việc thiết lập, duy trì và cải tiến liên tục FSMS chưa?" },
+      { id: "7.1.2", clause: "Điều khoản 7.1.2", text: "Con người. Tổ chức đã cung cấp đủ nhân sự có năng lực để vận hành FSMS một cách có hiệu lực chưa?" },
+      { id: "7.1.3", clause: "Điều khoản 7.1.3", text: "Cơ sở hạ tầng. Tổ chức có cung cấp và duy trì cơ sở hạ tầng cần thiết (nhà xưởng, thiết bị, vận tải, CNTT) không?" },
+      { id: "7.1.4", clause: "Điều khoản 7.1.4", text: "Môi trường làm việc. Tổ chức đã xác định, cung cấp và duy trì môi trường làm việc phù hợp để đảm bảo an toàn thực phẩm chưa?" },
+      { id: "7.1.6", clause: "Điều khoản 7.1.6", text: "Tổ chức có đánh giá, lựa chọn và giám sát các nhà cung cấp bên ngoài (nguyên liệu, dịch vụ) để đảm bảo không ảnh hưởng đến an toàn thực phẩm không?" },
+      { id: "7.2", clause: "Điều khoản 7.2", text: "Năng lực. Đảm bảo nhân sự có năng lực (dựa trên giáo dục, đào tạo hoặc kinh nghiệm), và lưu giữ thông tin văn bản làm bằng chứng chưa?" },
+      { id: "7.3", clause: "Điều khoản 7.3", text: "Nhận thức. Các cá nhân làm việc có nhận thức được chính sách ATTP, mục tiêu FSMS liên quan đến công việc của họ không?" },
+      { id: "7.4", clause: "Điều khoản 7.4", text: "Trao đổi thông tin. Tổ chức đã xác định các hoạt động trao đổi thông tin nội bộ và bên ngoài (trao đổi cái gì, khi nào, với ai, như thế nào) chưa?" },
+      { id: "7.5", clause: "Điều khoản 7.5", text: "Thông tin được văn bản hóa. FSMS có bao gồm hệ thống tạo lập, cập nhật và kiểm soát tài liệu rõ ràng không?" }
     ]
   },
   {
-    section: "8. VẬN HÀNH (OPERATION - PRPs, OPRP & HACCP PLAN)",
+    section: "ĐIỀU KHOẢN 8: THỰC HIỆN",
     items: [
-      { id: "8.1", text: "Hoạch định, thực hiện và kiểm soát các quá trình cần thiết để đáp ứng yêu cầu an toàn thực phẩm và thực hiện các hành động xác định tại Mục 6." },
-      { id: "8.2", text: "Thiết lập, áp dụng và duy trì các chương trình tiên quyết (PRPs) phù hợp với quy mô và bản chất hoạt động (nhà xưởng, vệ sinh, thiết bị, kiểm soát côn trùng)." },
-      { id: "8.3", text: "Thiết lập và áp dụng hệ thống truy xuất nguồn gốc có khả năng xác định sản phẩm từ nhà cung cấp trực tiếp đến khách hàng trực tiếp (nguyên tắc 1 bước trước - 1 bước sau)." },
-      { id: "8.4", text: "Thiết lập và duy trì quy trình xử lý các tình huống khẩn cấp và sự cố có khả năng ảnh hưởng đến an toàn thực phẩm." },
-      { id: "8.5.1", text: "Thu thập thông tin sơ bộ (mô tả nguyên liệu, sản phẩm cuối cùng, mục đích sử dụng) và xây dựng sơ đồ lưu trình được xác nhận thực tế tại hiện trường." },
-      { id: "8.5.2", text: "Tiến hành phân tích mối nguy (sinh học, hóa học, vật lý, chất gây dị ứng) và xác định mức độ chấp nhận được đối với từng mối nguy." },
-      { id: "8.5.3", text: "Lựa chọn và phân loại các biện pháp kiểm soát thành Chương trình tiên quyết vận hành (OPRP) hoặc Điểm kiểm soát tới hạn (CCP)." },
-      { id: "8.5.4", text: "Xây dựng Kế hoạch kiểm soát mối nguy (Hazard Control Plan): thiết lập giới hạn tới hạn/tiêu chí hành động, hệ thống giám sát, hành động khắc phục cho OPRP và CCP." },
-      { id: "8.7", text: "Kiểm soát việc theo dõi và đo lường: thiết bị đo lường dùng cho OPRP và CCP được hiệu chuẩn/kiểm định định kỳ và có hồ sơ lưu giữ." },
-      { id: "8.8", text: "Kiểm tra xác nhận (Verification) liên quan đến PRPs và Kế hoạch kiểm soát mối nguy được hoạch định và thực hiện bởi người có thẩm quyền." },
-      { id: "8.9", text: "Kiểm soát sự không phù hợp: xử lý sản phẩm có khả năng không an toàn, đánh giá để giải phóng lô hàng, thu hồi/rút sản phẩm khỏi thị trường." }
+      { id: "8.1.1", clause: "Điều khoản 8.1", text: "Hoạch định và kiểm soát thực hiện. Tổ chức có hoạch định, thực hiện, kiểm soát các quá trình cần thiết để đáp ứng các yêu cầu về việc tạo ra sản phẩm an toàn không?" },
+      { id: "8.2.1", clause: "Điều khoản 8.2.1", text: "Chương trình tiên quyết (PRP). Tổ chức có thiết lập, áp dụng và cập nhật các PRP để ngăn ngừa/giảm bớt ô nhiễm vào sản phẩm không?" },
+      { id: "8.3.1", clause: "Điều khoản 8.3", text: "Hệ thống truy xuất nguồn gốc. Hệ thống có khả năng nhận diện nguyên vật liệu đầu vào và tuyến phân phối sản phẩm đầu ra không?" },
+      { id: "8.4.1", clause: "Điều khoản 8.4", text: "Ứng phó khẩn cấp. Tổ chức có đảm bảo sẵn sàng ứng phó với các tình huống khẩn cấp (cháy, ngập lụt, cúp điện...) ảnh hưởng đến ATTP không?" },
+      { id: "8.5.1", clause: "Điều khoản 8.5.1", text: "Phân tích mối nguy. Đội ATTP có tiến hành phân tích mối nguy để xác định các mối nguy cần kiểm soát không?" },
+      { id: "8.5.2", clause: "Điều khoản 8.5.2", text: "Nhận diện & Đánh giá mối nguy. Tất cả các mối nguy có được đánh giá rủi ro dựa trên mức độ nghiêm trọng và khả năng xảy ra không?" },
+      { id: "8.5.4", clause: "Điều khoản 8.5.4", text: "Kế hoạch kiểm soát mối nguy (HACCP/OPRP). Kế hoạch có bao gồm: Giới hạn tới hạn/Tiêu chí hành động, Giám sát, Hành động khắc phục không?" },
+      { id: "8.7", clause: "Điều khoản 8.7", text: "Kiểm soát thiết bị đo lường. Thiết bị đo lường được chỉ định là đáng tin cậy, được hiệu chuẩn định kỳ hoặc kiểm tra không?" },
+      { id: "8.8", clause: "Điều khoản 8.8", text: "Thẩm tra (Verification). Tổ chức có lập lịch và thực hiện các hoạt động thẩm tra để chứng minh PRPs và Kế hoạch HACCP/OPRP được tuân thủ không?" },
+      { id: "8.9.3", clause: "Điều khoản 8.9.3", text: "Hành động khắc phục. Tổ chức có tiến hành phân tích nguyên nhân gốc rễ để ngăn ngừa lỗi tái diễn không?" },
+      { id: "8.9.5", clause: "Điều khoản 8.9.5", text: "Thu hồi sản phẩm (Recall). Tổ chức có quy trình thu hồi lô sản phẩm không an toàn không? Có diễn tập thu hồi không?" }
     ]
   },
   {
-    section: "9. ĐÁNH GIÁ KẾT QUẢ HOẠT ĐỘNG (PERFORMANCE EVALUATION)",
+    section: "ĐIỀU KHOẢN 9: ĐÁNH GIÁ KẾT QUẢ HOẠT ĐỘNG",
     items: [
-      { id: "9.1", text: "Xác định phương pháp theo dõi, đo lường, phân tích và đánh giá để kiểm chứng mức độ thỏa mãn các yêu cầu của FSMS." },
-      { id: "9.2", text: "Tiến hành đánh giá nội bộ theo các khoảng thời gian đã hoạch định; đánh giá viên có tính khách quan và độc lập với công việc được đánh giá." },
-      { id: "9.3", text: "Lãnh đạo cao nhất tiến hành xem xét định kỳ hệ thống quản lý an toàn thực phẩm để đảm bảo tính phù hợp, thỏa đáng và hiệu lực liên tục." }
+      { id: "9.1.1", clause: "Điều khoản 9.1.1", text: "Theo dõi, đo lường, phân tích và đánh giá. Tổ chức có xác định những gì cần theo dõi, phương pháp, thời điểm và cách thức phân tích kết quả chưa?" },
+      { id: "9.1.2", clause: "Điều khoản 9.1.2", text: "Phân tích và đánh giá dữ liệu. Tổ chức có đánh giá thông tin phát sinh từ quá trình theo dõi, đo lường (kể cả kết quả thẩm tra PRPs và HACCP) không?" },
+      { id: "9.2.1", clause: "Điều khoản 9.2.1", text: "Đánh giá nội bộ. Tổ chức có tiến hành đánh giá nội bộ theo các khoảng thời gian được hoạch định để cung cấp thông tin xem FSMS có phù hợp không?" },
+      { id: "9.2.2", clause: "Điều khoản 9.2.2", text: "Chương trình đánh giá nội bộ có đảm bảo tính khách quan và công bằng không (người đánh giá không tự đánh giá công việc của mình)?" },
+      { id: "9.3.1", clause: "Điều khoản 9.3.1", text: "Xem xét của lãnh đạo. Lãnh đạo cao nhất có tiến hành xem xét FSMS theo định kỳ để đảm bảo sự phù hợp, thỏa đáng và hiệu lực liên tục không?" },
+      { id: "9.3.3", clause: "Điều khoản 9.3.3", text: "Đầu ra xem xét của lãnh đạo có bao gồm các quyết định về cơ hội cải tiến, nhu cầu thay đổi đối với FSMS và nguồn lực không?" }
     ]
   },
   {
-    section: "10. CẢI TIẾN (IMPROVEMENT & CONTINUAL UPDATING)",
+    section: "ĐIỀU KHOẢN 10: CẢI TIẾN",
     items: [
-      { id: "10.1", text: "Khi có sự không phù hợp, tổ chức tiến hành hành động khắc phục (CAPA): xác định nguyên nhân gốc rễ, thực hiện hành động và đánh giá hiệu lực." },
-      { id: "10.2", text: "Cải tiến liên tục tính phù hợp, thỏa đáng và hiệu lực của FSMS thông qua truyền thông, xem xét của lãnh đạo, đánh giá nội bộ và phân tích dữ liệu." },
-      { id: "10.3", text: "Lãnh đạo cao nhất đảm bảo FSMS được cập nhật liên tục dựa trên các thay đổi về khoa học kỹ thuật, quy định pháp luật và thông tin phản hồi." }
+      { id: "10.1.1", clause: "Điều khoản 10.1.1", text: "Sự không phù hợp và hành động khắc phục. Khi sự không phù hợp xảy ra, tổ chức có hành động để kiểm soát, khắc phục và xử lý hệ quả không?" },
+      { id: "10.1.2", clause: "Điều khoản 10.1.2", text: "Tổ chức có đánh giá nhu cầu hành động nhằm loại bỏ nguyên nhân gốc rễ của sự không phù hợp để nó không tái diễn không?" },
+      { id: "10.2", clause: "Điều khoản 10.2", text: "Cải tiến liên tục. Lãnh đạo cao nhất có đảm bảo tổ chức liên tục nâng cao tính hiệu lực của FSMS thông qua xem xét lãnh đạo, đánh giá nội bộ, hành động khắc phục không?" },
+      { id: "10.3", clause: "Điều khoản 10.3", text: "Cập nhật Hệ thống quản lý ATTP. Tổ chức có đánh giá FSMS định kỳ để đảm bảo các mối nguy đã được kiểm soát một cách phù hợp và cập nhật chưa?" }
     ]
   }
 ];
 
 export const FastIso22kChecklist: React.FC = () => {
-  // Client Form State
+  // Client & Audit Form State
   const [clientName, setClientName] = useState<string>('');
+  const [contactName, setContactName] = useState<string>('');
+  const [contactPhone, setContactPhone] = useState<string>('');
+  const [leadAuditor, setLeadAuditor] = useState<string>('');
   const [auditType, setAuditType] = useState<string>('');
   const [auditAddress, setAuditAddress] = useState<string>('');
   const [fsmsScope, setFsmsScope] = useState<string>('');
-  const [contactPhone, setContactPhone] = useState<string>('');
   const [auditDate, setAuditDate] = useState<string>('');
   const [reportNo, setReportNo] = useState<string>('');
 
@@ -89,6 +113,7 @@ export const FastIso22kChecklist: React.FC = () => {
   const [compliance, setCompliance] = useState<Record<string, string>>({});
   const [severities, setSeverities] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [capa, setCapa] = useState<Record<string, string>>({});
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -105,9 +130,17 @@ export const FastIso22kChecklist: React.FC = () => {
     return ISO22K_CHECKLIST_DATA.reduce((acc, sec) => acc + sec.items.length, 0);
   }, []);
 
-  // Completed items count
-  const completedItemsCount = useMemo(() => {
-    return Object.keys(compliance).filter(k => compliance[k]).length;
+  // Completed items count & N-count
+  const { completedItemsCount, nCount } = useMemo(() => {
+    let completed = 0;
+    let n = 0;
+    Object.keys(compliance).forEach((k) => {
+      if (compliance[k]) {
+        completed++;
+        if (compliance[k] === 'N') n++;
+      }
+    });
+    return { completedItemsCount: completed, nCount: n };
   }, [compliance]);
 
   // Percentage
@@ -120,7 +153,7 @@ export const FastIso22kChecklist: React.FC = () => {
   useEffect(() => {
     // A. Load local state
     try {
-      const savedLocal = localStorage.getItem('fast_iso22k_current');
+      const savedLocal = localStorage.getItem('fast_iso22000_full_current');
       if (savedLocal) {
         const parsed = JSON.parse(savedLocal);
         applyStateData(parsed);
@@ -130,7 +163,7 @@ export const FastIso22kChecklist: React.FC = () => {
     }
 
     try {
-      const savedCrm = localStorage.getItem('fast_iso22k_crm');
+      const savedCrm = localStorage.getItem('fast_iso22000_full_crm');
       if (savedCrm) {
         setCrmRecords(JSON.parse(savedCrm));
       }
@@ -141,11 +174,11 @@ export const FastIso22kChecklist: React.FC = () => {
       if (snap.exists()) {
         const data = snap.data();
         if (data && data._lastUpdated) {
-          const localTimestamp = localStorage.getItem('fast_iso22k_current_ts');
+          const localTimestamp = localStorage.getItem('fast_iso22000_full_ts');
           if (!localTimestamp || Number(data._lastUpdated) > Number(localTimestamp)) {
             applyStateData(data);
-            localStorage.setItem('fast_iso22k_current', JSON.stringify(data));
-            localStorage.setItem('fast_iso22k_current_ts', String(data._lastUpdated));
+            localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
+            localStorage.setItem('fast_iso22000_full_ts', String(data._lastUpdated));
           }
         }
       }
@@ -156,7 +189,7 @@ export const FastIso22kChecklist: React.FC = () => {
         const data = snap.data();
         if (data && data.records) {
           setCrmRecords(data.records);
-          localStorage.setItem('fast_iso22k_crm', JSON.stringify(data.records));
+          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(data.records));
         }
       }
     }, (err) => console.warn('[FastIso22k] CRM listener error:', err));
@@ -171,43 +204,52 @@ export const FastIso22kChecklist: React.FC = () => {
   const applyStateData = (data: Record<string, any>) => {
     if (!data) return;
     if (data.clientName !== undefined) setClientName(data.clientName || '');
+    if (data.contactName !== undefined) setContactName(data.contactName || '');
+    if (data.contactPhone !== undefined) setContactPhone(data.contactPhone || '');
+    if (data.leadAuditor !== undefined) setLeadAuditor(data.leadAuditor || '');
     if (data.auditType !== undefined) setAuditType(data.auditType || '');
     if (data.auditAddress !== undefined) setAuditAddress(data.auditAddress || '');
     if (data.fsmsScope !== undefined) setFsmsScope(data.fsmsScope || '');
-    if (data.contactPhone !== undefined) setContactPhone(data.contactPhone || '');
     if (data.auditDate !== undefined) setAuditDate(data.auditDate || '');
     if (data.reportNo !== undefined) setReportNo(data.reportNo || '');
 
     const newComp: Record<string, string> = {};
     const newSev: Record<string, string> = {};
     const newCmt: Record<string, string> = {};
+    const newCapa: Record<string, string> = {};
 
     Object.keys(data).forEach((key) => {
-      if (key.startsWith('comp_iso_')) {
-        const id = key.replace('comp_iso_', '');
+      if (key.startsWith('comp_')) {
+        const id = key.replace('comp_', '');
         newComp[id] = data[key];
-      } else if (key.startsWith('sev_iso_')) {
-        const id = key.replace('sev_iso_', '');
+      } else if (key.startsWith('sev_')) {
+        const id = key.replace('sev_', '');
         newSev[id] = data[key];
-      } else if (key.startsWith('cmt_iso_')) {
-        const id = key.replace('cmt_iso_', '');
+      } else if (key.startsWith('cmt_')) {
+        const id = key.replace('cmt_', '');
         newCmt[id] = data[key];
+      } else if (key.startsWith('capa_')) {
+        const id = key.replace('capa_', '');
+        newCapa[id] = data[key];
       }
     });
 
     setCompliance(newComp);
     setSeverities(newSev);
     setComments(newCmt);
+    setCapa(newCapa);
   };
 
-  // Compile current state data into object
+  // Compile current state data into object matching attached HTML key names
   const getCurrentStateDataObject = () => {
     const data: Record<string, any> = {
       clientName,
+      contactName,
+      contactPhone,
+      leadAuditor,
       auditType,
       auditAddress,
       fsmsScope,
-      contactPhone,
       auditDate,
       reportNo,
       _progress: `${progressPercentage}%`,
@@ -217,13 +259,16 @@ export const FastIso22kChecklist: React.FC = () => {
     };
 
     Object.keys(compliance).forEach((id) => {
-      if (compliance[id]) data[`comp_iso_${id}`] = compliance[id];
+      if (compliance[id]) data[`comp_${id}`] = compliance[id];
     });
     Object.keys(severities).forEach((id) => {
-      if (severities[id]) data[`sev_iso_${id}`] = severities[id];
+      if (severities[id]) data[`sev_${id}`] = severities[id];
     });
     Object.keys(comments).forEach((id) => {
-      if (comments[id]) data[`cmt_iso_${id}`] = comments[id];
+      if (comments[id]) data[`cmt_${id}`] = comments[id];
+    });
+    Object.keys(capa).forEach((id) => {
+      if (capa[id]) data[`capa_${id}`] = capa[id];
     });
 
     return data;
@@ -237,8 +282,8 @@ export const FastIso22kChecklist: React.FC = () => {
     saveTimeoutRef.current = setTimeout(async () => {
       const data = getCurrentStateDataObject();
       // 1. LocalStorage
-      localStorage.setItem('fast_iso22k_current', JSON.stringify(data));
-      localStorage.setItem('fast_iso22k_current_ts', String(data._lastUpdated));
+      localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
+      localStorage.setItem('fast_iso22000_full_ts', String(data._lastUpdated));
 
       // 2. Cloud Firestore Sync
       try {
@@ -246,33 +291,38 @@ export const FastIso22kChecklist: React.FC = () => {
       } catch (err) {
         console.warn('[FastIso22k] Cloud save error:', err);
       }
-    }, 400);
+    }, 300);
   };
 
-  // New Client Action
+  // New Client Action (Reset)
   const newClient = () => {
-    if (window.confirm("Tạo mới sẽ xóa form hiện tại (hãy chắc chắn bạn đã nhấn 'Lưu CRM'). Tiếp tục?")) {
-      localStorage.removeItem('fast_iso22k_current');
-      localStorage.removeItem('fast_iso22k_current_ts');
+    if (window.confirm("Tạo mới sẽ xóa trắng form hiện tại (hãy chắc chắn bạn đã 'Lưu CRM' nếu cần). Tiếp tục?")) {
+      localStorage.removeItem('fast_iso22000_full_current');
+      localStorage.removeItem('fast_iso22000_full_ts');
       setClientName('');
+      setContactName('');
+      setContactPhone('');
+      setLeadAuditor('');
       setAuditType('');
       setAuditAddress('');
       setFsmsScope('');
-      setContactPhone('');
       setAuditDate('');
       setReportNo('');
       setCompliance({});
       setSeverities({});
       setComments({});
+      setCapa({});
 
       // Reset Cloud Session
       try {
         setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), {
           clientName: '',
+          contactName: '',
+          contactPhone: '',
+          leadAuditor: '',
           auditType: '',
           auditAddress: '',
           fsmsScope: '',
-          contactPhone: '',
           auditDate: '',
           reportNo: '',
           _progress: '0%',
@@ -286,12 +336,13 @@ export const FastIso22kChecklist: React.FC = () => {
   const saveToCRM = async () => {
     const currentData = getCurrentStateDataObject();
     if (!currentData || !currentData.clientName || !currentData.clientName.trim()) {
-      alert("Vui lòng điền 'Tên Khách Hàng' trước khi lưu CRM!");
+      alert("Vui lòng điền ít nhất 'Tên Khách Hàng' trước khi lưu vào CRM!");
       return;
     }
 
-    const recordId = `${currentData.clientName.trim()}_${currentData.auditDate || 'nodate'}`;
+    const recordId = `${currentData.clientName.trim()}_${new Date().getTime()}`;
     currentData._progress = `${progressPercentage}%`;
+    currentData._savedAt = new Date().toLocaleString('vi-VN');
 
     const updatedCrm = {
       ...crmRecords,
@@ -299,7 +350,7 @@ export const FastIso22kChecklist: React.FC = () => {
     };
 
     setCrmRecords(updatedCrm);
-    localStorage.setItem('fast_iso22k_crm', JSON.stringify(updatedCrm));
+    localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updatedCrm));
 
     // Sync to Cloud Firestore
     try {
@@ -311,7 +362,7 @@ export const FastIso22kChecklist: React.FC = () => {
       console.warn('[FastIso22k] CRM Cloud sync error:', e);
     }
 
-    alert("Đã lưu thông tin khách hàng vào CRM ISO 22000 thành công!");
+    alert("Đã lưu thông tin phiên đánh giá vào CRM thành công!");
   };
 
   // Open CRM Modal
@@ -326,12 +377,12 @@ export const FastIso22kChecklist: React.FC = () => {
 
   // Load Record from CRM
   const loadRecord = (id: string) => {
-    if (window.confirm("Tải dữ liệu này sẽ ghi đè lên form hiện tại. Tiếp tục?")) {
+    if (window.confirm("Tải dữ liệu này sẽ ghi đè lên form làm việc hiện tại. Tiếp tục?")) {
       const rec = crmRecords[id];
       if (rec) {
         applyStateData(rec);
-        localStorage.setItem('fast_iso22k_current', JSON.stringify(rec));
-        localStorage.setItem('fast_iso22k_current_ts', String(Date.now()));
+        localStorage.setItem('fast_iso22000_full_current', JSON.stringify(rec));
+        localStorage.setItem('fast_iso22000_full_ts', String(Date.now()));
         try {
           setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), {
             ...rec,
@@ -345,11 +396,11 @@ export const FastIso22kChecklist: React.FC = () => {
 
   // Delete Record from CRM
   const deleteRecord = async (id: string) => {
-    if (window.confirm("Xóa khách hàng này khỏi CRM?")) {
+    if (window.confirm("Bạn có chắc chắn muốn xóa dữ liệu khách hàng này khỏi hệ thống CRM?")) {
       const updated = { ...crmRecords };
       delete updated[id];
       setCrmRecords(updated);
-      localStorage.setItem('fast_iso22k_crm', JSON.stringify(updated));
+      localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updated));
 
       // Sync to Cloud Firestore
       try {
@@ -369,7 +420,7 @@ export const FastIso22kChecklist: React.FC = () => {
     });
   };
 
-  // Generate Defect Report Window (Non-Conformity Report for ISO 22000:2018)
+  // Xuất Báo Cáo Lỗi & CAPA (NCR & CAPA Report Window Print matching attached HTML)
   const generateReport = () => {
     const data = getCurrentStateDataObject();
 
@@ -380,9 +431,10 @@ export const FastIso22kChecklist: React.FC = () => {
 
     ISO22K_CHECKLIST_DATA.forEach((section) => {
       section.items.forEach((item) => {
-        const severity = data[`sev_iso_${item.id}`];
-        const notes = data[`cmt_iso_${item.id}`] || '';
-        const status = data[`comp_iso_${item.id}`] || 'Chưa đánh giá';
+        const severity = data[`sev_${item.id}`];
+        const notes = data[`cmt_${item.id}`] || '';
+        const itemCapa = data[`capa_${item.id}`] || '';
+        const status = data[`comp_${item.id}`] || 'Chưa đánh giá';
 
         if (severity === 'Major' || severity === 'Minor' || severity === 'Observation') {
           if (severity === 'Major') majorCount++;
@@ -393,11 +445,12 @@ export const FastIso22kChecklist: React.FC = () => {
 
           reportRows += `
             <tr>
-                <td style="text-align:center;"><strong>Điều ${item.id}</strong></td>
+                <td style="text-align:center;"><strong>${item.clause}</strong></td>
                 <td>${item.text}</td>
                 <td style="text-align:center;"><strong>${status}</strong></td>
                 <td style="text-align:center; color:${badgeColor}; font-weight:bold;">${severity}</td>
                 <td>${notes}</td>
+                <td>${itemCapa}</td>
             </tr>
           `;
         }
@@ -405,13 +458,13 @@ export const FastIso22kChecklist: React.FC = () => {
     });
 
     if (!reportRows) {
-      alert("Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo!");
+      alert("Hoàn hảo! Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo.");
       return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert("Vui lòng cho phép mở cửa sổ popup để xuất báo cáo in!");
+      alert("Vui lòng cấp quyền mở tab mới để xuất báo cáo!");
       return;
     }
 
@@ -420,28 +473,36 @@ export const FastIso22kChecklist: React.FC = () => {
       <html>
       <head>
           <meta charset="UTF-8">
-          <title>Báo Cáo Lỗi Đánh Giá ISO 22000:2018 - FAST CONSULTING</title>
+          <title>Báo Cáo NCR & CAPA - FAST CONSULTING</title>
           <style>
               body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; line-height: 1.5; }
-              h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; font-size: 20px; }
+              h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; margin-bottom: 25px; font-size: 20px;}
               .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f4f8f8; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; }
               .info-grid div { margin-bottom: 5px; }
               .summary { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-weight: bold; background: #fff; }
               .badge-major { color: #d9534f; } .badge-minor { color: #f0ad4e; } .badge-obs { color: #0275d8; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-              th, td { border: 1px solid #000; padding: 10px; text-align: left; }
+              th, td { border: 1px solid #000; padding: 10px; text-align: left; vertical-align: top; }
               th { background-color: #007c76; color: white; text-align: center; }
-              @media print { body { padding: 0; } .info-grid { background: transparent; border: none; padding: 0; } }
+              @media print { 
+                  body { padding: 0; } 
+                  .info-grid { background: transparent; border: none; padding: 0; } 
+                  table { page-break-inside: auto; }
+                  tr { page-break-inside: avoid; page-break-after: auto; }
+              }
           </style>
       </head>
       <body>
-          <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ ISO 22000:2018 (NON-CONFORMITY REPORT)</h1>
+          <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ VÀ HÀNH ĐỘNG KHẮC PHỤC (NCR & CAPA REPORT)</h1>
           <div class="info-grid">
               <div><strong>Khách hàng:</strong> ${data.clientName || '...........................................'}</div>
+              <div><strong>Tên liên hệ:</strong> ${data.contactName || '...........................................'}</div>
+              <div><strong>Điện thoại:</strong> ${data.contactPhone || '...........................................'}</div>
+              <div><strong>Chuyên gia (Lead Auditor):</strong> ${data.leadAuditor || '...........................................'}</div>
               <div><strong>Loại đánh giá:</strong> ${data.auditType || '...........................................'}</div>
               <div><strong>Ngày đánh giá:</strong> ${data.auditDate || '...........................................'}</div>
               <div><strong>Địa chỉ:</strong> ${data.auditAddress || '...........................................'}</div>
-              <div><strong>Phạm vi FSMS:</strong> ${data.fsmsScope || '...........................................'}</div>
+              <div><strong>Phạm vi (Scope):</strong> ${data.fsmsScope || '...........................................'}</div>
               <div><strong>Số Report:</strong> ${data.reportNo || '...........................................'}</div>
           </div>
 
@@ -455,11 +516,12 @@ export const FastIso22kChecklist: React.FC = () => {
           <table>
               <thead>
                   <tr>
-                      <th style="width: 8%;">Điều khoản</th>
-                      <th style="width: 35%;">Yêu cầu & Hướng dẫn (ISO 22000:2018)</th>
-                      <th style="width: 10%;">Đánh giá</th>
-                      <th style="width: 15%;">Phân loại</th>
-                      <th style="width: 32%;">Bằng chứng & Ghi chú</th>
+                      <th style="width: 10%;">Điều khoản</th>
+                      <th style="width: 25%;">Nội dung Yêu cầu</th>
+                      <th style="width: 7%;">Kết quả</th>
+                      <th style="width: 10%;">Phân loại</th>
+                      <th style="width: 24%;">Bằng chứng & Ghi chú</th>
+                      <th style="width: 24%;">Hành động khắc phục (CAPA)</th>
                   </tr>
               </thead>
               <tbody>
@@ -469,12 +531,14 @@ export const FastIso22kChecklist: React.FC = () => {
           
           <div style="margin-top: 50px; display: flex; justify-content: space-around;">
               <div style="text-align: center;">
-                  <strong>Đại diện Khách Hàng</strong><br><br><br><br>
-                  .......................................
+                  <strong>Đại diện Khách Hàng</strong><br>
+                  <i>(Ký và ghi rõ họ tên)</i><br><br><br><br>
+                  <strong>${data.contactName || '.......................................'}</strong>
               </div>
               <div style="text-align: center;">
-                  <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br><br><br><br>
-                  .......................................
+                  <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br>
+                  <i>(Ký và ghi rõ họ tên)</i><br><br><br><br>
+                  <strong>${data.leadAuditor || '.......................................'}</strong>
               </div>
           </div>
       </body>
@@ -495,7 +559,7 @@ export const FastIso22kChecklist: React.FC = () => {
     return ISO22K_CHECKLIST_DATA.map(sec => {
       const matched = new Set<string>();
       sec.items.forEach(it => {
-        if (it.id.toLowerCase().includes(q) || it.text.toLowerCase().includes(q)) {
+        if (it.clause.toLowerCase().includes(q) || it.text.toLowerCase().includes(q) || it.id.toLowerCase().includes(q)) {
           matched.add(it.id);
         }
       });
@@ -509,7 +573,7 @@ export const FastIso22kChecklist: React.FC = () => {
 
   return (
     <div className="fast-iso22k-wrapper">
-      {/* Scoped CSS matching HACCP checklist exactly */}
+      {/* Scoped CSS from attached HTML */}
       <style>{`
         .fast-iso22k-wrapper {
           --primary: #007c76;
@@ -752,7 +816,7 @@ export const FastIso22kChecklist: React.FC = () => {
 
         .fast-iso22k-wrapper .audit-info {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
           gap: 15px;
         }
 
@@ -852,6 +916,18 @@ export const FastIso22kChecklist: React.FC = () => {
         .fast-iso22k-wrapper .col-comp { width: 20%; text-align: center; }
         .fast-iso22k-wrapper .col-ev { width: 35%; }
 
+        .fast-iso22k-wrapper .clause-badge {
+          display: inline-block;
+          background-color: var(--primary-light);
+          color: var(--primary-dark);
+          padding: 4px 10px;
+          border-radius: 4px;
+          font-size: 13px;
+          font-weight: bold;
+          margin-bottom: 8px;
+          border: 1px solid #c2e0df;
+        }
+
         .fast-iso22k-wrapper .radio-group {
           display: flex;
           justify-content: center;
@@ -888,12 +964,13 @@ export const FastIso22kChecklist: React.FC = () => {
 
         .fast-iso22k-wrapper textarea {
           width: 100%;
-          min-height: 60px;
+          min-height: 70px;
           padding: 10px;
           border: 1px solid var(--border-color);
           border-radius: 4px;
           resize: vertical;
           font-family: inherit;
+          margin-bottom: 8px;
           background-color: #fff;
           color: #333;
         }
@@ -902,6 +979,15 @@ export const FastIso22kChecklist: React.FC = () => {
         .fast-iso22k-wrapper .severity-select:focus {
           outline: none;
           border-color: var(--primary);
+        }
+
+        .fast-iso22k-wrapper .capa-input {
+          border-left: 3px solid var(--accent-blue);
+          background-color: #f8fbff;
+        }
+
+        .fast-iso22k-wrapper .capa-input:focus {
+          border-color: var(--accent-blue);
         }
 
         /* CRM Modal */
@@ -949,9 +1035,29 @@ export const FastIso22kChecklist: React.FC = () => {
           text-align: center;
         }
 
+        /* Footer */
+        .fast-iso22k-wrapper footer {
+          background-color: var(--primary-dark);
+          color: var(--white);
+          text-align: center;
+          padding: 25px 20px;
+          margin-top: 40px;
+          font-size: 14px;
+        }
+
+        .fast-iso22k-wrapper footer p {
+          margin: 5px 0;
+        }
+
+        .fast-iso22k-wrapper footer .footer-brand {
+          font-size: 16px;
+          font-weight: bold;
+          letter-spacing: 0.5px;
+        }
+
         /* Print CSS */
         @media print {
-          body { background: #fff !important; color: #000 !important; font-size: 12pt !important; }
+          body { background: #fff !important; color: #000 !important; font-size: 12pt !important; display: block !important; }
           .fast-iso22k-wrapper header,
           .fast-iso22k-wrapper .action-bar,
           .fast-iso22k-wrapper .progress-container,
@@ -967,13 +1073,15 @@ export const FastIso22kChecklist: React.FC = () => {
           .fast-iso22k-wrapper th,
           .fast-iso22k-wrapper td { border: 1px solid #000 !important; }
           .fast-iso22k-wrapper th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact !important; }
+          .fast-iso22k-wrapper .clause-badge { border: 1px solid #000 !important; color: #000 !important; background: #fff !important; }
           .fast-iso22k-wrapper textarea,
-          .fast-iso22k-wrapper .severity-select { border: none !important; border-bottom: 1px dotted #ccc !important; resize: none !important; min-height: auto !important; padding: 2px !important; }
+          .fast-iso22k-wrapper .severity-select { border: none !important; border-bottom: 1px dotted #ccc !important; resize: none !important; min-height: auto !important; padding: 2px !important; margin-bottom: 5px !important; background-color: #fff !important; }
           .fast-iso22k-wrapper .severity-select { -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important; }
           .fast-iso22k-wrapper .radio-label input { display: none !important; }
           .fast-iso22k-wrapper .radio-label { flex-direction: row !important; font-size: 14px !important; }
           .fast-iso22k-wrapper .radio-label input:checked + span { font-weight: bold !important; text-decoration: underline !important; }
           .fast-iso22k-wrapper .radio-label input:not(:checked) + span { display: none !important; }
+          .fast-iso22k-wrapper footer { background-color: #fff !important; color: #000 !important; padding: 10px 0 !important; border-top: 1px solid #000 !important; margin-top: 20px !important; font-size: 10pt !important; }
         }
       `}</style>
 
@@ -982,7 +1090,7 @@ export const FastIso22kChecklist: React.FC = () => {
         <div className="header-container">
           <div className="brand-info">
             <h1>FAST CONSULTING</h1>
-            <p>Checklist đánh giá ISO 22000:2018 (FSMS)</p>
+            <p>Checklist Đánh Giá Tiêu Chuẩn ISO 22000:2018 (Full Version)</p>
           </div>
           <a href="tel:0927002668" className="hotline">📞 0927 002 668</a>
         </div>
@@ -995,7 +1103,7 @@ export const FastIso22kChecklist: React.FC = () => {
             <input
               type="text"
               id="searchInput"
-              placeholder="Tìm kiếm tiêu chuẩn, điều khoản, quy trình..."
+              placeholder="Tìm kiếm tiêu chuẩn, điều khoản, từ khóa..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -1004,16 +1112,21 @@ export const FastIso22kChecklist: React.FC = () => {
             <button className="btn-outline" onClick={() => toggleAll(true)}>Mở rộng tất cả</button>
             <button className="btn-outline" onClick={() => toggleAll(false)}>Thu gọn tất cả</button>
             <button className="btn-primary" onClick={() => window.print()}>🖨 In Checklist</button>
-            <button className="btn-warning" onClick={generateReport}>📄 Xuất Báo Cáo Lỗi</button>
+            <button className="btn-warning" onClick={generateReport}>📄 Xuất Báo Cáo Lỗi & CAPA</button>
           </div>
         </div>
 
         {/* Progress Tracker */}
         <div className="progress-container">
           <div className="progress-header">
-            <span>Tiến độ đánh giá ISO 22000:</span>
+            <span>Tiến độ đánh giá:</span>
             <span id="progressText">
               Đã hoàn thành: {completedItemsCount} / {totalItemsCount} mục ({progressPercentage}%)
+              {nCount > 20 && (
+                <span style={{ color: 'var(--accent-red)', fontWeight: 'bold', marginLeft: '10px' }}>
+                  (Cảnh báo: Lớn hơn 20 lỗi "N" - Yêu cầu rà soát lại!)
+                </span>
+              )}
             </span>
           </div>
           <div className="progress-bar-bg">
@@ -1028,7 +1141,7 @@ export const FastIso22kChecklist: React.FC = () => {
         {/* Client & CRM Info */}
         <div className="client-section">
           <div className="client-header">
-            <h2>Thông Tin Khách Hàng</h2>
+            <h2>Thông Tin Khách Hàng & Chuyên Gia</h2>
             <div className="btn-group">
               <button className="btn-danger" onClick={newClient}>➕ Tạo mới</button>
               <button className="btn-primary" onClick={saveToCRM}>💾 Lưu CRM</button>
@@ -1045,6 +1158,45 @@ export const FastIso22kChecklist: React.FC = () => {
                 value={clientName}
                 onChange={(e) => {
                   setClientName(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="contactName">Tên người liên hệ:</label>
+              <input
+                type="text"
+                id="contactName"
+                className="save-state"
+                value={contactName}
+                onChange={(e) => {
+                  setContactName(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="contactPhone">Số điện thoại liên hệ:</label>
+              <input
+                type="text"
+                id="contactPhone"
+                className="save-state"
+                value={contactPhone}
+                onChange={(e) => {
+                  setContactPhone(e.target.value);
+                  triggerSaveState();
+                }}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="leadAuditor">Chuyên gia đánh giá (Lead Auditor):</label>
+              <input
+                type="text"
+                id="leadAuditor"
+                className="save-state"
+                value={leadAuditor}
+                onChange={(e) => {
+                  setLeadAuditor(e.target.value);
                   triggerSaveState();
                 }}
               />
@@ -1081,7 +1233,7 @@ export const FastIso22kChecklist: React.FC = () => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="fsmsScope">Phạm vi FSMS (Audit Scope):</label>
+              <label htmlFor="fsmsScope">Phạm vi (Scope):</label>
               <input
                 type="text"
                 id="fsmsScope"
@@ -1089,19 +1241,6 @@ export const FastIso22kChecklist: React.FC = () => {
                 value={fsmsScope}
                 onChange={(e) => {
                   setFsmsScope(e.target.value);
-                  triggerSaveState();
-                }}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="contactPhone">Số điện thoại liên hệ:</label>
-              <input
-                type="text"
-                id="contactPhone"
-                className="save-state"
-                value={contactPhone}
-                onChange={(e) => {
-                  setContactPhone(e.target.value);
                   triggerSaveState();
                 }}
               />
@@ -1120,7 +1259,7 @@ export const FastIso22kChecklist: React.FC = () => {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="reportNo">Report (Số báo cáo):</label>
+              <label htmlFor="reportNo">Số Report:</label>
               <input
                 type="text"
                 id="reportNo"
@@ -1135,44 +1274,49 @@ export const FastIso22kChecklist: React.FC = () => {
           </div>
         </div>
 
-        {/* Checklist Container */}
+        {/* Checklist Sections */}
         <div id="checklistContainer">
-          {filteredSections.map((section, sIndex) => {
-            if (!section.visible) return null;
+          {filteredSections.map((sec, sIdx) => {
+            if (!sec.visible) return null;
             return (
-              <details key={sIndex} open className="checklist-section">
-                <summary>{section.section}</summary>
+              <details key={sIdx} open className="checklist-section">
+                <summary>{sec.section}</summary>
                 <div className="table-responsive">
-                  <table data-section={sIndex}>
+                  <table data-section={sIdx}>
                     <thead>
                       <tr>
                         <th className="col-req">
-                          Yêu cầu & Hướng dẫn (ISO 22000:2018)<br />
+                          Yêu cầu & Hướng dẫn<br />
                           <small>(Requirements & Guidelines)</small>
                         </th>
                         <th className="col-comp">
-                          Tuân thủ<br />
+                          Đánh giá Tuân thủ<br />
                           <small>(Y / N / NI / N/A)</small>
                         </th>
                         <th className="col-ev">
-                          Phân loại & Ghi chú<br />
-                          <small>(Severity & Comments)</small>
+                          Phân loại, Ghi chú & CAPA<br />
+                          <small>(Severity, Comments & Corrective Actions)</small>
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {section.items.map((item: any) => {
-                        if (section.matchedItemIds && !section.matchedItemIds.has(item.id)) {
-                          return null;
-                        }
+                      {sec.items.map((item) => {
+                        if (!sec.matchedItemIds.has(item.id)) return null;
                         const currentComp = compliance[item.id] || '';
                         const currentSev = severities[item.id] || '';
                         const currentCmt = comments[item.id] || '';
+                        const currentCapa = capa[item.id] || '';
 
                         return (
-                          <tr key={item.id} className="check-item" data-id={item.id} data-text={item.text}>
+                          <tr
+                            key={item.id}
+                            className="check-item"
+                            data-id={item.id}
+                            data-clause={item.clause}
+                            data-text={item.text}
+                          >
                             <td className="req-text">
-                              <strong>Điều {item.id}. </strong>
+                              <span className="clause-badge">{item.clause}</span><br />
                               {item.text}
                             </td>
                             <td>
@@ -1181,12 +1325,12 @@ export const FastIso22kChecklist: React.FC = () => {
                                   <label key={opt} className="radio-label">
                                     <input
                                       type="radio"
-                                      name={`comp_iso_${item.id}`}
+                                      name={`comp_${item.id}`}
                                       value={opt}
                                       className="save-state radio-req"
                                       checked={currentComp === opt}
                                       onChange={() => {
-                                        setCompliance(prev => ({ ...prev, [item.id]: opt }));
+                                        setCompliance((prev) => ({ ...prev, [item.id]: opt }));
                                         triggerSaveState();
                                       }}
                                     />
@@ -1198,10 +1342,10 @@ export const FastIso22kChecklist: React.FC = () => {
                             <td>
                               <select
                                 className="save-state severity-select"
-                                name={`sev_iso_${item.id}`}
+                                name={`sev_${item.id}`}
                                 value={currentSev}
                                 onChange={(e) => {
-                                  setSeverities(prev => ({ ...prev, [item.id]: e.target.value }));
+                                  setSeverities((prev) => ({ ...prev, [item.id]: e.target.value }));
                                   triggerSaveState();
                                 }}
                               >
@@ -1212,11 +1356,21 @@ export const FastIso22kChecklist: React.FC = () => {
                               </select>
                               <textarea
                                 className="save-state"
-                                name={`cmt_iso_${item.id}`}
-                                placeholder="Nhập bằng chứng / ghi chú..."
+                                name={`cmt_${item.id}`}
+                                placeholder="Bằng chứng / Ghi chú (Notes)..."
                                 value={currentCmt}
                                 onChange={(e) => {
-                                  setComments(prev => ({ ...prev, [item.id]: e.target.value }));
+                                  setComments((prev) => ({ ...prev, [item.id]: e.target.value }));
+                                  triggerSaveState();
+                                }}
+                              />
+                              <textarea
+                                className="save-state capa-input"
+                                name={`capa_${item.id}`}
+                                placeholder="Hành động khắc phục (CAPA)..."
+                                value={currentCapa}
+                                onChange={(e) => {
+                                  setCapa((prev) => ({ ...prev, [item.id]: e.target.value }));
                                   triggerSaveState();
                                 }}
                               />
@@ -1236,14 +1390,12 @@ export const FastIso22kChecklist: React.FC = () => {
       {/* CRM Modal */}
       {isCrmOpen && (
         <div id="crmModal" className="modal" onClick={(e) => {
-          if ((e.target as HTMLElement).id === 'crmModal') {
-            closeCRM();
-          }
+          if (e.target === e.currentTarget) closeCRM();
         }}>
           <div className="modal-content">
             <span className="close" onClick={closeCRM}>&times;</span>
-            <h2 style={{ marginBottom: '20px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>
-              Thống Kê Khách Hàng ISO 22000 (CRM)
+            <h2 style={{ marginBottom: '20px', color: 'var(--primary-dark)', fontWeight: 'bold', fontSize: '20px' }}>
+              Thống Kê Khách Hàng (CRM) - ISO 22000
             </h2>
             <div className="table-responsive">
               <table className="crm-table" id="crmTable">
@@ -1259,34 +1411,34 @@ export const FastIso22kChecklist: React.FC = () => {
                 <tbody>
                   {Object.keys(crmRecords).length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Chưa có dữ liệu khách hàng nào.</td>
+                      <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                        Chưa có dữ liệu khách hàng nào được lưu trữ.
+                      </td>
                     </tr>
                   ) : (
-                    Object.keys(crmRecords).map((id) => {
-                      const record = crmRecords[id];
+                    Object.keys(crmRecords).map((recId) => {
+                      const rec = crmRecords[recId];
                       return (
-                        <tr key={id}>
-                          <td>{record.auditDate || 'N/A'}</td>
-                          <td><strong>{record.clientName}</strong></td>
-                          <td>{record.auditType || 'N/A'}</td>
-                          <td>{record._progress || '0%'}</td>
+                        <tr key={recId}>
+                          <td>{rec.auditDate || (rec._savedAt ? rec._savedAt.split(' ')[1] : 'N/A')}</td>
+                          <td><strong>{rec.clientName}</strong></td>
+                          <td>{rec.auditType || 'N/A'}</td>
+                          <td>{rec._progress || '0%'}</td>
                           <td>
-                            <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                              <button
-                                className="btn-outline"
-                                style={{ padding: '5px 10px', fontSize: '12px' }}
-                                onClick={() => loadRecord(id)}
-                              >
-                                Tải
-                              </button>
-                              <button
-                                className="btn-danger"
-                                style={{ padding: '5px 10px', fontSize: '12px' }}
-                                onClick={() => deleteRecord(id)}
-                              >
-                                Xóa
-                              </button>
-                            </div>
+                            <button
+                              className="btn-outline"
+                              style={{ padding: '5px 10px', fontSize: '12px', marginRight: '6px' }}
+                              onClick={() => loadRecord(recId)}
+                            >
+                              Tải
+                            </button>
+                            <button
+                              className="btn-danger"
+                              style={{ padding: '5px 10px', fontSize: '12px' }}
+                              onClick={() => deleteRecord(recId)}
+                            >
+                              Xóa
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1298,6 +1450,12 @@ export const FastIso22kChecklist: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer>
+        <p className="footer-brand">FAST CONSULTING - Food All Standard & Training</p>
+        <p>&copy; Bản quyền của FAST. Tất cả các quyền được bảo lưu.</p>
+      </footer>
     </div>
   );
 };

@@ -4,39 +4,12 @@ import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { Course } from '../types';
-import { getMergedCourses } from '../constants';
+import { getMergedCourses, getMergedCombos, DEFAULT_COMBOS, ComboItem } from '../constants';
 import PaymentModal from '../components/PaymentModal';
 import { useToast } from '../contexts/ToastContext';
 import { Lock, Sparkles, CheckCircle2, ChevronRight, Check, Award, Crown, Shield } from 'lucide-react';
 
-interface Combo {
-  id: string;
-  title: string;
-  price: string;
-  image: string;
-  description: string;
-  courseIds: string[];
-  benefits?: string[];
-}
-
-const DEFAULT_COMBOS: Combo[] = [
-  {
-    id: 'combo-basic',
-    title: 'Gói Combo Basic (Nhập Môn Thực Phẩm)',
-    price: '1.200.000đ',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Basic: Học trọn gói các kiến thức cơ bản về HACCP, 5 nguyên tắc vàng của WHO và các tiêu chuẩn kiểm soát chất lượng sơ bộ.',
-    courseIds: ['basic-principles', 'truy-xuat-nguon-goc']
-  },
-  {
-    id: 'combo-pro',
-    title: 'Gói Combo Pro (Chuyên Gia Vận Hành)',
-    price: '1.800.000đ',
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
-    description: 'Gói Combo Pro: Học chuyên sâu dành cho kỹ sư vận hành nhà máy gồm đầy đủ các khóa ISO (ISO 9001, ISO 14001, ISO 22000), nâng cao tối đa năng lực sản xuất.',
-    courseIds: ['iso-9001', 'iso-14001', 'iso-22000']
-  }
-];
+type Combo = ComboItem;
 
 const VipUpgrade: React.FC = () => {
   const navigate = useNavigate();
@@ -47,53 +20,34 @@ const VipUpgrade: React.FC = () => {
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   
   // Combos data
-  const [combos, setCombos] = useState<Combo[]>(DEFAULT_COMBOS);
+  const [combos, setCombos] = useState<Combo[]>(() => getMergedCombos([], { includeInactive: false }));
   const [selectedComboForPurchase, setSelectedComboForPurchase] = useState<Combo | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Sync combos from Firestore
+  // Sync combos from Firestore and Server API
   useEffect(() => {
     // Sync regular courses for reference
     const list = getMergedCourses([]);
     setAllCourses(list);
 
-    // Sync combos
+    // Sync combos helper
     const syncCombosList = (fsCombos?: Combo[]) => {
-      let deletedIds: string[] = [];
-      try {
-        const delStr = localStorage.getItem('deleted_combo_ids');
-        if (delStr) deletedIds = JSON.parse(delStr);
-      } catch (e) {}
-
-      let currentDbList = fsCombos;
-      if (!currentDbList) {
-        try {
-          const cached = localStorage.getItem('combo_cache_all');
-          if (cached) currentDbList = JSON.parse(cached);
-        } catch (e) {}
-      }
-
-      // Merge defaults with Firestore edits
-      const merged = DEFAULT_COMBOS.map(def => {
-        const found = (currentDbList || []).find(dbc => dbc.id === def.id);
-        return found ? { ...def, ...found } : def;
-      });
-
-      const defaultIds = DEFAULT_COMBOS.map(d => d.id);
-      const customCombos = (currentDbList || []).filter(dbc => !defaultIds.includes(dbc.id));
-
-      const all = [...merged, ...customCombos]
-        .filter(c => !deletedIds.includes(c.id))
-        .filter(c => (c as any).status !== 'inactive')
-        .filter(c => c.id !== 'khoa-vip' && c.id !== 'combo-vip');
-
-      setCombos(all);
+      setCombos(getMergedCombos(fsCombos, { includeInactive: false }));
     };
 
-    // Clean up Firestore data
-    deleteDoc(doc(db, 'combos', 'khoa-vip')).catch(() => {});
-    deleteDoc(doc(db, 'combos', 'combo-vip')).catch(() => {});
+    // 1. Snapshot from backend API
+    fetch('/api/combos')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.combos)) {
+          syncCombosList(data.combos);
+        }
+      })
+      .catch(err => {
+        console.warn("Lỗi fetch /api/combos ở VipUpgrade:", err);
+      });
 
+    // 2. Realtime listener from Firestore
     const unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
       const dbCombos: Combo[] = [];
       snapshot.forEach((doc) => {
@@ -203,7 +157,7 @@ const VipUpgrade: React.FC = () => {
       } catch (e) {}
 
       // 2. If VIP was purchased, unlock VIP profile status globally
-      if (combo.id === 'khoa-vip') {
+      if (combo.id === 'khoa-vip' || combo.id === 'combo-vip' || combo.id.includes('vip')) {
         await setDoc(doc(db, "users", userEmail), {
           isVip: true,
           vipSince: new Date().toISOString()
@@ -248,7 +202,7 @@ const VipUpgrade: React.FC = () => {
       try {
         localStorage.setItem(`course_unlocked_${combo.id}`, 'true');
       } catch (e) {}
-      if (combo.id === 'khoa-vip') {
+      if (combo.id === 'khoa-vip' || combo.id === 'combo-vip' || combo.id.includes('vip')) {
         setIsVip(true);
       } else {
         (combo.courseIds || []).forEach(id => {
@@ -316,10 +270,10 @@ const VipUpgrade: React.FC = () => {
 
       {/* Pricing Grid */}
       <div id="pricing-grid" className="max-w-7xl mx-auto px-4 py-12 scroll-mt-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 max-w-5xl mx-auto gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto gap-8">
           {combos.map((combo) => {
-            const isVipPackage = combo.id === 'khoa-vip';
-            const isProPackage = combo.id === 'combo-pro';
+            const isVipPackage = combo.id === 'khoa-vip' || combo.id === 'combo-vip' || combo.id.includes('vip');
+            const isProPackage = combo.id === 'combo-pro' || combo.id.includes('pro');
             const isOwned = purchasedComboIds.includes(combo.id) || (isVip && isVipPackage);
 
             // Fetch course objects linked to this combo
@@ -358,7 +312,7 @@ const VipUpgrade: React.FC = () => {
                   
                   <div className="absolute top-4 right-4 z-10">
                     <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/90 text-white border border-emerald-400 backdrop-blur-md shadow-md flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Tiết kiệm 50%
+                      <Sparkles className="w-3 h-3" /> {combo.savings || 'Tiết kiệm 50%'}
                     </span>
                   </div>
 
@@ -370,7 +324,7 @@ const VipUpgrade: React.FC = () => {
                           ? 'bg-teal-500/25 text-teal-300 border border-teal-500/40'
                           : 'bg-blue-500/25 text-blue-300 border border-blue-500/40'
                     }`}>
-                      {isVipPackage ? 'Gói Đặc Quyền VIP' : isProPackage ? 'Gói Combo Pro' : 'Gói Combo Basic'}
+                      {isVipPackage ? 'Gói Đặc Quyền VIP' : isProPackage ? 'Gói Combo Pro' : (combo.savings ? 'Gói Combo Tiết Kiệm' : 'Gói Combo Basic')}
                     </span>
                     <h3 className="text-xl font-black uppercase text-white mt-1.5 leading-snug drop-shadow-sm">
                       {combo.title}

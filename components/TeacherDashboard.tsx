@@ -94,19 +94,61 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
   };
 
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('custom_course_categories');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Dynamically merge default categories + categories from loaded courses + custom categories
+  const dynamicCategories = useMemo(() => {
+    const set = new Set<string>(Categories);
+    courses.forEach(c => {
+      if (c.category && c.category.trim() && c.category !== 'Gói VIP') {
+        set.add(c.category.trim());
+      }
+    });
+    customCategories.forEach(cat => {
+      if (cat && cat.trim()) set.add(cat.trim());
+    });
+    return Array.from(set);
+  }, [courses, customCategories]);
+
+  const handleAddNewCategory = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    if (!dynamicCategories.includes(trimmed)) {
+      const updated = [...customCategories, trimmed];
+      setCustomCategories(updated);
+      try {
+        localStorage.setItem('custom_course_categories', JSON.stringify(updated));
+      } catch (e) {}
+    }
+    setCategory(trimmed);
+    setNewCategoryName('');
+    setIsCreatingCategory(false);
+    toast.success(`Đã thêm phân loại "${trimmed}"!`, 3000, 'Thêm phân loại');
+  };
+
   const handleCourseDiscountPercentChange = (pct: number) => {
     const clampedPct = Math.min(99.9, Math.max(0, Number(pct)));
     setDiscountPercent(clampedPct);
-    const numPrice = parsePriceNumber(price);
     const numOrig = parsePriceNumber(originalPrice);
+    const numPrice = parsePriceNumber(price);
 
-    // Nếu đã nhập giá bán/khuyến mãi và chọn % sale off -> Tự động tính giá gốc
-    if (numPrice > 0 && clampedPct > 0 && clampedPct < 100) {
-      const calculatedOrig = Math.round(numPrice / (1 - clampedPct / 100));
-      setOriginalPrice(formatVndPrice(calculatedOrig));
-    } else if (numOrig > 0) {
+    // Khi chọn hoặc đổi % sale off:
+    // Nếu đã có Giá Gốc -> Tính Giá Bán = Giá Gốc * (1 - % Sale Off)
+    if (numOrig > 0) {
       const discountedNum = Math.round(numOrig * (1 - clampedPct / 100));
       setPrice(formatVndPrice(discountedNum));
+    } else if (numPrice > 0 && clampedPct > 0 && clampedPct < 100) {
+      const calculatedOrig = Math.round(numPrice / (1 - clampedPct / 100));
+      setOriginalPrice(formatVndPrice(calculatedOrig));
     }
   };
 
@@ -115,13 +157,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const numPrice = parsePriceNumber(newPriceStr);
     const numOrig = parsePriceNumber(originalPrice);
 
-    // Khi nhập giá đã sale off và đã có % sale off -> Tự động tính giá gốc
-    if (discountPercent > 0 && discountPercent < 100 && numPrice > 0) {
+    // Khi sửa Giá Bán Khuyến Mãi:
+    // Tự động tính toán lại % Sale Off thực tế so với Giá Gốc
+    if (numOrig > 0 && numPrice > 0) {
+      if (numPrice <= numOrig) {
+        const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
+        setDiscountPercent(calculatedPct);
+      } else {
+        setOriginalPrice(newPriceStr);
+        setDiscountPercent(0);
+      }
+    } else if (numOrig === 0 && numPrice > 0 && discountPercent > 0 && discountPercent < 100) {
       const calculatedOrig = Math.round(numPrice / (1 - discountPercent / 100));
       setOriginalPrice(formatVndPrice(calculatedOrig));
-    } else if (numOrig > 0 && numPrice > 0 && numOrig >= numPrice) {
-      const calculatedPct = parseFloat((((numOrig - numPrice) / numOrig) * 100).toFixed(1));
-      setDiscountPercent(calculatedPct);
     }
   };
 
@@ -1680,7 +1728,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 </div>
 
                 <div className="text-[11px] text-teal-800 bg-teal-50/80 px-3 py-1.5 rounded-xl border border-teal-200/60 font-medium">
-                  💡 <strong>Cách dùng thông minh:</strong> Bạn có thể nhập <strong>Giá Khuyến Mãi</strong> và chọn <strong>% Sale Off</strong> (hỗ trợ số lẻ như 12.5%, 15.5%) ➔ Hệ thống sẽ <strong>tự động tính ra Giá Gốc</strong> chuẩn xác!
+                  💡 <strong>Cách dùng:</strong> Nhập <strong>Giá Gốc</strong> và chọn <strong>% Sale Off</strong> ➔ Hệ thống tự động tính <strong>Giá Khuyến Mãi Bán Ra</strong> (hoặc nhập Giá Khuyến Mãi để tự tính % giảm giá)!
                 </div>
 
                 {/* Quick % Sale Off Buttons */}
@@ -1735,16 +1783,67 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Danh mục phân loại *</label>
-                <select 
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
-                >
-                  {Categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-gray-700">Danh mục phân loại *</label>
+                  {!isCreatingCategory ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingCategory(true)}
+                      className="text-xs font-bold text-[#007c76] hover:text-teal-700 flex items-center gap-1 cursor-pointer hover:underline"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                      <span>Tạo phân loại mới</span>
+                    </button>
+                  ) : null}
+                </div>
+
+                {isCreatingCategory ? (
+                  <div className="p-3 bg-teal-50/70 border border-teal-200 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-xs font-bold text-teal-900 block">Nhập tên phân loại mới:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddNewCategory(); } }}
+                        placeholder="VD: BRCGS, FSSC 22000, An toàn lao động..."
+                        className="flex-1 px-3 py-2 bg-white border border-teal-300 rounded-lg text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#007c76]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddNewCategory()}
+                        className="px-4 py-2 bg-[#007c76] hover:bg-[#005c56] text-white text-xs font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+                      >
+                        Lưu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsCreatingCategory(false); setNewCategoryName(''); }}
+                        className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <select 
+                    value={category}
+                    onChange={e => {
+                      if (e.target.value === '__NEW__') {
+                        setIsCreatingCategory(true);
+                      } else {
+                        setCategory(e.target.value);
+                      }
+                    }}
+                    className="w-full py-3 px-4 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
+                  >
+                    {dynamicCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="__NEW__">➕ Tạo phân loại mới...</option>
+                  </select>
+                )}
               </div>
 
               <div className="space-y-2">

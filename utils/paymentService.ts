@@ -189,6 +189,54 @@ export async function processWebhookTransaction(
       timeoutPromise(5000)
     ]);
 
+    // If VIP combo, grant VIP status globally
+    if (courseId === 'khoa-vip' || courseId === 'combo-vip') {
+      try {
+        await db.collection("users").doc(matchedEmail).set({
+          isVip: true,
+          vipSince: new Date().toISOString()
+        }, { merge: true });
+      } catch (vipErr: any) {
+        console.warn("[PaymentService] Could not set isVip flag:", vipErr.message);
+      }
+    }
+
+    // If Combo, automatically unlock all sub-courses
+    if (courseId.startsWith("combo-")) {
+      try {
+        let linkedCourseIds: string[] = [];
+        const comboDoc = await db.collection("combos").doc(courseId).get();
+        if (comboDoc.exists && Array.isArray(comboDoc.data()?.courseIds)) {
+          linkedCourseIds = comboDoc.data()?.courseIds || [];
+        } else if (courseId === 'combo-basic') {
+          linkedCourseIds = ['basic-principles', 'truy-xuat-nguon-goc'];
+        } else if (courseId === 'combo-pro') {
+          linkedCourseIds = ['iso-9001', 'iso-14001', 'iso-22000'];
+        } else if (courseId === 'combo-vip') {
+          linkedCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
+        }
+
+        for (const subId of linkedCourseIds) {
+          await db
+            .collection("users")
+            .doc(matchedEmail)
+            .collection("purchased_courses")
+            .doc(subId)
+            .set({
+              courseId: subId,
+              status: "active",
+              activatedAt: new Date().toISOString(),
+              paymentRef: referenceId,
+              price: "Mở khóa qua Gói Combo",
+              paymentMethod: "vietqr_auto_banking",
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+        }
+      } catch (comboErr: any) {
+        console.warn("[PaymentService] Error provisioning subcourses for combo:", comboErr.message);
+      }
+    }
+
     // Step 6: Mark pending_payment as processed
     try {
       await db.collection("pending_payments").doc(suffix).delete();
