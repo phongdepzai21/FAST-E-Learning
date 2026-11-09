@@ -18,6 +18,7 @@ import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 import { useToast } from '../contexts/ToastContext';
 import { markCourseAsSeen } from '../utils/courseNotificationService';
 import { trackCourseView } from '../utils/courseTrackingService';
+import { LiveCourseRegistration } from '../components/LiveCourseRegistration';
 
 const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseId }) => {
   const { showToast, success } = useToast();
@@ -30,6 +31,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   const [currentUser, setCurrentUser] = useState<{name: string, email: string} | null>(null);
   const [isOwned, setIsOwned] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
+  const [showDirectModal, setShowDirectModal] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [courseProgress, setCourseProgress] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
@@ -210,6 +212,11 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   };
 
   const handleRegisterClick = async () => {
+    if (course?.isDirectTraining) {
+      setShowDirectModal(true);
+      return;
+    }
+
     if (!currentUser) {
         navigate('/account', { 
             state: { 
@@ -369,21 +376,9 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
         {/* VIDEO / CONTENT PLAYER SECTION */}
         <section className={`transition-all duration-1000 delay-200 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <div id="video-player-section" className={`rounded-[32px] overflow-hidden shadow-2xl border-4 border-white bg-black relative group hover:shadow-primary/20 transition-all duration-500 ${id === 'basic-principles' ? 'aspect-auto min-h-[500px] h-[70vh] bg-gray-50 overflow-y-auto' : 'aspect-video'}`}>
+            <div id="video-player-section" className="rounded-[32px] overflow-hidden shadow-2xl border-4 border-white bg-black relative group hover:shadow-primary/20 transition-all duration-500 aspect-video">
                 {isOwned ? (
-                    id === 'basic-principles' ? (
-                        <div className="h-full w-full bg-white relative">
-                            <iframe 
-                                src="https://dl.dropboxusercontent.com/scl/fi/9h8ydfiuhtfbrceoovbf4/5-ch-a-kh-a-WHO.pdf?rlkey=zbhjh9375ihr6sxs693o3xw67&st=z99hnxy2#toolbar=0" 
-                                width="100%"
-                                height="600px"
-                                className="w-full h-full min-h-[600px] border-0"
-                                title="5 Chìa Khóa WHO"
-                                onContextMenu={(e) => e.preventDefault()}
-                                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                            />
-                        </div>
-                    ) : (() => {
+                    (() => {
                             if (isVideoLoading) {
                                 return (
                                     <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-slate-900 flex flex-col items-center justify-center">
@@ -959,6 +954,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
             isOpen={showPaymentModal}
             onClose={() => setShowPaymentModal(false)}
             onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {showDirectModal && (
+        <LiveCourseRegistration
+          isOpen={showDirectModal}
+          onClose={() => setShowDirectModal(false)}
+          preselectedCourseId={id}
         />
       )}
     </main>

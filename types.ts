@@ -31,6 +31,28 @@ export interface Course {
   authorEmail?: string;
   createdAt?: string;
   updatedAt?: string;
+  startDate?: string;
+  trainingType?: 'zoom' | 'direct' | 'all';
+  isDirectTraining?: boolean;
+}
+
+export interface DirectRegistration {
+  id: string;
+  studentName: string;
+  studentEmail: string;
+  phone: string;
+  companyName?: string;
+  courseId: string;
+  courseTitle: string;
+  price: string;
+  trainingType: 'zoom' | 'direct';
+  startDate: string;
+  zoomLink?: string;
+  zoomMeetingId?: string;
+  zoomPasscode?: string;
+  registeredAt: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  notes?: string;
 }
 
 export interface TeamMember {

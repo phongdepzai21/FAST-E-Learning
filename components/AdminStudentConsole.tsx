@@ -36,8 +36,10 @@ import {
   ShieldAlert, 
   CheckCircle2, 
   Tv, 
-  HelpCircle 
+  HelpCircle,
+  Video
 } from 'lucide-react';
+import { FeaturedCoursesDashboard } from './FeaturedCoursesDashboard';
 import { useToast } from '../contexts/ToastContext';
 
 interface StudentProfile {
@@ -75,6 +77,7 @@ interface GlobalRegistrationNotice {
 
 export const AdminStudentConsole: React.FC = () => {
   const toast = useToast();
+  const [consoleTab, setConsoleTab] = useState<'analytics' | 'direct-courses'>('analytics');
   const [searchEmail, setSearchEmail] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   
@@ -311,8 +314,41 @@ export const AdminStudentConsole: React.FC = () => {
         <p className="text-gray-500 text-xs font-semibold mt-1">Giám sát thông báo đăng ký thời gian thực và tra cứu trạng thái kích hoạt khóa học của học viên</p>
       </div>
 
-      {/* Real-time Registrations Analytics & Chart Section */}
-      <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-6">
+      {/* Sub-tab Navigation */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100 rounded-2xl border border-gray-200 self-start">
+        <button
+          type="button"
+          onClick={() => setConsoleTab('analytics')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            consoleTab === 'analytics'
+              ? 'bg-white text-[#007c76] shadow-sm'
+              : 'text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <Bell className="w-4 h-4" />
+          <span>Tra cứu & Analytics</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setConsoleTab('direct-courses')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+            consoleTab === 'direct-courses'
+              ? 'bg-[#007c76] text-white shadow-md shadow-[#007c76]/20'
+              : 'text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          <span>Cấu hình 5 Khóa Nổi Bật & Lớp Trực Tiếp (199K)</span>
+        </button>
+      </div>
+
+      {consoleTab === 'direct-courses' ? (
+        <FeaturedCoursesDashboard />
+      ) : (
+        <>
+          {/* Real-time Registrations Analytics & Chart Section */}
+          <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-50 pb-4">
           <div>
             <h4 className="font-extrabold text-gray-800 uppercase text-sm tracking-wide flex items-center gap-2">
@@ -653,6 +689,8 @@ export const AdminStudentConsole: React.FC = () => {
         </div>
 
       </div>
+        </>
+      )}
     </div>
   );
 };

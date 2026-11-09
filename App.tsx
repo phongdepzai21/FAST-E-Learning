@@ -66,6 +66,7 @@ const VipUpgrade = lazyWithRetry(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazyWithRetry(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazyWithRetry(() => import('./pages/PrivacyPolicy'));
 const Classroom = lazyWithRetry(() => import('./pages/Classroom'));
+const LiveCourseRegistration = lazyWithRetry(() => import('./components/LiveCourseRegistration'));
 const NotFound = lazyWithRetry(() => import('./pages/NotFound'));
 
 // Lazy load Components phụ trợ & Footer
@@ -345,6 +346,8 @@ const AppLayout: React.FC = () => {
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
             <Route path="/account/vip-upgrade" element={<VipUpgrade />} />
+            <Route path="/dang-ky-truc-tiep" element={<LiveCourseRegistration isStandalonePage={true} />} />
+            <Route path="/live-training" element={<LiveCourseRegistration isStandalonePage={true} />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />
             <Route path="*" element={<NotFound />} />

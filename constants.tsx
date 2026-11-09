@@ -106,6 +106,15 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
   }
 ];
 
+// Danh sách 5 khóa học an toàn thực phẩm nổi bật mặc định
+export const DEFAULT_FEATURED_COURSE_IDS = [
+  'haccp-tcvn',
+  'iso-22000',
+  'qa-qc-pro',
+  'basic-principles',
+  'iso-9001'
+];
+
 export const COURSES: Course[] = [
   {
     id: 'haccp-tcvn',

@@ -169,7 +169,32 @@ export const FastIso22kChecklist: React.FC = () => {
       }
     } catch (e) {}
 
-    // B. Firestore Real-time Listeners (multi-user / multi-tab cloud sync)
+    // B. Server API Preload (if local is empty)
+    fetch('/api/fast-iso22k/session')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.session && data.session._lastUpdated) {
+          const localTs = localStorage.getItem('fast_iso22000_full_ts');
+          if (!localTs || Number(data.session._lastUpdated) > Number(localTs)) {
+            applyStateData(data.session);
+            localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data.session));
+            localStorage.setItem('fast_iso22000_full_ts', String(data.session._lastUpdated));
+          }
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/fast-iso22k/crm')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.records && Object.keys(data.records).length > 0) {
+          setCrmRecords(prev => ({ ...data.records, ...prev }));
+          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(data.records));
+        }
+      })
+      .catch(() => {});
+
+    // C. Firestore Real-time Listeners (multi-user / multi-tab cloud sync)
     const unsubSession = onSnapshot(doc(db, 'fast_iso22k_crm', 'current_session'), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -285,9 +310,14 @@ export const FastIso22kChecklist: React.FC = () => {
       localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
       localStorage.setItem('fast_iso22000_full_ts', String(data._lastUpdated));
 
-      // 2. Cloud Firestore Sync
+      // 2. Cloud Firestore Sync & Server API Dual Write
       try {
         await setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), data, { merge: true });
+        fetch('/api/fast-iso22k/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).catch(() => {});
       } catch (err) {
         console.warn('[FastIso22k] Cloud save error:', err);
       }
@@ -314,20 +344,27 @@ export const FastIso22kChecklist: React.FC = () => {
       setCapa({});
 
       // Reset Cloud Session
+      const resetObj = {
+        clientName: '',
+        contactName: '',
+        contactPhone: '',
+        leadAuditor: '',
+        auditType: '',
+        auditAddress: '',
+        fsmsScope: '',
+        auditDate: '',
+        reportNo: '',
+        _progress: '0%',
+        _lastUpdated: Date.now()
+      };
+
       try {
-        setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), {
-          clientName: '',
-          contactName: '',
-          contactPhone: '',
-          leadAuditor: '',
-          auditType: '',
-          auditAddress: '',
-          fsmsScope: '',
-          auditDate: '',
-          reportNo: '',
-          _progress: '0%',
-          _lastUpdated: Date.now()
-        });
+        setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), resetObj);
+        fetch('/api/fast-iso22k/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resetObj)
+        }).catch(() => {});
       } catch (e) {}
     }
   };
@@ -352,12 +389,18 @@ export const FastIso22kChecklist: React.FC = () => {
     setCrmRecords(updatedCrm);
     localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updatedCrm));
 
-    // Sync to Cloud Firestore
+    // Sync to Cloud Firestore + Server API
     try {
       await setDoc(doc(db, 'fast_iso22k_crm', 'database'), {
         records: updatedCrm,
         _lastUpdated: Date.now()
       }, { merge: true });
+
+      fetch('/api/fast-iso22k/crm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: updatedCrm })
+      }).catch(() => {});
     } catch (e) {
       console.warn('[FastIso22k] CRM Cloud sync error:', e);
     }

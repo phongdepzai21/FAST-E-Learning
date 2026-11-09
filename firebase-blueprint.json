@@ -162,6 +162,10 @@
       "schema": "Combo",
       "description": "Platform combo packages editable by admins and teachers"
     },
+    "customCombos/{comboId}": {
+      "schema": "Combo",
+      "description": "Custom combo packages created and synchronized across the platform"
+    },
     "manual_unlocks/{unlockId}": {
       "schema": "ManualUnlock",
       "description": "Log records tracking administrative course activations"
@@ -169,6 +173,10 @@
     "course_registrations/{registrationId}": {
       "schema": "CourseRegistration",
       "description": "Public/Admin feed tracking course enrollments on the platform"
+    },
+    "direct_course_registrations/{regId}": {
+      "schema": "DirectCourseRegistration",
+      "description": "Direct and Zoom live course training enrollments (199k)"
     },
     "payment_config/{configId}": {
       "schema": "PaymentConfig",
@@ -193,6 +201,14 @@
     "payment_logs/{logId}": {
       "schema": "PaymentLog",
       "description": "Payment webhook inspection logs"
+    },
+    "featured_courses/{docId}": {
+      "schema": "FeaturedCoursesConfig",
+      "description": "Configuration containing the top 5 featured course IDs"
+    },
+    "live_course_registrations/{regId}": {
+      "schema": "LiveCourseRegistration",
+      "description": "Live food safety training (199k) student registration records"
     }
   }
 }

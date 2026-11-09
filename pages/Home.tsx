@@ -304,32 +304,38 @@ const Home: React.FC = () => {
     };
   }, []);
 
-  // Sync combos real-time from Firestore and local caches
+  // Sync combos real-time from Firestore (combos & customCombos) and local caches
   useEffect(() => {
-    let latestFsCombos: any[] = [];
-    const syncCombos = (fsList?: any[]) => {
-      if (fsList) latestFsCombos = fsList;
-      const merged = getMergedCombos(latestFsCombos, { includeInactive: false })
+    const latestFsCombosMap = new Map<string, any>();
+    const syncCombos = () => {
+      const merged = getMergedCombos(Array.from(latestFsCombosMap.values()), { includeInactive: false })
         .filter(c => c.id !== 'combo-vip' && c.id !== 'khoa-vip');
       setHomeCombos(merged);
     };
 
-    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
-      const dbCombos: any[] = [];
+    const unsub1 = onSnapshot(collection(db, 'combos'), (snapshot) => {
       snapshot.forEach(docSnap => {
-        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
+        latestFsCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
       });
-      syncCombos(dbCombos);
+      syncCombos();
     }, () => {
       syncCombos();
     });
+
+    const unsub2 = onSnapshot(collection(db, 'customCombos'), (snapshot) => {
+      snapshot.forEach(docSnap => {
+        latestFsCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+      });
+      syncCombos();
+    }, () => {});
 
     const handleSync = () => syncCombos();
     window.addEventListener('combos_updated', handleSync);
     window.addEventListener('storage', handleSync);
 
     return () => {
-      unsub();
+      unsub1();
+      unsub2();
       window.removeEventListener('combos_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };

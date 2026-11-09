@@ -110,9 +110,7 @@ async function checkUserExistsSafe(emailKey: string): Promise<boolean | null> {
       return true;
     }
   } catch (authErr: any) {
-    if (authErr.code === 'auth/user-not-found') {
-      return false;
-    }
+    // Continue to Step 4 check in Firestore
   }
 
   // 4. Fallback to Firestore users collection
@@ -125,7 +123,7 @@ async function checkUserExistsSafe(emailKey: string): Promise<boolean | null> {
     // Silently ignore if Firestore admin check fails
   }
 
-  return null;
+  return false;
 }
 
 const DEFAULT_SERVER_COMBOS: Record<string, any> = {
@@ -944,6 +942,9 @@ async function startServer() {
           db.collection("combos").doc(combo.id).set(serverCombos[combo.id], { merge: true }).catch((err) => {
             console.warn("[Firestore] Failed to save combo doc:", err.message);
           });
+          db.collection("customCombos").doc(combo.id).set(serverCombos[combo.id], { merge: true }).catch((err) => {
+            console.warn("[Firestore] Failed to save customCombos doc:", err.message);
+          });
           db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
       } else if (action === "status" && comboId && status) {
@@ -967,6 +968,9 @@ async function startServer() {
           db.collection("combos").doc(comboId).set({ status, updatedAt: now }, { merge: true }).catch((err) => {
             console.warn("[Firestore] Failed to update combo status doc:", err.message);
           });
+          db.collection("customCombos").doc(comboId).set({ status, updatedAt: now }, { merge: true }).catch((err) => {
+            console.warn("[Firestore] Failed to update customCombos status doc:", err.message);
+          });
           db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
       } else if (action === "delete" && comboId) {
@@ -977,6 +981,9 @@ async function startServer() {
           const db = getServerFirestore();
           db.collection("combos").doc(comboId).delete().catch((err) => {
             console.warn("[Firestore] Failed to delete combo doc:", err.message);
+          });
+          db.collection("customCombos").doc(comboId).delete().catch((err) => {
+            console.warn("[Firestore] Failed to delete customCombos doc:", err.message);
           });
           db.collection("sync_control").doc("combos").set({ updatedAt: now }, { merge: true }).catch(() => {});
         } catch (e) {}
@@ -989,6 +996,7 @@ async function startServer() {
             try {
               const db = getServerFirestore();
               db.collection("combos").doc(c.id).set(serverCombos[c.id], { merge: true }).catch(() => {});
+              db.collection("customCombos").doc(c.id).set(serverCombos[c.id], { merge: true }).catch(() => {});
             } catch (e) {}
           }
         });
@@ -1134,7 +1142,280 @@ async function startServer() {
     }
   });
 
-  // Persistent OTP storage file & in-memory cache
+  // 6. Direct Training & Zoom Course Registrations (199k)
+  const DIRECT_REGISTRATIONS_FILE = path.join(DATA_DIR, "direct_course_registrations.json");
+  function loadDirectRegistrationsFromDisk(): any[] {
+    try {
+      if (fs.existsSync(DIRECT_REGISTRATIONS_FILE)) {
+        const raw = fs.readFileSync(DIRECT_REGISTRATIONS_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("Failed to load direct registrations from disk:", e);
+    }
+    return [];
+  }
+
+  function saveDirectRegistrationsToDisk(records: any[]) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DIRECT_REGISTRATIONS_FILE, JSON.stringify(records, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Failed to save direct registrations to disk:", e);
+    }
+  }
+
+  let serverDirectRegistrations: any[] = loadDirectRegistrationsFromDisk();
+
+  app.get("/api/direct-registrations", (req, res) => {
+    try {
+      res.json({ success: true, records: serverDirectRegistrations });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/direct-registrations", async (req, res) => {
+    try {
+      const regData = req.body;
+      if (!regData || !regData.studentName) {
+        return res.status(400).json({ success: false, error: "Thiếu thông tin đăng ký" });
+      }
+      const id = regData.id || `direct-reg-${Date.now()}`;
+      const record = {
+        ...regData,
+        id,
+        courseTitle: regData.courseTitle || 'Khóa đào tạo An toàn Vệ sinh Thực phẩm 199k',
+        price: regData.price || '199.000đ',
+        registeredAt: regData.registeredAt || new Date().toISOString(),
+        status: regData.status || 'pending',
+        trainingType: regData.trainingType || 'zoom'
+      };
+
+      serverDirectRegistrations.unshift(record);
+      saveDirectRegistrationsToDisk(serverDirectRegistrations);
+
+      try {
+        const db = getServerFirestore();
+        await db.collection("direct_course_registrations").doc(id).set(record, { merge: true });
+        await db.collection("course_registrations").doc(id).set({
+          ...record,
+          type: 'DIRECT_TRAINING_199K'
+        }, { merge: true });
+      } catch (e) {}
+
+      res.json({ success: true, record });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/direct-registrations/sync", async (req, res) => {
+    try {
+      const { action, record, recordId, records } = req.body;
+      if (action === "sync_all" && Array.isArray(records)) {
+        serverDirectRegistrations = records;
+      } else if (action === "upsert" && record && record.id) {
+        const idx = serverDirectRegistrations.findIndex((c: any) => c.id === record.id);
+        if (idx >= 0) {
+          serverDirectRegistrations[idx] = { ...serverDirectRegistrations[idx], ...record };
+        } else {
+          serverDirectRegistrations.unshift(record);
+        }
+        try {
+          const db = getServerFirestore();
+          await db.collection("direct_course_registrations").doc(record.id).set(record, { merge: true });
+        } catch (e) {}
+      } else if (action === "delete" && recordId) {
+        serverDirectRegistrations = serverDirectRegistrations.filter((c: any) => c.id !== recordId);
+        try {
+          const db = getServerFirestore();
+          await db.collection("direct_course_registrations").doc(recordId).delete();
+        } catch (e) {}
+      }
+      saveDirectRegistrationsToDisk(serverDirectRegistrations);
+      res.json({ success: true, records: serverDirectRegistrations });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- FEATURED COURSES & LIVE REGISTRATIONS ENDPOINTS ---
+  const FEATURED_COURSES_FILE = path.join(DATA_DIR, "featured_courses.json");
+  const DEFAULT_FEATURED = ['haccp-tcvn', 'iso-22000', 'qa-qc-pro', 'basic-principles', 'iso-9001'];
+
+  function loadFeaturedCoursesFromDisk(): string[] {
+    try {
+      if (fs.existsSync(FEATURED_COURSES_FILE)) {
+        const raw = JSON.parse(fs.readFileSync(FEATURED_COURSES_FILE, "utf-8"));
+        if (Array.isArray(raw?.featuredCourseIds) && raw.featuredCourseIds.length > 0) {
+          return raw.featuredCourseIds.slice(0, 5);
+        }
+      }
+    } catch (e) {}
+    return [...DEFAULT_FEATURED];
+  }
+
+  function saveFeaturedCoursesToDisk(ids: string[]) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(FEATURED_COURSES_FILE, JSON.stringify({ featuredCourseIds: ids.slice(0, 5), updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+    } catch (e) {}
+  }
+
+  let serverFeaturedCourses = loadFeaturedCoursesFromDisk();
+
+  app.get("/api/featured-courses", (req, res) => {
+    res.json({ success: true, featuredCourseIds: serverFeaturedCourses });
+  });
+
+  app.post("/api/featured-courses", async (req, res) => {
+    try {
+      const { featuredCourseIds, updatedBy } = req.body;
+      if (Array.isArray(featuredCourseIds)) {
+        serverFeaturedCourses = featuredCourseIds.slice(0, 5);
+        saveFeaturedCoursesToDisk(serverFeaturedCourses);
+        try {
+          const db = getServerFirestore();
+          await db.collection("featured_courses").doc("config").set({
+            featuredCourseIds: serverFeaturedCourses,
+            updatedAt: new Date().toISOString(),
+            updatedBy: updatedBy || 'admin'
+          }, { merge: true });
+        } catch (e) {}
+      }
+      res.json({ success: true, featuredCourseIds: serverFeaturedCourses });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Alias /api/live-registrations to direct-registrations
+  app.get("/api/live-registrations", (req, res) => {
+    res.json({ success: true, records: serverDirectRegistrations });
+  });
+
+  app.post("/api/live-registrations", async (req, res) => {
+    try {
+      const regData = req.body;
+      if (!regData || !regData.studentName) {
+        return res.status(400).json({ success: false, error: "Thiếu thông tin đăng ký" });
+      }
+      const id = regData.id || `live-attp-${Date.now()}`;
+      const record = {
+        ...regData,
+        id,
+        price: regData.price || '199.000đ',
+        registeredAt: regData.registeredAt || new Date().toISOString(),
+        status: regData.status || 'pending',
+        trainingType: regData.trainingType || 'zoom'
+      };
+
+      serverDirectRegistrations.unshift(record);
+      saveDirectRegistrationsToDisk(serverDirectRegistrations);
+
+      try {
+        const db = getServerFirestore();
+        await db.collection("live_course_registrations").doc(id).set(record, { merge: true });
+        await db.collection("direct_course_registrations").doc(id).set(record, { merge: true });
+        await db.collection("course_registrations").doc(id).set({
+          ...record,
+          type: 'LIVE_TRAINING_199K'
+        }, { merge: true });
+      } catch (e) {}
+
+      res.json({ success: true, record });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- FAST SERVICE ISO 22000 AUDIT ENDPOINTS ---
+  const ISO22K_SESSION_FILE = path.join(DATA_DIR, "fast_iso22k_session.json");
+  const ISO22K_CRM_FILE = path.join(DATA_DIR, "fast_iso22k_crm.json");
+
+  function loadIso22kSessionFromDisk(): any {
+    try {
+      if (fs.existsSync(ISO22K_SESSION_FILE)) {
+        return JSON.parse(fs.readFileSync(ISO22K_SESSION_FILE, "utf-8"));
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveIso22kSessionToDisk(data: any) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(ISO22K_SESSION_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {}
+  }
+
+  function loadIso22kCrmFromDisk(): any {
+    try {
+      if (fs.existsSync(ISO22K_CRM_FILE)) {
+        return JSON.parse(fs.readFileSync(ISO22K_CRM_FILE, "utf-8"));
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  function saveIso22kCrmToDisk(crmData: any) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(ISO22K_CRM_FILE, JSON.stringify(crmData, null, 2), "utf-8");
+    } catch (e) {}
+  }
+
+  let serverIso22kSession = loadIso22kSessionFromDisk();
+  let serverIso22kCrm = loadIso22kCrmFromDisk();
+
+  app.get("/api/fast-iso22k/session", (req, res) => {
+    res.json({ success: true, session: serverIso22kSession });
+  });
+
+  app.post("/api/fast-iso22k/session", async (req, res) => {
+    try {
+      const sessionData = req.body;
+      if (sessionData) {
+        serverIso22kSession = sessionData;
+        saveIso22kSessionToDisk(serverIso22kSession);
+        try {
+          const db = getServerFirestore();
+          await db.collection("fast_iso22k_crm").doc("current_session").set(sessionData, { merge: true });
+        } catch (e) {}
+      }
+      res.json({ success: true, session: serverIso22kSession });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/fast-iso22k/crm", (req, res) => {
+    res.json({ success: true, records: serverIso22kCrm });
+  });
+
+  app.post("/api/fast-iso22k/crm", async (req, res) => {
+    try {
+      const { records } = req.body;
+      if (records) {
+        serverIso22kCrm = records;
+        saveIso22kCrmToDisk(serverIso22kCrm);
+        try {
+          const db = getServerFirestore();
+          await db.collection("fast_iso22k_crm").doc("database").set({
+            records: serverIso22kCrm,
+            _lastUpdated: Date.now()
+          }, { merge: true });
+        } catch (e) {}
+      }
+      res.json({ success: true, records: serverIso22kCrm });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   const OTP_FILE = path.join(DATA_DIR, "otp_cache.json");
   function loadOtpFromDisk(): Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }> {
     const map = new Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }>();
@@ -2119,15 +2400,28 @@ async function startServer() {
       });
       console.log("[Sync] Synchronized courses from Firestore to disk.");
 
-      // Sync combos from Firestore periodically
+      // Sync combos from Firestore periodically (both combos and customCombos collections)
       try {
-        const comboSnap = await db.collection("combos").get();
         const firestoreCombos: Record<string, any> = {};
-        comboSnap.forEach(doc => {
+        const [comboSnap, customComboSnap] = await Promise.all([
+          db.collection("combos").get().catch(() => ({ forEach: () => {} })),
+          db.collection("customCombos").get().catch(() => ({ forEach: () => {} }))
+        ]);
+
+        comboSnap.forEach((doc: any) => {
           if (serverDeletedComboIds.has(doc.id)) {
             db.collection("combos").doc(doc.id).delete().catch(() => {});
           } else {
             firestoreCombos[doc.id] = { id: doc.id, ...doc.data() };
+          }
+        });
+
+        customComboSnap.forEach((doc: any) => {
+          if (serverDeletedComboIds.has(doc.id)) {
+            db.collection("customCombos").doc(doc.id).delete().catch(() => {});
+          } else {
+            const existing = firestoreCombos[doc.id];
+            firestoreCombos[doc.id] = { ...(existing || {}), id: doc.id, ...doc.data() };
           }
         });
 

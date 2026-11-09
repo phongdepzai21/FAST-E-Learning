@@ -20,6 +20,8 @@ import { ViewedCoursesView } from '../components/ViewedCoursesView';
 import { FastCodeLookup } from '../components/FastCodeLookup';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { AdminDiagnosticConsole } from '../components/AdminDiagnosticConsole';
+import { DirectCourseDashboard } from '../components/DirectCourseDashboard';
+import { FeaturedCoursesDashboard } from '../components/FeaturedCoursesDashboard';
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -357,7 +359,7 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
   const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'student'>('student');
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
@@ -2211,6 +2213,8 @@ const Account: React.FC = () => {
                     ] : []),
                     ...(isAdmin ? [
                       { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+                      { id: 'featured-courses', label: 'Cấu hình 5 Khóa Nổi Bật', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z' },
+                      { id: 'direct-courses', label: 'Lớp Trực Tiếp / Zoom (199k)', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
                       { id: 'fast-code-lookup', label: 'Truy vết Giao dịch (Payment Trace)', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
                       { id: 'admin-audit-center', label: 'FAST SERVICE', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
@@ -2296,6 +2300,8 @@ const Account: React.FC = () => {
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
                   {isAdmin && <option value="user-management">Học viên & Khóa học</option>}
+                  {isAdmin && <option value="featured-courses">Cấu hình 5 Khóa Nổi Bật</option>}
+                  {isAdmin && <option value="direct-courses">Lớp Trực Tiếp / Zoom (199k)</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
                   {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (Food Safety Audit + Checklist • ATTP • HSQC)</option>}
                 </select>
@@ -2359,7 +2365,11 @@ const Account: React.FC = () => {
                 className="w-full"
               >
                 <TabErrorBoundary key={activeTab} fallbackTitle={`Phân hệ ${activeTab}`}>
-                {activeTab === 'fast-code-lookup' && isAdmin ? (
+                {activeTab === 'featured-courses' && isAdmin ? (
+                  <FeaturedCoursesDashboard />
+                ) : activeTab === 'direct-courses' && isAdmin ? (
+                  <FeaturedCoursesDashboard />
+                ) : activeTab === 'fast-code-lookup' && isAdmin ? (
                   <FastCodeLookup />
                 ) : activeTab === 'admin-student-console' && isAdmin ? (
                   <AdminStudentConsole />
@@ -2738,7 +2748,7 @@ const Account: React.FC = () => {
             <div className="w-full md:w-7/12 p-8 md:p-16 flex flex-col justify-center bg-white/50">
                 <div className="max-w-md mx-auto w-full">
                     
-                    <div className="text-center mb-10">
+                    <div className="text-center mb-8">
                         <h3 className="text-3xl font-black text-gray-800 uppercase tracking-tighter mb-2">
                             {isResettingPassword 
                               ? 'Đặt lại mật khẩu' 
@@ -2746,10 +2756,22 @@ const Account: React.FC = () => {
                         </h3>
                         <p className="text-gray-500 text-sm font-medium">
                             {isResettingPassword 
-                              ? 'Nhập email và mật khẩu mới để nhận mã OTP xác thực qua email.' 
+                              ? 'Nhập email và mật khẩu mới bạn muốn tạo để nhận mã OTP xác thực qua email.' 
                               : (isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.')}
                         </p>
                     </div>
+
+                    {isResettingPassword && (
+                        <div className="mb-6 p-4 bg-teal-50/80 border border-teal-200 rounded-2xl text-left text-xs text-teal-900 space-y-1.5 shadow-2xs">
+                            <p className="font-extrabold text-[#007c76] uppercase tracking-wide flex items-center gap-1.5">
+                              <span>🔑</span>
+                              <span>HƯỚNG DẪN ĐỔI / ĐẶT LẠI MẬT KHẨU</span>
+                            </p>
+                            <p className="font-medium text-slate-700 leading-relaxed">
+                              Vui lòng điền <strong>Email của bạn</strong> và <strong>Mật khẩu mới bạn muốn cài đặt</strong> bên dưới. Sau đó nhấn nút nhận mã OTP, hệ thống sẽ gửi mã xác thực 6 chữ số đến email của bạn để xác nhận cập nhật mật khẩu mới này.
+                            </p>
+                        </div>
+                    )}
 
                     {redirectMessage && (
                         <div className="mb-6 p-4 bg-yellow-50 text-yellow-800 rounded-2xl text-sm font-bold border border-yellow-100 flex items-center gap-3">
@@ -2783,31 +2805,43 @@ const Account: React.FC = () => {
                             </div>
                         )}
                         
-                        <div className="group relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <div className="space-y-1 text-left">
+                            {isResettingPassword && (
+                              <label className="block text-xs font-black text-slate-700 ml-1">
+                                Email đăng nhập tài khoản:
+                              </label>
+                            )}
+                            <div className="group relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                </div>
+                                <input
+     
+                                    type="email" 
+                                    value={email} 
+                                    onChange={e => setEmail(e.target.value)} 
+                                    placeholder="Email đăng nhập (Ví dụ: user@gmail.com)" 
+                                    className="w-full py-4 pl-12 pr-4 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
+                                />
                             </div>
-                            <input
- 
-                                type="email" 
-                                value={email} 
-                                onChange={e => setEmail(e.target.value)} 
-                                placeholder="Email đăng nhập" 
-                                className="w-full py-4 pl-12 pr-4 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
-                            />
                         </div>
                         
-                        <div className="space-y-1.5">
+                        <div className="space-y-1 text-left">
+                            {isResettingPassword && (
+                              <label className="block text-xs font-black text-slate-700 ml-1">
+                                Mật khẩu mới bạn muốn đổi thành (≥ 6 ký tự):
+                              </label>
+                            )}
                             <div className="group relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                                 </div>
                                 <input
-     
+      
                                     type={showPassword ? "text" : "password"} 
                                     value={password} 
                                     onChange={e => setPassword(e.target.value)} 
-                                    placeholder={isResettingPassword ? "Mật khẩu mới (tối thiểu 6 ký tự)" : "Mật khẩu"} 
+                                    placeholder={isResettingPassword ? "Nhập mật khẩu mới bạn muốn tạo" : "Mật khẩu"} 
                                     className="w-full py-4 pl-12 pr-12 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
                                 />
                                 <button 
@@ -2863,7 +2897,7 @@ const Account: React.FC = () => {
                             ) : (
                                 <>
                                     {isResettingPassword 
-                                      ? 'NHẬN MÃ OTP ĐẶT LẠI MẬT KHẨU' 
+                                      ? 'NHẬN MÃ OTP ĐỔI MẬT KHẨU MỚI' 
                                       : (isRegistering ? 'ĐĂNG KÝ NGAY' : 'ĐĂNG NHẬP')}
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                 </>

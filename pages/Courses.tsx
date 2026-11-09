@@ -13,6 +13,7 @@ import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagno
 import { Helmet } from 'react-helmet-async';
 import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
 import { trackCourseView } from '../utils/courseTrackingService';
+import { LiveCourseRegistration } from '../components/LiveCourseRegistration';
 
 const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
@@ -20,6 +21,7 @@ const Courses: React.FC = () => {
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
+  const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(true);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
@@ -36,21 +38,31 @@ const Courses: React.FC = () => {
 
   // --- REAL-TIME SYNC ALL COMBOS FROM FIRESTORE & API ---
   useEffect(() => {
-    const syncCombosList = (fsCombos?: any[]) => {
-      const all = getMergedCombos(fsCombos, { includeInactive: false });
+    const latestCombosMap = new Map<string, any>();
+
+    const syncCombosList = () => {
+      const all = getMergedCombos(Array.from(latestCombosMap.values()), { includeInactive: false });
       setCombos(all);
     };
 
-    // 1. Listen on Firestore real-time snapshot
-    const unsub = onSnapshot(collection(db, 'combos'), (snapshot) => {
-      const dbCombos: any[] = [];
+    // 1. Listen on Firestore real-time snapshots (both combos and customCombos)
+    const unsub1 = onSnapshot(collection(db, 'combos'), (snapshot) => {
       snapshot.forEach((docSnap) => {
-        dbCombos.push({ id: docSnap.id, ...docSnap.data() });
+        latestCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
       });
-      syncCombosList(dbCombos);
+      syncCombosList();
     }, (err) => {
       console.warn("Lỗi snapshot Firestore combos ở Courses.tsx:", err);
       syncCombosList();
+    });
+
+    const unsub2 = onSnapshot(collection(db, 'customCombos'), (snapshot) => {
+      snapshot.forEach((docSnap) => {
+        latestCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+      });
+      syncCombosList();
+    }, (err) => {
+      console.warn("Lỗi snapshot Firestore customCombos ở Courses.tsx:", err);
     });
 
     // 2. Also listen for custom combo events
@@ -62,7 +74,8 @@ const Courses: React.FC = () => {
     window.addEventListener('storage', handleSync);
 
     return () => {
-      unsub();
+      unsub1();
+      unsub2();
       window.removeEventListener('combos_updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
@@ -269,6 +282,33 @@ const Courses: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-20">
+        {/* BANNER ĐÀO TẠO TRỰC TIẾP & ZOOM (199K) */}
+        <div className="mb-10 bg-gradient-to-r from-emerald-900 via-teal-900 to-[#005c56] rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-emerald-500/30 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="space-y-2 text-center md:text-left z-10">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider text-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Lớp Khai Giảng Định Kỳ • Trực Tiếp Hội Trường & Online Zoom
+            </div>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight">
+              Khóa Đào Tạo An Toàn Vệ Sinh Thực Phẩm <span className="text-yellow-300">199.000đ</span>
+            </h3>
+            <p className="text-emerald-100 text-xs sm:text-sm font-medium max-w-2xl leading-relaxed">
+              Tập huấn chuẩn Bộ Y tế & Codex • Cấp chứng nhận hoàn thành sau buổi học • Khai giảng các tối Chủ Nhật (19:30 Zoom) hoặc sáng Chủ Nhật (Hội trường).
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 z-10 shrink-0 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setIsDirectModalOpen(true)}
+              className="px-7 py-4 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-yellow-400/20 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Đăng Ký Khóa 199K Ngay</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+
         {/* Category Pills */}
         <div className="flex overflow-x-auto no-scrollbar gap-3 mb-12 py-2">
             {Categories.map((cat) => {
@@ -511,6 +551,12 @@ const Courses: React.FC = () => {
             </div>
         </section>
       </div>
+
+      {/* Modal Đăng Ký Khóa Đào Tạo Trực Tiếp / Zoom 199k (Chọn trong 5 khóa nổi bật) */}
+      <LiveCourseRegistration
+        isOpen={isDirectModalOpen}
+        onClose={() => setIsDirectModalOpen(false)}
+      />
     </main>
   );
 };

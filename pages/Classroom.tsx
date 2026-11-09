@@ -776,7 +776,7 @@ const Classroom: React.FC = () => {
               webkit-playsinline="true"
             />
 
-            <div className={`w-full ${courseId === 'basic-principles' ? 'min-h-[550px] md:min-h-[650px] bg-slate-950 overflow-y-auto' : 'aspect-video bg-black flex items-center justify-center relative'}`}>
+            <div className="w-full aspect-video bg-black flex items-center justify-center relative">
               {/* HUD NOTIFICATION OVERLAY FOR KEYBOARD SHORTCUTS */}
               {shortcutFeedback && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-slate-900/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl border border-teal-500/40 shadow-2xl flex items-center gap-2.5 animate-bounce text-xs sm:text-sm font-bold pointer-events-none">
@@ -787,11 +787,7 @@ const Classroom: React.FC = () => {
                 </div>
               )}
 
-              {courseId === 'basic-principles' ? (
-                <div className="h-full w-full bg-white text-slate-900 relative">
-                  <Handbook />
-                </div>
-              ) : !isDataLoaded && curriculum.length === 0 ? (
+              {!isDataLoaded && curriculum.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
                   <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đang tải bài giảng...</p>

@@ -108,9 +108,40 @@ export function applyDeletedCombos(deletedIds: string[]) {
 }
 
 /**
- * Apply updated combos into localStorage safely with merging
+ * Detailed comparator helper between existing and incoming combo
  */
-function updateStoredCombos(incomingCombos: any[], deletedIds?: string[]) {
+function getComboDiff(oldCombo: any, newCombo: any): string[] {
+  const diffs: string[] = [];
+  if (!oldCombo) return ['Mới tạo hoàn toàn'];
+  if (oldCombo.title !== newCombo.title) diffs.push(`Tên: "${oldCombo.title}" -> "${newCombo.title}"`);
+  if (oldCombo.price !== newCombo.price) diffs.push(`Giá: "${oldCombo.price}" -> "${newCombo.price}"`);
+  if (oldCombo.originalPrice !== newCombo.originalPrice) diffs.push(`Giá gốc: "${oldCombo.originalPrice}" -> "${newCombo.originalPrice}"`);
+  if (oldCombo.savings !== newCombo.savings) diffs.push(`Tiết kiệm: "${oldCombo.savings}" -> "${newCombo.savings}"`);
+  if (oldCombo.status !== newCombo.status) diffs.push(`Trạng thái: "${oldCombo.status}" -> "${newCombo.status}"`);
+
+  const oldCourseIds = Array.isArray(oldCombo.courseIds) ? oldCombo.courseIds : [];
+  const newCourseIds = Array.isArray(newCombo.courseIds) ? newCombo.courseIds : [];
+  if (JSON.stringify(oldCourseIds.slice().sort()) !== JSON.stringify(newCourseIds.slice().sort())) {
+    diffs.push(`Khóa liên kết: [${oldCourseIds.length} khóa] -> [${newCourseIds.length} khóa]`);
+  }
+
+  const oldBenefits = Array.isArray(oldCombo.benefits) ? oldCombo.benefits : [];
+  const newBenefits = Array.isArray(newCombo.benefits) ? newCombo.benefits : [];
+  if (JSON.stringify(oldBenefits) !== JSON.stringify(newBenefits)) {
+    diffs.push(`Quyền lợi: [${oldBenefits.length} mục] -> [${newBenefits.length} mục]`);
+  }
+
+  if (oldCombo.image !== newCombo.image) diffs.push('Ảnh bìa đã đổi');
+  if (oldCombo.description !== newCombo.description) diffs.push('Mô tả đã cập nhật');
+  if (oldCombo.updatedAt !== newCombo.updatedAt) diffs.push(`Thời gian: ${oldCombo.updatedAt} -> ${newCombo.updatedAt}`);
+
+  return diffs;
+}
+
+/**
+ * Apply updated combos into localStorage safely with accurate old vs new comparison and detailed logging
+ */
+function updateStoredCombos(incomingCombos: any[], deletedIds?: string[], sourceName = 'Unknown') {
   if (!Array.isArray(incomingCombos)) return;
   try {
     let delList: string[] = ['combo-vip', 'khoa-vip'];
@@ -148,18 +179,42 @@ function updateStoredCombos(incomingCombos: any[], deletedIds?: string[]) {
       });
     }
 
-    // 2. Overlay incoming combos from server/SSE
+    let newlyAddedCount = 0;
+    let modifiedCount = 0;
+    let unchangedCount = 0;
+
+    console.groupCollapsed(`[Firestore Sync Debug] [Snapshot Comparison] Nguồn: ${sourceName} (${new Date().toLocaleTimeString('vi-VN')})`);
+    console.log(`[Firestore Sync Debug] Hiện tại trong cache: ${comboMap.size} gói | Nhận từ snapshot: ${incomingCombos.length} gói`);
+
+    // 2. Overlay incoming combos with accurate field-level comparison
     incomingCombos.forEach((c) => {
-      if (c && c.id && !delSet.has(c.id) && c.id !== 'combo-vip' && c.id !== 'khoa-vip') {
-        const prev = comboMap.get(c.id);
-        comboMap.set(c.id, prev ? { ...prev, ...c } : c);
+      if (!c || !c.id || delSet.has(c.id) || c.id === 'combo-vip' || c.id === 'khoa-vip') return;
+
+      const prev = comboMap.get(c.id);
+      const diffs = getComboDiff(prev, c);
+
+      if (!prev) {
+        newlyAddedCount++;
+        console.log(`%c[Firestore Sync Debug] + [MỚI] ${c.id}: "${c.title}" - ${c.price} [${c.status || 'active'}]`, 'color: #10b981; font-weight: bold;');
+        comboMap.set(c.id, c);
+      } else if (diffs.length > 0) {
+        modifiedCount++;
+        console.log(`%c[Firestore Sync Debug] ~ [CẬP NHẬT] ${c.id}: ${diffs.join(' | ')}`, 'color: #0284c7; font-weight: bold;');
+        comboMap.set(c.id, { ...prev, ...c, updatedAt: c.updatedAt || new Date().toISOString() });
+      } else {
+        unchangedCount++;
+        console.log(`[Firestore Sync Debug] = [KHÔNG ĐỔI] ${c.id} - Dữ liệu khớp 100%`);
       }
     });
 
+    console.log(`[Firestore Sync Debug] Tổng kết: +${newlyAddedCount} mới, ~${modifiedCount} sửa đổi, =${unchangedCount} trùng khớp.`);
+    console.groupEnd();
+
     const merged = Array.from(comboMap.values());
     localStorage.setItem('combo_cache_all', JSON.stringify(merged));
+    localStorage.setItem('fast_custom_combos_backup', JSON.stringify(merged));
   } catch (err) {
-    console.warn('Error saving combos to local storage:', err);
+    console.warn('[Firestore Sync Debug] Lỗi khi lưu combo vào local storage:', err);
   }
 }
 
@@ -404,21 +459,50 @@ export function initCourseSyncService() {
   try {
     const handleSnapshotDocs = (snapshot: any, sourceName: string) => {
       const fsCombos: any[] = [];
+      const removedIds: string[] = [];
+
       snapshot.docChanges().forEach((change: any) => {
-        console.log(`[Firestore Sync Debug] [${sourceName} snapshot change] Type: ${change.type}, Doc ID: ${change.doc.id}`, change.doc.data());
+        const docId = change.doc.id;
+        const data = change.doc.data();
+        if (change.type === 'added') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: ADDED] ID: ${docId}`, 'color: #10b981; font-weight: bold;', {
+            title: data?.title,
+            price: data?.price,
+            status: data?.status,
+            courseCount: data?.courseIds?.length || 0,
+            updatedAt: data?.updatedAt
+          });
+        } else if (change.type === 'modified') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: MODIFIED] ID: ${docId}`, 'color: #0284c7; font-weight: bold;', {
+            title: data?.title,
+            price: data?.price,
+            status: data?.status,
+            courseCount: data?.courseIds?.length || 0,
+            updatedAt: data?.updatedAt
+          });
+        } else if (change.type === 'removed') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: REMOVED] ID: ${docId}`, 'color: #ef4444; font-weight: bold;');
+          removedIds.push(docId);
+        }
       });
+
+      if (removedIds.length > 0) {
+        applyDeletedCombos(removedIds);
+      }
+
       snapshot.forEach((docSnap: any) => {
         fsCombos.push({ id: docSnap.id, ...docSnap.data() });
       });
-      console.log(`[Firestore Sync Debug] Received ${sourceName} snapshot: total items = ${fsCombos.length}`, fsCombos);
-      updateStoredCombos(fsCombos);
-      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: `${sourceName}_snapshot`, combos: fsCombos } }));
+
+      console.log(`[Firestore Sync Debug] Đã nạp thành công ${fsCombos.length} tài liệu từ Firestore [${sourceName}].`);
+      updateStoredCombos(fsCombos, removedIds, sourceName);
+      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: `${sourceName}_snapshot`, combos: fsCombos, removedIds } }));
     };
 
     onSnapshot(collection(db, 'customCombos'), (snapshot) => {
       handleSnapshotDocs(snapshot, 'customCombos');
     }, (err) => {
-      console.warn('[Firestore Sync Debug] customCombos snapshot error:', err);
+      console.warn('[Firestore Sync Debug] Lỗi lắng nghe collection customCombos:', err);
     });
 
     onSnapshot(collection(db, 'combos'), (snapshot) => {

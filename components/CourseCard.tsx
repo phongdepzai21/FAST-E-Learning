@@ -163,10 +163,15 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                 />
                 
                 {/* Floating Category & New Badge */}
-                <div className="absolute top-4 left-4 flex items-center gap-1.5 z-10">
+                <div className="absolute top-4 left-4 flex flex-wrap items-center gap-1.5 z-10 max-w-[80%]">
                     <div className={`${style.bg} ${style.text} backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm text-[10px] font-black uppercase tracking-widest border border-white/50`}>
                         {course.category}
                     </div>
+                    {course.isDirectTraining && (
+                        <div className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 border border-emerald-400 shadow-emerald-600/30">
+                            <span>🎥 Trực tiếp / Zoom</span>
+                        </div>
+                    )}
                     {isNewOrUpdated && (
                         <div 
                           id={`course-new-badge-${course.id}`}
@@ -211,8 +216,14 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center text-[11px] font-bold text-gray-400">
                         <svg className="w-3.5 h-3.5 mr-1 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                        {stats.lessons} bài học
+                        {course.isDirectTraining ? 'Đào tạo trực tiếp' : `${stats.lessons} bài học`}
                     </div>
+                    {course.startDate && (
+                        <div className="flex items-center text-[11px] font-bold text-emerald-600 truncate">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 shrink-0 animate-ping" />
+                            <span>KG: {course.startDate}</span>
+                        </div>
+                    )}
                 </div>
 
                 <h3 className="font-black text-lg text-gray-800 mb-4 line-clamp-2 leading-[1.3] group-hover:text-[#007c76] transition-colors duration-200">

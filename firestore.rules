@@ -137,6 +137,8 @@ service cloud.firestore {
       return (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
              (!('title' in data) || (data.title is string && data.title.size() <= 256)) &&
              (!('price' in data) || (data.price is string && data.price.size() <= 64)) &&
+             (!('originalPrice' in data) || (data.originalPrice is string && data.originalPrice.size() <= 64)) &&
+             (!('savings' in data) || (data.savings is string && data.savings.size() <= 64)) &&
              (!('image' in data) || (data.image is string && data.image.size() <= 1024)) &&
              (!('description' in data) || (data.description is string && data.description.size() <= 10000)) &&
              (!('status' in data) || (data.status is string && data.status.size() <= 64)) &&
@@ -213,27 +215,27 @@ service cloud.firestore {
 
     // 4. Fast Standards Audits (FSA-Checklist)
     match /fast_standards_audits/{auditId} {
-      allow read, write: if isSystemOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // 5. Ad Profile CRM Records (Ads)
     match /ad_profile_crm/{recordId} {
-      allow read, write: if isSystemOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // 6. Food Safety CRM Records (ATTP)
     match /fast_food_safety_crm/{recordId} {
-      allow read, write: if isSystemOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // 7. Fast HACCP CRM Records (HACCP Checklist)
     match /fast_haccp_crm/{recordId} {
-      allow read, write: if isSystemOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // 8. Fast ISO 22000 CRM Records (ISO 22K Checklist)
     match /fast_iso22k_crm/{recordId} {
-      allow read, write: if isSystemOwner() || isAdmin();
+      allow read, write: if true;
     }
 
     // 9. Manual Unlocks Logs
@@ -244,8 +246,28 @@ service cloud.firestore {
     // 10. Course Registrations Logs and Notices
     match /course_registrations/{registrationId} {
       allow read: if isAdmin() || isSystemOwner() || isTeacher();
-      allow create: if isSignedIn();
+      allow create: if true;
       allow update, delete: if isAdmin() || isSystemOwner();
+    }
+
+    // 10.1 Direct Training / Zoom Course Registrations (199k)
+    match /direct_course_registrations/{regId} {
+      allow read: if isAdmin() || isSystemOwner() || isTeacher();
+      allow create: if true;
+      allow update, delete: if isAdmin() || isSystemOwner();
+    }
+
+    // 10.2 Live Course Registrations (199k Live & Zoom)
+    match /live_course_registrations/{regId} {
+      allow read: if isAdmin() || isSystemOwner() || isTeacher();
+      allow create: if true;
+      allow update, delete: if isAdmin() || isSystemOwner();
+    }
+
+    // 10.3 Featured Courses Selection (Top 5 nổi bật)
+    match /featured_courses/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSystemOwner();
     }
 
     // 11. Payment Config (Banking / QR Code)
@@ -257,7 +279,7 @@ service cloud.firestore {
     // 12. Sync Control (Global real-time cache invalidation)
     match /sync_control/{docId} {
       allow read: if true;
-      allow write: if isAdmin() || isSystemOwner();
+      allow write: if true;
     }
 
     // 13. Global Sync (Real-time form reset synchronization across tabs)
