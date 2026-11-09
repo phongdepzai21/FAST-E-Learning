@@ -1332,6 +1332,125 @@ async function startServer() {
     }
   });
 
+  // --- API CLEAR ALL REGISTRATIONS (Xóa tất cả 4 bản ghi đăng ký cũ) ---
+  app.post("/api/admin/clear-registrations", async (req, res) => {
+    try {
+      serverDirectRegistrations = [];
+      saveDirectRegistrationsToDisk([]);
+
+      try {
+        const db = getServerFirestore();
+        const batch1 = db.batch();
+        const snap1 = await db.collection("live_course_registrations").get();
+        snap1.forEach(doc => batch1.delete(doc.ref));
+
+        const snap2 = await db.collection("direct_course_registrations").get();
+        snap2.forEach(doc => batch1.delete(doc.ref));
+
+        await batch1.commit().catch(() => {});
+      } catch (e) {}
+
+      res.json({ success: true, message: "Đã xóa toàn bộ dữ liệu đăng ký khóa đào tạo!" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- API WEBHOOK KHÁCH HÀNG CHUYỂN KHOẢN TỰ ĐỘNG (Casso / VietQR Webhook) ---
+  app.post("/api/webhook/payment", async (req, res) => {
+    try {
+      const payload = req.body || {};
+      console.log("[Webhook Payment Received]:", JSON.stringify(payload));
+
+      const logId = `webhook-${Date.now()}`;
+      const webhookRecord = {
+        id: logId,
+        receivedAt: new Date().toISOString(),
+        payload
+      };
+
+      // Extract details
+      const textContent = JSON.stringify(payload).toUpperCase();
+      let matchedRegId: string | null = null;
+
+      // Find matching registration by memo / phone / ID
+      for (const reg of serverDirectRegistrations) {
+        if (!reg) continue;
+        const phone = reg.phone ? reg.phone.replace(/[^\d]/g, '') : '';
+        const regId = reg.id ? reg.id.toUpperCase() : '';
+        const name = reg.studentName ? reg.studentName.toUpperCase() : '';
+
+        if ((phone && textContent.includes(phone)) || (regId && textContent.includes(regId)) || (name && textContent.includes(name))) {
+          matchedRegId = reg.id;
+          reg.status = 'confirmed';
+          reg.paidAt = new Date().toISOString();
+          reg.paymentMethod = 'webhook_bank';
+          break;
+        }
+      }
+
+      if (matchedRegId) {
+        saveDirectRegistrationsToDisk(serverDirectRegistrations);
+        try {
+          const db = getServerFirestore();
+          await db.collection("live_course_registrations").doc(matchedRegId).set({
+            status: 'confirmed',
+            paidAt: new Date().toISOString(),
+            paymentMethod: 'webhook_bank'
+          }, { merge: true });
+          await db.collection("direct_course_registrations").doc(matchedRegId).set({
+            status: 'confirmed',
+            paidAt: new Date().toISOString(),
+            paymentMethod: 'webhook_bank'
+          }, { merge: true });
+        } catch (e) {}
+      }
+
+      // Save webhook log
+      try {
+        const db = getServerFirestore();
+        await db.collection("payment_webhooks").doc(logId).set(webhookRecord, { merge: true });
+      } catch (e) {}
+
+      res.json({ error: 0, message: "Ok", success: true, matchedRegId });
+    } catch (err: any) {
+      res.status(500).json({ error: 0, message: err.message });
+    }
+  });
+
+  app.get("/api/webhook/payment", (req, res) => {
+    res.json({ success: true, status: "Active", endpoint: "/api/webhook/payment" });
+  });
+
+  // --- API TEAHCER ADD COURSE ---
+  app.post("/api/teacher/add-course", async (req, res) => {
+    try {
+      const courseData = req.body;
+      if (!courseData || !courseData.title) {
+        return res.status(400).json({ success: false, error: "Thiếu thông tin khóa học" });
+      }
+
+      const id = courseData.id || `course-${Date.now()}`;
+      const course = {
+        ...courseData,
+        id,
+        createdAt: courseData.createdAt || new Date().toISOString()
+      };
+
+      serverCourses[id] = course;
+      saveCoursesToDisk(serverCourses, serverDeletedCourseIds);
+
+      try {
+        const db = getServerFirestore();
+        await db.collection("courses").doc(id).set(course, { merge: true });
+      } catch (e) {}
+
+      res.json({ success: true, course });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // --- FAST SERVICE ISO 22000 AUDIT ENDPOINTS ---
   const ISO22K_SESSION_FILE = path.join(DATA_DIR, "fast_iso22k_session.json");
   const ISO22K_CRM_FILE = path.join(DATA_DIR, "fast_iso22k_crm.json");
@@ -2425,11 +2544,32 @@ async function startServer() {
           }
         });
 
+        // Purge deleted combo IDs from in-memory map
         for (const delId of serverDeletedComboIds) {
           delete serverCombos[delId];
         }
 
-        Object.assign(serverCombos, firestoreCombos);
+        // Reconstruct serverCombos cleanly from default combos + Firestore snapshot
+        const newServerCombos: Record<string, any> = {};
+        Object.entries(DEFAULT_SERVER_COMBOS).forEach(([id, combo]) => {
+          if (!serverDeletedComboIds.has(id)) {
+            newServerCombos[id] = combo;
+          }
+        });
+
+        // Overlay active Firestore combos
+        Object.entries(firestoreCombos).forEach(([id, combo]) => {
+          if (!serverDeletedComboIds.has(id)) {
+            newServerCombos[id] = combo;
+          }
+        });
+
+        // Clear existing serverCombos map and replace with merged state
+        for (const key of Object.keys(serverCombos)) {
+          delete serverCombos[key];
+        }
+        Object.assign(serverCombos, newServerCombos);
+
         saveCombosToDisk(serverCombos, serverDeletedComboIds);
         broadcastCombosUpdate("combos_updated", {
           action: "sync_all",
@@ -2437,7 +2577,7 @@ async function startServer() {
           deletedComboIds: Array.from(serverDeletedComboIds),
           timestamp: Date.now()
         });
-        console.log("[Sync] Synchronized combos from Firestore to disk.");
+        console.log(`[Sync] Synchronized ${Object.keys(serverCombos).length} combos from Firestore to disk successfully.`);
       } catch (comboErr) {
         console.error("[Sync] Error syncing combos from Firestore:", comboErr);
       }

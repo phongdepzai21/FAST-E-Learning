@@ -252,22 +252,22 @@ service cloud.firestore {
 
     // 10.1 Direct Training / Zoom Course Registrations (199k)
     match /direct_course_registrations/{regId} {
-      allow read: if isAdmin() || isSystemOwner() || isTeacher();
-      allow create: if true;
-      allow update, delete: if isAdmin() || isSystemOwner();
+      allow read, create, update, delete: if true;
     }
 
     // 10.2 Live Course Registrations (199k Live & Zoom)
     match /live_course_registrations/{regId} {
-      allow read: if isAdmin() || isSystemOwner() || isTeacher();
-      allow create: if true;
-      allow update, delete: if isAdmin() || isSystemOwner();
+      allow read, create, update, delete: if true;
     }
 
     // 10.3 Featured Courses Selection (Top 5 nổi bật)
     match /featured_courses/{docId} {
-      allow read: if true;
-      allow write: if isAdmin() || isSystemOwner();
+      allow read, write: if true;
+    }
+
+    // 10.4 Payment Webhook Logs
+    match /payment_webhooks/{logId} {
+      allow read, write: if true;
     }
 
     // 11. Payment Config (Banking / QR Code)

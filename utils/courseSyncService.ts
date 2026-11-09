@@ -188,7 +188,16 @@ function updateStoredCombos(incomingCombos: any[], deletedIds?: string[], source
 
     // 2. Overlay incoming combos with accurate field-level comparison
     incomingCombos.forEach((c) => {
-      if (!c || !c.id || delSet.has(c.id) || c.id === 'combo-vip' || c.id === 'khoa-vip') return;
+      if (!c || !c.id || c.id === 'combo-vip' || c.id === 'khoa-vip') return;
+
+      // If combo is present in live snapshot, ensure it is not blocked by stale deleted list
+      if (delSet.has(c.id) && (!deletedIds || !deletedIds.includes(c.id))) {
+        delSet.delete(c.id);
+        delList = delList.filter(id => id !== c.id);
+        localStorage.setItem('deleted_combo_ids', JSON.stringify(delList));
+      }
+
+      if (delSet.has(c.id)) return;
 
       const prev = comboMap.get(c.id);
       const diffs = getComboDiff(prev, c);

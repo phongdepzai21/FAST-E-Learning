@@ -38,17 +38,20 @@ const Courses: React.FC = () => {
 
   // --- REAL-TIME SYNC ALL COMBOS FROM FIRESTORE & API ---
   useEffect(() => {
-    const latestCombosMap = new Map<string, any>();
+    const combosCollMap = new Map<string, any>();
+    const customCombosCollMap = new Map<string, any>();
 
     const syncCombosList = () => {
-      const all = getMergedCombos(Array.from(latestCombosMap.values()), { includeInactive: false });
+      const combined = [...combosCollMap.values(), ...customCombosCollMap.values()];
+      const all = getMergedCombos(combined, { includeInactive: false });
       setCombos(all);
     };
 
     // 1. Listen on Firestore real-time snapshots (both combos and customCombos)
     const unsub1 = onSnapshot(collection(db, 'combos'), (snapshot) => {
+      combosCollMap.clear();
       snapshot.forEach((docSnap) => {
-        latestCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        combosCollMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
       });
       syncCombosList();
     }, (err) => {
@@ -57,12 +60,14 @@ const Courses: React.FC = () => {
     });
 
     const unsub2 = onSnapshot(collection(db, 'customCombos'), (snapshot) => {
+      customCombosCollMap.clear();
       snapshot.forEach((docSnap) => {
-        latestCombosMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        customCombosCollMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
       });
       syncCombosList();
     }, (err) => {
       console.warn("Lỗi snapshot Firestore customCombos ở Courses.tsx:", err);
+      syncCombosList();
     });
 
     // 2. Also listen for custom combo events
