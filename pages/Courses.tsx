@@ -3,25 +3,29 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import CourseCard from '../components/CourseCard';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, DEFAULT_COMBOS } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, DEFAULT_COMBOS, getMergedTrainingCourses } from '../constants';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, setDoc, onSnapshot, QuerySnapshot, DocumentData, getDocs } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
-import { Course } from '../types';
+import { Course, TrainingCourse } from '../types';
 import { parseFirestoreError, logFirestoreError } from '../utils/firestoreDiagnostics';
 import { Helmet } from 'react-helmet-async';
 import { isCourseNewOrUpdated, getUnreadCount } from '../utils/courseNotificationService';
 import { trackCourseView } from '../utils/courseTrackingService';
-import { LiveCourseRegistration } from '../components/LiveCourseRegistration';
+import { TrainingRegistrationModal } from '../components/TrainingRegistrationModal';
+import { Calendar, Clock, MapPin, Video, Award, Users, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 
-const Categories = ['Tất cả', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
+const Categories = ['Tất cả', 'Khóa Đào Tạo', 'ISO', 'HACCP', 'QA/QC', 'VietGAP', 'Sản xuất', 'Lean', 'Quản trị'];
 
 const Courses: React.FC = () => {
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
+  const [trainingCourses, setTrainingCourses] = useState<TrainingCourse[]>(() => getMergedTrainingCourses([], { includeInactive: false }));
+  const [selectedTrainingCourse, setSelectedTrainingCourse] = useState<TrainingCourse | null>(null);
+  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
   const [ownedCourseIds, setOwnedCourseIds] = useState<string[]>([]);
   const [isLoadingOwnership, setIsLoadingOwnership] = useState(true);
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
@@ -35,6 +39,20 @@ const Courses: React.FC = () => {
   const toggleComboExpand = (id: string) => {
     setExpandedComboIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // --- REAL-TIME SYNC TRAINING COURSES FROM FIRESTORE ---
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'training_courses'), (snapshot) => {
+      const fsList: TrainingCourse[] = [];
+      snapshot.forEach((docSnap) => {
+        fsList.push({ id: docSnap.id, ...docSnap.data() } as TrainingCourse);
+      });
+      setTrainingCourses(getMergedTrainingCourses(fsList, { includeInactive: false }));
+    }, (err) => {
+      console.warn("Lỗi snapshot Firestore training_courses ở Courses.tsx:", err);
+    });
+    return () => unsub();
+  }, []);
 
   // --- REAL-TIME SYNC ALL COMBOS FROM FIRESTORE & API ---
   useEffect(() => {
@@ -232,6 +250,8 @@ const Courses: React.FC = () => {
       let matchesCategory = false;
       if (activeCategory === 'Tất cả') {
         matchesCategory = true;
+      } else if (activeCategory === 'Khóa Đào Tạo') {
+        return false;
       } else {
         matchesCategory = Boolean(course.category && course.category.toUpperCase().includes(activeCategory.toUpperCase()));
       }
@@ -287,33 +307,6 @@ const Courses: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-20">
-        {/* BANNER ĐÀO TẠO TRỰC TIẾP & ZOOM (199K) */}
-        <div className="mb-10 bg-gradient-to-r from-emerald-900 via-teal-900 to-[#005c56] rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-emerald-500/30 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="space-y-2 text-center md:text-left z-10">
-            <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider text-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Lớp Khai Giảng Định Kỳ • Trực Tiếp Hội Trường & Online Zoom
-            </div>
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight">
-              Khóa Đào Tạo An Toàn Vệ Sinh Thực Phẩm <span className="text-yellow-300">199.000đ</span>
-            </h3>
-            <p className="text-emerald-100 text-xs sm:text-sm font-medium max-w-2xl leading-relaxed">
-              Tập huấn chuẩn Bộ Y tế & Codex • Cấp chứng nhận hoàn thành sau buổi học • Khai giảng các tối Chủ Nhật (19:30 Zoom) hoặc sáng Chủ Nhật (Hội trường).
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 z-10 shrink-0 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setIsDirectModalOpen(true)}
-              className="px-7 py-4 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-yellow-400/20 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>Đăng Ký Khóa 199K Ngay</span>
-              <span>→</span>
-            </button>
-          </div>
-        </div>
-
         {/* Category Pills */}
         <div className="flex overflow-x-auto no-scrollbar gap-3 mb-12 py-2">
             {Categories.map((cat) => {
@@ -397,13 +390,142 @@ const Courses: React.FC = () => {
             </div>
         )}
 
+        {/* DEDICATED SECTION: CHƯƠNG TRÌNH ĐÀO TẠO TRỰC TIẾP & ONLINE ZOOM */}
+        <div id="khoa-dao-tao-section" className="mt-16 mb-14">
+          <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/90 shadow-sm text-slate-800">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-slate-100 pb-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider text-[#007c76]">
+                  <span className="w-2 h-2 rounded-full bg-[#007c76] animate-pulse" />
+                  Chương Trình Đào Tạo Trực Tiếp &amp; Online Zoom
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+                  Khóa Đào Tạo Tập Huấn &amp; Cấp Chứng Nhận
+                </h3>
+                <p className="text-slate-500 text-xs sm:text-sm font-medium max-w-2xl leading-relaxed">
+                  Đào tạo bài bản theo quy chuẩn Bộ Y tế, ISO 22000 &amp; Codex. Tương tác trực tiếp 1-1 cùng chuyên gia QMS/ATTP, cấp chứng nhận định danh điện tử 10 số.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-200">
+                  {trainingCourses.length} khóa đào tạo có sẵn
+                </span>
+              </div>
+            </div>
+
+            {/* Grid Khóa Đào Tạo với ảnh bìa như khóa thường */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+              {trainingCourses.map((tc) => {
+                const formatLabel = tc.trainingFormat === 'zoom' 
+                  ? 'Online qua Zoom' 
+                  : tc.trainingFormat === 'direct' 
+                    ? 'Trực tiếp Hội trường' 
+                    : 'Trực tiếp & Online Zoom';
+                return (
+                  <div 
+                    key={tc.id}
+                    className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200/80 flex flex-col group hover:shadow-2xl hover:border-teal-400 transition-all duration-300 text-slate-800"
+                  >
+                    {/* Ảnh bìa như khóa thường */}
+                    <div className="relative h-44 overflow-hidden bg-slate-100">
+                      <img 
+                        src={tc.image} 
+                        alt={tc.title} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute top-3 left-3">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-teal-600/90 text-white backdrop-blur-xs border border-white/20 flex items-center gap-1 shadow-xs">
+                          {tc.trainingFormat === 'zoom' ? <Video className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                          {formatLabel}
+                        </span>
+                      </div>
+                      <div className="absolute top-3 right-3">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-900/80 text-teal-200 backdrop-blur-xs border border-white/10">
+                          {tc.category}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-teal-300" />
+                          {tc.duration}
+                        </span>
+                        <span className="text-teal-300 font-mono text-[10px]">
+                          ID: {tc.id}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Nội dung card */}
+                    <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="font-black text-slate-900 text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-[#007c76] transition-colors">
+                          {tc.title}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
+                          {tc.description}
+                        </p>
+
+                        <div className="pt-2 space-y-1.5 text-xs text-slate-600">
+                          <div className="flex items-center gap-1.5 text-slate-700 font-semibold truncate">
+                            <Calendar className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                            <span className="truncate">{tc.startDate}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-500 truncate">
+                            <Users className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                            <span className="truncate">{tc.instructor}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Giá & Nút đăng ký */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base sm:text-lg font-black text-[#007c76]">
+                              {tc.price}
+                            </span>
+                            {tc.originalPrice && tc.originalPrice !== tc.price && (
+                              <span className="text-xs text-slate-400 line-through font-semibold">
+                                {tc.originalPrice}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-emerald-700 font-bold block">
+                            Học phí trọn gói
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTrainingCourse(tc);
+                            setIsTrainingModalOpen(true);
+                          }}
+                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-[#007c76] hover:from-emerald-700 hover:to-[#005c56] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-teal-700/20 hover:shadow-lg transition-all transform hover:scale-[1.02] active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                          <span>Đăng ký</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* COMBO PACKAGES SECTION */}
         <div className="mt-20 space-y-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-l-4 border-[#007c76] pl-4">
                 <div>
                     <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
-                        <span>🎁 Gói Combo Tiết Kiệm</span>
-                        <span className="text-xs bg-red-100 text-red-600 font-bold px-2.5 py-1 rounded-full border border-red-200">Sale Off 50%</span>
+                        <span>🎁 Gói Combo Đào Tạo Trọn Gói</span>
                     </h2>
                     <p className="text-gray-500 text-xs sm:text-sm font-medium mt-1">
                         Lộ trình chuẩn hóa trọn gói, tiết kiệm chi phí tối đa so với mua lẻ từng khóa học
@@ -557,10 +679,14 @@ const Courses: React.FC = () => {
         </section>
       </div>
 
-      {/* Modal Đăng Ký Khóa Đào Tạo Trực Tiếp / Zoom 199k (Chọn trong 5 khóa nổi bật) */}
-      <LiveCourseRegistration
-        isOpen={isDirectModalOpen}
-        onClose={() => setIsDirectModalOpen(false)}
+      {/* Modal Đăng Ký Khóa Đào Tạo Trực Tiếp & Online Zoom */}
+      <TrainingRegistrationModal
+        isOpen={isTrainingModalOpen || isDirectModalOpen}
+        onClose={() => {
+          setIsTrainingModalOpen(false);
+          setIsDirectModalOpen(false);
+        }}
+        course={selectedTrainingCourse || (trainingCourses.length > 0 ? trainingCourses[0] : null)}
       />
     </main>
   );

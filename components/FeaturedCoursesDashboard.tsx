@@ -66,8 +66,8 @@ export const FeaturedCoursesDashboard: React.FC = () => {
 
   // Webhook Test simulation state
   const [webhookPhone, setWebhookPhone] = useState('');
-  const [webhookAmount, setWebhookAmount] = useState('199000');
-  const [webhookContent, setWebhookContent] = useState('LIVE199K 0987654321 CHUYEN KHOAN HOAN TAT');
+  const [webhookAmount, setWebhookAmount] = useState('299000');
+  const [webhookContent, setWebhookContent] = useState('DAOTAO 0987654321 CHUYEN KHOAN HOAN TAT');
   const [isSimulatingWebhook, setIsSimulatingWebhook] = useState(false);
 
   // Sync toàn bộ khóa học
@@ -194,14 +194,14 @@ export const FeaturedCoursesDashboard: React.FC = () => {
     let updated: string[];
     if (featuredIds.includes(courseId)) {
       updated = featuredIds.filter(id => id !== courseId);
-      toast.showToast(`Đã tắt trạng thái nổi bật cho khóa học này (${updated.length}/5)`, 'info');
+      toast.showToast(`Đã tắt trạng thái nổi bật cho khóa học này (${updated.length}/3)`, 'info');
     } else {
-      if (featuredIds.length >= 5) {
-        toast.showToast('Đã đủ 5 khóa học nổi bật. Vui lòng tắt bớt 1 khóa trước khi bật khóa này!', 'error');
+      if (featuredIds.length >= 3) {
+        toast.showToast('Đã đủ 3 khóa học nổi bật. Vui lòng tắt bớt 1 khóa trước khi bật khóa này!', 'error');
         return;
       }
       updated = [...featuredIds, courseId];
-      toast.showToast(`Đã bật trạng thái nổi bật (${updated.length}/5)`, 'success');
+      toast.showToast(`Đã bật trạng thái nổi bật (${updated.length}/3)`, 'success');
     }
     setFeaturedIds(updated);
     await saveFeaturedCourseIds(updated, auth.currentUser?.email || 'admin');
@@ -229,12 +229,12 @@ export const FeaturedCoursesDashboard: React.FC = () => {
     await saveFeaturedCourseIds(copy, auth.currentUser?.email || 'admin');
   };
 
-  // Khôi phục 5 khóa mặc định
+  // Khôi phục 3 khóa mặc định
   const handleResetDefaults = async () => {
-    if (window.confirm('Khôi phục danh sách 5 khóa nổi bật chuẩn mặc định của FAST?')) {
+    if (window.confirm('Khôi phục danh sách 3 khóa nổi bật chuẩn mặc định của FAST?')) {
       setFeaturedIds([...DEFAULT_FEATURED_COURSE_IDS]);
       await saveFeaturedCourseIds([...DEFAULT_FEATURED_COURSE_IDS], auth.currentUser?.email || 'admin');
-      toast.showToast('Đã khôi phục 5 khóa học nổi bật mặc định!', 'info');
+      toast.showToast('Đã khôi phục 3 khóa học nổi bật mặc định!', 'info');
     }
   };
 
@@ -279,8 +279,8 @@ export const FeaturedCoursesDashboard: React.FC = () => {
       phone: reg.phone || '',
       email: reg.email || '',
       companyName: reg.companyName || '',
-      courseTitle: reg.courseTitle || 'Đào tạo An toàn Thực phẩm 199K',
-      amount: reg.price || '199.000đ',
+      courseTitle: reg.courseTitle || 'Đào tạo An toàn Thực phẩm Chuyên sâu',
+      amount: reg.price || '299.000đ',
       issueDate: reg.registeredAt ? new Date(reg.registeredAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       receiptNo: `BL-FAST-${reg.id ? reg.id.slice(-6).toUpperCase() : Date.now().toString().slice(-6)}`
     });
@@ -325,7 +325,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
   // Sao chép tin nhắn Zalo gửi học viên
   const handleCopyZaloMessage = (reg: any) => {
     const isZoom = reg.trainingType === 'zoom';
-    const msg = `Kính gửi Anh/Chị ${reg.studentName},\nViện Đào Tạo FAST E-Learning xin gửi thông tin tham gia lớp đào tạo "${reg.courseTitle}" (Học phí 199.000đ):\n- Thời gian khai giảng: ${reg.startDate}\n${isZoom ? `- Phòng học Zoom Meeting ID: ${reg.zoomMeetingId || '849 2700 2668'}\n- Passcode: ${reg.zoomPasscode || 'FAST199K'}` : `- Địa điểm: Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội`}\n- Hotline hỗ trợ kỹ thuật: 0927 002 668\nTrân trọng đón tiếp Anh/Chị!`;
+    const msg = `Kính gửi Anh/Chị ${reg.studentName},\nViện Đào Tạo FAST E-Learning xin gửi thông tin đăng ký lớp đào tạo "${reg.courseTitle}" (Học phí: ${reg.price || 'Đã thanh toán'}):\n- Thời gian khai giảng: ${reg.startDate}\n${isZoom ? `- Hình thức: Trực tuyến qua Zoom Meeting` : `- Hình thức: Trực tiếp tại Hội trường`}\n- Hotline hỗ trợ kỹ thuật: 0927 002 668\nTrân trọng đón tiếp Anh/Chị!`;
     navigator.clipboard.writeText(msg);
     setCopiedId(reg.id);
     toast.showToast('Đã chép nội dung tin nhắn gửi học viên qua Zalo!', 'success');
@@ -358,7 +358,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Danh_Sach_Hoc_Vien_Live_199K_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `Danh_Sach_Hoc_Vien_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     toast.showToast('Đã tải xuống file danh sách học viên!', 'success');
   };
@@ -386,13 +386,13 @@ export const FeaturedCoursesDashboard: React.FC = () => {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 text-[#007c76] border border-teal-200">
             <Flame className="w-4 h-4 text-amber-500 animate-pulse" />
-            Bảng Quản Trị Khóa Nổi Bật & Biên Lai Webhook (FAST Admin)
+            Bảng Quản Trị Khóa Nổi Bật &amp; Biên Lai Webhook (FAST Admin)
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Quản Lý Khóa Học & Đăng Ký Lớp 199K
+            Quản Lý 3 Khóa Học Đặc Biệt Nổi Bật (Hiển Thị Trang Chủ Layout 3 Cột)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-xl">
-            Bật/Tắt trạng thái nổi bật cho 5 khóa học hàng ngang, quản lý đăng ký học viên, thêm khóa học mới cho Giảng viên và cấu hình Webhook chuyển khoản.
+            Bật/Tắt trạng thái nổi bật cho đúng 3 khóa học đặc biệt hiển thị chia 3 cột hiện đại tinh tế trên trang chủ, quản lý đăng ký và cấu hình Webhook.
           </p>
         </div>
 
@@ -433,7 +433,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
           }`}
         >
           <Star className="w-4 h-4" />
-          <span>Khóa Nổi Bật 5 Cột ({featuredIds.length}/5)</span>
+          <span>3 Khóa Nổi Bật Trang Chủ ({featuredIds.length}/3)</span>
         </button>
 
         <button
@@ -472,29 +472,29 @@ export const FeaturedCoursesDashboard: React.FC = () => {
           }`}
         >
           <Webhook className="w-4 h-4" />
-          <span>Webhook & Tạo Biên Lai</span>
+          <span>Webhook &amp; Tạo Biên Lai</span>
         </button>
       </div>
 
-      {/* TAB 1: CẤU HÌNH KHÓA HỌC NỔI BẬT DÀN HÀNG NGANG 5 CỘT HIỆN ĐẠI */}
+      {/* TAB 1: CẤU HÌNH KHÓA HỌC NỔI BẬT DÀN HÀNG NGANG CHIA 3 CỘT HIỆN ĐẠI */}
       {activeSubTab === 'featured-manager' && (
         <div className="space-y-8 animate-fade-in">
-          {/* HÀNG NGANG 5 CỘT KHÓA NỔI BẬT */}
+          {/* HÀNG NGANG 3 CỘT KHÓA NỔI BẬT */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${
-                  featuredIds.length === 5 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  featuredIds.length === 3 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                 }`}>
-                  {featuredIds.length}/5
+                  {featuredIds.length}/3
                 </span>
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                    <span>5 Khóa Học Nổi Bật Hiển Thị Hàng Ngang</span>
+                    <span>3 Khóa Học Đặc Biệt Nổi Bật Hiển Thị Trang Chủ (Bố Cục Chia 3 Cột)</span>
                     <Sparkles className="w-4 h-4 text-amber-500" />
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Bật/Tắt trực tiếp bên dưới hoặc kéo di chuyển thứ tự. Dữ liệu đồng bộ tự động lên Firestore.
+                    Bật/Tắt công tắc bên dưới để chọn 3 khóa hiển thị ở giao diện trang chủ. Đồng bộ trực tiếp theo thời gian thực.
                   </p>
                 </div>
               </div>
@@ -505,19 +505,19 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                 className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 transition flex items-center gap-1.5 cursor-pointer self-start sm:self-center"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Reset Mặc Định</span>
+                <span>Reset 3 Khóa Mặc Định</span>
               </button>
             </div>
 
-            {/* DÀN HÀNG NGANG CHIA 5 CỘT (Modern 5-Column Grid Layout) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {/* DÀN HÀNG NGANG CHIA 3 CỘT (Modern 3-Column Grid Layout Preview) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {activeFeaturedCourses.map((c, index) => (
                 <div
                   key={c.id}
-                  className="p-4 rounded-2xl border-2 border-teal-200 bg-teal-50/40 flex flex-col justify-between space-y-3 relative group hover:shadow-md transition"
+                  className="p-5 rounded-2xl border-2 border-teal-200 bg-gradient-to-b from-teal-50/60 to-white flex flex-col justify-between space-y-4 relative group hover:shadow-lg transition"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="w-6 h-6 rounded-full bg-[#007c76] text-white font-black text-[11px] flex items-center justify-center shadow-xs">
+                    <span className="w-7 h-7 rounded-full bg-[#007c76] text-white font-black text-xs flex items-center justify-center shadow-xs">
                       #{index + 1}
                     </span>
                     <div className="flex items-center gap-1">
@@ -526,7 +526,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                         disabled={index === 0}
                         onClick={() => handleMoveUp(index)}
                         title="Đẩy sang trái"
-                        className="p-1 rounded bg-white hover:bg-slate-100 text-slate-600 disabled:opacity-20 cursor-pointer"
+                        className="p-1.5 rounded bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 disabled:opacity-20 cursor-pointer"
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
                       </button>
@@ -535,7 +535,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                         disabled={index === activeFeaturedCourses.length - 1}
                         onClick={() => handleMoveDown(index)}
                         title="Đẩy sang phải"
-                        className="p-1 rounded bg-white hover:bg-slate-100 text-slate-600 disabled:opacity-20 cursor-pointer"
+                        className="p-1.5 rounded bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 disabled:opacity-20 cursor-pointer"
                       >
                         <ArrowDown className="w-3.5 h-3.5" />
                       </button>
@@ -545,42 +545,43 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                   <img
                     src={c.image}
                     alt={c.title}
-                    className="w-full h-24 rounded-xl object-cover border border-slate-200"
+                    className="w-full h-36 rounded-xl object-cover border border-slate-200 shadow-xs"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=200';
                     }}
                   />
 
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 inline-block">
-                      {c.category || 'ATTP'}
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md bg-slate-900 text-teal-200 inline-block">
+                      {c.category || 'ISO/ATTP'}
                     </span>
-                    <h4 className="font-black text-xs text-slate-900 line-clamp-2 leading-snug">
+                    <h4 className="font-black text-sm text-slate-900 line-clamp-2 leading-snug">
                       {c.title}
                     </h4>
+                    <p className="text-xs text-slate-500 line-clamp-1 font-medium">{c.description}</p>
                   </div>
 
                   {/* Nút Công Tắt Bật/Tắt Trạng Thái Nổi Bật */}
                   <button
                     type="button"
                     onClick={() => handleToggleFeatured(c.id)}
-                    className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
                   >
-                    <Star className="w-3.5 h-3.5 fill-current text-amber-300" />
-                    <span>NỔI BẬT (ON)</span>
+                    <Star className="w-4 h-4 fill-current text-amber-300" />
+                    <span>NỔI BẬT TRANG CHỦ (ON)</span>
                   </button>
                 </div>
               ))}
 
-              {/* Ô trống nếu chưa đủ 5 khóa */}
-              {Array.from({ length: Math.max(0, 5 - activeFeaturedCourses.length) }).map((_, i) => (
+              {/* Ô trống nếu chưa đủ 3 khóa */}
+              {Array.from({ length: Math.max(0, 3 - activeFeaturedCourses.length) }).map((_, i) => (
                 <div
                   key={`empty-${i}`}
-                  className="p-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center text-slate-400 space-y-2 min-h-[220px]"
+                  className="p-6 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center text-slate-400 space-y-2 min-h-[260px]"
                 >
-                  <Star className="w-8 h-8 text-slate-300" />
-                  <p className="text-xs font-bold">Vị trí #{activeFeaturedCourses.length + i + 1} trống</p>
-                  <p className="text-[10px]">Nhấn Bật bên dưới để thêm</p>
+                  <Star className="w-10 h-10 text-slate-300 animate-pulse" />
+                  <p className="text-xs font-bold text-slate-600">Vị trí #{activeFeaturedCourses.length + i + 1} trống</p>
+                  <p className="text-[11px] text-slate-400">Chọn 1 khóa trong danh mục bên dưới và nhấn Bật Nổi Bật</p>
                 </div>
               ))}
             </div>
@@ -713,7 +714,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-black text-slate-900">
-                Danh Sách Học Viên Đăng Ký Đào Tạo Trực Tiếp (199K)
+                Danh Sách Học Viên Đăng Ký Đào Tạo Trực Tiếp &amp; Zoom
               </h3>
               <p className="text-xs text-slate-500">
                 Theo dõi, duyệt thanh toán, xuất Biên lai và có nút Xóa sạch tất cả dữ liệu đăng ký cũ theo yêu cầu.
@@ -785,7 +786,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
           ) : filteredRegistrations.length === 0 ? (
             <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 space-y-2">
               <p className="font-bold">Danh sách đăng ký hiện đang trống (Đã xóa hết bản ghi cũ).</p>
-              <p className="text-xs">Khi học viên đăng ký mới qua form 199k, hồ sơ sẽ tự động hiển thị tại đây.</p>
+              <p className="text-xs">Khi học viên đăng ký mới, hồ sơ sẽ tự động hiển thị tại đây.</p>
             </div>
           ) : (
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
@@ -841,7 +842,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                         </td>
 
                         <td className="py-3 px-4 font-black text-[#007c76]">
-                          {reg.price || '199.000đ'}
+                          {reg.price || '299.000đ'}
                         </td>
 
                         <td className="py-3 px-4">
@@ -981,7 +982,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                   type="text"
                   value={webhookContent}
                   onChange={(e) => setWebhookContent(e.target.value)}
-                  placeholder="LIVE199K 0987654321 CHUYEN KHOAN HOAN TAT"
+                  placeholder="DAOTAO 0987654321 CHUYEN KHOAN HOAN TAT"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1025,7 +1026,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                   BL
                 </div>
                 <div>
-                  <h4 className="font-black text-slate-900 text-sm">Biên Lai Điện Tử FAST 199K</h4>
+                  <h4 className="font-black text-slate-900 text-sm">Biên Lai Điện Tử FAST</h4>
                   <p className="text-xs text-slate-600">Có sẵn địa chỉ, hotline và con dấu Viện Đào Tạo</p>
                 </div>
               </div>

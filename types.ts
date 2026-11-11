@@ -36,6 +36,28 @@ export interface Course {
   isDirectTraining?: boolean;
 }
 
+export interface TrainingCourse {
+  id: string;
+  title: string;
+  price: string;
+  originalPrice?: string;
+  discountPercent?: number;
+  duration?: string;
+  image: string;
+  category: string;
+  description?: string;
+  status: 'active' | 'inactive';
+  trainingFormat: 'zoom' | 'direct' | 'both' | 'inhouse';
+  startDate: string;
+  scheduleDetails?: string;
+  venueAddress?: string;
+  instructor?: string;
+  maxStudents?: number;
+  benefits?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface DirectRegistration {
   id: string;
   studentName: string;

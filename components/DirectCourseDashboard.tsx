@@ -169,7 +169,7 @@ Hotline hỗ trợ: 0927 002 668. Trân trọng!`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `danh_sach_hoc_vien_attp_199k_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `danh_sach_hoc_vien_attp_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -200,7 +200,7 @@ Hotline hỗ trợ: 0927 002 668. Trân trọng!`;
     const directCount = registrations.filter(r => r.trainingType === 'direct').length;
     const confirmedCount = registrations.filter(r => r.status === 'confirmed').length;
     const totalRevenue = registrations.reduce((sum, r) => {
-      const num = parseInt(r.price.replace(/[^\d]/g, ''), 10) || 199000;
+      const num = parseInt(r.price.replace(/[^\d]/g, ''), 10) || 299000;
       return sum + num;
     }, 0);
 
@@ -217,7 +217,7 @@ Hotline hỗ trợ: 0927 002 668. Trân trọng!`;
             <GraduationCap className="w-3.5 h-3.5" /> Bảng Dashboard Khóa Đào Tạo Trực Tiếp & Zoom
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Khóa Đào Tạo An Toàn Vệ Sinh Thực Phẩm 199K
+            Khóa Đào Tạo An Toàn Vệ Sinh Thực Phẩm Chuyên Sâu
           </h2>
           <p className="text-teal-100 text-xs sm:text-sm mt-1 max-w-2xl font-medium">
             Quản lý học viên đăng ký các lớp đào tạo trực tiếp tại cơ sở và lớp tập huấn tương tác qua phòng học Zoom.
@@ -342,7 +342,7 @@ Hotline hỗ trợ: 0927 002 668. Trân trọng!`;
             <GraduationCap className="w-12 h-12 text-gray-300 mx-auto" />
             <h4 className="text-base font-extrabold text-gray-700">Chưa có học viên nào trong danh mục đã chọn</h4>
             <p className="text-xs text-gray-400 max-w-sm mx-auto">
-              Học viên khi bấm đăng ký khóa học trực tiếp / Zoom 199k từ trang chủ hoặc danh mục khóa học sẽ hiển thị tức thì tại đây.
+              Học viên khi bấm đăng ký khóa đào tạo trực tiếp / Zoom từ danh mục khóa học sẽ hiển thị tức thì tại đây.
             </p>
             <button
               onClick={() => setIsAddModalOpen(true)}

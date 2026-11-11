@@ -1,5 +1,5 @@
 
-import { NavLink, Course, TeamMember } from './types';
+import { NavLink, Course, TeamMember, TrainingCourse } from './types';
 
 export const ADMIN_EMAILS = [
   'h1h4phong@gmail.com',
@@ -106,13 +106,11 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
   }
 ];
 
-// Danh sách 5 khóa học an toàn thực phẩm nổi bật mặc định
+// Danh sách 3 khóa học nổi bật đặc biệt mặc định (Hiển thị trang chủ layout 3 cột)
 export const DEFAULT_FEATURED_COURSE_IDS = [
   'haccp-tcvn',
   'iso-22000',
-  'qa-qc-pro',
-  'basic-principles',
-  'iso-9001'
+  'qa-qc-pro'
 ];
 
 export const COURSES: Course[] = [
@@ -985,3 +983,124 @@ export function getMergedCombos(firestoreCombos?: any[], options: { includeInact
 
   return all;
 }
+
+// ----------------------------------------------------
+// KHÓA ĐÀO TẠO TRỰC TIẾP & ZOOM (TRAINING COURSES)
+// ----------------------------------------------------
+export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
+  {
+    id: '1093847261',
+    title: 'Tập huấn An toàn Vệ sinh Thực phẩm Cơ sở Sản xuất & F&B',
+    price: '299.000đ',
+    originalPrice: '600.000đ',
+    discountPercent: 50,
+    duration: '1 ngày (8 tiết)',
+    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800',
+    category: 'An toàn thực phẩm',
+    description: 'Chương trình đào tạo cấp chứng nhận kiến thức ATTP chuẩn Bộ Y tế & Codex. Hướng dẫn thiết lập quy trình kiểm soát vệ sinh cơ sở, trang thiết bị và nhân sự thực phẩm.',
+    status: 'active',
+    trainingFormat: 'both',
+    startDate: 'Chủ Nhật hàng tuần (08:30 - 16:30)',
+    scheduleDetails: 'Sáng: 08:30 - 11:30 | Chiều: 13:30 - 16:30',
+    venueAddress: 'Tòa nhà FAST E-Learning, Số 18 Phố Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Online Zoom',
+    instructor: 'ThS. Nguyễn Văn Thành (Chuyên gia QMS & ATTP 15 năm kinh nghiệm)',
+    benefits: ['Chứng nhận hoàn thành có mã tra cứu 10 số điện tử', 'Bộ biểu mẫu hồ sơ ATTP mẫu', 'Tư vấn giải đáp trực tiếp cùng chuyên gia']
+  },
+  {
+    id: '2094857163',
+    title: 'Thực hành Thiết lập Kế hoạch HACCP & Điểm Kiểm Soát Tới Hạn (CCP)',
+    price: '499.000đ',
+    originalPrice: '1.000.000đ',
+    discountPercent: 50,
+    duration: '2 buổi tối Zoom',
+    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+    category: 'HACCP',
+    description: 'Khóa đào tạo chuyên sâu hướng dẫn 12 bước xây dựng hệ thống và 7 nguyên tắc HACCP Codex 2020. Bài tập tình huống nhận diện mối nguy và lập bảng HACCP Plan thực tế.',
+    status: 'active',
+    trainingFormat: 'zoom',
+    startDate: 'Tối Thứ 7 & Chủ Nhật (19:30 - 21:30)',
+    scheduleDetails: 'Trực tuyến có tương tác hai chiều qua Zoom HD',
+    venueAddress: 'Phòng học trực tuyến Zoom FAST Academy',
+    instructor: 'TS. Trần Hạnh (Chuyên gia Kiểm định Thực phẩm)',
+    benefits: ['Bộ kế hoạch HACCP mẫu ứng dụng được ngay', 'Video quay lại buổi học xem lại trọn đời', 'Chứng nhận hoàn thành']
+  },
+  {
+    id: '3095867274',
+    title: 'Đào tạo Đánh giá viên Nội bộ ISO 22000:2018 Chuyên sâu',
+    price: '799.000đ',
+    originalPrice: '1.500.000đ',
+    discountPercent: 47,
+    duration: '2 ngày cuối tuần',
+    image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800',
+    category: 'ISO',
+    description: 'Trang bị kỹ năng lập kế hoạch đánh giá nội bộ, viết báo cáo NCR và thực hiện hành động khắc phục CAPA theo chuẩn ISO 19011 và ISO 22000.',
+    status: 'active',
+    trainingFormat: 'both',
+    startDate: 'Khai giảng ngày 15 và 30 hàng tháng',
+    scheduleDetails: 'Thứ 7 & Chủ Nhật',
+    venueAddress: 'Hội trường Tầng 6, Tòa nhà Mộc Gia, 238-242 Nguyễn Oanh, Gò Vấp, TP.HCM',
+    instructor: 'Chuyên gia Đặng Minh Trí',
+    benefits: ['Chứng chỉ Internal Auditor ISO 22000', 'Bộ checklist audit đầy đủ từ điều khoản 4 đến 10', 'Hỗ trợ nghiệp vụ sau khóa']
+  },
+  {
+    id: '4096878385',
+    title: 'Thiết kế Vận hành Bếp Ăn Một Chiều & Bếp Trung Tâm (Central Kitchen)',
+    price: '399.000đ',
+    originalPrice: '800.000đ',
+    discountPercent: 50,
+    duration: '1 ngày thực chiến',
+    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=800',
+    category: 'Bếp ăn & Nhà hàng',
+    description: 'Hướng dẫn quy chuẩn phân luồng sơ chế, chế biến nhiệt, phân phối và lưu mẫu thức ăn 24h. Tối ưu chi phí vận hành và vượt qua các đợt kiểm tra liên ngành.',
+    status: 'active',
+    trainingFormat: 'direct',
+    startDate: 'Thứ 7 tuần thứ 2 hàng tháng',
+    scheduleDetails: '09:00 - 17:00',
+    venueAddress: 'Trung tâm Đào tạo FAST, Nam Từ Liêm, Hà Nội',
+    instructor: 'Bếp trưởng & Chuyên gia ATTP Lê Hoàng',
+    benefits: ['Sơ đồ mặt bằng bếp 1 chiều chuẩn Bộ Y tế', 'Mẫu sổ kiểm thực 3 bước và lưu mẫu thức ăn', 'Tư vấn trực tiếp cho cơ sở']
+  }
+];
+
+export function getMergedTrainingCourses(firestoreTrainings?: TrainingCourse[], options: { includeInactive?: boolean } = {}): TrainingCourse[] {
+  const map = new Map<string, TrainingCourse>();
+
+  // 1. Base default trainings
+  DEFAULT_TRAINING_COURSES.forEach(item => {
+    map.set(item.id, { ...item });
+  });
+
+  // 2. Local storage cache
+  try {
+    const raw = localStorage.getItem('training_courses_cache');
+    if (raw) {
+      const parsed: TrainingCourse[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(t => {
+          if (t && t.id) {
+            const prev = map.get(t.id);
+            map.set(t.id, prev ? { ...prev, ...t } : t);
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 3. Overlay Firestore trainings
+  if (Array.isArray(firestoreTrainings) && firestoreTrainings.length > 0) {
+    firestoreTrainings.forEach(ft => {
+      if (ft && ft.id) {
+        const prev = map.get(ft.id);
+        map.set(ft.id, prev ? { ...prev, ...ft } : ft);
+      }
+    });
+  }
+
+  let list = Array.from(map.values());
+  if (!options.includeInactive) {
+    list = list.filter(t => t.status !== 'inactive');
+  }
+
+  return list;
+}
+

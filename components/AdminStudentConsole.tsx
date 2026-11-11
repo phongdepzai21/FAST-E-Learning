@@ -339,7 +339,7 @@ export const AdminStudentConsole: React.FC = () => {
           }`}
         >
           <Video className="w-4 h-4" />
-          <span>Cấu hình 5 Khóa Nổi Bật & Lớp Trực Tiếp (199K)</span>
+          <span>Cấu hình 3 Khóa Nổi Bật Trang Chủ</span>
         </button>
       </div>
 

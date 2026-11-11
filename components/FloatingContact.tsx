@@ -176,12 +176,12 @@ Học phí ưu đãi: **599.000đ** (kèm chứng nhận điện tử bảo mậ
 - Phương pháp xác lập CCP, OPRP và xây dựng bảng kế hoạch HACCP ứng dụng thực tế.
 - Bộ biểu mẫu giám sát, thẩm tra và hành động khắc phục thực tế.
 
-👉 Lớp đào tạo trực tiếp / Zoom học phí chỉ **199.000đ**. Liên hệ Hotline/Zalo **0927 002 668** để đăng ký ngay!`;
+👉 Khóa đào tạo trực tiếp / Zoom khai giảng định kỳ hàng tuần. Liên hệ Hotline/Zalo **0927 002 668** để đăng ký ngay!`;
     }
 
     if (q.includes('học phí') || q.includes('giá') || q.includes('chi phí') || q.includes('bao nhiêu') || q.includes('tiền')) {
       return `Bảng học phí các chương trình đào tạo tại FAST E-Learning:
-- **Khóa đào tạo trực tiếp / Zoom (ATTP & HACCP)**: Chỉ **199.000đ/học viên** (lịch học tương tác trực tiếp với chuyên gia).
+- **Khóa đào tạo trực tiếp / Zoom**: Học phí theo từng chuyên đề thực chiến với chuyên gia (có cấp chứng nhận 10 số).
 - **Khóa lẻ E-Learning trực tuyến**: Từ **299.000đ - 799.000đ/khóa** (ISO 9001, ISO 22000, HACCP, QA/QC, BRCGS...).
 - **Gói Combo ưu đãi trọn gói**: Tiết kiệm tới 60% học phí so với đăng ký lẻ.
 
@@ -207,7 +207,7 @@ Mọi học viên đều được cấp tài khoản truy cập vĩnh viễn và
 
     return `Chào bạn! Tôi là **Trần Hạnh** - Trợ lý chuyên gia FAST E-Learning. 
 Tôi có thể hỗ trợ bạn về:
-- Các khóa đào tạo **ISO 22000, HACCP, ISO 9001, QA/QC** (lớp Zoom/trực tiếp chỉ **199k**).
+- Các chương trình đào tạo **ISO 22000, HACCP, ISO 9001, QA/QC** (lớp Zoom & trực tiếp hội trường).
 - Dịch vụ **Tư vấn trọn gói Giấy phép An toàn thực phẩm**, thiết kế bếp một chiều.
 - Hướng dẫn thủ tục đăng ký, học phí và xuất hóa đơn VAT.
 

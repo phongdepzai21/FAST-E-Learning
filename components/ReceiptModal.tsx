@@ -38,8 +38,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [phone, setPhone] = useState(initialData?.phone || '');
   const [email, setEmail] = useState(initialData?.email || '');
   const [companyName, setCompanyName] = useState(initialData?.companyName || '');
-  const [courseTitle, setCourseTitle] = useState(initialData?.courseTitle || 'Đào tạo An toàn Vệ sinh Thực phẩm (199K)');
-  const [amount, setAmount] = useState<string>(initialData?.amount ? String(initialData.amount) : '199.000đ');
+  const [courseTitle, setCourseTitle] = useState(initialData?.courseTitle || 'Đào tạo An toàn Vệ sinh Thực phẩm Chuyên sâu');
+  const [amount, setAmount] = useState<string>(initialData?.amount ? String(initialData.amount) : '299.000đ');
   const [issueDate, setIssueDate] = useState(initialData?.issueDate || todayStr);
   const [receiptNo, setReceiptNo] = useState(initialData?.receiptNo ? toTenDigitId(initialData.receiptNo) : defaultReceiptNo);
   const [isGenerated, setIsGenerated] = useState<boolean>(!!initialData?.studentName);
@@ -310,3 +310,5 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     </div>
   );
 };
+
+export default ReceiptModal;

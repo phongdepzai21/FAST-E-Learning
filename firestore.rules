@@ -312,5 +312,11 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isAdmin() || isSystemOwner();
     }
+
+    // 19. Training Courses (Khóa Đào Tạo Trực Tiếp & Zoom)
+    match /training_courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin() || isTeacher() || isSystemOwner();
+    }
   }
 }

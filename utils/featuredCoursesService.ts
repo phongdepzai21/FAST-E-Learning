@@ -8,7 +8,7 @@ const FIRESTORE_COLLECTION = 'featured_courses';
 const FIRESTORE_DOC = 'config';
 
 /**
- * Lấy danh sách ID 5 khóa học nổi bật từ bộ nhớ cục bộ (cache fallback)
+ * Lấy danh sách ID 3 khóa học nổi bật từ bộ nhớ cục bộ (cache fallback)
  */
 export function getCachedFeaturedCourseIds(): string[] {
   try {
@@ -16,7 +16,7 @@ export function getCachedFeaturedCourseIds(): string[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.slice(0, 5);
+        return parsed.slice(0, 3);
       }
     }
   } catch (e) {
@@ -26,7 +26,7 @@ export function getCachedFeaturedCourseIds(): string[] {
 }
 
 /**
- * Tải danh sách 5 khóa học nổi bật từ Firestore / Server
+ * Tải danh sách 3 khóa học nổi bật từ Firestore / Server
  */
 export async function fetchFeaturedCourseIds(): Promise<string[]> {
   try {
@@ -36,7 +36,7 @@ export async function fetchFeaturedCourseIds(): Promise<string[]> {
     if (snap.exists()) {
       const data = snap.data();
       if (Array.isArray(data?.featuredCourseIds) && data.featuredCourseIds.length > 0) {
-        const ids = data.featuredCourseIds.slice(0, 5);
+        const ids = data.featuredCourseIds.slice(0, 3);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
         return ids;
       }
@@ -47,7 +47,7 @@ export async function fetchFeaturedCourseIds(): Promise<string[]> {
     if (res.ok) {
       const apiData = await res.json();
       if (Array.isArray(apiData?.featuredCourseIds) && apiData.featuredCourseIds.length > 0) {
-        const ids = apiData.featuredCourseIds.slice(0, 5);
+        const ids = apiData.featuredCourseIds.slice(0, 3);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
         return ids;
       }
@@ -60,7 +60,7 @@ export async function fetchFeaturedCourseIds(): Promise<string[]> {
 }
 
 /**
- * Lưu danh sách 5 khóa học nổi bật mới (tối đa 5 khóa)
+ * Lưu danh sách 3 khóa học nổi bật mới (tối đa 3 khóa)
  */
 export async function saveFeaturedCourseIds(courseIds: string[], updatedBy?: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -68,8 +68,8 @@ export async function saveFeaturedCourseIds(courseIds: string[], updatedBy?: str
       return { success: false, error: 'Dữ liệu khóa học không hợp lệ' };
     }
 
-    // Đảm bảo chỉ lấy tối đa 5 khóa không trùng lặp
-    const uniqueIds = Array.from(new Set(courseIds.filter(id => typeof id === 'string' && id.trim().length > 0))).slice(0, 5);
+    // Đảm bảo chỉ lấy tối đa 3 khóa không trùng lặp
+    const uniqueIds = Array.from(new Set(courseIds.filter(id => typeof id === 'string' && id.trim().length > 0))).slice(0, 3);
 
     // 1. Cập nhật localStorage tức thì
     localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueIds));
@@ -102,7 +102,7 @@ export async function saveFeaturedCourseIds(courseIds: string[], updatedBy?: str
 }
 
 /**
- * Lắng nghe thay đổi thời gian thực của cấu hình 5 khóa học nổi bật
+ * Lắng nghe thay đổi thời gian thực của cấu hình 3 khóa học nổi bật
  */
 export function subscribeToFeaturedCourseIds(callback: (ids: string[]) => void): () => void {
   // Bắn dữ liệu cache trước
@@ -116,7 +116,7 @@ export function subscribeToFeaturedCourseIds(callback: (ids: string[]) => void):
       if (snap.exists()) {
         const data = snap.data();
         if (Array.isArray(data?.featuredCourseIds)) {
-          const ids = data.featuredCourseIds.slice(0, 5);
+          const ids = data.featuredCourseIds.slice(0, 3);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
           callback(ids);
         }

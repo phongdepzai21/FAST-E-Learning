@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from "react-router-dom";
 import Hero from '../components/Hero';
-import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, extractLessonsFlat } from '../constants';
+import { COURSES as HARDCODED_COURSES, getMergedCourses, getMergedCombos, extractLessonsFlat, DEFAULT_FEATURED_COURSE_IDS } from '../constants';
+import { subscribeToFeaturedCourseIds } from '../utils/featuredCoursesService';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
@@ -121,29 +122,60 @@ const Home: React.FC = () => {
     return list;
   }, [allCourses]);
 
-  // Top 5 Featured Prominent Courses (HACCP, ISO 22000, ISO 9001, ISO 14001, VietGAP)
-  const top5Courses = useMemo(() => {
-    const famousCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
-    const list: Course[] = [];
+  // Real-time subscription to featured course IDs configured by admin
+  const [featuredIds, setFeaturedIds] = useState<string[]>([]);
 
-    // 1. Lấy từ allCourses theo thứ tự ưu tiên (chỉ lấy khóa đang hoạt động, bỏ qua khóa ẩn/nháp)
-    for (const id of famousCourseIds) {
-      const found = allCourses.find(c => c.id === id && c.status !== 'draft' && c.status !== 'inactive');
+  useEffect(() => {
+    const unsub = subscribeToFeaturedCourseIds((ids) => {
+      setFeaturedIds(ids);
+    });
+    return () => unsub();
+  }, []);
+
+  // Top 3 Special Featured Courses dynamically configured from Admin Dashboard
+  const top3FeaturedCourses = useMemo(() => {
+    const list: Course[] = [];
+    const courseMap = new Map<string, Course>();
+
+    allCourses.forEach(c => {
+      if (c && c.id && c.status !== 'draft' && c.status !== 'inactive') {
+        courseMap.set(c.id, c);
+      }
+    });
+
+    // 1. Prioritize courses selected in Admin Dashboard (up to 3)
+    const activeIds = featuredIds.length > 0 ? featuredIds : DEFAULT_FEATURED_COURSE_IDS;
+    for (const id of activeIds) {
+      const found = courseMap.get(id);
       if (found && !list.some(item => item.id === found.id)) {
         list.push(found);
       }
+      if (list.length >= 3) break;
     }
 
-    // 2. Nếu thiếu 5 khóa do có khóa bị ẩn, bù từ các khóa học đang hoạt động khác trong featuredCourses
-    for (const c of featuredCourses) {
-      if (!list.some(item => item.id === c.id)) {
-        list.push(c);
+    // 2. Fallback to default famous IDs if fewer than 3
+    if (list.length < 3) {
+      for (const id of DEFAULT_FEATURED_COURSE_IDS) {
+        const found = courseMap.get(id);
+        if (found && !list.some(item => item.id === found.id)) {
+          list.push(found);
+        }
+        if (list.length >= 3) break;
       }
-      if (list.length >= 5) break;
     }
 
-    return list.slice(0, 5);
-  }, [allCourses, featuredCourses]);
+    // 3. Fallback to any active course in catalog
+    if (list.length < 3) {
+      for (const c of allCourses) {
+        if (c && c.id && c.status !== 'draft' && c.status !== 'inactive' && !list.some(item => item.id === c.id)) {
+          list.push(c);
+        }
+        if (list.length >= 3) break;
+      }
+    }
+
+    return list.slice(0, 3);
+  }, [allCourses, featuredIds]);
 
   const marqueeContainerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -446,9 +478,9 @@ const Home: React.FC = () => {
             </p>
           </div>
 
-          {/* Featured Courses 3-Column Modern Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredCourses.map((c) => {
+          {/* Featured Courses 3-Column Modern Grid (Exactly 3 Special Featured Courses) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {top3FeaturedCourses.map((c) => {
               const cLessons = extractLessonsFlat(c.curriculum);
               const { price, originalPrice, discountBadge } = getCoursePriceDisplay(c);
               const isOwned = ownedCourseIds.includes(c.id);
@@ -552,7 +584,7 @@ const Home: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Interactive Dynamic Syllabus Preview Slide-Up (Triggered on hover/focus) */}
+                  {/* Interactive Dynamic Syllabus Preview Slide-Up */}
                   <div
                     className={`absolute inset-0 z-20 bg-white flex flex-col transition-all duration-300 ease-out ${
                       isHoveredOrActive
@@ -639,7 +671,7 @@ const Home: React.FC = () => {
             })}
           </div>
 
-          {featuredCourses.length === 0 && (
+          {top3FeaturedCourses.length === 0 && (
             <div className="text-center py-12 bg-white rounded-3xl border border-slate-200/80 p-8">
               <p className="text-slate-500 font-medium text-sm">
                 Đang cập nhật danh sách khóa học nổi bật.
@@ -652,25 +684,22 @@ const Home: React.FC = () => {
       {/* 2.5. Gói Combo & Ưu Đãi Sale Off 50% (Layout Lưới 3 Cột Hiện Đại, Đổ Bóng Hover & Badge Tiết Kiệm) */}
       <section className="py-14 md:py-20 bg-gradient-to-b from-white via-slate-50 to-teal-950/[0.02] border-t border-slate-200/80 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Flash Sale Banner Header */}
+          {/* Combo Banner Header */}
           <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 mb-10 border border-teal-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="space-y-2 text-center md:text-left relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-600/90 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md animate-pulse">
-                <span>🔥 SIÊU ƯU ĐÃI SALE OFF 50%</span>
-              </div>
               <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white leading-tight">
-                Gói Combo Đào Tạo Trọn Gói Tiết Kiệm
+                Gói Combo Đào Tạo Trọn Gói
               </h3>
               <p className="text-slate-300 text-xs sm:text-sm font-medium max-w-xl">
-                Đăng ký học trọn bộ tiêu chuẩn ISO, HACCP &amp; VietGAP với chi phí ưu đãi nhất. Tiết kiệm đến 50% so với đăng ký riêng lẻ.
+                Đăng ký học trọn bộ tiêu chuẩn ISO, HACCP &amp; VietGAP giúp tối ưu lộ trình học và tiết kiệm chi phí so với đăng ký riêng lẻ.
               </p>
             </div>
             <Link
               to="/account/vip-upgrade"
               className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg hover:scale-105 transition-all shrink-0 cursor-pointer flex items-center gap-2"
             >
-              <span>Đăng Ký Nhận Sale Off</span>
+              <span>Xem Chi Tiết Combo</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
