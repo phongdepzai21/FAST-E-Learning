@@ -13,12 +13,27 @@ export default defineConfig(({ mode }) => {
         drop: ['console', 'debugger'],
       },
       build: {
-        chunkSizeWarningLimit: 1200,
+        target: 'esnext',
+        minify: 'esbuild',
+        cssCodeSplit: true,
+        chunkSizeWarningLimit: 1500,
         rollupOptions: {
           output: {
-            manualChunks: {
-              vendor: ['react', 'react-dom', 'react-router-dom'],
-              firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            manualChunks(id) {
+              if (id.includes('node_modules')) {
+                if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+                  return 'vendor-react';
+                }
+                if (id.includes('firebase')) {
+                  return 'vendor-firebase';
+                }
+                if (id.includes('lucide-react')) {
+                  return 'vendor-icons';
+                }
+                if (id.includes('motion') || id.includes('framer-motion')) {
+                  return 'vendor-animation';
+                }
+              }
             }
           }
         }

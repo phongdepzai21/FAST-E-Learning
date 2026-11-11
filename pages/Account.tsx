@@ -3,27 +3,29 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { COURSES as HARDCODED_COURSES, TEACHER_EMAILS, ADMIN_EMAILS, getMergedCourses } from '../constants';
 import emailjs from '@emailjs/browser';
 import CourseCard from '../components/CourseCard';
-import TeacherDashboard from '../components/TeacherDashboard';
 import AccountSettings from './AccountSettings';
 import CourseDetail from './CourseDetail';
-import { UserManagement } from '../components/UserManagement';
-import ComboManagement from '../components/ComboManagement';
-import { AdminManualUnlock } from '../components/AdminManualUnlock';
-import { AdminStudentConsole } from '../components/AdminStudentConsole';
-import FastStandardsAudit from '../components/FastStandardsAudit';
-import AdProfileManagement from '../components/AdProfileManagement';
-import FastFoodSafetyManagement from '../components/FastFoodSafetyManagement';
-import FastHaccpChecklist from '../components/FastHaccpChecklist';
-import FastIso22kChecklist from '../components/FastIso22kChecklist';
-import { PurchaseHistory } from '../components/PurchaseHistory';
 import { ViewedCoursesView } from '../components/ViewedCoursesView';
-import { FastCodeLookup } from '../components/FastCodeLookup';
 import { NotificationDropdown } from '../components/NotificationDropdown';
-import { AdminDiagnosticConsole } from '../components/AdminDiagnosticConsole';
-import { DirectCourseDashboard } from '../components/DirectCourseDashboard';
-import { FeaturedCoursesDashboard } from '../components/FeaturedCoursesDashboard';
-import { TrainingCourseDashboard } from '../components/TrainingCourseDashboard';
 import { MyTrainingRegistrationsView } from '../components/MyTrainingRegistrationsView';
+
+// Lazy load heavy admin & CRM components to speed up student load time
+const TeacherDashboard = React.lazy(() => import('../components/TeacherDashboard'));
+const UserManagement = React.lazy(() => import('../components/UserManagement').then(m => ({ default: m.UserManagement })));
+const ComboManagement = React.lazy(() => import('../components/ComboManagement'));
+const AdminManualUnlock = React.lazy(() => import('../components/AdminManualUnlock').then(m => ({ default: m.AdminManualUnlock })));
+const AdminStudentConsole = React.lazy(() => import('../components/AdminStudentConsole').then(m => ({ default: m.AdminStudentConsole })));
+const FastStandardsAudit = React.lazy(() => import('../components/FastStandardsAudit'));
+const AdProfileManagement = React.lazy(() => import('../components/AdProfileManagement'));
+const FastFoodSafetyManagement = React.lazy(() => import('../components/FastFoodSafetyManagement'));
+const FastHaccpChecklist = React.lazy(() => import('../components/FastHaccpChecklist'));
+const FastIso22kChecklist = React.lazy(() => import('../components/FastIso22kChecklist'));
+const AdminDiagnosticConsole = React.lazy(() => import('../components/AdminDiagnosticConsole').then(m => ({ default: m.AdminDiagnosticConsole })));
+const DirectCourseDashboard = React.lazy(() => import('../components/DirectCourseDashboard').then(m => ({ default: m.DirectCourseDashboard })));
+const FeaturedCoursesDashboard = React.lazy(() => import('../components/FeaturedCoursesDashboard').then(m => ({ default: m.FeaturedCoursesDashboard })));
+const TrainingCourseDashboard = React.lazy(() => import('../components/TrainingCourseDashboard').then(m => ({ default: m.TrainingCourseDashboard })));
+const FastCodeLookup = React.lazy(() => import('../components/FastCodeLookup').then(m => ({ default: m.FastCodeLookup })));
+const PurchaseHistory = React.lazy(() => import('../components/PurchaseHistory').then(m => ({ default: m.PurchaseHistory })));
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -2372,6 +2374,12 @@ const Account: React.FC = () => {
                 className="w-full"
               >
                 <TabErrorBoundary key={activeTab} fallbackTitle={`Phân hệ ${activeTab}`}>
+                  <React.Suspense fallback={
+                    <div className="bg-white rounded-3xl p-12 border border-slate-200 text-center space-y-3 my-4">
+                      <div className="w-8 h-8 border-3 border-[#007c76] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Đang tải phân hệ quản trị...</p>
+                    </div>
+                  }>
                 {activeTab === 'featured-courses' && isAdmin ? (
                   <FeaturedCoursesDashboard />
                 ) : activeTab === 'direct-courses' && (isAdmin || isTeacher) ? (
@@ -2512,7 +2520,8 @@ const Account: React.FC = () => {
                 />
               </div>
             )}
-            </TabErrorBoundary>
+                  </React.Suspense>
+                </TabErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </div>
