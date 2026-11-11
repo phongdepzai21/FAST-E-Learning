@@ -55,11 +55,16 @@
       "description": "Master data record for dynamic combo packages offered on the platform",
       "type": "object",
       "properties": {
+        "id": { "type": "string", "description": "Combo package unique ID" },
         "title": { "type": "string", "description": "Combo package title" },
         "price": { "type": "string", "description": "Formatted package price" },
+        "originalPrice": { "type": "string", "description": "Original unDiscounted price" },
+        "savings": { "type": "string", "description": "Savings summary tag" },
         "image": { "type": "string", "description": "Banner photo URL" },
         "description": { "type": "string", "description": "Detailed description of the combo" },
         "status": { "type": "string", "description": "Status (active or inactive)" },
+        "courseIds": { "type": "array", "description": "Array of course IDs included in this combo" },
+        "benefits": { "type": "array", "description": "Array of feature benefit bullet points" },
         "updatedAt": { "type": "string", "description": "ISO update timestamp string" }
       },
       "required": ["title"]

@@ -1,6 +1,6 @@
 import { Course } from '../types';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
 // BroadcastChannel for instant (0ms) same-browser multi-tab synchronization
 const CHANNEL_NAME = 'fast_elearning_courses_sync';
@@ -16,6 +16,14 @@ try {
 let eventSource: EventSource | null = null;
 let isInitialized = false;
 let reconnectTimer: any = null;
+
+// Track active Firestore unsubscribe functions to allow clean restarts
+let unsubCourses: (() => void) | null = null;
+let unsubCombos: (() => void) | null = null;
+let unsubCustomCombos: (() => void) | null = null;
+let unsubSyncControlCourses: (() => void) | null = null;
+let unsubSyncControlCombos: (() => void) | null = null;
+let unsubFeaturedCourses: (() => void) | null = null;
 
 // Helper to purge deleted course IDs from all local caches
 export function applyDeletedCourses(deletedIds: string[]) {
@@ -42,7 +50,7 @@ export function applyDeletedCourses(deletedIds: string[]) {
 }
 
 /**
- * Apply updated courses into localStorage safely
+ * Apply updated courses into localStorage safely with accurate merge
  */
 function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
   if (Array.isArray(deletedIds) && deletedIds.length > 0) {
@@ -57,6 +65,7 @@ function updateStoredCourses(courses: Course[], deletedIds?: string[]) {
 
     const validCourses = courses.filter(c => c && c.id && !delSet.has(c.id));
     localStorage.setItem('server_custom_courses', JSON.stringify(validCourses));
+    localStorage.setItem('cached_firestore_courses', JSON.stringify(validCourses));
 
     const localStr = localStorage.getItem('local_custom_courses');
     let localList: Course[] = [];
@@ -239,7 +248,7 @@ export async function fetchLatestCombosFromServer(): Promise<any[]> {
       applyDeletedCombos(data.deletedComboIds);
     }
     if (data && Array.isArray(data.combos)) {
-      updateStoredCombos(data.combos, data.deletedComboIds);
+      updateStoredCombos(data.combos, data.deletedComboIds, 'Server API');
       window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'poll', combos: data.combos, deletedComboIds: data.deletedComboIds } }));
       return data.combos;
     }
@@ -272,13 +281,50 @@ export async function fetchLatestCoursesFromServer(): Promise<Course[]> {
 }
 
 /**
- * Initialize cross-tab, cross-account, and cross-device real-time sync
+ * Trigger an instant complete refresh from Firestore (courses + combos)
+ */
+export async function triggerManualFirestoreSync() {
+  console.log('[Firestore Sync Debug] Bắt đầu đồng bộ thủ công từ Firestore...');
+  try {
+    const [coursesSnap, combosSnap, customCombosSnap] = await Promise.all([
+      getDocs(collection(db, 'courses')),
+      getDocs(collection(db, 'combos')),
+      getDocs(collection(db, 'customCombos'))
+    ]);
+
+    const fsCourses: Course[] = [];
+    coursesSnap.forEach(docSnap => {
+      fsCourses.push({ id: docSnap.id, ...docSnap.data() } as Course);
+    });
+    if (fsCourses.length > 0) {
+      updateStoredCourses(fsCourses);
+      window.dispatchEvent(new CustomEvent('courses_updated', { detail: { action: 'manual_sync', courses: fsCourses } }));
+    }
+
+    const fsCombos: any[] = [];
+    combosSnap.forEach(docSnap => fsCombos.push({ id: docSnap.id, ...docSnap.data() }));
+    customCombosSnap.forEach(docSnap => fsCombos.push({ id: docSnap.id, ...docSnap.data() }));
+    if (fsCombos.length > 0) {
+      updateStoredCombos(fsCombos, undefined, 'Manual Firestore Read');
+      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: 'manual_sync', combos: fsCombos } }));
+    }
+
+    console.log(`[Firestore Sync Debug] Hoàn tất đồng bộ thủ công: ${fsCourses.length} khóa học, ${fsCombos.length} combo.`);
+  } catch (err) {
+    console.warn('[Firestore Sync Debug] Lỗi khi thực hiện đồng bộ thủ công từ Firestore:', err);
+  }
+}
+
+/**
+ * Initialize cross-tab, cross-account, and cross-device real-time sync via Firestore & SSE
  */
 export function initCourseSyncService() {
   if (isInitialized || typeof window === 'undefined') return;
   isInitialized = true;
 
-  // 1. Listen on BroadcastChannel for other open tabs in the same browser
+  console.log('%c[Firestore Sync Engine] Khởi động hệ thống đồng bộ thời gian thực đa thiết bị...', 'color: #007c76; font-weight: bold;');
+
+  // 1. Listen on BroadcastChannel for instant sync across tabs in the same browser
   if (broadcastChannel) {
     broadcastChannel.onmessage = (event) => {
       const data = event.data;
@@ -311,18 +357,165 @@ export function initCourseSyncService() {
           applyDeletedCombos(data.deletedComboIds);
         }
         if (data.combos && Array.isArray(data.combos)) {
-          updateStoredCombos(data.combos, data.deletedComboIds);
+          updateStoredCombos(data.combos, data.deletedComboIds, 'BroadcastChannel');
         }
         window.dispatchEvent(new CustomEvent('combos_updated', { detail: data }));
       }
     };
   }
 
-  // 2. Fetch initial courses & combos snapshot from backend API
+  // 2. Hydrate initially from Firestore & Server in parallel
+  triggerManualFirestoreSync();
   fetchLatestCoursesFromServer();
   fetchLatestCombosFromServer();
 
-  // 3. Connect to Server-Sent Events stream for real-time push from server
+  // 3. ATTACH FULL REAL-TIME FIRESTORE SNAPSHOT LISTENERS
+  // 3A. Firestore Collection: 'courses' (Cross-device, cross-machine live course sync)
+  try {
+    unsubCourses = onSnapshot(collection(db, 'courses'), (snapshot) => {
+      const fsCourses: Course[] = [];
+      const removedIds: string[] = [];
+
+      snapshot.docChanges().forEach((change) => {
+        const docId = change.doc.id;
+        const data = change.doc.data() as Course;
+
+        if (change.type === 'added') {
+          console.log(`%c[Firestore Sync Debug] [courses + THÊM MỚI] ID: ${docId}`, 'color: #10b981; font-weight: bold;', {
+            title: data.title,
+            price: data.price,
+            status: data.status,
+            updatedAt: data.updatedAt
+          });
+        } else if (change.type === 'modified') {
+          console.log(`%c[Firestore Sync Debug] [courses ~ CẬP NHẬT] ID: ${docId}`, 'color: #0284c7; font-weight: bold;', {
+            title: data.title,
+            price: data.price,
+            status: data.status,
+            updatedAt: data.updatedAt
+          });
+        } else if (change.type === 'removed') {
+          console.log(`%c[Firestore Sync Debug] [courses - ĐÃ XÓA] ID: ${docId}`, 'color: #ef4444; font-weight: bold;');
+          removedIds.push(docId);
+        }
+      });
+
+      if (removedIds.length > 0) {
+        applyDeletedCourses(removedIds);
+      }
+
+      snapshot.forEach((docSnap) => {
+        fsCourses.push({ id: docSnap.id, ...docSnap.data() } as Course);
+      });
+
+      console.log(`[Firestore Sync Debug] Đã nhận snapshot courses từ Firestore (${fsCourses.length} khóa).`);
+      updateStoredCourses(fsCourses, removedIds);
+      window.dispatchEvent(new CustomEvent('courses_updated', {
+        detail: { action: 'firestore_snapshot', courses: fsCourses, removedIds }
+      }));
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] Lỗi kết nối Firestore collection "courses":', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore Sync Debug] Không thể đính kèm listener courses:', err);
+  }
+
+  // 3B. Firestore Collection: 'combos' and 'customCombos' (Cross-device live combo sync)
+  try {
+    const handleComboSnapshot = (snapshot: any, sourceName: string) => {
+      const fsCombos: any[] = [];
+      const removedIds: string[] = [];
+
+      snapshot.docChanges().forEach((change: any) => {
+        const docId = change.doc.id;
+        const data = change.doc.data();
+        if (change.type === 'added') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} + THÊM MỚI] ID: ${docId}`, 'color: #10b981; font-weight: bold;', {
+            title: data?.title,
+            price: data?.price,
+            status: data?.status,
+            courseCount: data?.courseIds?.length || 0,
+            updatedAt: data?.updatedAt
+          });
+        } else if (change.type === 'modified') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} ~ CẬP NHẬT] ID: ${docId}`, 'color: #0284c7; font-weight: bold;', {
+            title: data?.title,
+            price: data?.price,
+            status: data?.status,
+            courseCount: data?.courseIds?.length || 0,
+            updatedAt: data?.updatedAt
+          });
+        } else if (change.type === 'removed') {
+          console.log(`%c[Firestore Sync Debug] [${sourceName} - ĐÃ XÓA] ID: ${docId}`, 'color: #ef4444; font-weight: bold;');
+          removedIds.push(docId);
+        }
+      });
+
+      if (removedIds.length > 0) {
+        applyDeletedCombos(removedIds);
+      }
+
+      snapshot.forEach((docSnap: any) => {
+        fsCombos.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      console.log(`[Firestore Sync Debug] Đã nhận snapshot combo từ [${sourceName}] (${fsCombos.length} gói).`);
+      updateStoredCombos(fsCombos, removedIds, sourceName);
+      window.dispatchEvent(new CustomEvent('combos_updated', {
+        detail: { action: `${sourceName}_snapshot`, combos: fsCombos, removedIds }
+      }));
+    };
+
+    unsubCombos = onSnapshot(collection(db, 'combos'), (snapshot) => {
+      handleComboSnapshot(snapshot, 'combos');
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] Lỗi lắng nghe collection combos:', err);
+    });
+
+    unsubCustomCombos = onSnapshot(collection(db, 'customCombos'), (snapshot) => {
+      handleComboSnapshot(snapshot, 'customCombos');
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] Lỗi lắng nghe collection customCombos:', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore Sync Debug] Không thể đính kèm listener combos:', err);
+  }
+
+  // 3C. Firestore Sync Control Triggers: 'sync_control/courses' & 'sync_control/combos'
+  try {
+    unsubSyncControlCourses = onSnapshot(doc(db, 'sync_control', 'courses'), (docSnap) => {
+      if (docSnap.exists()) {
+        console.log('[Firestore Sync Debug] Tín hiệu sync_control/courses:', docSnap.data().updatedAt);
+        fetchLatestCoursesFromServer();
+      }
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] sync_control/courses notice:', err);
+    });
+
+    unsubSyncControlCombos = onSnapshot(doc(db, 'sync_control', 'combos'), (docSnap) => {
+      if (docSnap.exists()) {
+        console.log('[Firestore Sync Debug] Tín hiệu sync_control/combos:', docSnap.data().updatedAt);
+        fetchLatestCombosFromServer();
+      }
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] sync_control/combos notice:', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore Sync Debug] Không thể đính kèm sync_control listeners:', err);
+  }
+
+  // 3D. Firestore Collection: 'featured_courses' (Top 5 khóa nổi bật live sync)
+  try {
+    unsubFeaturedCourses = onSnapshot(collection(db, 'featured_courses'), (snapshot) => {
+      const featList: any[] = [];
+      snapshot.forEach(docSnap => featList.push({ id: docSnap.id, ...docSnap.data() }));
+      window.dispatchEvent(new CustomEvent('featured_courses_updated', { detail: { featured: featList } }));
+    }, (err) => {
+      console.warn('[Firestore Sync Debug] featured_courses snapshot notice:', err);
+    });
+  } catch (err) {}
+
+  // 4. Server-Sent Events stream as real-time secondary push transport
   function connectSSE() {
     if (eventSource) {
       try {
@@ -333,10 +526,6 @@ export function initCourseSyncService() {
 
     try {
       eventSource = new EventSource('/api/courses/stream');
-
-      eventSource.onopen = () => {
-        // Connected
-      };
 
       eventSource.addEventListener('init', (e: MessageEvent) => {
         try {
@@ -352,7 +541,7 @@ export function initCourseSyncService() {
             applyDeletedCombos(payload.deletedComboIds);
           }
           if (payload && Array.isArray(payload.combos) && payload.combos.length > 0) {
-            updateStoredCombos(payload.combos, payload.deletedComboIds);
+            updateStoredCombos(payload.combos, payload.deletedComboIds, 'SSE Init');
             window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));
           }
         } catch (err) {
@@ -368,23 +557,10 @@ export function initCourseSyncService() {
           }
           if (payload && Array.isArray(payload.courses)) {
             updateStoredCourses(payload.courses, payload.deletedCourseIds);
-          } else if (payload && payload.action === 'status' && payload.courseId) {
-            const localStr = localStorage.getItem('local_custom_courses');
-            if (localStr) {
-              const list: Course[] = JSON.parse(localStr);
-              const updated = list.map((c) => (c.id === payload.courseId ? { ...c, status: payload.status } : c));
-              localStorage.setItem('local_custom_courses', JSON.stringify(updated));
-            }
           }
-          // Notify current tab's components
           window.dispatchEvent(new CustomEvent('courses_updated', { detail: payload }));
-
-          // Also notify any sibling tabs via BroadcastChannel
           if (broadcastChannel) {
-            broadcastChannel.postMessage({
-              type: 'courses_updated',
-              ...payload,
-            });
+            broadcastChannel.postMessage({ type: 'courses_updated', ...payload });
           }
         } catch (err) {
           console.warn('Failed to parse courses_updated SSE event:', err);
@@ -398,17 +574,11 @@ export function initCourseSyncService() {
             applyDeletedCombos(payload.deletedComboIds);
           }
           if (payload && Array.isArray(payload.combos)) {
-            updateStoredCombos(payload.combos, payload.deletedComboIds);
+            updateStoredCombos(payload.combos, payload.deletedComboIds, 'SSE Push');
           }
-          // Notify current tab's components
           window.dispatchEvent(new CustomEvent('combos_updated', { detail: payload }));
-
-          // Also notify any sibling tabs via BroadcastChannel
           if (broadcastChannel) {
-            broadcastChannel.postMessage({
-              type: 'combos_updated',
-              ...payload,
-            });
+            broadcastChannel.postMessage({ type: 'combos_updated', ...payload });
           }
         } catch (err) {
           console.warn('Failed to parse combos_updated SSE event:', err);
@@ -428,7 +598,6 @@ export function initCourseSyncService() {
         }
       };
     } catch (err) {
-      console.warn('Could not establish SSE connection:', err);
       if (!reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
@@ -440,104 +609,37 @@ export function initCourseSyncService() {
 
   connectSSE();
 
-  // 4. Background heartbeat polling for multi-device sync guarantee
+  // 5. Background polling & Window focus sync
   setInterval(() => {
     if (typeof document !== 'undefined' && !document.hidden) {
       fetchLatestCoursesFromServer();
       fetchLatestCombosFromServer();
     }
-  }, 4000);
+  }, 5000);
 
-  // Instant refresh when user returns to window / tab
   window.addEventListener('focus', () => {
+    triggerManualFirestoreSync();
     fetchLatestCoursesFromServer();
     fetchLatestCombosFromServer();
   });
 
-  // 4. Also listen to native storage events
+  // 6. Native storage event listener
   window.addEventListener('storage', (e) => {
-    if (e.key === 'local_custom_courses' || e.key === 'server_custom_courses') {
+    if (e.key === 'local_custom_courses' || e.key === 'server_custom_courses' || e.key === 'cached_firestore_courses') {
       window.dispatchEvent(new CustomEvent('courses_updated'));
     }
     if (e.key === 'combo_cache_all' || e.key === 'fast_custom_combos_backup') {
       window.dispatchEvent(new CustomEvent('combos_updated'));
     }
   });
-
-  // 5. Direct Firestore Real-Time Snapshot Listener for Combos & customCombos with Detailed Debug Logs
-  try {
-    const handleSnapshotDocs = (snapshot: any, sourceName: string) => {
-      const fsCombos: any[] = [];
-      const removedIds: string[] = [];
-
-      snapshot.docChanges().forEach((change: any) => {
-        const docId = change.doc.id;
-        const data = change.doc.data();
-        if (change.type === 'added') {
-          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: ADDED] ID: ${docId}`, 'color: #10b981; font-weight: bold;', {
-            title: data?.title,
-            price: data?.price,
-            status: data?.status,
-            courseCount: data?.courseIds?.length || 0,
-            updatedAt: data?.updatedAt
-          });
-        } else if (change.type === 'modified') {
-          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: MODIFIED] ID: ${docId}`, 'color: #0284c7; font-weight: bold;', {
-            title: data?.title,
-            price: data?.price,
-            status: data?.status,
-            courseCount: data?.courseIds?.length || 0,
-            updatedAt: data?.updatedAt
-          });
-        } else if (change.type === 'removed') {
-          console.log(`%c[Firestore Sync Debug] [${sourceName} CHANGE: REMOVED] ID: ${docId}`, 'color: #ef4444; font-weight: bold;');
-          removedIds.push(docId);
-        }
-      });
-
-      if (removedIds.length > 0) {
-        applyDeletedCombos(removedIds);
-      }
-
-      snapshot.forEach((docSnap: any) => {
-        fsCombos.push({ id: docSnap.id, ...docSnap.data() });
-      });
-
-      console.log(`[Firestore Sync Debug] Đã nạp thành công ${fsCombos.length} tài liệu từ Firestore [${sourceName}].`);
-      updateStoredCombos(fsCombos, removedIds, sourceName);
-      window.dispatchEvent(new CustomEvent('combos_updated', { detail: { action: `${sourceName}_snapshot`, combos: fsCombos, removedIds } }));
-    };
-
-    onSnapshot(collection(db, 'customCombos'), (snapshot) => {
-      handleSnapshotDocs(snapshot, 'customCombos');
-    }, (err) => {
-      console.warn('[Firestore Sync Debug] Lỗi lắng nghe collection customCombos:', err);
-    });
-
-    onSnapshot(collection(db, 'combos'), (snapshot) => {
-      handleSnapshotDocs(snapshot, 'combos');
-    }, (err) => {
-      console.warn('[Firestore Sync Debug] combos snapshot error:', err);
-    });
-
-    onSnapshot(doc(db, 'sync_control', 'combos'), (docSnap) => {
-      if (docSnap.exists()) {
-        console.log('[Firestore Sync Debug] sync_control/combos updated at:', docSnap.data().updatedAt);
-        fetchLatestCombosFromServer();
-      }
-    }, (err) => {
-      console.warn('[Firestore Sync Debug] sync_control/combos error:', err);
-    });
-  } catch (e) {
-    console.warn('[Firestore Sync Debug] Failed to attach Firestore listeners in courseSyncService:', e);
-  }
 }
 
 /**
- * Broadcast an edit/status/delete action across ALL tabs and accounts:
- * - Instantly notifies local tab
- * - Instantly notifies all sibling tabs in the same browser (BroadcastChannel)
- * - Sends update to backend server (/api/courses/sync) which pushes SSE to other accounts/browsers/devices
+ * Broadcast an edit/status/delete action across ALL tabs, accounts, and devices:
+ * 1. Instantly updates local storage & dispatches locally (0ms)
+ * 2. Broadcasts to sibling tabs via BroadcastChannel (0ms)
+ * 3. Writes directly to Firestore collection 'courses' and 'sync_control/courses' (ensures all other machines receive via onSnapshot)
+ * 4. Pushes to backend server /api/courses/sync (disk backup & SSE stream)
  */
 export async function broadcastCourseUpdate(
   action: 'upsert' | 'status' | 'delete' | 'sync_all',
@@ -549,6 +651,7 @@ export async function broadcastCourseUpdate(
   }
 ) {
   const now = new Date().toISOString();
+  const cId = payload.courseId || payload.course?.id;
 
   // 1. Immediately apply to local storage
   try {
@@ -572,7 +675,6 @@ export async function broadcastCourseUpdate(
         localList.push({ id: payload.courseId, status: payload.status, updatedAt: now } as Course);
       }
 
-      // Also sync into server_custom_courses and cached_firestore_courses
       ['server_custom_courses', 'cached_firestore_courses'].forEach(key => {
         try {
           const str = localStorage.getItem(key);
@@ -592,8 +694,6 @@ export async function broadcastCourseUpdate(
       });
     } else if (action === 'delete' && payload.courseId) {
       localList = localList.filter((c) => c.id !== payload.courseId);
-
-      // Track deleted ID so it stays deleted
       try {
         const delStr = localStorage.getItem('deleted_course_ids');
         const delList: string[] = delStr ? JSON.parse(delStr) : [];
@@ -623,26 +723,41 @@ export async function broadcastCourseUpdate(
         ...payload,
         timestamp: Date.now(),
       });
-    } catch (e) {
-      console.warn('BroadcastChannel postMessage error:', e);
-    }
+    } catch (e) {}
   }
 
-  // 4. Send to server backend to propagate via SSE to all other accounts/devices
+  // 4. WRITE DIRECTLY TO FIRESTORE TO TRIGGER ONSNAPSHOT ON ALL OTHER MACHINES
   try {
-    const res = await fetch('/api/courses/sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        ...payload,
-      }),
-    });
-    if (!res.ok) {
-      console.warn('Server course sync responded with status', res.status);
+    if (cId) {
+      if (action === 'delete') {
+        await deleteDoc(doc(db, 'courses', cId)).catch(e => console.warn('Firestore delete course notice:', e));
+      } else if (action === 'status' && payload.status) {
+        await setDoc(doc(db, 'courses', cId), {
+          id: cId,
+          status: payload.status,
+          updatedAt: now
+        }, { merge: true }).catch(e => console.warn('Firestore status course notice:', e));
+      } else if (action === 'upsert' && payload.course) {
+        await setDoc(doc(db, 'courses', cId), {
+          ...payload.course,
+          id: cId,
+          updatedAt: now
+        }, { merge: true }).catch(e => console.warn('Firestore upsert course notice:', e));
+      }
     }
+    // Update sync_control signal
+    await setDoc(doc(db, 'sync_control', 'courses'), { updatedAt: now, action, courseId: cId || '' }, { merge: true }).catch(() => {});
+  } catch (fsErr) {
+    console.warn('[Firestore Sync] Lỗi ghi trực tiếp vào Firestore (tiếp tục đồng bộ qua API server):', fsErr);
+  }
+
+  // 5. Send to server backend to propagate via SSE to all other accounts/devices
+  try {
+    await fetch('/api/courses/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload }),
+    });
   } catch (err) {
     console.warn('Network error pushing course sync to server:', err);
   }
@@ -650,6 +765,10 @@ export async function broadcastCourseUpdate(
 
 /**
  * Broadcast an edit/delete action for Combos across all tabs and devices
+ * 1. Instantly updates local storage & dispatches locally (0ms)
+ * 2. Broadcasts to sibling tabs via BroadcastChannel (0ms)
+ * 3. Writes directly to Firestore collections 'combos', 'customCombos', and 'sync_control/combos'
+ * 4. Pushes to backend server /api/combos/sync
  */
 export async function broadcastComboUpdate(
   action: 'save' | 'upsert' | 'status' | 'delete' | 'sync_all',
@@ -661,6 +780,7 @@ export async function broadcastComboUpdate(
   }
 ) {
   const now = new Date().toISOString();
+  const cId = payload.comboId || payload.combo?.id;
 
   // 1. Immediately apply to local storage
   try {
@@ -669,9 +789,6 @@ export async function broadcastComboUpdate(
     if (!Array.isArray(localList)) localList = [];
 
     if ((action === 'save' || action === 'upsert') && (payload.combo || payload.comboId)) {
-      const cId = payload.combo?.id || payload.comboId;
-
-      // Unmark from deleted_combo_ids if previously deleted
       try {
         const delStr = localStorage.getItem('deleted_combo_ids');
         if (delStr) {
@@ -697,8 +814,6 @@ export async function broadcastComboUpdate(
       }
     } else if (action === 'delete' && payload.comboId) {
       localList = localList.filter((c) => c.id !== payload.comboId);
-
-      // Track deleted combo ID
       try {
         const delStr = localStorage.getItem('deleted_combo_ids');
         const delList: string[] = delStr ? JSON.parse(delStr) : [];
@@ -729,22 +844,42 @@ export async function broadcastComboUpdate(
         ...payload,
         timestamp: Date.now()
       });
-    } catch (e) {
-      console.warn('BroadcastChannel postMessage error for combo sync:', e);
-    }
+    } catch (e) {}
   }
 
-  // 4. Send to server backend to propagate via SSE to all other accounts/devices
+  // 4. WRITE DIRECTLY TO FIRESTORE TO TRIGGER ONSNAPSHOT ON ALL OTHER MACHINES
+  try {
+    if (cId) {
+      if (action === 'delete') {
+        await Promise.all([
+          deleteDoc(doc(db, 'combos', cId)).catch(() => {}),
+          deleteDoc(doc(db, 'customCombos', cId)).catch(() => {})
+        ]);
+      } else if (action === 'status' && payload.status) {
+        const statusPayload = { id: cId, status: payload.status, updatedAt: now };
+        await Promise.all([
+          setDoc(doc(db, 'combos', cId), statusPayload, { merge: true }).catch(() => {}),
+          setDoc(doc(db, 'customCombos', cId), statusPayload, { merge: true }).catch(() => {})
+        ]);
+      } else if ((action === 'save' || action === 'upsert') && payload.combo) {
+        const fullComboData = { ...payload.combo, id: cId, updatedAt: now };
+        await Promise.all([
+          setDoc(doc(db, 'combos', cId), fullComboData, { merge: true }).catch(() => {}),
+          setDoc(doc(db, 'customCombos', cId), fullComboData, { merge: true }).catch(() => {})
+        ]);
+      }
+    }
+    await setDoc(doc(db, 'sync_control', 'combos'), { updatedAt: now, action, comboId: cId || '' }, { merge: true }).catch(() => {});
+  } catch (fsErr) {
+    console.warn('[Firestore Sync] Lỗi ghi trực tiếp combo vào Firestore:', fsErr);
+  }
+
+  // 5. Send to server backend to propagate via SSE to all other accounts/devices
   try {
     await fetch('/api/combos/sync', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        ...payload,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload }),
     });
   } catch (err) {
     console.warn('Network error pushing combo sync to server:', err);

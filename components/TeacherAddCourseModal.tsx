@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
+import { generateTenDigitId } from '../utils/idGenerator';
 
 export interface TeacherAddCourseModalProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const TeacherAddCourseModal: React.FC<TeacherAddCourseModalProps> = ({
     }
 
     setIsSubmitting(true);
-    const courseId = `course-teacher-${Date.now()}`;
+    const courseId = generateTenDigitId();
     const newCourse: Course = {
       id: courseId,
       title: title.trim(),

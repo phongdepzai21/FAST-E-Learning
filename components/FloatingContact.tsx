@@ -142,6 +142,78 @@ export const FloatingContact: React.FC = () => {
     `.trim();
   }, [liveCourses]);
 
+  const getExpertLocalReply = (query: string): string => {
+    const q = query.toLowerCase().trim();
+
+    if (q.includes('22000') || q.includes('iso 22000') || q.includes('iso22000')) {
+      return `Khóa học **ISO 22000:2018 - Hệ Thống Quản Lý An Toàn Thực Phẩm** tại FAST gồm các học phần trọng tâm:
+1. **Tổng quan tiêu chuẩn & Chu trình PDCA**: Nhận diện bối cảnh tổ chức, tư duy dựa trên rủi ro.
+2. **Các chương trình tiên quyết (PRP)** theo ISO/TS 22002-1 cho sản xuất chế biến.
+3. **Phân tích mối nguy & Điểm kiểm soát tới hạn (HACCP)**: 7 nguyên tắc & 12 bước thực hành.
+4. **Kế hoạch OPRP & CCP**: Xác lập giới hạn tới hạn, giám sát và hành động khắc phục CAPA.
+5. **Truy xuất nguồn gốc & Kiểm soát sự không phù hợp (NCR)**.
+6. **Đánh giá nội bộ & Bộ Checklist audit điều khoản 4 - 10**.
+
+Học phí ưu đãi: **599.000đ** (kèm chứng nhận điện tử bảo mật 10 chữ số).
+👉 Bạn có thể đăng ký trực tuyến hoặc kết nối Hotline/Zalo **0927 002 668** để được hướng dẫn chi tiết!`;
+    }
+
+    if (q.includes('an toàn thực phẩm') || q.includes('attp') || q.includes('vệ sinh') || q.includes('tư vấn') || q.includes('giấy chứng nhận') || q.includes('bếp')) {
+      return `FAST Consulting cung cấp dịch vụ **Tư vấn An toàn thực phẩm trọn gói** cho doanh nghiệp F&B:
+1. **Khảo sát hiện trạng & Thiết kế bếp một chiều**: Phân luồng chống nhiễm chéo chuẩn quy định của Bộ Y tế.
+2. **Soạn thảo toàn bộ hồ sơ pháp lý**: Đơn đề nghị Mẫu số 01, Bản thuyết minh cơ sở vật chất Mẫu 02a theo Nghị định 15/2018/NĐ-CP.
+3. **Đào tạo & Cấp chứng nhận tập huấn kiến thức ATTP** cho chủ cơ sở và toàn bộ nhân sự.
+4. **Kiểm soát nguồn gốc & Lập hồ sơ truy xuất nguyên liệu thực phẩm**.
+5. **Đồng hành tiếp đoàn thẩm định** liên ngành Chi cục ATTP đến khi nhận Giấy chứng nhận.
+
+👉 Đội ngũ chuyên gia luôn sẵn sàng hỗ trợ bạn qua Hotline/Zalo: **0927 002 668**!`;
+    }
+
+    if (q.includes('haccp') || q.includes('mối nguy') || q.includes('ccp')) {
+      return `Khóa học **HACCP (Phân tích mối nguy và Điểm kiểm soát tới hạn)** tại FAST trang bị:
+- 12 bước xây dựng hệ thống và 7 nguyên tắc HACCP theo tiêu chuẩn quốc tế Codex 2020.
+- Ma trận nhận diện và phân tích mối nguy sinh học, hóa học, vật lý, chất gây dị ứng.
+- Phương pháp xác lập CCP, OPRP và xây dựng bảng kế hoạch HACCP ứng dụng thực tế.
+- Bộ biểu mẫu giám sát, thẩm tra và hành động khắc phục thực tế.
+
+👉 Lớp đào tạo trực tiếp / Zoom học phí chỉ **199.000đ**. Liên hệ Hotline/Zalo **0927 002 668** để đăng ký ngay!`;
+    }
+
+    if (q.includes('học phí') || q.includes('giá') || q.includes('chi phí') || q.includes('bao nhiêu') || q.includes('tiền')) {
+      return `Bảng học phí các chương trình đào tạo tại FAST E-Learning:
+- **Khóa đào tạo trực tiếp / Zoom (ATTP & HACCP)**: Chỉ **199.000đ/học viên** (lịch học tương tác trực tiếp với chuyên gia).
+- **Khóa lẻ E-Learning trực tuyến**: Từ **299.000đ - 799.000đ/khóa** (ISO 9001, ISO 22000, HACCP, QA/QC, BRCGS...).
+- **Gói Combo ưu đãi trọn gói**: Tiết kiệm tới 60% học phí so với đăng ký lẻ.
+
+Mọi học viên đều được cấp tài khoản truy cập vĩnh viễn và chứng nhận hoàn thành điện tử có mã số 10 chữ số chuẩn hóa!`;
+    }
+
+    if (q.includes('combo') || q.includes('gói')) {
+      return `FAST có các **Gói Combo tiết kiệm** dành cho học viên và doanh nghiệp:
+- **Combo Tiêu chuẩn F&B (HACCP + ISO 22000)**: Nắm trọn bộ kỹ năng kiểm soát an toàn thực phẩm.
+- **Combo Quản lý chất lượng chuyên sâu (ISO 9001 + ISO 22000 + QA/QC)**.
+- **Combo Doanh nghiệp F&B trọn gói**: Bao gồm cả đào tạo nhân sự và bộ tài liệu biểu mẫu áp dụng thực tế.
+
+👉 Vui lòng xem tab **Gói Combo** trên thanh điều hướng hoặc gọi Hotline **0927 002 668** để được tư vấn gói phù hợp nhất!`;
+    }
+
+    if (q.includes('hotline') || q.includes('liên hệ') || q.includes('zalo') || q.includes('sđt') || q.includes('điện thoại') || q.includes('địa chỉ') || q.includes('ở đâu')) {
+      return `Thông tin liên hệ chính thức của FAST:
+- **Hotline / Zalo tư vấn 24/7**: **0927 002 668**
+- **Email**: \`hkc.qms@gmail.com\` / \`support@fastelearning.com.vn\`
+- **Trụ sở miền Nam**: Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 Nguyễn Oanh, P.17, Gò Vấp, TP.HCM
+- **Cơ sở miền Bắc**: Tòa nhà FAST E-Learning, Số 18 Phố Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội.`;
+    }
+
+    return `Chào bạn! Tôi là **Trần Hạnh** - Trợ lý chuyên gia FAST E-Learning. 
+Tôi có thể hỗ trợ bạn về:
+- Các khóa đào tạo **ISO 22000, HACCP, ISO 9001, QA/QC** (lớp Zoom/trực tiếp chỉ **199k**).
+- Dịch vụ **Tư vấn trọn gói Giấy phép An toàn thực phẩm**, thiết kế bếp một chiều.
+- Hướng dẫn thủ tục đăng ký, học phí và xuất hóa đơn VAT.
+
+👉 Bạn cần hỗ trợ chi tiết phần nào hoặc có thể liên hệ ngay Hotline/Zalo: **0927 002 668** nhé!`;
+  };
+
   const handleSend = async (customText?: string) => {
     const textToSend = (customText || input).trim();
     if (!textToSend || isLoading) return;
@@ -212,21 +284,40 @@ export const FloatingContact: React.FC = () => {
             }
             return updated;
           });
-          // Instant direct scroll prevents text jumping/jitter
           if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
           }
         }
       }
-    } catch (error: any) {
-      console.error("Trợ lý Trần Hạnh Error:", error);
-      
-      let errorMessage = "Hệ thống bận. Vui lòng liên hệ Zalo 0927 002 668.";
-      if (error.message?.includes('fetch') || error.message?.includes('network')) {
-        errorMessage = "Lỗi kết nối mạng.";
-      }
 
-      setMessages(prev => [...prev, { role: 'model', text: errorMessage, isError: true }]);
+      // Nếu stream kết thúc mà không có nội dung, sử dụng bộ giải đáp chuyên gia địa phương
+      if (!fullText.trim()) {
+        const fallbackText = getExpertLocalReply(textToSend);
+        setMessages(prev => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg && lastMsg.role === 'model') {
+            updated[updated.length - 1] = { ...lastMsg, text: fallbackText };
+          }
+          return updated;
+        });
+      }
+    } catch (error: any) {
+      console.warn("Trợ lý Trần Hạnh chuyển sang bộ giải đáp chuyên gia FAST:", error);
+      const fallbackText = getExpertLocalReply(textToSend);
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg && lastMsg.role === 'model' && !lastMsg.text) {
+          updated[updated.length - 1] = { ...lastMsg, text: fallbackText };
+          return updated;
+        }
+        return [...prev, {
+          role: 'model',
+          text: fallbackText,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        }];
+      });
       setTimeout(() => scrollToBottom(false), 50);
     } finally {
       setIsLoading(false);

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import emailjs from '@emailjs/browser';
+import { generateTenDigitId } from '../utils/idGenerator';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { 
   Mail, 
   Phone, 
@@ -95,16 +98,36 @@ const Contact: React.FC = () => {
     }
 
     setStatus('sending');
-    const genTicket = `FAST-${Math.floor(100000 + Math.random() * 900000)}`;
+    const genTicket = generateTenDigitId();
     setTicketId(genTicket);
 
-    const fullMessage = `[MÃ PHIẾU: ${genTicket}]
+    const inquiryData = {
+      id: genTicket,
+      name: formData.name.trim(),
+      email: formData.email.trim() || 'khong-co@email.com',
+      phone: formData.phone.trim(),
+      company: formData.company.trim() || 'Cá nhân',
+      topic,
+      preferredContact,
+      message: formData.message.trim() || 'Yêu cầu tư vấn nhanh',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      // 1. Lưu dự phòng Firestore
+      try {
+        await setDoc(doc(db, 'contact_inquiries', genTicket), inquiryData);
+      } catch (fsErr) {
+        console.warn('Firestore contact save notice:', fsErr);
+      }
+
+      // 2. Gửi qua EmailJS
+      const fullMessage = `[MÃ TIẾP NHẬN: ${genTicket}]
 - Chủ đề: ${topic}
 - Kênh liên hệ ưu tiên: ${preferredContact}
 - Doanh nghiệp/Đơn vị: ${formData.company || 'Cá nhân'}
 - Nội dung: ${formData.message || 'Yêu cầu tư vấn nhanh'}`;
 
-    try {
       await emailjs.send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID,
@@ -112,7 +135,7 @@ const Contact: React.FC = () => {
           name: formData.name,
           email: formData.email || 'khong-co@email.com',
           phone: formData.phone,
-          title: `[Tư vấn] ${topic} - ${formData.name}`,
+          title: `[Tư vấn #${genTicket}] ${topic} - ${formData.name}`,
           message: fullMessage,
           to_email: officialEmail
         },

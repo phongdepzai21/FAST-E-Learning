@@ -6,6 +6,7 @@ import { Course } from '../types';
 import { getMergedCourses } from '../constants';
 import { getCachedFeaturedCourseIds, subscribeToFeaturedCourseIds, filterFeaturedCourses } from '../utils/featuredCoursesService';
 import { getPaymentConfig, getVietQrUrl } from '../utils/qrService';
+import { generateTenDigitId } from '../utils/idGenerator';
 import {
   X,
   Video,
@@ -186,7 +187,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
     }
 
     setIsSubmitting(true);
-    const regId = `live-attp-${Date.now()}`;
+    const regId = generateTenDigitId();
     const chosenSchedule = customDate ? `Ngày riêng: ${customDate} (${trainingType === 'zoom' ? 'Zoom' : 'Trực tiếp'})` : scheduleChoice;
 
     const registrationData = {
@@ -294,37 +295,10 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500 font-bold">Mã số hồ sơ:</span>
-              <span className="font-mono font-black text-xs text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                #{createdRecord.id.toUpperCase().slice(-8)}
+              <span className="font-mono font-black text-xs text-slate-800 bg-white px-2.5 py-1 rounded border border-slate-200">
+                #{createdRecord.id}
               </span>
             </div>
-          </div>
-
-          {/* Box thông tin phòng học Zoom hoặc địa chỉ */}
-          <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl text-left space-y-2">
-            <div className="flex items-center gap-2 text-teal-800 font-bold text-xs">
-              <ShieldCheck className="w-4 h-4 text-[#007c76]" />
-              <span>Thông tin tham gia lớp học:</span>
-            </div>
-            {createdRecord.trainingType === 'zoom' ? (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-white p-2.5 rounded-xl border border-teal-100">
-                  <span className="text-[10px] text-gray-500 block font-bold">Meeting ID Zoom</span>
-                  <span className="font-mono font-black text-sm text-[#007c76]">{createdRecord.zoomMeetingId}</span>
-                </div>
-                <div className="bg-white p-2.5 rounded-xl border border-teal-100">
-                  <span className="text-[10px] text-gray-500 block font-bold">Passcode</span>
-                  <span className="font-mono font-black text-sm text-[#007c76]">{createdRecord.zoomPasscode}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-teal-900 font-medium">
-                Địa điểm: {createdRecord.venueAddress}
-              </p>
-            )}
-            <p className="text-[11px] text-teal-700 italic">
-              Ban quản lý học viện sẽ gửi tin nhắn Zalo kèm đường dẫn phòng học và giáo trình chi tiết trước giờ khai giảng.
-            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">

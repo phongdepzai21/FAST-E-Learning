@@ -3,13 +3,16 @@ import { Helmet } from 'react-helmet-async';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CONSULTING_SERVICES } from '../constants';
 import { Link } from "react-router-dom";
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Eye, Lock, ShieldCheck } from 'lucide-react';
 import Iso22000ChecklistModal from '../components/Iso22000ChecklistModal';
+import SecureDocViewerModal from '../components/SecureDocViewerModal';
 import { useToast } from '../contexts/ToastContext';
 
 const Consulting: React.FC = () => {
   const toast = useToast();
   const [showIsoChecklistModal, setShowIsoChecklistModal] = useState(false);
+  const [showSecureDocModal, setShowSecureDocModal] = useState(false);
+  const [selectedDocTitle, setSelectedDocTitle] = useState('Mẫu Hồ Sơ Xin Cấp Giấy Chứng Nhận Cơ Sở Đủ Điều Kiện ATTP');
 
   const steps = [
     { step: '01', label: 'Khảo sát thực tế', desc: 'Đánh giá hiện trạng cơ sở, nhận diện khoảng cách so với các tiêu chuẩn chuẩn mực.' },
@@ -152,17 +155,19 @@ const Consulting: React.FC = () => {
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                   </button>
                                 ) : (
-                                  <a
-                                    href={`#download-${att.id}`}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      toast.success(`Đã chuẩn bị tải về file "${att.name}"`);
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedDocTitle(att.name);
+                                      setShowSecureDocModal(true);
                                     }}
-                                    className="px-3.5 py-2 bg-slate-200 hover:bg-teal-100 text-slate-700 hover:text-teal-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                                    className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                                    title="Chỉ xem trực tuyến - Không hỗ trợ tải về hoặc in ấn"
                                   >
-                                    <Download className="w-3.5 h-3.5 text-teal-700" />
-                                    <span>Tải file</span>
-                                  </a>
+                                    <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                                    <span>Xem trực tuyến</span>
+                                    <span className="text-[9px] bg-emerald-200/80 text-emerald-900 px-1 py-0.5 rounded font-black uppercase">Khóa in/tải</span>
+                                  </button>
                                 )}
                               </div>
                             ))}
@@ -256,6 +261,13 @@ const Consulting: React.FC = () => {
       <Iso22000ChecklistModal
         isOpen={showIsoChecklistModal}
         onClose={() => setShowIsoChecklistModal(false)}
+      />
+
+      {/* Secure View-Only Document Previewer Modal */}
+      <SecureDocViewerModal
+        isOpen={showSecureDocModal}
+        onClose={() => setShowSecureDocModal(false)}
+        documentTitle={selectedDocTitle}
       />
     </main>
   );

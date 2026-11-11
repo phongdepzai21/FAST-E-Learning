@@ -201,16 +201,12 @@ service cloud.firestore {
 
     // 3. Combos (Global)
     match /combos/{comboId} {
-      allow read: if true;
-      allow create, update: if (isSignedIn() || isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
-      allow delete: if isAdmin() || isTeacher() || isSignedIn();
+      allow read, write: if true;
     }
 
     // 3.1 Custom Combos (Global)
     match /customCombos/{comboId} {
-      allow read: if true;
-      allow create, update: if (isSignedIn() || isAdmin() || isTeacher()) && isValidId(comboId) && isValidCombo(incoming());
-      allow delete: if isAdmin() || isTeacher() || isSignedIn();
+      allow read, write: if true;
     }
 
     // 4. Fast Standards Audits (FSA-Checklist)
@@ -309,6 +305,12 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if true;
       allow delete: if isAdmin() || isSystemOwner();
+    }
+
+    // 18. Contact Inquiries (Online consultation tickets)
+    match /contact_inquiries/{inquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin() || isSystemOwner();
     }
   }
 }

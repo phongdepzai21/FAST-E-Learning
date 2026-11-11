@@ -10,9 +10,9 @@ import { CourseConfirmModal, CourseSuccessBannerModal, ConfirmActionType } from 
 import { broadcastCourseUpdate, broadcastComboUpdate, fetchLatestCoursesFromServer } from '../utils/courseSyncService';
 import LivePriceQrPreview from './LivePriceQrPreview';
 import { AnimatedPriceCounter } from './AnimatedPriceCounter';
-import { Download, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { logFirestoreError } from '../utils/firestoreDiagnostics';
+import { toTenDigitId, generateTenDigitId } from '../utils/idGenerator';
 
 interface TeacherDashboardProps {
   userEmail: string;
@@ -608,7 +608,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     }
 
     const finalPrice = formatPriceSubmit(price);
-    const courseId = `course-${Date.now()}`;
+    const courseId = generateTenDigitId();
     let finalImageUrl = imageUrlInput.trim() || 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
 
     // Prioritize server disk upload for local data URL images
@@ -1512,7 +1512,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                                       <span className="font-extrabold text-gray-800 leading-snug whitespace-nowrap block group-hover/row:text-[#007c76] transition-colors duration-200">{course.title}</span>
                                     </div>
                                     <span className="text-[10px] font-bold text-gray-400 block mt-1 uppercase tracking-wider whitespace-nowrap">
-                                      ID: {course.id} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
+                                      ID: {toTenDigitId(course.id)} {isSystem && <span className="bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded text-[9px] ml-1">Gốc</span>}
                                     </span>
                                   </td>
                                   <td className="py-4 px-6 whitespace-nowrap">

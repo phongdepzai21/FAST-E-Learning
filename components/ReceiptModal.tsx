@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Printer, Download, CheckCircle2, Building, Mail, Phone, Calendar, ShieldCheck, FileText, Sparkles } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
+import { generateTenDigitId, toTenDigitId } from '../utils/idGenerator';
 
 export interface ReceiptData {
   receiptNo: string;
@@ -31,7 +32,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const toast = useToast();
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const defaultReceiptNo = `BL-FAST-${Date.now().toString().slice(-6)}`;
+  const defaultReceiptNo = generateTenDigitId();
 
   const [studentName, setStudentName] = useState(initialData?.studentName || '');
   const [phone, setPhone] = useState(initialData?.phone || '');
@@ -40,7 +41,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [courseTitle, setCourseTitle] = useState(initialData?.courseTitle || 'Đào tạo An toàn Vệ sinh Thực phẩm (199K)');
   const [amount, setAmount] = useState<string>(initialData?.amount ? String(initialData.amount) : '199.000đ');
   const [issueDate, setIssueDate] = useState(initialData?.issueDate || todayStr);
-  const [receiptNo, setReceiptNo] = useState(initialData?.receiptNo || defaultReceiptNo);
+  const [receiptNo, setReceiptNo] = useState(initialData?.receiptNo ? toTenDigitId(initialData.receiptNo) : defaultReceiptNo);
   const [isGenerated, setIsGenerated] = useState<boolean>(!!initialData?.studentName);
 
   if (!isOpen) return null;
