@@ -92,7 +92,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
 
   const cleanPhone = phone.replace(/[^\d]/g, '').slice(-6) || 'HOCVIEN';
   const transferMemo = `DAOTAO ${cleanPhone} ${toTenDigitId(course.id).slice(-4)}`;
-  const qrUrl = `https://img.vietqr.io/image/970422-0927002668-compact2.png?amount=${totalNumericPrice}&addInfo=${encodeURIComponent(transferMemo)}&accountName=VIEN%20DAO%20TAO%20FAST`;
+  const qrUrl = `https://img.vietqr.io/image/970422-0927002668-compact2.png?amount=${totalNumericPrice}&addInfo=${encodeURIComponent(transferMemo)}&accountName=CONG%20TY%20TNHH%20TU%20VAN%20FAST`;
 
   const copyToClipboard = (text: string, type: 'memo' | 'stk') => {
     navigator.clipboard.writeText(text);
@@ -303,7 +303,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase block">Ngân hàng &amp; STK</span>
                       <strong className="font-mono text-slate-900 font-black text-sm">MB Bank: 0927 002 668</strong>
-                      <span className="text-[10px] text-slate-500 block">VIEN DAO TAO FAST</span>
+                      <span className="text-[10px] text-slate-600 block font-black uppercase">CÔNG TY TNHH TƯ VẤN FAST</span>
                     </div>
                     <button
                       type="button"
@@ -328,7 +328,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                       className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer shadow-xs"
                     >
                       {copiedMemo ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedMemo ? 'Đã chép' : 'Chép cú pháp'}</span>
+                      <span>{copiedMemo ? 'Đã chép' : 'Sao chép nội dung'}</span>
                     </button>
                   </div>
                 </div>

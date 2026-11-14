@@ -154,7 +154,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
     return getVietQrUrl({
       bankId: paymentConfig.bankId || 'MB',
       accountNo: paymentConfig.accountNo || '0927002668',
-      accountName: paymentConfig.accountName || 'CONG TY TNHH DAO TAO FAST',
+      accountName: paymentConfig.accountName || 'CONG TY TNHH TU VAN FAST',
       amount: tuitionAmount,
       memo: cleanPhoneMemo,
       template: 'compact2'
@@ -665,7 +665,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
               <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 font-bold block">Chủ tài khoản</span>
-                  <span className="font-bold text-slate-800 uppercase">{paymentConfig.accountName || 'CONG TY TNHH DAO TAO FAST'}</span>
+                  <span className="font-black text-slate-800 uppercase text-xs">{paymentConfig.accountName || 'CÔNG TY TNHH TƯ VẤN FAST'}</span>
                 </div>
               </div>
 
