@@ -147,6 +147,23 @@ service cloud.firestore {
              (!('benefits' in data) || data.benefits is list);
     }
 
+    function isValidUserNotification(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             (!('title' in data) || (data.title is string && data.title.size() <= 256)) &&
+             (!('message' in data) || (data.message is string && data.message.size() <= 2000)) &&
+             (!('type' in data) || (data.type is string && data.type.size() <= 64)) &&
+             (!('courseId' in data) || (data.courseId is string && data.courseId.size() <= 128)) &&
+             (!('courseTitle' in data) || (data.courseTitle is string && data.courseTitle.size() <= 256)) &&
+             (!('courseImage' in data) || (data.courseImage is string && data.courseImage.size() <= 2048)) &&
+             (!('registrationId' in data) || (data.registrationId is string && data.registrationId.size() <= 128)) &&
+             (!('link' in data) || (data.link is string && data.link.size() <= 2048)) &&
+             (!('startDate' in data) || (data.startDate is string && data.startDate.size() <= 128)) &&
+             (!('trainingTypeLabel' in data) || (data.trainingTypeLabel is string && data.trainingTypeLabel.size() <= 128)) &&
+             (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 256)) &&
+             (!('isRead' in data) || data.isRead is bool) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
+    }
+
     // --- Collection Rules ---
 
     // 1. Users
@@ -187,8 +204,20 @@ service cloud.firestore {
 
       // 1.3 Notifications Subcollection
       match /notifications/{notifId} {
-        allow read: if isOwner(userEmail) || isAdmin();
-        allow write: if isAdmin() || isSystemOwner();
+        allow get, list: if isOwner(userEmail) || isAdmin() || isSystemOwner();
+        allow create: if isValidId(notifId) && isValidUserNotification(incoming()) && (
+          isAdmin() ||
+          isTeacher() ||
+          isSystemOwner() ||
+          (isOwner(userEmail) && incoming().get('type', '') == 'training_link')
+        );
+        allow update: if isValidId(notifId) && isValidUserNotification(incoming()) && (
+          isAdmin() ||
+          isTeacher() ||
+          isSystemOwner() ||
+          (isOwner(userEmail) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']))
+        );
+        allow delete: if isOwner(userEmail) || isAdmin() || isSystemOwner();
       }
     }
 

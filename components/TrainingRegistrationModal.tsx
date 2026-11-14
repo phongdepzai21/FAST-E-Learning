@@ -19,13 +19,18 @@ import {
   Plus,
   Info,
   ChevronRight,
-  Check
+  Check,
+  ExternalLink,
+  Bell
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { TrainingCourse } from '../types';
 import { generateTenDigitId, toTenDigitId } from '../utils/idGenerator';
 import { db, auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
+import { getFastSessionUser } from '../utils/sessionAuth';
+import { addTrainingLinkNotification } from '../utils/courseNotificationService';
 
 interface TrainingRegistrationModalProps {
   isOpen: boolean;
@@ -39,6 +44,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
   course
 }) => {
   const toast = useToast();
+  const navigate = useNavigate();
 
   // Form inputs
   const [studentName, setStudentName] = useState('');
@@ -53,16 +59,24 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
   // UI state
   const [copiedMemo, setCopiedMemo] = useState(false);
   const [copiedStk, setCopiedStk] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdRecord, setCreatedRecord] = useState<any>(null);
 
-  // Sync user info and default format on open
+  // Sync user info and default format on open / course change
   useEffect(() => {
     if (isOpen) {
-      if (auth.currentUser) {
-        setStudentName(auth.currentUser.displayName || '');
-        setEmail(auth.currentUser.email || '');
+      setIsSuccess(false);
+      setCreatedRecord(null);
+      setCopiedMemo(false);
+      setCopiedStk(false);
+      setCopiedLink(false);
+      const sessionUser = getFastSessionUser();
+      const effectiveUser = auth.currentUser || sessionUser;
+      if (effectiveUser) {
+        setStudentName(prev => prev || effectiveUser.displayName || '');
+        setEmail(prev => prev || effectiveUser.email || '');
       }
       if (course) {
         if (course.trainingFormat === 'zoom') {
@@ -76,16 +90,16 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
         }
       }
     }
-  }, [isOpen, course]);
+  }, [isOpen, course?.id]);
 
-  if (!isOpen || !course) return null;
-
-  // Calculate pricing based on single course price and attendee count
+  // Calculate pricing unconditionally (before early return) to respect Rules of Hooks
   const unitPriceNumeric = useMemo(() => {
-    const rawDigits = (course.price || '').replace(/[^\d]/g, '');
+    const rawDigits = (course?.price || '').replace(/[^\d]/g, '');
     const num = parseInt(rawDigits, 10);
     return isNaN(num) || num <= 0 ? 299000 : num;
-  }, [course.price]);
+  }, [course?.price]);
+
+  if (!isOpen || !course) return null;
 
   const totalNumericPrice = unitPriceNumeric * Math.max(1, participantCount);
   const formattedTotalPrice = totalNumericPrice.toLocaleString('vi-VN') + 'đ';
@@ -94,12 +108,16 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
   const transferMemo = `DAOTAO ${cleanPhone} ${toTenDigitId(course.id).slice(-4)}`;
   const qrUrl = `https://img.vietqr.io/image/970422-0927002668-compact2.png?amount=${totalNumericPrice}&addInfo=${encodeURIComponent(transferMemo)}&accountName=CONG%20TY%20TNHH%20TU%20VAN%20FAST`;
 
-  const copyToClipboard = (text: string, type: 'memo' | 'stk') => {
+  const copyToClipboard = (text: string, type: 'memo' | 'stk' | 'link') => {
     navigator.clipboard.writeText(text);
     if (type === 'memo') {
       setCopiedMemo(true);
       setTimeout(() => setCopiedMemo(false), 2000);
       toast.showToast('Đã sao chép nội dung chuyển khoản!', 'success');
+    } else if (type === 'link') {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+      toast.showToast('Đã sao chép link tham gia khóa học!', 'success');
     } else {
       setCopiedStk(true);
       setTimeout(() => setCopiedStk(false), 2000);
@@ -148,13 +166,27 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       .map(s => s.trim())
       .filter(Boolean);
 
+    const sessionUser = getFastSessionUser();
+    const accountEmail = (
+      auth.currentUser?.email ||
+      sessionUser?.email ||
+      email.trim() ||
+      ''
+    ).toLowerCase().trim();
+
+    const resolvedMeetingLink =
+      course.meetingLink?.trim() ||
+      (trainingType === 'direct'
+        ? 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi'
+        : 'https://zoom.us/j/84927002668');
+
     const regData = {
       id: regId,
       userId: auth.currentUser?.uid || null,
-      userEmail: auth.currentUser?.email || email.trim(),
+      userEmail: accountEmail,
       studentName: studentName.trim(),
       phone: phone.trim(),
-      email: email.trim() || (auth.currentUser?.email || ''),
+      email: email.trim() || accountEmail,
       companyName: companyName.trim() || 'Cá nhân / Tự do',
       additionalStudents: additionalNames,
       courseId: course.id,
@@ -169,6 +201,8 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       startDate: course.startDate || 'Theo lịch khóa học',
       scheduleDetails: course.scheduleDetails || 'Sáng 08:30 - 11:30 | Chiều 13:30 - 16:30',
       venueAddress: course.venueAddress || 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Zoom HD',
+      meetingLink: resolvedMeetingLink,
+      zoomLink: resolvedMeetingLink,
       notes: notes.trim(),
       paymentMethod: 'vietqr',
       paymentMemo: transferMemo,
@@ -177,20 +211,59 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       updatedAt: nowIso
     };
 
+    const notifId = `training_${regId}`;
+    const notificationPayload = {
+      id: notifId,
+      title: `Link tham gia: ${course.title}`,
+      message: `Đăng ký #${regId} thành công (${regData.trainingTypeLabel}). Link tham gia lớp học: ${resolvedMeetingLink}`,
+      type: 'training_link',
+      courseId: course.id,
+      courseTitle: course.title,
+      courseImage: course.image || '',
+      registrationId: regId,
+      link: resolvedMeetingLink,
+      startDate: regData.startDate,
+      trainingTypeLabel: regData.trainingTypeLabel,
+      userEmail: accountEmail,
+      isRead: false,
+      createdAt: nowIso
+    };
+
     try {
       // 1. Save to Firestore collection live_course_registrations
-      await setDoc(doc(db, 'live_course_registrations', regId), regData);
+      await setDoc(doc(db, 'live_course_registrations', regId), regData).catch((err) => {
+        console.warn('Firestore live_course_registrations fallback:', err);
+      });
 
-      // 2. Post to backend server endpoint (non-blocking fallback)
-      fetch('/api/direct-registrations', {
+      // 2. Save instant local notification for account bell
+      addTrainingLinkNotification({
+        id: notifId,
+        userEmail: accountEmail || undefined,
+        courseId: course.id,
+        courseTitle: course.title,
+        courseImage: course.image,
+        link: resolvedMeetingLink,
+        registrationId: regId,
+        startDate: regData.startDate,
+        trainingTypeLabel: regData.trainingTypeLabel,
+        message: notificationPayload.message
+      });
+
+      // 3. Persist notification directly to Firestore user notifications subcollection when possible
+      if (accountEmail) {
+        setDoc(doc(db, 'users', accountEmail, 'notifications', notifId), notificationPayload).catch(() => {});
+      }
+
+      // 4. Post to backend server endpoint (creates server backup + admin Firestore notification)
+      await fetch('/api/direct-registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(regData)
+        body: JSON.stringify({ ...regData, notification: notificationPayload })
       }).catch(() => {});
 
       setCreatedRecord(regData);
       setIsSuccess(true);
-      toast.showToast('Đăng ký khóa học thành công! Vui lòng hoàn tất thanh toán học phí.', 'success');
+      toast.showToast('Đăng ký thành công! Đã gửi thông báo link khóa học về tài khoản của bạn.', 'success');
     } catch (err: any) {
       console.error('Lỗi lưu đăng ký khóa học:', err);
       toast.showToast('Không thể gửi đăng ký. Vui lòng kiểm tra lại kết nối mạng!', 'error');
@@ -342,14 +415,63 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
               </div>
             </div>
 
+            {/* Account Notification & Class Link Banner */}
+            <div className="p-4 sm:p-5 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-emerald-800 font-black uppercase text-xs">
+                  <Bell className="w-4 h-4 text-emerald-600" />
+                  <span>Thông Báo Link Lớp Học Đã Gửi Qua Tài Khoản</span>
+                </div>
+                {createdRecord.userEmail && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-full border border-emerald-200 truncate max-w-[180px]">
+                    {createdRecord.userEmail}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Link tham gia / thông tin lớp học</span>
+                  <a
+                    href={createdRecord.meetingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-black text-[#007c76] hover:underline break-all inline-flex items-center gap-1"
+                  >
+                    <span>{createdRecord.meetingLink}</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                  </a>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(createdRecord.meetingLink, 'link')}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer shrink-0 self-start sm:self-center"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedLink ? 'Đã chép link' : 'Sao chép link'}</span>
+                </button>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                onClick={handleReset}
-                className="w-full py-3.5 bg-[#007c76] hover:bg-[#005c56] text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-[#007c76]/20 flex items-center justify-center gap-2"
+                onClick={() => {
+                  handleReset();
+                  navigate('/account');
+                }}
+                className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>Hoàn Tất &amp; Đóng Thông Báo</span>
+                <Bell className="w-4 h-4 text-teal-300" />
+                <span>Xem Thông Báo Trong Tài Khoản</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex-1 py-3.5 bg-[#007c76] hover:bg-[#005c56] text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-[#007c76]/20 flex items-center justify-center gap-2"
+              >
+                <span>Hoàn Tất &amp; Đóng</span>
               </button>
             </div>
           </div>

@@ -460,6 +460,80 @@ async function startServer() {
     }
   });
 
+  // API to send contact inquiry via Resend or fallback
+  app.post("/api/send-contact", async (req, res) => {
+    try {
+      const { name, email, phone, company, topic, preferredContact, message, ticketId } = req.body;
+      if (!name || !phone) {
+        return res.status(400).json({ success: false, error: "Họ tên và số điện thoại là bắt buộc." });
+      }
+
+      const db = getFirestore();
+      const genId = ticketId || Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      const inquiryData = {
+        id: genId,
+        name: name.trim(),
+        email: email ? email.trim() : 'khong-co@email.com',
+        phone: phone.trim(),
+        company: company ? company.trim() : 'Cá nhân',
+        topic: topic || 'Tư vấn chung',
+        preferredContact: preferredContact || 'phone',
+        message: message ? message.trim() : '',
+        createdAt: new Date().toISOString()
+      };
+
+      // Save to Firestore
+      try {
+        await db.collection("contact_inquiries").doc(genId).set(inquiryData);
+      } catch (err: any) {
+        console.warn("Failed to save contact inquiry to Firestore:", err.message);
+      }
+
+      // Try sending via Resend API if RESEND_API_KEY is available
+      const resendApiKey = process.env.RESEND_API_KEY || '';
+      let emailSent = false;
+      if (resendApiKey) {
+        try {
+          const resendRes = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${resendApiKey}`
+            },
+            body: JSON.stringify({
+              from: "FAST E-Learning <onboarding@resend.dev>",
+              to: ["hkc.qms@gmail.com", "support@fastelearning.com.vn"],
+              subject: `[Tư vấn #${genId}] ${topic} - ${name}`,
+              text: `[MÃ TIẾP NHẬN: #${genId}]
+- Họ tên: ${name}
+- Số điện thoại: ${phone}
+- Email: ${email || 'Không có'}
+- Doanh nghiệp: ${company || 'Cá nhân'}
+- Chủ đề: ${topic}
+- Kênh liên hệ ưu tiên: ${preferredContact}
+- Nội dung: ${message || 'Yêu cầu tư vấn nhanh'}`
+            })
+          });
+          if (resendRes.ok) {
+            emailSent = true;
+          }
+        } catch (resendErr: any) {
+          console.warn("Resend API send error:", resendErr.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        ticketId: genId,
+        emailSent,
+        message: "Gửi yêu cầu hỗ trợ thành công!"
+      });
+    } catch (err: any) {
+      console.error("Send contact API error:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // API to look up student email & course registration based on payment code, phone, or ID
   app.get("/api/payment/lookup", async (req, res) => {
     try {
@@ -1208,6 +1282,57 @@ async function startServer() {
     }
   }
 
+  const USER_NOTIFICATIONS_FILE = path.join(DATA_DIR, "user_notifications.json");
+
+  function loadUserNotificationsFromDisk(): Record<string, any[]> {
+    try {
+      if (fs.existsSync(USER_NOTIFICATIONS_FILE)) {
+        const raw = fs.readFileSync(USER_NOTIFICATIONS_FILE, "utf-8");
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      }
+    } catch (e) {
+      console.warn("Failed to load user notifications from disk:", e);
+    }
+    return {};
+  }
+
+  function saveUserNotificationsToDisk(data: Record<string, any[]>) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(USER_NOTIFICATIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {
+      console.warn("Failed to save user notifications to disk:", e);
+    }
+  }
+
+  let serverUserNotifications: Record<string, any[]> = loadUserNotificationsFromDisk();
+
+  async function persistUserNotification(email: string, notif: any) {
+    const emailKey = (email || '').toLowerCase().trim();
+    if (!emailKey) return;
+    const notifId = notif.id || `notif_${Date.now()}`;
+    const fullNotif = {
+      ...notif,
+      id: notifId,
+      userEmail: emailKey,
+      isRead: !!notif.isRead,
+      createdAt: notif.createdAt || new Date().toISOString()
+    };
+
+    const existingList = Array.isArray(serverUserNotifications[emailKey]) ? serverUserNotifications[emailKey] : [];
+    const filtered = existingList.filter((item: any) => item.id !== notifId);
+    serverUserNotifications[emailKey] = [fullNotif, ...filtered].slice(0, 50);
+    saveUserNotificationsToDisk(serverUserNotifications);
+
+    try {
+      const db = getServerFirestore();
+      await db.collection("users").doc(emailKey).collection("notifications").doc(notifId).set(fullNotif, { merge: true });
+    } catch (e) {}
+  }
+
   let serverDirectRegistrations: any[] = loadDirectRegistrationsFromDisk();
 
   app.get("/api/direct-registrations", (req, res) => {
@@ -1220,34 +1345,139 @@ async function startServer() {
 
   app.post("/api/direct-registrations", async (req, res) => {
     try {
-      const regData = req.body;
+      const { notification: incomingNotif, ...regData } = req.body || {};
       if (!regData || !regData.studentName) {
         return res.status(400).json({ success: false, error: "Thiếu thông tin đăng ký" });
       }
       const id = regData.id || `direct-reg-${Date.now()}`;
+      const resolvedLink = regData.meetingLink || regData.zoomLink || 'https://zoom.us/j/84927002668';
+      const targetEmail = (regData.userEmail || regData.email || '').toLowerCase().trim();
       const record = {
         ...regData,
         id,
-        courseTitle: regData.courseTitle || 'Khóa đào tạo An toàn Vệ sinh Thực phẩm 199k',
-        price: regData.price || '199.000đ',
+        userEmail: targetEmail,
+        courseTitle: regData.courseTitle || 'Khóa đào tạo An toàn Vệ sinh Thực phẩm',
+        price: regData.totalPrice || regData.price || '299.000đ',
+        meetingLink: resolvedLink,
+        zoomLink: resolvedLink,
         registeredAt: regData.registeredAt || new Date().toISOString(),
         status: regData.status || 'pending',
         trainingType: regData.trainingType || 'zoom'
       };
 
-      serverDirectRegistrations.unshift(record);
+      const existingIdx = serverDirectRegistrations.findIndex((r: any) => r.id === id);
+      if (existingIdx >= 0) {
+        serverDirectRegistrations[existingIdx] = { ...serverDirectRegistrations[existingIdx], ...record };
+      } else {
+        serverDirectRegistrations.unshift(record);
+      }
       saveDirectRegistrationsToDisk(serverDirectRegistrations);
 
       try {
         const db = getServerFirestore();
+        await db.collection("live_course_registrations").doc(id).set(record, { merge: true });
         await db.collection("direct_course_registrations").doc(id).set(record, { merge: true });
         await db.collection("course_registrations").doc(id).set({
           ...record,
-          type: 'DIRECT_TRAINING_199K'
+          type: 'DIRECT_TRAINING'
         }, { merge: true });
       } catch (e) {}
 
+      if (targetEmail) {
+        const notifPayload = incomingNotif || {
+          id: `training_${id}`,
+          title: `Link tham gia: ${record.courseTitle}`,
+          message: `Đăng ký #${id} thành công. Link tham gia lớp học: ${resolvedLink}`,
+          type: 'training_link',
+          courseId: record.courseId || '',
+          courseTitle: record.courseTitle,
+          registrationId: id,
+          link: resolvedLink,
+          startDate: record.startDate || '',
+          trainingTypeLabel: record.trainingTypeLabel || '',
+          isRead: false,
+          createdAt: record.registeredAt
+        };
+        await persistUserNotification(targetEmail, notifPayload);
+      }
+
       res.json({ success: true, record });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/user/notifications", async (req, res) => {
+    try {
+      const emailKey = String(req.query.email || '').toLowerCase().trim();
+      if (!emailKey) {
+        return res.json({ success: true, notifications: [] });
+      }
+      const map = new Map<string, any>();
+      const diskList = Array.isArray(serverUserNotifications[emailKey]) ? serverUserNotifications[emailKey] : [];
+      diskList.forEach((n: any) => {
+        if (n && n.id) map.set(n.id, n);
+      });
+
+      try {
+        const db = getServerFirestore();
+        const snap = await db.collection("users").doc(emailKey).collection("notifications").get();
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          map.set(docSnap.id, { id: docSnap.id, ...data });
+        });
+      } catch (e) {}
+
+      const list = Array.from(map.values()).sort((a, b) =>
+        new Date(b.createdAt || b.timestamp || 0).getTime() - new Date(a.createdAt || a.timestamp || 0).getTime()
+      );
+      res.json({ success: true, notifications: list });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/user/notifications/send", async (req, res) => {
+    try {
+      const { email, notification } = req.body || {};
+      const emailKey = String(email || notification?.userEmail || '').toLowerCase().trim();
+      if (!emailKey || !notification) {
+        return res.status(400).json({ success: false, error: "Thiếu email hoặc nội dung thông báo" });
+      }
+      await persistUserNotification(emailKey, notification);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/user/notifications/read", async (req, res) => {
+    try {
+      const { email, notifId, markAll } = req.body || {};
+      const emailKey = String(email || '').toLowerCase().trim();
+      if (!emailKey) return res.json({ success: true });
+
+      const diskList = Array.isArray(serverUserNotifications[emailKey]) ? serverUserNotifications[emailKey] : [];
+      serverUserNotifications[emailKey] = diskList.map((n: any) =>
+        markAll || n.id === notifId ? { ...n, isRead: true } : n
+      );
+      saveUserNotificationsToDisk(serverUserNotifications);
+
+      try {
+        const db = getServerFirestore();
+        if (markAll) {
+          const snap = await db.collection("users").doc(emailKey).collection("notifications").get();
+          const batch = db.batch();
+          snap.forEach((docSnap) => {
+            batch.set(docSnap.ref, { isRead: true }, { merge: true });
+          });
+          await batch.commit();
+        } else if (notifId) {
+          await db.collection("users").doc(emailKey).collection("notifications").doc(notifId).set({ isRead: true }, { merge: true });
+        }
+      } catch (e) {}
+
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

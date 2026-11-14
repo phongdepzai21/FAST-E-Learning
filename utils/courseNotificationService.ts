@@ -1,11 +1,12 @@
 import { Course } from '../types';
 
-export type NotificationType = 'new' | 'updated' | 'approval';
+export type NotificationType = 'new' | 'updated' | 'approval' | 'training_link';
 
 export interface CourseNotification {
   id: string;
   courseId?: string;
   courseTitle: string;
+  title?: string;
   courseCategory?: string;
   courseImage?: string;
   type: NotificationType;
@@ -15,6 +16,10 @@ export interface CourseNotification {
   price?: string;
   userEmail?: string;
   rolesSummary?: string;
+  link?: string;
+  registrationId?: string;
+  startDate?: string;
+  trainingTypeLabel?: string;
 }
 
 const STORAGE_KEY = 'fast_course_notifications';
@@ -168,6 +173,48 @@ export function addApprovalNotification(params: {
 
   const current = getStoredNotifications();
   const updated = [newNotif, ...current].slice(0, 30);
+  saveNotifications(updated);
+  return newNotif;
+}
+
+export function addTrainingLinkNotification(params: {
+  id?: string;
+  userEmail?: string;
+  courseId: string;
+  courseTitle: string;
+  courseImage?: string;
+  link: string;
+  registrationId: string;
+  startDate?: string;
+  trainingTypeLabel?: string;
+  message?: string;
+}): CourseNotification {
+  const normalizedEmail = params.userEmail?.toLowerCase().trim() || undefined;
+  const notifId = params.id || `training_${params.registrationId || Date.now()}`;
+  const title = `Link tham gia khóa đào tạo: ${params.courseTitle}`;
+  const message = params.message || `Đăng ký #${params.registrationId} thành công (${params.trainingTypeLabel || 'Đào tạo'}). Link lớp học: ${params.link}`;
+
+  const newNotif: CourseNotification = {
+    id: notifId,
+    courseId: params.courseId,
+    courseTitle: params.courseTitle,
+    title,
+    courseCategory: 'Khóa đào tạo',
+    courseImage: params.courseImage,
+    type: 'training_link',
+    message,
+    timestamp: new Date().toISOString(),
+    isRead: false,
+    userEmail: normalizedEmail,
+    link: params.link,
+    registrationId: params.registrationId,
+    startDate: params.startDate,
+    trainingTypeLabel: params.trainingTypeLabel
+  };
+
+  const current = getStoredNotifications();
+  const filtered = current.filter(n => n.id !== notifId);
+  const updated = [newNotif, ...filtered].slice(0, 30);
   saveNotifications(updated);
   return newNotif;
 }

@@ -1003,6 +1003,7 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     startDate: 'Chủ Nhật hàng tuần (08:30 - 16:30)',
     scheduleDetails: 'Sáng: 08:30 - 11:30 | Chiều: 13:30 - 16:30',
     venueAddress: 'Tòa nhà FAST E-Learning, Số 18 Phố Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Online Zoom',
+    meetingLink: 'https://zoom.us/j/84927002668',
     instructor: 'ThS. Nguyễn Văn Thành (Chuyên gia QMS & ATTP 15 năm kinh nghiệm)',
     benefits: ['Chứng nhận hoàn thành có mã tra cứu 10 số điện tử', 'Bộ biểu mẫu hồ sơ ATTP mẫu', 'Tư vấn giải đáp trực tiếp cùng chuyên gia']
   },
@@ -1021,6 +1022,7 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     startDate: 'Tối Thứ 7 & Chủ Nhật (19:30 - 21:30)',
     scheduleDetails: 'Trực tuyến có tương tác hai chiều qua Zoom HD',
     venueAddress: 'Phòng học trực tuyến Zoom FAST Academy',
+    meetingLink: 'https://zoom.us/j/84927002668',
     instructor: 'TS. Trần Hạnh (Chuyên gia Kiểm định Thực phẩm)',
     benefits: ['Bộ kế hoạch HACCP mẫu ứng dụng được ngay', 'Video quay lại buổi học xem lại trọn đời', 'Chứng nhận hoàn thành']
   },
@@ -1039,6 +1041,7 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     startDate: 'Khai giảng ngày 15 và 30 hàng tháng',
     scheduleDetails: 'Thứ 7 & Chủ Nhật',
     venueAddress: 'Hội trường Tầng 6, Tòa nhà Mộc Gia, 238-242 Nguyễn Oanh, Gò Vấp, TP.HCM',
+    meetingLink: 'https://meet.google.com/fast-iso22000-live',
     instructor: 'Chuyên gia Đặng Minh Trí',
     benefits: ['Chứng chỉ Internal Auditor ISO 22000', 'Bộ checklist audit đầy đủ từ điều khoản 4 đến 10', 'Hỗ trợ nghiệp vụ sau khóa']
   },
@@ -1057,6 +1060,7 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     startDate: 'Thứ 7 tuần thứ 2 hàng tháng',
     scheduleDetails: '09:00 - 17:00',
     venueAddress: 'Trung tâm Đào tạo FAST, Nam Từ Liêm, Hà Nội',
+    meetingLink: 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi',
     instructor: 'Bếp trưởng & Chuyên gia ATTP Lê Hoàng',
     benefits: ['Sơ đồ mặt bằng bếp 1 chiều chuẩn Bộ Y tế', 'Mẫu sổ kiểm thực 3 bước và lưu mẫu thức ăn', 'Tư vấn trực tiếp cho cơ sở']
   }

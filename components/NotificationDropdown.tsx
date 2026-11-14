@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
@@ -9,11 +9,14 @@ import {
   Clock, 
   X,
   Shield,
-  UserCheck
+  Video
 } from 'lucide-react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { getFastSessionUser } from '../utils/sessionAuth';
 import { 
   getStoredNotifications, 
-  getUnreadCount, 
   markNotificationAsRead, 
   markAllNotificationsAsRead, 
   formatTimeAgo,
@@ -36,26 +39,136 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CourseNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [accountEmail, setAccountEmail] = useState<string>('');
+  const [remoteNotifs, setRemoteNotifs] = useState<CourseNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const refresh = () => {
-    const list = getStoredNotifications();
-    setNotifications(list);
-    setUnreadCount(getUnreadCount());
-  };
-
-  useEffect(() => {
-    refresh();
-
-    const handleUpdate = () => refresh();
-    window.addEventListener('course_notifications_updated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-
-    return () => {
-      window.removeEventListener('course_notifications_updated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
+  const normalizeRemoteDoc = useCallback((id: string, data: any): CourseNotification => {
+    return {
+      id,
+      courseId: data.courseId || '',
+      courseTitle: data.title || data.courseTitle || 'Thông báo hệ thống',
+      title: data.title,
+      courseCategory: data.type === 'training_link' ? 'Link khóa đào tạo' : data.type === 'approval' ? 'Phê duyệt' : data.courseCategory,
+      courseImage: data.courseImage || '',
+      type: data.type || 'training_link',
+      message: data.message || '',
+      timestamp: data.createdAt || data.timestamp || new Date().toISOString(),
+      isRead: !!data.isRead,
+      price: data.price,
+      userEmail: data.userEmail,
+      link: data.link,
+      registrationId: data.registrationId,
+      startDate: data.startDate,
+      trainingTypeLabel: data.trainingTypeLabel
     };
   }, []);
+
+  const mergeAndSetNotifications = useCallback((remoteList: CourseNotification[], email: string) => {
+    const localList = getStoredNotifications().filter(n => {
+      if (!n.userEmail) return true;
+      if (!email) return false;
+      return n.userEmail.toLowerCase() === email.toLowerCase();
+    });
+
+    const mergedMap = new Map<string, CourseNotification>();
+    localList.forEach(item => mergedMap.set(item.id, item));
+    remoteList.forEach(item => {
+      const existing = mergedMap.get(item.id);
+      mergedMap.set(item.id, existing ? { ...existing, ...item, isRead: existing.isRead || item.isRead } : item);
+    });
+
+    const sorted = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+    );
+    setNotifications(sorted);
+    setUnreadCount(sorted.filter(n => !n.isRead).length);
+  }, []);
+
+  useEffect(() => {
+    mergeAndSetNotifications(remoteNotifs, accountEmail);
+  }, [remoteNotifs, accountEmail, mergeAndSetNotifications]);
+
+  useEffect(() => {
+    let unsubFirestore = () => {};
+    let currentEmail = '';
+
+    const loadServerNotifications = async (email: string) => {
+      if (!email) return;
+      try {
+        const res = await fetch(`/api/user/notifications?email=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data.notifications)) {
+            setRemoteNotifs(prev => {
+              const map = new Map<string, CourseNotification>();
+              prev.forEach(p => map.set(p.id, p));
+              data.notifications.forEach((raw: any) => {
+                const n = normalizeRemoteDoc(raw.id, raw);
+                map.set(n.id, n);
+              });
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (e) {}
+    };
+
+    const setupListeners = (userEmailRaw?: string | null) => {
+      unsubFirestore();
+      unsubFirestore = () => {};
+
+      const sessionUser = getFastSessionUser();
+      const email = (userEmailRaw || auth.currentUser?.email || sessionUser?.email || '').toLowerCase().trim();
+      currentEmail = email;
+      setAccountEmail(email);
+
+      if (!email) {
+        setRemoteNotifs([]);
+        return;
+      }
+
+      loadServerNotifications(email);
+
+      try {
+        unsubFirestore = onSnapshot(collection(db, 'users', email, 'notifications'), (snapshot) => {
+          const list: CourseNotification[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(normalizeRemoteDoc(docSnap.id, docSnap.data()));
+          });
+          setRemoteNotifs(prev => {
+            const map = new Map<string, CourseNotification>();
+            prev.forEach(p => map.set(p.id, p));
+            list.forEach(n => map.set(n.id, n));
+            return Array.from(map.values());
+          });
+        }, () => {});
+      } catch (e) {}
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      setupListeners(user?.email);
+    });
+    setupListeners(auth.currentUser?.email);
+
+    const handleFastAuth = () => setupListeners(auth.currentUser?.email);
+    const handleLocalUpdate = () => {
+      mergeAndSetNotifications(remoteNotifs, currentEmail);
+      if (currentEmail) loadServerNotifications(currentEmail);
+    };
+
+    window.addEventListener('fast_auth_changed', handleFastAuth);
+    window.addEventListener('course_notifications_updated', handleLocalUpdate);
+    window.addEventListener('storage', handleLocalUpdate);
+
+    return () => {
+      unsubAuth();
+      unsubFirestore();
+      window.removeEventListener('fast_auth_changed', handleFastAuth);
+      window.removeEventListener('course_notifications_updated', handleLocalUpdate);
+      window.removeEventListener('storage', handleLocalUpdate);
+    };
+  }, [normalizeRemoteDoc, mergeAndSetNotifications]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -71,13 +184,31 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  const markReadEverywhere = (notifId: string) => {
+    markNotificationAsRead(notifId);
+    setRemoteNotifs(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+    if (accountEmail) {
+      setDoc(doc(db, 'users', accountEmail, 'notifications', notifId), { isRead: true }, { merge: true }).catch(() => {});
+      fetch('/api/user/notifications/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: accountEmail, notifId })
+      }).catch(() => {});
+    }
+  };
+
   const handleSelectNotification = (notif: CourseNotification) => {
-    markNotificationAsRead(notif.id);
-    if (notif.courseId) {
+    markReadEverywhere(notif.id);
+    if (notif.courseId && notif.type !== 'training_link') {
       markCourseAsSeen(notif.courseId);
     }
     setIsOpen(false);
     onItemClick?.();
+
+    if (notif.type === 'training_link') {
+      navigate('/account');
+      return;
+    }
 
     if (notif.type === 'approval') {
       navigate('/account', { state: { tab: 'user-management' } });
@@ -91,9 +222,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
         if (targetCourse) {
           navigate(`/khoa-hoc/${notif.courseId}`);
         } else {
-          // Stale or deleted course notification
           deleteNotification(notif.id);
-          refresh();
+          mergeAndSetNotifications(remoteNotifs, accountEmail);
           navigate('/khoa-hoc');
         }
       });
@@ -105,7 +235,14 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   const handleMarkAllRead = (e: React.MouseEvent) => {
     e.stopPropagation();
     markAllNotificationsAsRead();
-    refresh();
+    setRemoteNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+    if (accountEmail) {
+      fetch('/api/user/notifications/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: accountEmail, markAll: true })
+      }).catch(() => {});
+    }
   };
 
   return (
@@ -114,7 +251,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       <button
         id="notification-bell-button"
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Thông báo khóa học"
+        aria-label="Thông báo tài khoản & khóa học"
         className={`relative p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
           isOpen 
             ? 'bg-[#007c76]/10 text-[#007c76]' 
@@ -138,7 +275,6 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       {/* Fullscreen Backdrop & Dropdown Popover */}
       {isOpen && (
         <>
-          {/* Fullscreen Aesthetic Backdrop: Làm mờ và xám toàn bộ màn hình khi mở bảng thông báo */}
           <div 
             className="fixed inset-0 w-screen h-screen min-h-screen bg-slate-950/70 backdrop-blur-md backdrop-grayscale-[30%] z-[105] animate-fade-in"
             onClick={() => setIsOpen(false)}
@@ -154,7 +290,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           <div className="px-4 py-3.5 bg-gradient-to-r from-gray-50 to-teal-50/40 dark:from-slate-800 dark:to-slate-800/80 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm text-gray-900 dark:text-white">
-                Thông báo khóa học
+                Thông báo tài khoản
               </span>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
@@ -185,12 +321,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           </div>
 
           {/* Notification List */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800">
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800">
             {notifications.length === 0 ? (
               <div className="py-10 px-4 text-center">
                 <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-xs font-bold text-gray-500">Chưa có thông báo khóa học nào</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">Các khóa học mới và nội dung cập nhật sẽ xuất hiện tại đây.</p>
+                <p className="text-xs font-bold text-gray-500">Chưa có thông báo nào</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Thông báo đăng ký khóa đào tạo, link học và bài giảng mới sẽ hiển thị tại đây.</p>
               </div>
             ) : (
               notifications.map((notif) => (
@@ -205,7 +341,11 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 >
                   {/* Thumbnail / Icon */}
                   <div className="relative shrink-0 mt-0.5">
-                    {notif.type === 'approval' ? (
+                    {notif.type === 'training_link' ? (
+                      <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-[#007c76] dark:text-emerald-400 shadow-xs">
+                        <Video className="w-5 h-5" />
+                      </div>
+                    ) : notif.type === 'approval' ? (
                       <div className="w-11 h-11 rounded-xl bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
                         <Shield className="w-5 h-5" />
                       </div>
@@ -230,15 +370,17 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                        notif.type === 'new' 
-                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' 
-                          : notif.type === 'approval'
-                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                            : 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
+                        notif.type === 'training_link'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : notif.type === 'new' 
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' 
+                            : notif.type === 'approval'
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+                              : 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
                       }`}>
-                        {notif.type === 'new' ? 'Mới' : notif.type === 'approval' ? 'Phê duyệt' : 'Cập nhật'}
+                        {notif.type === 'training_link' ? 'Link lớp học' : notif.type === 'new' ? 'Mới' : notif.type === 'approval' ? 'Phê duyệt' : 'Cập nhật'}
                       </span>
-                      {notif.courseCategory && (
+                      {notif.courseCategory && notif.type !== 'training_link' && (
                         <span className="text-[10px] font-semibold text-gray-500">
                           {notif.courseCategory}
                         </span>
@@ -247,32 +389,57 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         <Clock className="w-2.5 h-2.5" />
                         {formatTimeAgo(notif.timestamp)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (notif.courseId) {
-                            dismissCourseNotification(notif.courseId);
-                          }
-                          deleteNotification(notif.id);
-                          refresh();
-                        }}
-                        title="Bỏ qua & không hiện lại thông báo này"
-                        className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors ml-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      {notif.type !== 'training_link' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (notif.courseId) {
+                              dismissCourseNotification(notif.courseId);
+                            }
+                            deleteNotification(notif.id);
+                            mergeAndSetNotifications(remoteNotifs, accountEmail);
+                          }}
+                          title="Bỏ qua & không hiện lại thông báo này"
+                          className="p-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors ml-1"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
 
                     <h5 className="text-xs font-bold text-gray-900 dark:text-white leading-snug group-hover:text-[#007c76] transition-colors line-clamp-2">
                       {notif.courseTitle}
                     </h5>
 
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
                       {notif.message}
                     </p>
 
-                    {notif.price && (
+                    {notif.link && (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <a
+                          href={notif.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markReadEverywhere(notif.id);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#007c76] text-white text-[10px] font-black uppercase tracking-wider hover:bg-[#005c56] transition"
+                        >
+                          <span>Mở link học</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {notif.registrationId && (
+                          <span className="text-[10px] font-mono font-bold text-gray-400">
+                            #{notif.registrationId}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {notif.price && !notif.link && (
                       <div className="mt-1 flex items-center justify-between">
                         <span className="text-[11px] font-extrabold text-[#007c76]">
                           {notif.price}
@@ -293,11 +460,11 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             <button
               onClick={() => {
                 setIsOpen(false);
-                navigate('/khoa-hoc');
+                navigate('/khoa-dao-tao');
               }}
               className="text-[11px] font-extrabold text-[#007c76] hover:text-[#005a56] flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
-              <span>Xem tất cả khóa học →</span>
+              <span>Xem khóa đào tạo →</span>
             </button>
           </div>
         </div>

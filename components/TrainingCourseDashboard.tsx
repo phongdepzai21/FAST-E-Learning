@@ -56,6 +56,7 @@ export const TrainingCourseDashboard: React.FC = () => {
   const [startDate, setStartDate] = useState('Chủ Nhật hàng tuần (08:30 - 16:30)');
   const [scheduleDetails, setScheduleDetails] = useState('Sáng: 08:30 - 11:30 | Chiều: 13:30 - 16:30');
   const [venueAddress, setVenueAddress] = useState('Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Trực tuyến Zoom');
+  const [meetingLink, setMeetingLink] = useState('https://zoom.us/j/84927002668');
   const [instructor, setInstructor] = useState('ThS. Nguyễn Văn Thành (Chuyên gia QMS & ATTP)');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
@@ -68,6 +69,10 @@ export const TrainingCourseDashboard: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<Partial<ReceiptData> | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkModalReg, setLinkModalReg] = useState<any | null>(null);
+  const [linkInput, setLinkInput] = useState('');
+  const [linkMessageInput, setLinkMessageInput] = useState('');
+  const [isSendingLink, setIsSendingLink] = useState(false);
 
   // 1. Lắng nghe Firestore collection 'training_courses' theo thời gian thực
   useEffect(() => {
@@ -140,6 +145,7 @@ export const TrainingCourseDashboard: React.FC = () => {
     setStartDate('Chủ Nhật hàng tuần (08:30 - 16:30)');
     setScheduleDetails('Sáng: 08:30 - 11:30 | Chiều: 13:30 - 16:30');
     setVenueAddress('Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Trực tuyến Zoom');
+    setMeetingLink('https://zoom.us/j/84927002668');
     setInstructor('ThS. Nguyễn Văn Thành (Chuyên gia QMS & ATTP)');
     setDescription('');
     setStatus('active');
@@ -159,6 +165,7 @@ export const TrainingCourseDashboard: React.FC = () => {
     setStartDate(course.startDate || 'Chủ Nhật hàng tuần');
     setScheduleDetails(course.scheduleDetails || '');
     setVenueAddress(course.venueAddress || '');
+    setMeetingLink(course.meetingLink || 'https://zoom.us/j/84927002668');
     setInstructor(course.instructor || '');
     setDescription(course.description || '');
     setStatus(course.status || 'active');
@@ -193,6 +200,7 @@ export const TrainingCourseDashboard: React.FC = () => {
       startDate: startDate.trim(),
       scheduleDetails: scheduleDetails.trim(),
       venueAddress: venueAddress.trim(),
+      meetingLink: meetingLink.trim(),
       instructor: instructor.trim(),
       description: description.trim(),
       image: finalCover,
@@ -287,11 +295,77 @@ export const TrainingCourseDashboard: React.FC = () => {
       email: reg.email || '',
       companyName: reg.companyName || 'Cá nhân',
       courseTitle: reg.courseTitle || 'Khóa Đào Tạo Trực Tiếp',
-      amount: reg.price || '299.000đ',
-      trainingType: reg.trainingType === 'zoom' ? 'Trực tuyến Zoom' : 'Trực tiếp Hội trường',
+      amount: reg.totalPrice || reg.price || '299.000đ',
+      trainingType: reg.trainingTypeLabel || (reg.trainingType === 'zoom' ? 'Trực tuyến Zoom' : 'Trực tiếp Hội trường'),
       issueDate: new Date().toISOString().slice(0, 10)
     });
     setIsReceiptModalOpen(true);
+  };
+
+  const handleOpenSendLink = (reg: any) => {
+    const defaultLink = reg.meetingLink || reg.zoomLink || 'https://zoom.us/j/84927002668';
+    setLinkModalReg(reg);
+    setLinkInput(defaultLink);
+    setLinkMessageInput(`Chào ${reg.studentName || 'học viên'}, mời bạn truy cập link lớp học "${reg.courseTitle}" (${reg.startDate || ''}): ${defaultLink}`);
+  };
+
+  const handleSendLinkNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkModalReg) return;
+    const cleanLink = linkInput.trim();
+    if (!cleanLink) {
+      toast.showToast('Vui lòng nhập link lớp học!', 'error');
+      return;
+    }
+    const targetEmail = (linkModalReg.userEmail || linkModalReg.email || '').toLowerCase().trim();
+    if (!targetEmail) {
+      toast.showToast('Hồ sơ đăng ký này chưa có email tài khoản học viên!', 'error');
+      return;
+    }
+
+    setIsSendingLink(true);
+    const nowIso = new Date().toISOString();
+    const notifId = `training_link_${linkModalReg.id}_${Date.now()}`;
+    const notifPayload = {
+      id: notifId,
+      title: `Thông báo link lớp học: ${linkModalReg.courseTitle}`,
+      message: linkMessageInput.trim() || `Link tham gia khóa học "${linkModalReg.courseTitle}": ${cleanLink}`,
+      type: 'training_link',
+      courseId: linkModalReg.courseId || '',
+      courseTitle: linkModalReg.courseTitle || 'Khóa đào tạo',
+      registrationId: linkModalReg.id,
+      link: cleanLink,
+      startDate: linkModalReg.startDate || '',
+      trainingTypeLabel: linkModalReg.trainingTypeLabel || '',
+      userEmail: targetEmail,
+      isRead: false,
+      createdAt: nowIso
+    };
+
+    try {
+      await setDoc(doc(db, 'live_course_registrations', linkModalReg.id), {
+        meetingLink: cleanLink,
+        zoomLink: cleanLink,
+        status: 'confirmed',
+        updatedAt: nowIso
+      }, { merge: true });
+
+      await setDoc(doc(db, 'users', targetEmail, 'notifications', notifId), notifPayload).catch(() => {});
+
+      await fetch('/api/user/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail, notification: notifPayload })
+      }).catch(() => {});
+
+      toast.showToast(`Đã gửi thông báo link lớp học tới tài khoản ${targetEmail}!`, 'success');
+      setLinkModalReg(null);
+    } catch (err) {
+      console.error('Lỗi gửi link lớp học:', err);
+      toast.showToast('Không thể gửi thông báo link. Vui lòng thử lại!', 'error');
+    } finally {
+      setIsSendingLink(false);
+    }
   };
 
   const filteredCourses = trainingCourses.filter(c => 
@@ -767,14 +841,27 @@ export const TrainingCourseDashboard: React.FC = () => {
 
               <div className="space-y-1 sm:col-span-2">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700">
-                  Địa điểm tổ chức hoặc link Zoom:
+                  Địa điểm tổ chức:
                 </label>
                 <input
                   type="text"
                   value={venueAddress}
                   onChange={e => setVenueAddress(e.target.value)}
-                  placeholder="VD: Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội hoặc Phòng Zoom FAST"
+                  placeholder="VD: Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội hoặc Trực tuyến Zoom"
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-[#007c76] outline-none"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Link phòng học Zoom / Meet / Tài liệu (tự động gửi về tài khoản khi đăng ký):
+                </label>
+                <input
+                  type="url"
+                  value={meetingLink}
+                  onChange={e => setMeetingLink(e.target.value)}
+                  placeholder="VD: https://zoom.us/j/84927002668"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-[#007c76] focus:bg-white focus:border-[#007c76] outline-none"
                 />
               </div>
 
@@ -959,6 +1046,15 @@ export const TrainingCourseDashboard: React.FC = () => {
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
+                              onClick={() => handleOpenSendLink(reg)}
+                              className="px-2.5 py-1 bg-[#007c76] hover:bg-[#005c56] text-white rounded-lg font-bold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
+                              title="Gửi thông báo link lớp học về tài khoản học viên"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Gửi Link</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleOpenReceipt(reg)}
                               className="px-2.5 py-1 bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-[#007c76] border border-slate-200 rounded-lg font-bold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
                               title="Tạo biên lai thu học phí"
@@ -1114,6 +1210,71 @@ export const TrainingCourseDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal Gửi Link Lớp Học Về Tài Khoản Học Viên */}
+      {linkModalReg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs">
+          <form
+            onSubmit={handleSendLinkNotification}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl space-y-4 animate-fade-in"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="font-black text-base text-slate-900">Gửi Link Lớp Học Qua Tài Khoản</h4>
+                <p className="text-xs text-slate-500">
+                  Học viên: <strong>{linkModalReg.studentName}</strong> ({linkModalReg.userEmail || linkModalReg.email || 'Chưa có email'})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkModalReg(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-slate-700 block">Link Zoom / Google Meet / Tài liệu *</label>
+              <input
+                type="url"
+                required
+                value={linkInput}
+                onChange={e => setLinkInput(e.target.value)}
+                placeholder="https://zoom.us/j/..."
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-[#007c76] focus:bg-white focus:border-[#007c76] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-slate-700 block">Nội dung thông báo gửi học viên</label>
+              <textarea
+                rows={3}
+                value={linkMessageInput}
+                onChange={e => setLinkMessageInput(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:border-[#007c76] outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setLinkModalReg(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSendingLink}
+                className="px-5 py-2 rounded-xl bg-[#007c76] hover:bg-[#005c56] text-white text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-50"
+              >
+                {isSendingLink ? 'Đang gửi...' : 'Xác nhận gửi link'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -114,37 +114,48 @@ const Contact: React.FC = () => {
     };
 
     try {
-      // 1. Lưu dự phòng Firestore
-      try {
-        await setDoc(doc(db, 'contact_inquiries', genTicket), inquiryData);
-      } catch (fsErr) {
-        console.warn('Firestore contact save notice:', fsErr);
-      }
+      // 1. Gửi qua backend API (/api/send-contact -> Resend & Firestore)
+      const res = await fetch('/api/send-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId: genTicket,
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          company: formData.company.trim(),
+          topic,
+          preferredContact,
+          message: formData.message.trim()
+        })
+      });
 
-      // 2. Gửi qua EmailJS
-      const fullMessage = `[MÃ TIẾP NHẬN: ${genTicket}]
+      if (!res.ok) {
+        // Fallback to EmailJS if backend API fails
+        const fullMessage = `[MÃ TIẾP NHẬN: ${genTicket}]
 - Chủ đề: ${topic}
 - Kênh liên hệ ưu tiên: ${preferredContact}
 - Doanh nghiệp/Đơn vị: ${formData.company || 'Cá nhân'}
 - Nội dung: ${formData.message || 'Yêu cầu tư vấn nhanh'}`;
 
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          name: formData.name,
-          email: formData.email || 'khong-co@email.com',
-          phone: formData.phone,
-          title: `[Tư vấn #${genTicket}] ${topic} - ${formData.name}`,
-          message: fullMessage,
-          to_email: officialEmail
-        },
-        EMAILJS_PUBLIC_KEY
-      );
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            name: formData.name,
+            email: formData.email || 'khong-co@email.com',
+            phone: formData.phone,
+            title: `[Tư vấn #${genTicket}] ${topic} - ${formData.name}`,
+            message: fullMessage,
+            to_email: officialEmail
+          },
+          EMAILJS_PUBLIC_KEY
+        );
+      }
+
       setStatus('success');
     } catch (err) {
-      console.warn('Lỗi gửi emailjs:', err);
-      // Fallback local acknowledgment so client inquiry is never blocked
+      console.warn('Lỗi gửi API liên hệ:', err);
       setStatus('success');
     }
   };

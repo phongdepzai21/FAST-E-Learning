@@ -148,6 +148,40 @@
       "properties": {
         "timestamp": { "type": "string", "description": "ISO timestamp" }
       }
+    },
+    "UserNotification": {
+      "title": "UserNotification",
+      "description": "Account notification delivered to a user (including training class links and approvals)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Notification document ID" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Notification body text" },
+        "type": { "type": "string", "description": "Notification type (training_link, approval, new, updated)" },
+        "courseId": { "type": "string", "description": "Related course ID" },
+        "courseTitle": { "type": "string", "description": "Related course title" },
+        "registrationId": { "type": "string", "description": "Related registration ID" },
+        "link": { "type": "string", "description": "Class meeting link or resource URL" },
+        "userEmail": { "type": "string", "description": "Lowercase recipient email" },
+        "isRead": { "type": "boolean", "description": "Read status flag" },
+        "createdAt": { "type": "string", "description": "ISO 8601 timestamp" }
+      },
+      "required": ["title", "message", "type", "isRead"]
+    },
+    "TrainingCourse": {
+      "title": "TrainingCourse",
+      "description": "Live/Zoom training course definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "10-digit training course ID" },
+        "title": { "type": "string", "description": "Training course title" },
+        "price": { "type": "string", "description": "Formatted tuition price" },
+        "category": { "type": "string", "description": "Training category" },
+        "trainingFormat": { "type": "string", "description": "zoom, direct, both, or inhouse" },
+        "meetingLink": { "type": "string", "description": "Zoom/Meet class link sent to registered accounts" },
+        "status": { "type": "string", "description": "active or inactive" }
+      },
+      "required": ["id", "title"]
     }
   },
   "firestore": {
@@ -214,6 +248,14 @@
     "live_course_registrations/{regId}": {
       "schema": "LiveCourseRegistration",
       "description": "Live food safety training (199k) student registration records"
+    },
+    "users/{userEmail}/notifications/{notifId}": {
+      "schema": "UserNotification",
+      "description": "Per-user account notifications including training class links"
+    },
+    "training_courses/{courseId}": {
+      "schema": "TrainingCourse",
+      "description": "Live and Zoom training courses catalog"
     }
   }
 }

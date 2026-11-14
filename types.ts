@@ -51,6 +51,7 @@ export interface TrainingCourse {
   startDate: string;
   scheduleDetails?: string;
   venueAddress?: string;
+  meetingLink?: string;
   instructor?: string;
   maxStudents?: number;
   benefits?: string[];

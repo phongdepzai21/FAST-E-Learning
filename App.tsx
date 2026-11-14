@@ -333,6 +333,7 @@ const AppLayout: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/khoa-hoc" element={<Courses />} />
+            <Route path="/khoa-dao-tao" element={<Courses initialCategory="Khóa Đào Tạo" />} />
             <Route path="/khoa-hoc/:id" element={<CourseDetail />} />
             <Route path="/hoc/:courseId" element={<Classroom />} />
             <Route path="/hoc-bai/:courseId" element={<Classroom />} />
@@ -350,6 +351,8 @@ const AppLayout: React.FC = () => {
             <Route path="/live-training" element={<LiveCourseRegistration isStandalonePage={true} />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />
+            <Route path="/chinh-sach-quyen-rieng-tu" element={<PrivacyPolicy />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

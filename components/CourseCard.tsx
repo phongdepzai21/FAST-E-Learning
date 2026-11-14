@@ -15,6 +15,8 @@ interface CourseCardProps {
   onSelect?: (course: Course) => void;
   onClaimCourse?: (course: Course) => void;
   isClaiming?: boolean;
+  metaLabel?: string;
+  ctaLabel?: string;
 }
 
 const getOptimizedUrl = (url: string, width: number) => {
@@ -43,7 +45,9 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
   progress = 0, 
   onSelect,
   onClaimCourse,
-  isClaiming = false
+  isClaiming = false,
+  metaLabel,
+  ctaLabel
 }) => {
   const { showToast } = useToast();
   const [isLoaded, setIsLoaded] = useState(false);
@@ -205,7 +209,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                         </p>
                     )}
                     <div className="inline-flex items-center gap-2 bg-[#007c76] text-white px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest shadow-lg shadow-[#007c76]/40 transform translate-y-3 group-hover:translate-y-0 transition-all duration-300 ease-out">
-                        <span>Xem chi tiết</span>
+                        <span>{ctaLabel || 'Xem chi tiết'}</span>
                         <svg className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </div>
                 </div>
@@ -216,7 +220,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center text-[11px] font-bold text-gray-400">
                         <svg className="w-3.5 h-3.5 mr-1 text-[#007c76]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                        {course.isDirectTraining ? 'Đào tạo trực tiếp' : `${stats.lessons} bài học`}
+                        {metaLabel || (course.isDirectTraining ? 'Đào tạo trực tiếp' : `${stats.lessons} bài học`)}
                     </div>
                     {course.startDate && (
                         <div className="flex items-center text-[11px] font-bold text-emerald-600 truncate">

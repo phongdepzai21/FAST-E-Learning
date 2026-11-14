@@ -2512,6 +2512,9 @@ const Account: React.FC = () => {
                   )}
                 </section>
 
+                {/* Khóa Đào Tạo Trực Tiếp & Zoom Đã Đăng Ký */}
+                <MyTrainingRegistrationsView userEmail={user.email} />
+
                 {/* Gamification & Milestone Badges in Main Dashboard */}
                 <GamificationBadgeSection 
                   gamificationData={gamificationData} 
