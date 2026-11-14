@@ -29,15 +29,16 @@ const Header: React.FC = () => {
       const sessionUser = getFastSessionUser();
       const effectiveUser = user || auth.currentUser || (sessionUser ? createSyntheticFirebaseUser(sessionUser) : null);
       setCurrentUser(effectiveUser);
-      if (effectiveUser && effectiveUser.email) {
-        const normalizedEmail = effectiveUser.email.toLowerCase();
+      if (effectiveUser && (effectiveUser.email || effectiveUser.uid)) {
+        const normalizedEmail = (effectiveUser.email || '').toLowerCase().trim();
+        const accountDocKey = normalizedEmail || effectiveUser.uid;
         
         let localIsVip = false;
-        let localIsAdmin = ADMIN_EMAILS.includes(normalizedEmail);
-        let localIsTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+        let localIsAdmin = normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false;
+        let localIsTeacher = normalizedEmail ? TEACHER_EMAILS.includes(normalizedEmail) : false;
 
         try {
-          const localRolesStr = localStorage.getItem(`user_roles_${normalizedEmail}`);
+          const localRolesStr = localStorage.getItem(`user_roles_${accountDocKey}`);
           if (localRolesStr) {
             const localRoles = JSON.parse(localRolesStr);
             if (localRoles.isVip) localIsVip = true;
@@ -55,17 +56,17 @@ const Header: React.FC = () => {
         let currentIsAdmin = localIsAdmin;
         let currentIsTeacher = localIsTeacher;
 
-        const unsubUserDoc = onSnapshot(doc(db, "users", normalizedEmail), (docSnap) => {
+        const unsubUserDoc = onSnapshot(doc(db, "users", accountDocKey), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.isVip !== undefined) {
               currentIsVip = !!data.isVip;
             }
             if (data.isAdmin !== undefined) {
-              currentIsAdmin = !!data.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
+              currentIsAdmin = !!data.isAdmin || (normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false);
             }
             if (data.isTeacher !== undefined) {
-              currentIsTeacher = !!data.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
+              currentIsTeacher = !!data.isTeacher || (normalizedEmail ? TEACHER_EMAILS.includes(normalizedEmail) : false);
             }
 
             setIsVip(currentIsVip);
@@ -73,23 +74,23 @@ const Header: React.FC = () => {
             setIsTeacher(currentIsTeacher);
 
             setUserProfile({
-              name: data.fullName || data.name || user.displayName || 'Học viên',
-              avatar: data.avatar || user.photoURL || ''
+              name: data.fullName || data.displayName || data.name || effectiveUser.displayName || 'Học viên',
+              avatar: data.avatar || data.photoURL || effectiveUser.photoURL || ''
             });
           } else {
             setIsVip(currentIsVip);
             setIsAdmin(currentIsAdmin);
             setIsTeacher(currentIsTeacher);
             setUserProfile({
-              name: user.displayName || 'Học viên',
-              avatar: user.photoURL || ''
+              name: effectiveUser.displayName || 'Học viên',
+              avatar: effectiveUser.photoURL || ''
             });
           }
         }, () => {});
         unsubs.push(unsubUserDoc);
 
         // Real-time listener for purchased courses VIP check
-        const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
+        const unsubPurchased = onSnapshot(collection(db, "users", accountDocKey, "purchased_courses"), (snap) => {
           const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
           if (isVipDoc) {
             currentIsVip = true;
@@ -101,7 +102,7 @@ const Header: React.FC = () => {
         // Listen to local user_roles_updated
         const handleLocalRoleUpdate = () => {
           try {
-            const str = localStorage.getItem(`user_roles_${normalizedEmail}`);
+            const str = localStorage.getItem(`user_roles_${accountDocKey}`);
             if (str) {
               const r = JSON.parse(str);
               if (r.isVip !== undefined) currentIsVip = !!r.isVip;
@@ -245,7 +246,7 @@ const Header: React.FC = () => {
                     <div className="text-right hidden md:block">
                       <p className="text-xs font-black text-gray-800 leading-none">{userProfile?.name || 'Học viên'}</p>
                       <p className="text-[9px] font-bold text-text-muted uppercase mt-0.5">
-                        ID: #FAST-{(currentUser.email || '').split('@')[0] || 'USER'}
+                        ID: #FAST-{(currentUser.email || '').split('@')[0] || (currentUser.uid ? currentUser.uid.slice(0, 8) : 'USER')}
                       </p>
                     </div>
                     

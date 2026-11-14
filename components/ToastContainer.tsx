@@ -62,15 +62,27 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = (
   return (
     <motion.div
       layout
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.45}
+      onDragEnd={(_, info) => {
+        if (Math.abs(info.offset.x) > 85 || Math.abs(info.velocity.x) > 400) {
+          onDismiss(toast.id);
+        }
+      }}
+      whileDrag={{ scale: 0.98, opacity: 0.85 }}
       initial={{ opacity: 0, y: -20, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, y: -10, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, scale: 0.9, x: 80, transition: { duration: 0.2 } }}
       transition={{ type: 'spring', damping: 26, stiffness: 360 }}
       id={`toast-${toast.id}`}
-      className={`relative flex flex-col w-full max-w-md p-4 sm:p-5 rounded-3xl border backdrop-blur-xl ${theme.bg} ${theme.border} ${theme.glow} overflow-hidden`}
+      className={`relative flex flex-col w-full max-w-md p-4 sm:p-5 rounded-3xl border backdrop-blur-xl ${theme.bg} ${theme.border} ${theme.glow} overflow-hidden cursor-grab active:cursor-grabbing select-none`}
     >
       {/* Top Gradient Progress / Accent Bar */}
       <div className={`absolute top-0 left-0 right-0 h-1 ${theme.bar}`} />
+
+      {/* Drag indicator pill */}
+      <div className="w-8 h-1 rounded-full bg-gray-200 dark:bg-slate-700 mx-auto mb-2.5 opacity-80" aria-hidden="true" />
 
       {/* Main Toast Content Header */}
       <div className="flex items-start gap-3.5">

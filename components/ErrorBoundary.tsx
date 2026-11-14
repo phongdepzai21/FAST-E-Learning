@@ -55,24 +55,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2.5 bg-[#007c76] text-white font-medium rounded-xl hover:bg-[#00625d] transition-colors"
+            className="px-6 py-2.5 bg-[#007c76] text-white font-medium rounded-xl hover:bg-[#00625d] transition-colors cursor-pointer"
           >
             Tải lại trang
           </button>
-          
-          {this.state.error && (
-            <div className="mt-8 max-w-2xl w-full text-left">
-              <details className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-                <summary className="px-4 py-3 font-medium text-sm text-gray-700 cursor-pointer hover:bg-gray-100 select-none transition-colors">
-                  Xem chi tiết thông tin lỗi kỹ thuật
-                </summary>
-                <div className="p-4 border-t border-gray-200 bg-white font-mono text-xs text-red-600 overflow-auto max-h-60 leading-relaxed whitespace-pre-wrap">
-                  <div className="font-bold mb-1">{this.state.error.name}: {this.state.error.message}</div>
-                  {this.state.error.stack}
-                </div>
-              </details>
-            </div>
-          )}
         </div>
       );
     }

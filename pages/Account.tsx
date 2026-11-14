@@ -38,14 +38,26 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  linkWithCredential,
   GoogleAuthProvider,
+  FacebookAuthProvider,
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   updateProfile,
-  type User
+  type User,
+  type AuthCredential
 } from 'firebase/auth';
+import {
+  createFacebookAuthProvider,
+  getLinkedProviderStatus,
+  linkCurrentUserWithFacebook,
+  syncLinkedProvidersMetadata,
+  isRealFirebaseUser
+} from '../utils/accountLinking';
 import { doc, setDoc, collection, onSnapshot, getDoc, deleteDoc, getDocs, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Helmet } from 'react-helmet-async';
@@ -56,6 +68,9 @@ import { getFastSessionUser, setFastSessionUser, clearFastSessionUser, createSyn
 import { ReCaptcha } from '../components/ReCaptcha';
 
 interface UserProfile {
+  uid?: string;
+  providerId?: string;
+  linkedProviders?: string[];
   name: string;
   email: string;
   avatar: string;
@@ -338,7 +353,7 @@ class TabErrorBoundary extends React.Component<TabErrorBoundaryProps, TabErrorBo
             {this.props.fallbackTitle || "Tạm thời không tải được phân hệ"}
           </h4>
           <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed">
-            {this.state.error?.message || "Hệ thống đang tự khôi phục dữ liệu phân hệ này. Các tab và chức năng tài khoản khác vẫn hoạt động bình thường."}
+            Hệ thống đang tự khôi phục dữ liệu phân hệ này. Các tab và chức năng tài khoản khác vẫn hoạt động bình thường.
           </p>
           <button
             type="button"
@@ -362,7 +377,24 @@ const Account: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isLinkingFacebook, setIsLinkingFacebook] = useState(false);
   const [error, setError] = useState<React.ReactNode | null>(null);
+  const [pendingFacebookConflict, setPendingFacebookConflict] = useState<{
+    email: string;
+    hasPendingCredential: boolean;
+  } | null>(null);
+  const [accountLinkNotice, setAccountLinkNotice] = useState<{
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+    showOpenNewTab?: boolean;
+    showOpenSettings?: boolean;
+  } | null>(null);
+  const [isUnlinkedDrawerOpen, setIsUnlinkedDrawerOpen] = useState(false);
+  const [isUnlinkedBannerDismissed, setIsUnlinkedBannerDismissed] = useState(false);
+  const pendingFacebookCredentialRef = useRef<AuthCredential | null>(null);
+  const pendingManualFacebookLinkRef = useRef(false);
+  const redirectHandledRef = useRef(false);
   const [emailError, setEmailError] = useState<string>('');
   const [passwordError, setPasswordError] = useState<string>('');
   const [nameError, setNameError] = useState<string>('');
@@ -658,20 +690,22 @@ const Account: React.FC = () => {
 
             const freshUser = auth.currentUser || currentUser;
             
-            // CRITICAL FIX: Normalize email to lowercase for consistent DB keys
-            // This fixes the synchronization issue with Courses.tsx and PaymentModal.tsx
+            // CRITICAL FIX: Normalize email to lowercase for consistent DB keys; fallback to UID if Facebook omits email
             const userEmail = (freshUser.email || '').toLowerCase().trim(); 
-            const isHardcodedAdmin = ADMIN_EMAILS.some(e => e.toLowerCase() === userEmail);
-            const isHardcodedTeacher = TEACHER_EMAILS.some(e => e.toLowerCase() === userEmail);
+            const profileDocKey = userEmail || freshUser.uid;
+            const { providerIds } = getLinkedProviderStatus(freshUser);
+            const providerId = providerIds[0] || (userEmail ? 'password' : 'facebook.com');
+            const isHardcodedAdmin = Boolean(userEmail) && ADMIN_EMAILS.some(e => e.toLowerCase() === userEmail);
+            const isHardcodedTeacher = Boolean(userEmail) && TEACHER_EMAILS.some(e => e.toLowerCase() === userEmail);
             let isVipStatus = false;
             let isAdminStatus = isHardcodedAdmin;
             let isTeacherStatus = isHardcodedTeacher || isHardcodedAdmin;
 
-            if (userEmail) {
+            if (profileDocKey) {
                 // Fetch from localStorage backup first
                 let localRolesStr = null;
                 try {
-                    localRolesStr = localStorage.getItem(`user_roles_${userEmail}`);
+                    localRolesStr = localStorage.getItem(`user_roles_${profileDocKey}`);
                 } catch (e) {}
                 if (localRolesStr) {
                     try {
@@ -683,7 +717,7 @@ const Account: React.FC = () => {
                 }
 
                 // Real-time listener on user doc
-                const userDocRef = doc(db, "users", userEmail);
+                const userDocRef = doc(db, "users", profileDocKey);
                 onSnapshot(userDocRef, async (userDocSnap) => {
                     let curVip = isVipStatus;
                     let curAdmin = isAdminStatus;
@@ -691,6 +725,8 @@ const Account: React.FC = () => {
                     let curLocked = false;
                     let curLockedAt: string | undefined = undefined;
                     let curLockReason: string | undefined = undefined;
+                    let customDisplayName: string | undefined = undefined;
+                    let customPhotoURL: string | undefined = undefined;
 
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
@@ -700,18 +736,31 @@ const Account: React.FC = () => {
                         curLocked = userData.isLocked === true;
                         curLockedAt = userData.lockedAt;
                         curLockReason = userData.lockReason;
+                        if (typeof userData.displayName === 'string' && userData.displayName.trim()) {
+                          customDisplayName = userData.displayName;
+                        } else if (typeof userData.fullName === 'string' && userData.fullName.trim()) {
+                          customDisplayName = userData.fullName;
+                        }
+                        if (typeof userData.photoURL === 'string' && userData.photoURL.trim()) {
+                          customPhotoURL = userData.photoURL;
+                        } else if (typeof userData.avatar === 'string' && userData.avatar.trim()) {
+                          customPhotoURL = userData.avatar;
+                        }
                         
-                        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
+                        localStorage.setItem(`user_roles_${profileDocKey}`, JSON.stringify({
                             isVip: curVip,
                             isAdmin: curAdmin,
                             isTeacher: curTeacher,
                             isLocked: curLocked
                         }));
                     } else {
-                        // Create default user document with proper hardcoded role preservation
+                        // Create default user document (omit email if provider did not supply one)
                         try {
                             await setDoc(userDocRef, {
-                                email: userEmail,
+                                uid: freshUser.uid,
+                                providerId,
+                                linkedProviders: providerIds,
+                                ...(userEmail ? { email: userEmail } : {}),
                                 displayName: freshUser.displayName || 'Học viên',
                                 photoURL: freshUser.photoURL || '',
                                 isAdmin: isHardcodedAdmin,
@@ -719,7 +768,7 @@ const Account: React.FC = () => {
                                 isVip: false,
                                 isLocked: false,
                                 createdAt: new Date().toISOString()
-                            });
+                            }, { merge: true });
                             curVip = false;
                             curAdmin = isHardcodedAdmin;
                             curTeacher = isHardcodedTeacher || isHardcodedAdmin;
@@ -728,7 +777,7 @@ const Account: React.FC = () => {
                             console.error('Error creating user profile:', err);
                         }
                         
-                        localStorage.setItem(`user_roles_${userEmail}`, JSON.stringify({
+                        localStorage.setItem(`user_roles_${profileDocKey}`, JSON.stringify({
                             isVip: curVip,
                             isAdmin: curAdmin,
                             isTeacher: curTeacher,
@@ -736,8 +785,15 @@ const Account: React.FC = () => {
                         }));
                     }
 
+                    const latestProviders = getLinkedProviderStatus(auth.currentUser || freshUser).providerIds;
+
                     setUser(prev => prev ? {
                       ...prev,
+                      uid: freshUser.uid,
+                      providerId,
+                      linkedProviders: latestProviders.length > 0 ? latestProviders : prev.linkedProviders,
+                      name: customDisplayName || prev.name,
+                      avatar: customPhotoURL || prev.avatar,
                       isVip: curVip,
                       isAdmin: curAdmin,
                       isTeacher: curTeacher,
@@ -752,8 +808,11 @@ const Account: React.FC = () => {
             }
             
             setUser({
+              uid: freshUser.uid,
+              providerId,
+              linkedProviders: providerIds,
               name: freshUser.displayName || 'Học viên FAST',
-              email: userEmail, // Store standardized email
+              email: userEmail,
               avatar: freshUser.photoURL || '',
               isVip: isVipStatus,
               isAdmin: isAdminStatus,
@@ -783,6 +842,8 @@ const Account: React.FC = () => {
               } catch (e) {}
 
               setUser({
+                uid: fastUser.uid,
+                linkedProviders: ['password'],
                 name: fastUser.displayName || 'Học viên',
                 email: cleanEmail,
                 avatar: fastUser.photoURL || '',
@@ -815,6 +876,8 @@ const Account: React.FC = () => {
           const isOwnerUser = cleanEmail === 'h1h4phong@gmail.com' || cleanEmail === 'trdung153@gmail.com';
 
           setUser({
+            uid: fastUser.uid,
+            linkedProviders: ['password'],
             name: fastUser.displayName || 'Học viên',
             email: cleanEmail,
             avatar: fastUser.photoURL || '',
@@ -827,6 +890,15 @@ const Account: React.FC = () => {
     };
     window.addEventListener('fast_auth_changed', handleFastAuthEvent);
 
+    const handleProvidersUpdated = (e: any) => {
+      const detail = e?.detail;
+      const updatedList = Array.isArray(detail?.providerIds)
+        ? detail.providerIds
+        : getLinkedProviderStatus(auth.currentUser).providerIds;
+      setUser(prev => prev ? { ...prev, linkedProviders: updatedList } : prev);
+    };
+    window.addEventListener('user_providers_updated', handleProvidersUpdated);
+
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
@@ -838,25 +910,23 @@ const Account: React.FC = () => {
       unsubscribeAuth();
       clearTimeout(safetyTimer);
       window.removeEventListener('fast_auth_changed', handleFastAuthEvent);
+      window.removeEventListener('user_providers_updated', handleProvidersUpdated);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [location]);
 
   // --- EFFECT 2: DATA LISTENER (Courses) ---
   useEffect(() => {
-    if (!user?.email) return;
-
-    const normalizedEmail = user.email.toLowerCase();
-    
-    if (!normalizedEmail) {
-        setIsLoadingCourses(false);
-        return;
+    const accountKey = (user?.email || user?.uid || '').toLowerCase().trim();
+    if (!accountKey) {
+      setIsLoadingCourses(false);
+      return;
     }
 
     // Fast local storage cache preload
     try {
-      const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
-      const hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+      const cachedStr = localStorage.getItem(`user_courses_${accountKey}`);
+      const hasClaimedAll = localStorage.getItem(`has_claimed_all_${accountKey}`) === 'true';
       if (cachedStr) {
         const cachedIds = JSON.parse(cachedStr);
         if (Array.isArray(cachedIds) && cachedIds.length > 0) {
@@ -870,7 +940,7 @@ const Account: React.FC = () => {
 
     setIsLoadingCourses(true);
 
-    const q = collection(db, "users", normalizedEmail, "purchased_courses");
+    const q = collection(db, "users", accountKey, "purchased_courses");
     
     const unsubscribeSnapshot = onSnapshot(q, 
         (snapshot: QuerySnapshot<DocumentData>) => {
@@ -888,7 +958,7 @@ const Account: React.FC = () => {
             
             let hasClaimedAll = false;
             try {
-              hasClaimedAll = localStorage.getItem(`has_claimed_all_${normalizedEmail}`) === 'true';
+              hasClaimedAll = localStorage.getItem(`has_claimed_all_${accountKey}`) === 'true';
             } catch (e) {}
             let finalCourses = courses;
             if (hasClaimedAll && allCoursesRef.current.length > 0) {
@@ -901,7 +971,7 @@ const Account: React.FC = () => {
             setPurchasedCourses(finalCourses);
             setIsLoadingCourses(false);
             try {
-              localStorage.setItem(`user_courses_${normalizedEmail}`, JSON.stringify(finalCourses.map(c => c.courseId)));
+              localStorage.setItem(`user_courses_${accountKey}`, JSON.stringify(finalCourses.map(c => c.courseId)));
               finalCourses.forEach(c => localStorage.setItem(`course_unlocked_${c.courseId}`, 'true'));
             } catch (e) {}
         },
@@ -913,7 +983,7 @@ const Account: React.FC = () => {
 
     const handleStorageChange = () => {
       try {
-        const cachedStr = localStorage.getItem(`user_courses_${normalizedEmail}`);
+        const cachedStr = localStorage.getItem(`user_courses_${accountKey}`);
         if (cachedStr) {
           const cachedIds = JSON.parse(cachedStr);
           if (Array.isArray(cachedIds)) {
@@ -931,12 +1001,13 @@ const Account: React.FC = () => {
       window.removeEventListener('courses_updated', handleStorageChange);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user?.email]);
+  }, [user?.email, user?.uid]);
 
   // --- EFFECT: GAMIFICATION STATS & BADGES LISTENER ---
   useEffect(() => {
-    if (!user?.email) return;
-    const normalizedEmail = user.email.toLowerCase();
+    const accountKey = (user?.email || user?.uid || '').toLowerCase().trim();
+    if (!accountKey) return;
+
     let localIsVip = false;
     let localUnlockedVip = false;
     try {
@@ -944,14 +1015,14 @@ const Account: React.FC = () => {
       localUnlockedVip = Boolean(localStorage.getItem('course_unlocked_khoa-vip'));
     } catch (e) {}
 
-    const isVipUser = user.isVip === true || 
+    const isVipUser = user?.isVip === true || 
       localIsVip || 
       localUnlockedVip || 
       purchasedCourses.some(c => c.id === 'khoa-vip' || c.id === 'vip-lifetime-access');
 
     // Load initial local data
     try {
-      const localKey = `gamification_${normalizedEmail}`;
+      const localKey = `gamification_${accountKey}`;
       const cached = localStorage.getItem(localKey);
       if (cached) {
         setGamificationData(JSON.parse(cached));
@@ -963,7 +1034,7 @@ const Account: React.FC = () => {
     const completedCourses = purchasedCourses.filter(c => c.progress >= 100).length;
 
     // Record activity and load streak
-    recordDailyLearningActivity(normalizedEmail).then(fresh => {
+    recordDailyLearningActivity(accountKey).then(fresh => {
       if (fresh) {
         const evaluated = evaluateBadges({
           ...fresh,
@@ -975,7 +1046,7 @@ const Account: React.FC = () => {
     });
 
     // Realtime Firestore Listener for Gamification Stats
-    const gamificationDocRef = doc(db, 'users', normalizedEmail, 'gamification', 'stats');
+    const gamificationDocRef = doc(db, 'users', accountKey, 'gamification', 'stats');
     const unsubscribeGamification = onSnapshot(gamificationDocRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data() as UserGamificationData;
@@ -986,7 +1057,7 @@ const Account: React.FC = () => {
         }, isVipUser);
         setGamificationData(evaluated);
         try {
-          localStorage.setItem(`gamification_${normalizedEmail}`, JSON.stringify(evaluated));
+          localStorage.setItem(`gamification_${accountKey}`, JSON.stringify(evaluated));
         } catch (e) {}
       }
     }, (error) => {
@@ -1004,7 +1075,7 @@ const Account: React.FC = () => {
       unsubscribeGamification();
       window.removeEventListener('gamification_updated', handleGamificationEvent);
     };
-  }, [user?.email, user?.isVip, purchasedCourses]);
+  }, [user?.email, user?.uid, user?.isVip, purchasedCourses]);
 
   const handleLogout = async () => {
     try {
@@ -1264,6 +1335,10 @@ const Account: React.FC = () => {
       setIsOtpPending(false);
       setIsResettingPassword(false);
 
+      if (newUser && isRealFirebaseUser(newUser)) {
+        await resolvePendingFacebookLink(newUser);
+      }
+
       if (location.state && location.state.from) {
           navigate(location.state.from);
       } else {
@@ -1383,8 +1458,9 @@ const Account: React.FC = () => {
         await startOtpFlow();
         return; // Halt here, transition to OTP Pending layout
       } else {
-        await signInWithEmailAndPassword(auth, cleanEmail, password);
+        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
         toast.success('Đăng nhập thành công! Chào mừng bạn quay trở lại.');
+        await resolvePendingFacebookLink(userCredential.user);
       }
       if (location.state && location.state.from) {
           navigate(location.state.from);
@@ -1543,6 +1619,409 @@ const Account: React.FC = () => {
     }
   };
 
+  const resolvePendingFacebookLink = async (signedInUser: User) => {
+    const pendingCred = pendingFacebookCredentialRef.current;
+    const hadManualIntent = pendingManualFacebookLinkRef.current;
+
+    if (!pendingCred) {
+      if (hadManualIntent) {
+        pendingManualFacebookLinkRef.current = false;
+        setPendingFacebookConflict(null);
+        setAccountLinkNotice({
+          type: 'info',
+          title: 'Sẵn sàng liên kết Facebook',
+          message:
+            'Bạn đã đăng nhập thành công vào tài khoản hiện tại. Hãy mở mục "Thông tin cá nhân & Liên kết" để nhấn "Liên kết Facebook" và hoàn tất kết nối cho các lần đăng nhập sau.',
+          showOpenSettings: true,
+        });
+      }
+      return;
+    }
+
+    if (!isRealFirebaseUser(signedInUser)) {
+      pendingFacebookCredentialRef.current = null;
+      pendingManualFacebookLinkRef.current = false;
+      setPendingFacebookConflict(null);
+      return;
+    }
+
+    const uidBefore = signedInUser.uid;
+    try {
+      const linkResult = await linkWithCredential(signedInUser, pendingCred);
+      pendingFacebookCredentialRef.current = null;
+      pendingManualFacebookLinkRef.current = false;
+      setPendingFacebookConflict(null);
+
+      if (linkResult.user.uid !== uidBefore) {
+        setAccountLinkNotice({
+          type: 'error',
+          title: 'Cảnh báo toàn vẹn UID',
+          message: 'UID tài khoản thay đổi bất thường trong quá trình liên kết. Vui lòng kiểm tra lại.',
+        });
+        return;
+      }
+
+      const updatedProviders = await syncLinkedProvidersMetadata(linkResult.user);
+      setUser(prev => prev ? { ...prev, linkedProviders: updatedProviders } : prev);
+      setAccountLinkNotice({
+        type: 'success',
+        title: 'Đã liên kết Facebook thành công',
+        message:
+          'Tài khoản Facebook đã được liên kết an toàn với tài khoản hiện tại (giữ nguyên UID, hồ sơ và các khóa học đã mua). Từ nay bạn có thể đăng nhập bằng Google, Email/Mật khẩu hoặc Facebook.',
+      });
+      toast.success('Đã liên kết tài khoản Facebook vào tài khoản hiện tại thành công!');
+    } catch (linkErr: any) {
+      console.warn('Facebook linkWithCredential warning:', linkErr);
+      pendingFacebookCredentialRef.current = null;
+      pendingManualFacebookLinkRef.current = false;
+      setPendingFacebookConflict(null);
+
+      if (linkErr?.code === 'auth/provider-already-linked') {
+        const updatedProviders = await syncLinkedProvidersMetadata(signedInUser);
+        setUser(prev => prev ? { ...prev, linkedProviders: updatedProviders } : prev);
+        setAccountLinkNotice({
+          type: 'info',
+          title: 'Facebook đã được liên kết',
+          message: 'Tài khoản này đã được liên kết với Facebook trước đó.',
+        });
+        toast.info('Tài khoản Facebook này đã được liên kết trước đó.');
+      } else if (linkErr?.code === 'auth/credential-already-in-use' || linkErr?.code === 'auth/email-already-in-use') {
+        setAccountLinkNotice({
+          type: 'error',
+          title: 'Tài khoản Facebook đã liên kết với tài khoản khác',
+          message:
+            'Tài khoản Facebook này đã gắn với một tài khoản (UID) FAST E-Learning khác. Để bảo vệ dữ liệu và khóa học, hệ thống KHÔNG tự động gộp hay ghi đè tài khoản. Phiên đăng nhập hiện tại vẫn được giữ nguyên.',
+        });
+        toast.error('Facebook này đã thuộc một tài khoản khác. Không tự động gộp dữ liệu.');
+      } else {
+        setAccountLinkNotice({
+          type: 'info',
+          title: 'Cần xác nhận liên kết lại',
+          message:
+            'Đăng nhập thành công nhưng credential Facebook tạm thời đã hết hạn. Hãy mở "Thông tin cá nhân & Liên kết" và nhấn "Liên kết Facebook" để kết nối an toàn.',
+          showOpenSettings: true,
+        });
+        toast.info('Đăng nhập thành công. Hãy mở "Thông tin cá nhân & Liên kết" để hoàn tất liên kết Facebook.');
+      }
+    }
+  };
+
+  const handleLinkFacebookInSession = async () => {
+    if (isAuthenticating || isLinkingFacebook) return;
+    setIsLinkingFacebook(true);
+    setAccountLinkNotice(null);
+    try {
+      const result = await linkCurrentUserWithFacebook(auth.currentUser);
+      if (result.ok) {
+        if (result.providerIds) {
+          setUser(prev => prev ? { ...prev, linkedProviders: result.providerIds } : prev);
+        }
+        setAccountLinkNotice({
+          type: result.alreadyLinked ? 'info' : 'success',
+          title: result.title || 'Liên kết Facebook',
+          message: result.message,
+        });
+        if (result.alreadyLinked) {
+          toast.info(result.message);
+        } else {
+          toast.success('Đã liên kết tài khoản Facebook thành công!');
+        }
+      } else {
+        setAccountLinkNotice({
+          type: 'error',
+          title: result.title || 'Không thể liên kết Facebook',
+          message: result.message,
+          showOpenNewTab: result.errorCode === 'iframe-restricted',
+        });
+        if (result.errorCode === 'auth/popup-closed-by-user') {
+          toast.info(result.message);
+        } else {
+          toast.error(result.title || 'Liên kết Facebook thất bại.');
+        }
+      }
+    } finally {
+      setIsLinkingFacebook(false);
+    }
+  };
+
+  const handleFacebookAuthError = async (err: any) => {
+    const errorCode = err?.code || '';
+    const errorMessage = String(err?.message || '');
+    const lowerMsg = errorMessage.toLowerCase();
+    const currentHost = window.location.hostname;
+
+    if (errorCode === 'auth/account-exists-with-different-credential') {
+      const pendingCred = FacebookAuthProvider.credentialFromError(err);
+      pendingFacebookCredentialRef.current = pendingCred || null;
+      pendingManualFacebookLinkRef.current = !pendingCred;
+
+      const conflictEmail = (err?.customData?.email || '').toLowerCase().trim();
+      if (conflictEmail) {
+        setEmail(conflictEmail);
+      }
+      setPendingFacebookConflict({
+        email: conflictEmail,
+        hasPendingCredential: Boolean(pendingCred),
+      });
+
+      toast.error('Email Facebook này đã được đăng ký bằng phương thức khác.');
+      setError(
+        <div className="space-y-2.5 text-left">
+          <p className="font-extrabold uppercase text-amber-700">EMAIL ĐÃ TỒN TẠI TRÊN HỆ THỐNG</p>
+          <p className="font-medium text-gray-700 leading-relaxed text-xs">
+            Email {conflictEmail ? <strong className="text-gray-900">{conflictEmail}</strong> : 'từ tài khoản Facebook này'} đã được đăng ký bằng <strong>Google</strong> hoặc <strong>Email &amp; Mật khẩu</strong>. Để bảo toàn UID và toàn bộ khóa học của bạn, hệ thống không tạo tài khoản mới hay tự gộp tài khoản.
+          </p>
+          <p className="font-semibold text-[#007c76] leading-relaxed text-xs">
+            {pendingCred
+              ? 'Vui lòng đăng nhập bằng Google hoặc Email & Mật khẩu của bạn ngay bên dưới/bên trên; sau khi xác thực thành công, hệ thống sẽ tự động liên kết Facebook vào đúng tài khoản đó.'
+              : 'Vui lòng đăng nhập bằng Google hoặc Email & Mật khẩu trước, sau đó vào mục "Thông tin cá nhân & Liên kết" để nhấn "Liên kết Facebook".'}
+          </p>
+          <div className="pt-1 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handleGoogleLogin()}
+              className="inline-flex items-center gap-2 bg-[#007c76] hover:bg-[#005f5b] text-white px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer"
+            >
+              <span>Đăng nhập Google để liên kết</span>
+            </button>
+          </div>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/credential-already-in-use' || errorCode === 'auth/email-already-in-use') {
+      toast.error('Tài khoản Facebook này đã liên kết với một tài khoản khác.');
+      setError(
+        <div className="space-y-1.5 text-left">
+          <p className="font-extrabold uppercase text-amber-700">TÀI KHOẢN FACEBOOK ĐÃ ĐƯỢC LIÊN KẾT TRƯỚC ĐÓ</p>
+          <p className="font-medium text-gray-700 leading-relaxed text-xs">
+            Tài khoản Facebook này hiện đã được gắn với một tài khoản (UID) FAST E-Learning khác. Hệ thống không tự động gộp hoặc ghi đè dữ liệu. Vui lòng đăng nhập bằng phương thức cũ hoặc liên hệ hỗ trợ để xác minh trước khi chuyển đổi.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/provider-already-linked') {
+      toast.info('Tài khoản này đã được liên kết Facebook trước đó.');
+      return;
+    }
+
+    if (errorCode === 'auth/popup-closed-by-user') {
+      toast.info('Bạn đã đóng cửa sổ đăng nhập Facebook.');
+      setError(
+        <div className="space-y-1 text-left">
+          <p className="font-extrabold uppercase text-amber-600">ĐÃ ĐÓNG CỬA SỔ ĐĂNG NHẬP FACEBOOK</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Bạn đã đóng cửa sổ xác thực Facebook trước khi hoàn tất. Vui lòng nhấn "Tiếp tục với Facebook" để thử lại.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/cancelled-popup-request') {
+      toast.info('Yêu cầu đăng nhập trước đó đã bị hủy.');
+      setError(
+        <div className="space-y-1 text-left">
+          <p className="font-extrabold uppercase text-amber-600">YÊU CẦU ĐĂNG NHẬP BỊ HỦY</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Cửa sổ đăng nhập Facebook bị mở trùng lặp. Vui lòng nhấn nút đăng nhập một lần và đợi xác thực hoàn tất.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/user-cancelled' || lowerMsg.includes('access_denied') || lowerMsg.includes('denied')) {
+      toast.error('Bạn đã từ chối cấp quyền đăng nhập Facebook.');
+      setError(
+        <div className="space-y-1 text-left">
+          <p className="font-extrabold uppercase text-amber-600">CHƯA CẤP QUYỀN ĐĂNG NHẬP FACEBOOK</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Bạn đã hủy hoặc từ chối cấp quyền hồ sơ công khai trên Facebook. Bạn có thể thử lại hoặc đăng nhập bằng Google / Email &amp; Mật khẩu.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (window.self !== window.top) {
+      toast.error('Trình duyệt không cho phép mở cửa sổ Facebook trong khung xem trước.');
+      setError(
+        <div className="space-y-3 text-left">
+          <p className="font-extrabold uppercase text-amber-600">BẢO MẬT IFRAME TRÌNH DUYỆT</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Trình duyệt và Facebook không cho phép đăng nhập OAuth bên trong khung xem trước (iframe). Vui lòng mở trang trong tab mới hoặc đăng nhập bằng Email &amp; Mật khẩu.
+          </p>
+          <div className="pt-1">
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 bg-[#1877F2] text-white px-4 py-2.5 rounded-xl font-bold uppercase text-[11px] tracking-wider hover:bg-[#166FE5] transition-all shadow-md"
+            >
+              Mở trong tab mới để đăng nhập Facebook
+            </a>
+          </div>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/unauthorized-domain') {
+      toast.error('Tên miền chưa được ủy quyền trên Firebase.');
+      setError(
+        <div className="space-y-2 text-left text-xs">
+          <p className="font-extrabold uppercase text-red-600">TÊN MIỀN CHƯA ĐƯỢC ỦY QUYỀN</p>
+          <p className="font-medium text-gray-700 leading-snug">
+            Tên miền <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-red-600 font-bold break-all">{currentHost}</code> chưa có trong danh sách Authorized domains của Firebase Authentication hoặc OAuth Redirect URI của Meta.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/popup-blocked') {
+      toast.error('Trình duyệt đã chặn cửa sổ đăng nhập Facebook.');
+      setError(
+        <div className="space-y-1 text-left">
+          <p className="font-extrabold uppercase text-amber-600">CỬA SỔ ĐĂNG NHẬP BỊ CHẶN</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Trình duyệt đã chặn cửa sổ bật lên (popup) của Facebook. Vui lòng bật quyền cho phép popup cho trang web này và thử lại.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/operation-not-allowed') {
+      toast.error('Nhà cung cấp Facebook chưa được bật trên Firebase.');
+      setError(
+        <div className="space-y-1.5 text-left">
+          <p className="font-extrabold uppercase text-amber-600">CHƯA BẬT ĐĂNG NHẬP FACEBOOK TRÊN FIREBASE</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Phương thức Facebook Login hiện chưa được kích hoạt trong Firebase Authentication (dự án fast-e-learning). Vui lòng kiểm tra cấu hình Sign-in method.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (errorCode === 'auth/network-request-failed') {
+      toast.error('Lỗi kết nối mạng khi đăng nhập Facebook.');
+      setError(
+        <div className="space-y-1 text-left">
+          <p className="font-extrabold uppercase text-red-600">LỖI KẾT NỐI MẠNG</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Không thể kết nối đến máy chủ xác thực Facebook hoặc Firebase. Vui lòng kiểm tra đường truyền Internet và thử lại.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    if (
+      lowerMsg.includes('redirect_uri') ||
+      lowerMsg.includes('development mode') ||
+      lowerMsg.includes('app not active') ||
+      lowerMsg.includes('url blocked') ||
+      errorCode === 'auth/invalid-credential'
+    ) {
+      toast.error('Cấu hình Meta App hoặc OAuth Redirect URI chưa hợp lệ.');
+      setError(
+        <div className="space-y-1.5 text-left">
+          <p className="font-extrabold uppercase text-red-600">LỖI CẤU HÌNH FACEBOOK LOGIN / META APP</p>
+          <p className="font-medium text-gray-700 leading-snug text-xs">
+            Ứng dụng Facebook trên Meta có thể đang ở chế độ Development (chỉ tài khoản Tester mới đăng nhập được) hoặc OAuth Redirect URI chưa khớp với <code className="bg-gray-100 px-1 py-0.5 rounded font-mono text-[11px]">https://fast-e-learning.firebaseapp.com/__/auth/handler</code>.
+          </p>
+        </div>
+      );
+      return;
+    }
+
+    toast.error('Đăng nhập bằng tài khoản Facebook thất bại!');
+    setError(
+      <div className="space-y-1 text-left">
+        <p className="font-extrabold uppercase text-red-600">ĐĂNG NHẬP FACEBOOK THẤT BẠI</p>
+        <p className="font-medium text-gray-700 leading-snug text-xs">
+          Mã lỗi: <code className="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-red-600 font-bold">{errorCode || 'unknown'}</code>
+        </p>
+        <p className="text-gray-500 font-medium text-[11px] leading-snug">
+          {errorMessage || 'Không thể hoàn tất đăng nhập Facebook. Vui lòng thử lại sau hoặc dùng Google / Email.'}
+        </p>
+      </div>
+    );
+  };
+
+  // Single unified Firebase OAuth redirect handler (runs once on mount)
+  useEffect(() => {
+    if (redirectHandledRef.current) return;
+    redirectHandledRef.current = true;
+
+    let isMounted = true;
+    getRedirectResult(auth)
+      .then((result) => {
+        if (!isMounted || !result?.user) return;
+        const providerIds = result.user.providerData?.map(p => p.providerId) || [];
+        const label = providerIds.includes('facebook.com') ? 'Facebook' : 'tài khoản';
+        toast.success(`Đăng nhập ${label} thành công!`);
+        if (location.state && (location.state as any).from) {
+          navigate((location.state as any).from);
+        }
+      })
+      .catch(async (err: any) => {
+        if (!isMounted) return;
+        console.error('Firebase OAuth Redirect Error:', err);
+        await handleFacebookAuthError(err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleFacebookLogin = async () => {
+    if (isAuthenticating || isLinkingFacebook) return;
+
+    // TRƯỜNG HỢP A: Người dùng ĐANG ĐĂNG NHẬP -> luôn dùng linkWithPopup, không chuyển tài khoản
+    if (auth.currentUser) {
+      await handleLinkFacebookInSession();
+      return;
+    }
+
+    // TRƯỜNG HỢP B: Người dùng CHƯA ĐĂNG NHẬP -> đăng nhập Facebook thông thường
+    setIsAuthenticating(true);
+    setError(null);
+    setPendingFacebookConflict(null);
+    pendingFacebookCredentialRef.current = null;
+    pendingManualFacebookLinkRef.current = false;
+
+    try {
+      const provider = createFacebookAuthProvider();
+      const isInsideIframe = window.self !== window.top;
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      // Mobile non-iframe uses redirect; desktop or iframe preview uses popup
+      if (isMobileDevice && !isInsideIframe) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      await signInWithPopup(auth, provider);
+      toast.success('Đăng nhập tài khoản Facebook thành công!');
+      if (location.state && location.state.from) {
+        navigate(location.state.from);
+      }
+    } catch (err: any) {
+      console.error('Firebase Facebook Login Error:', err);
+      await handleFacebookAuthError(err);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setIsAuthenticating(true);
     setError(null);
@@ -1550,8 +2029,9 @@ const Account: React.FC = () => {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       
-      await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(auth, provider);
       toast.success('Đăng nhập tài khoản Google thành công!');
+      await resolvePendingFacebookLink(userCredential.user);
       if (location.state && location.state.from) {
           navigate(location.state.from);
       }
@@ -1711,12 +2191,13 @@ const Account: React.FC = () => {
   }, [activeCourses, ownedCourseIds, isLoadingCourses]);
 
   const handleClaimSingleCourse = async (course: Course) => {
-    if (!user?.email) {
+    const accountKey = (user?.email || user?.uid || '').toLowerCase().trim();
+    if (!accountKey) {
       toast.error('Vui lòng đăng nhập để nhận khóa học.');
       return;
     }
     setClaimingId(course.id);
-    const normalizedEmail = user.email.toLowerCase();
+    const normalizedEmail = accountKey;
     try {
       const courseRef = doc(db, "users", normalizedEmail, "purchased_courses", course.id);
       const claimType = isVip ? 'VIP_INSTANT' : (isAdmin ? 'ADMIN_INSTANT' : 'FREE_CLAIM');
@@ -1736,8 +2217,8 @@ const Account: React.FC = () => {
       try {
         const regId = `${normalizedEmail.replace(/[^a-z0-9]/g, '_')}_${course.id}_${Date.now()}`;
         await setDoc(doc(db, 'course_registrations', regId), {
-          studentEmail: normalizedEmail,
-          studentName: user.name || normalizedEmail.split('@')[0],
+          studentEmail: user?.email ? user.email.toLowerCase().trim() : normalizedEmail,
+          studentName: user?.name || (user?.email ? user.email.split('@')[0] : 'Học viên Facebook'),
           courseId: course.id,
           courseTitle: course.title || '',
           registeredAt: new Date().toISOString(),
@@ -1765,7 +2246,7 @@ const Account: React.FC = () => {
       toast.success(`✨ Đã mở khóa khóa học "${course.title}" thành công!`);
     } catch (err: any) {
       console.error("Lỗi nhận khóa học:", err);
-      const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${user.email}/purchased_courses/${course.id}`, err);
+      const errorInfo = logFirestoreError(`Nhận khóa học "${course.title}"`, `users/${accountKey}/purchased_courses/${course.id}`, err);
       
       // Fallback lưu cục bộ để người dùng vẫn có thể học ngay trên máy
       try {
@@ -1795,7 +2276,8 @@ const Account: React.FC = () => {
   };
 
   const handleClaimAllCourses = async () => {
-    if (!user?.email) {
+    const accountKey = (user?.email || user?.uid || '').toLowerCase().trim();
+    if (!accountKey) {
       toast.error('Vui lòng đăng nhập để nhận khóa học.');
       return;
     }
@@ -1806,7 +2288,7 @@ const Account: React.FC = () => {
     }
 
     setIsClaimingAll(true);
-    const normalizedEmail = user.email.toLowerCase();
+    const normalizedEmail = accountKey;
     try {
       const claimType = isVip ? 'VIP_ALL' : 'ADMIN_ALL';
       await Promise.all(unowned.map(async (c) => {
@@ -1819,8 +2301,8 @@ const Account: React.FC = () => {
         try {
           const regId = `${normalizedEmail.replace(/[^a-z0-9]/g, '_')}_${c.id}_${Date.now()}`;
           await setDoc(doc(db, 'course_registrations', regId), {
-            studentEmail: normalizedEmail,
-            studentName: user.name || normalizedEmail.split('@')[0],
+            studentEmail: user?.email ? user.email.toLowerCase().trim() : normalizedEmail,
+            studentName: user?.name || (user?.email ? user.email.split('@')[0] : 'Học viên Facebook'),
             courseId: c.id,
             courseTitle: c.title || '',
             registeredAt: new Date().toISOString(),
@@ -1858,7 +2340,7 @@ const Account: React.FC = () => {
       toast.success(`🎉 Đã mở khóa thành công tất cả ${unowned.length} khóa học vào phòng học của bạn!`);
     } catch (err: any) {
       console.error("Lỗi nhận tất cả khóa học:", err);
-      const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${user.email}/purchased_courses/*`, err);
+      const errorInfo = logFirestoreError('Mở khóa toàn bộ khóa học', `users/${accountKey}/purchased_courses/*`, err);
       
       // Fallback mở khóa cục bộ trên thiết bị
       unowned.forEach(c => {
@@ -1936,7 +2418,7 @@ const Account: React.FC = () => {
             <div className="space-y-2">
               <h2 className="text-2xl font-black text-gray-900 tracking-tight">Tài khoản tạm thời bị khóa</h2>
               <p className="text-sm font-medium text-gray-500 leading-relaxed">
-                Tài khoản <span className="font-bold text-gray-800">{user.email}</span> đã bị quản trị viên khóa quyền truy cập.
+                Tài khoản <span className="font-bold text-gray-800">{user.email || user.uid}</span> đã bị quản trị viên khóa quyền truy cập.
               </p>
             </div>
 
@@ -2333,7 +2815,7 @@ const Account: React.FC = () => {
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-black text-gray-800 leading-none">{user.name || 'Học viên'}</p>
                     <p className={`text-[10px] font-bold uppercase mt-1 ${avatarConfig.statusColor}`}>
-                      {avatarConfig.statusText} • ID: #FAST-{(user.email || '').split('@')[0] || 'USER'}
+                      {avatarConfig.statusText} • ID: #FAST-{user.email ? user.email.split('@')[0] : (user.uid?.slice(0, 8).toUpperCase() || 'USER')}
                     </p>
                   </div>
                   <div className="relative">
@@ -2355,8 +2837,10 @@ const Account: React.FC = () => {
 
                 {isMenuOpen && (
                   <div className="absolute right-0 mt-3 w-64 bg-white rounded-[24px] shadow-2xl border border-gray-100 py-3 z-50 animate-in fade-in slide-in-from-top-2">
-                     <button onClick={() => { setActiveTab('settings'); setIsMenuOpen(false); }} className="w-full px-6 py-3.5 flex items-center gap-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">Thông tin cá nhân</button>
-                     <button onClick={handleLogout} className="w-full px-6 py-3.5 flex items-center gap-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-all">Đăng xuất</button>
+                     <button onClick={() => { setActiveTab('settings'); setIsMenuOpen(false); }} className="w-full px-6 py-3 flex items-center justify-between text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all cursor-pointer">
+                       <span>Thông tin cá nhân &amp; Liên kết</span>
+                     </button>
+                     <button onClick={handleLogout} className="w-full px-6 py-3 flex items-center gap-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-all cursor-pointer">Đăng xuất</button>
                   </div>
                 )}
              </div>
@@ -2413,7 +2897,7 @@ const Account: React.FC = () => {
                 ) : activeTab === 'badges' ? (
                   <GamificationBadgeSection 
                     gamificationData={gamificationData} 
-                    userEmail={user.email} 
+                    userEmail={user.email || user.uid || ''} 
                     isVip={isVip} 
                   />
                 ) : activeTab === 'purchase-history' ? (
@@ -2428,6 +2912,160 @@ const Account: React.FC = () => {
                   />
                 ) : (
                   <div className="space-y-10">
+                    <AnimatePresence>
+                      {accountLinkNotice && (
+                        <motion.div
+                          layout
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.4}
+                          onDragEnd={(_, info) => {
+                            if (Math.abs(info.offset.x) > 90 || Math.abs(info.velocity.x) > 400) {
+                              setAccountLinkNotice(null);
+                            }
+                          }}
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: 80 }}
+                          className={`rounded-3xl p-5 border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-grab active:cursor-grabbing ${
+                            accountLinkNotice.type === 'success'
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                              : accountLinkNotice.type === 'error'
+                                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                                : 'bg-blue-50 border-blue-200 text-blue-900'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <p className="text-xs font-black uppercase tracking-wider">{accountLinkNotice.title}</p>
+                            <p className="text-xs font-medium leading-relaxed opacity-90">{accountLinkNotice.message}</p>
+                            {accountLinkNotice.showOpenNewTab && (
+                              <a
+                                href={window.location.href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 mt-2 bg-[#1877F2] text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-[#166FE5] transition-all"
+                              >
+                                Mở trong tab mới để liên kết Facebook
+                              </a>
+                            )}
+                            {accountLinkNotice.showOpenSettings && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab('settings');
+                                  setAccountLinkNotice(null);
+                                }}
+                                className="inline-flex items-center gap-1.5 mt-2 bg-[#007c76] text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-[#005f5b] transition-all cursor-pointer"
+                              >
+                                Mở Thông tin cá nhân &amp; Liên kết
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setAccountLinkNotice(null)}
+                            className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white/80 hover:bg-white text-xs font-bold border border-black/10 shrink-0 cursor-pointer"
+                          >
+                            Đóng
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {(() => {
+                      const liveStatus = getLinkedProviderStatus(auth.currentUser);
+                      const providers = (user.linkedProviders && user.linkedProviders.length > 0)
+                        ? user.linkedProviders
+                        : liveStatus.providerIds;
+                      const isFbLinked = providers.includes('facebook.com');
+                      const isGoogleLinked = providers.includes('google.com');
+                      const hasUnlinked = !isFbLinked || !isGoogleLinked;
+
+                      if (!hasUnlinked || isUnlinkedBannerDismissed) return null;
+
+                      const missingLabels = [
+                        !isFbLinked ? 'Facebook' : null,
+                        !isGoogleLinked ? 'Google' : null,
+                      ].filter(Boolean).join(' • ');
+
+                      return (
+                        <motion.div
+                          layout
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 0 }}
+                          dragElastic={0.4}
+                          onDragEnd={(_, info) => {
+                            if (Math.abs(info.offset.x) > 100 || Math.abs(info.velocity.x) > 400) {
+                              setIsUnlinkedBannerDismissed(true);
+                            }
+                          }}
+                          className="bg-white rounded-3xl border border-blue-200/80 shadow-xs overflow-hidden cursor-grab active:cursor-grabbing"
+                        >
+                          <div
+                            onClick={() => setIsUnlinkedDrawerOpen((prev) => !prev)}
+                            className="px-5 py-3.5 flex items-center justify-between gap-3 bg-blue-50/50 hover:bg-blue-50/80 transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2] shrink-0" />
+                              <p className="text-xs font-bold text-slate-800 truncate">
+                                Tài khoản chưa liên kết: <span className="text-[#1877F2] font-black">{missingLabels}</span>
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] font-extrabold text-[#007c76]">
+                                {isUnlinkedDrawerOpen ? 'Thu gọn' : 'Kéo để liên kết'}
+                              </span>
+                              <svg
+                                className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isUnlinkedDrawerOpen ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+
+                          <AnimatePresence initial={false}>
+                            {isUnlinkedDrawerOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                                className="overflow-hidden border-t border-blue-100"
+                              >
+                                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+                                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                                    Liên kết thêm phương thức đăng nhập để dùng chung một tài khoản (UID) và bảo toàn toàn bộ khóa học.
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    {!isFbLinked && (
+                                      <button
+                                        type="button"
+                                        onClick={handleLinkFacebookInSession}
+                                        disabled={isLinkingFacebook}
+                                        className="px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#166FE5] text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-60"
+                                      >
+                                        {isLinkingFacebook ? 'Đang liên kết...' : 'Liên kết Facebook'}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveTab('settings')}
+                                      className="px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                      Thông tin cá nhân &amp; Liên kết
+                                    </button>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })()}
+
                     <section className="relative overflow-hidden bg-white rounded-[40px] p-8 md:p-12 border border-gray-100 shadow-sm animate-in slide-in-from-bottom-5 duration-700">
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                         <div className="text-center md:text-left">
@@ -2435,7 +3073,9 @@ const Account: React.FC = () => {
                           <p className="text-gray-500 font-bold max-w-lg leading-relaxed mt-4">
                             {isVip ? "Bạn đang có quyền truy cập không giới hạn. Tận hưởng việc học!" : "Tiếp tục hành trình chuẩn hóa kiến thức cùng FAST."}
                           </p>
-                          <button onClick={() => navigate('/khoa-hoc')} className="mt-8 px-10 py-4 bg-[#007c76] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20">TIẾP TỤC HỌC TẬP</button>
+                          <div className="mt-8 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                            <button onClick={() => navigate('/khoa-hoc')} className="px-10 py-4 bg-[#007c76] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#007c76]/20 cursor-pointer">TIẾP TỤC HỌC TẬP</button>
+                          </div>
                         </div>
                         <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
                            <div className="bg-gray-50 p-4 sm:p-5 rounded-2xl flex flex-col items-center border border-gray-100 min-w-[90px]">
@@ -2518,7 +3158,7 @@ const Account: React.FC = () => {
                 {/* Gamification & Milestone Badges in Main Dashboard */}
                 <GamificationBadgeSection 
                   gamificationData={gamificationData} 
-                  userEmail={user.email} 
+                  userEmail={user.email || user.uid || ''} 
                   isVip={isVip} 
                 />
               </div>
@@ -2931,7 +3571,15 @@ const Account: React.FC = () => {
                                 <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-white px-4 text-gray-400 font-bold">Hoặc tiếp tục với</span></div>
                             </div>
 
+                            {pendingFacebookConflict && (
+                                <div className="mb-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold text-left">
+                                    Đang chờ liên kết Facebook cho tài khoản{' '}
+                                    <strong>{pendingFacebookConflict.email || 'hiện có'}</strong>. Hãy đăng nhập bằng phương thức bên trên hoặc Google để hoàn tất liên kết an toàn.
+                                </div>
+                            )}
+
                             <button 
+                                type="button"
                                 onClick={handleGoogleLogin} 
                                 disabled={isAuthenticating}
                                 className="w-full border-2 border-gray-100 p-4 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 hover:border-gray-200 transition-all flex justify-center gap-3 items-center group disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
@@ -2942,6 +3590,22 @@ const Account: React.FC = () => {
                                     <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" /> 
                                 )}
                                 <span>Đăng nhập bằng Google</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleFacebookLogin}
+                                disabled={isAuthenticating}
+                                className="w-full mt-3 bg-[#1877F2] hover:bg-[#166FE5] text-white p-4 rounded-2xl font-bold transition-all flex justify-center gap-3 items-center shadow-sm hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                {isAuthenticating ? (
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                ) : (
+                                    <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                                    </svg>
+                                )}
+                                <span>Tiếp tục với Facebook</span>
                             </button>
                         </>
                     )}

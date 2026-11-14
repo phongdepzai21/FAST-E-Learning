@@ -227,15 +227,17 @@ const AppLayout: React.FC = () => {
           otpLogger.logAuthListenerEvent(currentUser, true, "User authenticated state changed: LOGGED_IN");
           await logTransition('LOGGED_IN', currentUser);
 
-          // Automatically sync the authenticated user profile with backend
-          if (currentUser.email) {
+          // Automatically sync the authenticated user profile with backend (supports Google, Email, and Facebook with/without email)
+          if (currentUser.email || currentUser.uid) {
             fetch('/api/user/sync-profile', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                email: currentUser.email,
+                uid: currentUser.uid,
+                email: currentUser.email || '',
                 displayName: currentUser.displayName || 'Học viên',
-                photoURL: currentUser.photoURL || ''
+                photoURL: currentUser.photoURL || '',
+                providerId: currentUser.providerData?.[0]?.providerId || ''
               })
             }).catch((err) => {
               console.warn("[AuthTransition] sync-profile notification note:", err);

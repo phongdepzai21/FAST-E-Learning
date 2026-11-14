@@ -6,66 +6,52 @@ import {
   updatePassword, 
   deleteUser,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  linkWithPopup,
   type User
 } from 'firebase/auth';
+import {
+  getLinkedProviderStatus,
+  linkCurrentUserWithFacebook,
+  syncLinkedProvidersMetadata,
+  isRealFirebaseUser,
+  type LinkedProviderStatus
+} from '../utils/accountLinking';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot, getDoc } from 'firebase/firestore'; 
-import { useTheme } from '../contexts/ThemeContext';
+import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore'; 
 import { useToast } from '../contexts/ToastContext';
-import { ADMIN_EMAILS, TEACHER_EMAILS, getMergedCombos, ComboItem } from '../constants';
-import { 
+import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
+import {
   User as UserIcon, 
   ShieldCheck, 
-  Award, 
-  Crown, 
   BookOpen, 
-  Layers, 
   KeyRound, 
-  Palette, 
   CheckCircle2, 
-  Sparkles, 
   Save, 
   RefreshCw, 
-  Target, 
-  Briefcase,
   AlertTriangle,
   ArrowLeft,
   Upload,
-  Trash2,
-  X,
-  Check,
   Calendar,
   Mail,
-  Zap,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown
 } from 'lucide-react';
-
-const SECTOR_OPTIONS = [
-  'ISO 22000 (An toàn thực phẩm)',
-  'HACCP Codex & TCVN',
-  'QA/QC Kiểm soát chất lượng',
-  'BRCGS Food Safety',
-  'FSSC 22000 International',
-  'VietGAP Nông nghiệp sạch',
-  'Lean & 5S Vận hành nhà máy',
-  'An toàn lao động & Môi trường ISO 14001',
-  'Quản trị nhà hàng & Khách sạn F&B'
-];
+import { motion, AnimatePresence } from 'motion/react';
 
 const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
   const toast = useToast();
   
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Tab State: 'profile' | 'security' | 'combo' | 'appearance'
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'combo' | 'appearance'>('profile');
+  // Tab State: 'profile' | 'security'
+  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
 
   // Form states
   const [displayName, setDisplayName] = useState('');
@@ -86,11 +72,15 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   const [deleteSelfEmail, setDeleteSelfEmail] = useState('');
   const [showDeleteZone, setShowDeleteZone] = useState(false);
 
-  // Personalized Combo Management States
-  const [preferredSectors, setPreferredSectors] = useState<string[]>(['ISO 22000 (An toàn thực phẩm)', 'HACCP Codex & TCVN']);
-  const [comboGoal, setComboGoal] = useState('Chinh phục chứng chỉ Chuyên gia Vận hành An toàn Thực phẩm & ISO 22000');
-  const [comboNotes, setComboNotes] = useState('');
-  const [unlockedCombos, setUnlockedCombos] = useState<ComboItem[]>([]);
+  // Linked Login Providers State
+  const [providerStatus, setProviderStatus] = useState<LinkedProviderStatus>({
+    isGoogleLinked: false,
+    isPasswordSet: false,
+    isFacebookLinked: false,
+    providerIds: [],
+  });
+  const [isLinkingProvider, setIsLinkingProvider] = useState<'facebook' | 'google' | null>(null);
+  const [isLinksExpanded, setIsLinksExpanded] = useState(false);
 
   // User status for Avatar color rules & Status Card
   const [userStatus, setUserStatus] = useState<{ 
@@ -98,27 +88,26 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     isAdmin: boolean; 
     isTeacher: boolean; 
     coursesCount: number;
-    unlockedCombosCount: number;
     joinedDate?: string;
   }>({
     isVip: false,
     isAdmin: false,
     isTeacher: false,
-    coursesCount: 0,
-    unlockedCombosCount: 0
+    coursesCount: 0
   });
 
   // Listen to User Profile & Status Real-time
   useEffect(() => {
-    if (!user || !user.email) return;
-    const normalizedEmail = user.email.toLowerCase();
+    if (!user || (!user.email && !user.uid)) return;
+    const normalizedEmail = (user.email || '').toLowerCase().trim();
+    const accountDocKey = normalizedEmail || user.uid;
 
-    let localIsAdmin = ADMIN_EMAILS.includes(normalizedEmail);
-    let localIsTeacher = TEACHER_EMAILS.includes(normalizedEmail);
+    let localIsAdmin = normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false;
+    let localIsTeacher = normalizedEmail ? TEACHER_EMAILS.includes(normalizedEmail) : false;
     let localIsVip = false;
 
     try {
-      const localRoles = localStorage.getItem(`user_roles_${normalizedEmail}`);
+      const localRoles = localStorage.getItem(`user_roles_${accountDocKey}`);
       if (localRoles) {
         const parsed = JSON.parse(localRoles);
         if (parsed.isVip) localIsVip = true;
@@ -131,7 +120,6 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     let currentIsAdmin = localIsAdmin;
     let currentIsTeacher = localIsTeacher;
     let currentCount = 0;
-    let currentCombosCount = 0;
 
     const updateStats = () => {
       const creationTime = user.metadata.creationTime 
@@ -143,44 +131,26 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         isAdmin: currentIsAdmin,
         isTeacher: currentIsTeacher,
         coursesCount: currentCount,
-        unlockedCombosCount: currentCombosCount,
         joinedDate: creationTime
       });
     };
 
-    const unsubUser = onSnapshot(doc(db, "users", normalizedEmail), (docSnap) => {
+    const unsubUser = onSnapshot(doc(db, "users", accountDocKey), (docSnap) => {
       if (docSnap.exists()) {
         const d = docSnap.data();
         if (d.isVip !== undefined) currentIsVip = !!d.isVip;
-        if (d.isAdmin !== undefined) currentIsAdmin = !!d.isAdmin || ADMIN_EMAILS.includes(normalizedEmail);
-        if (d.isTeacher !== undefined) currentIsTeacher = !!d.isTeacher || TEACHER_EMAILS.includes(normalizedEmail);
-
-        // Load personalized combo preferences
-        if (d.comboPreferences) {
-          if (Array.isArray(d.comboPreferences.preferredSectors)) {
-            setPreferredSectors(d.comboPreferences.preferredSectors);
-          }
-          if (d.comboPreferences.goal) setComboGoal(d.comboPreferences.goal);
-          if (d.comboPreferences.notes) setComboNotes(d.comboPreferences.notes);
-        }
+        if (d.isAdmin !== undefined) currentIsAdmin = !!d.isAdmin || (normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false);
+        if (d.isTeacher !== undefined) currentIsTeacher = !!d.isTeacher || (normalizedEmail ? TEACHER_EMAILS.includes(normalizedEmail) : false);
       }
       updateStats();
     }, () => updateStats());
 
-    const unsubPurchased = onSnapshot(collection(db, "users", normalizedEmail, "purchased_courses"), (snap) => {
+    const unsubPurchased = onSnapshot(collection(db, "users", accountDocKey, "purchased_courses"), (snap) => {
       const isVipDoc = snap.docs.some(d => d.id === 'vip-lifetime-access');
       const courseDocs = snap.docs.filter(d => d.id !== 'vip-lifetime-access' && !d.id.startsWith('combo-'));
-      const comboDocs = snap.docs.filter(d => d.id.startsWith('combo-'));
 
       currentCount = courseDocs.length;
-      currentCombosCount = comboDocs.length;
       if (isVipDoc) currentIsVip = true;
-
-      // Filter unlocked combos
-      const comboIds = comboDocs.map(d => d.id);
-      const allCombos = getMergedCombos([], { includeInactive: true });
-      const owned = allCombos.filter(c => comboIds.includes(c.id));
-      setUnlockedCombos(owned);
 
       updateStats();
     }, () => updateStats());
@@ -226,9 +196,10 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     if (location.state && location.state.section === 'security') {
       setActiveTab('security');
     }
-    if (location.state && location.state.section === 'combo') {
-      setActiveTab('combo');
-    }
+
+    const refreshProviderStatus = (targetUser: User | null) => {
+      setProviderStatus(getLinkedProviderStatus(targetUser));
+    };
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
@@ -236,11 +207,21 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         setDisplayName(currentUser.displayName || '');
         setPhotoURL(currentUser.photoURL || '');
         setEmail(currentUser.email || '');
+        refreshProviderStatus(currentUser);
       } else if (!embed) {
         navigate('/account');
       }
     });
-    return () => unsubscribe();
+
+    const handleProvidersUpdated = () => {
+      refreshProviderStatus(auth.currentUser);
+    };
+    window.addEventListener('user_providers_updated', handleProvidersUpdated);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('user_providers_updated', handleProvidersUpdated);
+    };
   }, [navigate, location, embed]);
 
   // Cleanup preview URL
@@ -320,14 +301,15 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         photoURL: finalPhotoURL
       });
 
-      if (user.email) {
+      const normalizedEmail = (user.email || '').toLowerCase().trim();
+      const accountDocKey = normalizedEmail || user.uid;
+      if (accountDocKey) {
         try {
-          const normalizedEmail = user.email.toLowerCase();
-          const userRef = doc(db, "users", normalizedEmail);
+          const userRef = doc(db, "users", accountDocKey);
           await setDoc(userRef, {
             displayName: displayName,
             photoURL: finalPhotoURL,
-            email: normalizedEmail,
+            ...(normalizedEmail ? { email: normalizedEmail } : {}),
             updatedAt: new Date().toISOString()
           }, { merge: true });
         } catch (err) {
@@ -372,6 +354,8 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         if (newPassword !== confirmPassword) throw new Error("Mật khẩu nhập lại không khớp.");
         
         await updatePassword(user, newPassword);
+        await syncLinkedProvidersMetadata(user);
+        setProviderStatus(getLinkedProviderStatus(auth.currentUser || user));
       }
       setMessage({ type: 'success', text: 'Cập nhật mật khẩu thành công! Bạn có thể cần đăng nhập lại.' });
       toast.success('Cập nhật mật khẩu thành công!');
@@ -391,47 +375,107 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     }
   };
 
-  // Toggle Preferred Sector
-  const handleToggleSector = (sector: string) => {
-    setPreferredSectors(prev =>
-      prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector]
-    );
+  const handleLinkFacebook = async () => {
+    const activeUser = auth.currentUser || user;
+    if (!activeUser || isLinkingProvider) return;
+
+    setIsLinkingProvider('facebook');
+    setMessage(null);
+    try {
+      const result = await linkCurrentUserWithFacebook(activeUser);
+      setProviderStatus(getLinkedProviderStatus(auth.currentUser || activeUser));
+      if (result.ok) {
+        if (auth.currentUser) setUser(auth.currentUser);
+        setMessage({ type: 'success', text: result.message });
+        if (result.alreadyLinked) {
+          toast.info(result.message);
+        } else {
+          toast.success('Đã liên kết tài khoản Facebook thành công!');
+        }
+      } else {
+        setMessage({ type: 'error', text: result.message });
+        if (result.errorCode === 'auth/popup-closed-by-user') {
+          toast.info(result.message);
+        } else {
+          toast.error(result.title || 'Liên kết Facebook thất bại.');
+        }
+      }
+    } finally {
+      setIsLinkingProvider(null);
+    }
   };
 
-  // Save Personalized Combo Preferences
-  const handleSaveComboPreferences = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !user.email) return;
-    setIsLoading(true);
+  const handleLinkGoogle = async () => {
+    const activeUser = auth.currentUser || user;
+    if (!activeUser || isLinkingProvider) return;
+
+    if (!isRealFirebaseUser(activeUser)) {
+      const msg = 'Phiên đăng nhập hiện tại là chế độ dự phòng ngoại tuyến. Vui lòng đăng nhập lại bằng Google hoặc Email/Mật khẩu để liên kết.';
+      setMessage({ type: 'error', text: msg });
+      toast.error(msg);
+      return;
+    }
+
+    if (providerStatus.isGoogleLinked) {
+      const msg = 'Tài khoản này đã được liên kết với Google trước đó.';
+      setMessage({ type: 'success', text: msg });
+      toast.info(msg);
+      return;
+    }
+
+    setIsLinkingProvider('google');
     setMessage(null);
-
+    const uidBefore = activeUser.uid;
     try {
-      const normalizedEmail = user.email.toLowerCase();
-      await setDoc(doc(db, 'users', normalizedEmail), {
-        comboPreferences: {
-          preferredSectors,
-          goal: comboGoal.trim(),
-          notes: comboNotes.trim(),
-          updatedAt: new Date().toISOString()
-        }
-      }, { merge: true });
-
-      toast.success('Đã cập nhật cấu hình quản lý Combo cá nhân thành công!');
-      setMessage({ type: 'success', text: 'Cấu hình quản lý Combo cá nhân đã được lưu vĩnh viễn.' });
+      const googleProvider = new GoogleAuthProvider();
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
+      const res = await linkWithPopup(activeUser, googleProvider);
+      if (res.user.uid !== uidBefore) {
+        throw new Error('Phát hiện thay đổi UID ngoài ý muốn.');
+      }
+      await syncLinkedProvidersMetadata(res.user);
+      setUser(res.user);
+      setProviderStatus(getLinkedProviderStatus(res.user));
+      const msg = 'Đã liên kết tài khoản Google thành công! Bạn có thể dùng Google để đăng nhập tài khoản này.';
+      setMessage({ type: 'success', text: msg });
+      toast.success('Đã liên kết tài khoản Google thành công!');
     } catch (err: any) {
-      console.error('Lỗi lưu cấu hình Combo:', err);
-      toast.error('Cập nhật thất bại: ' + (err.message || ''));
-      setMessage({ type: 'error', text: 'Không thể lưu cấu hình Combo cá nhân.' });
+      const code = err?.code || '';
+      if (code === 'auth/provider-already-linked') {
+        await syncLinkedProvidersMetadata(activeUser);
+        setProviderStatus(getLinkedProviderStatus(auth.currentUser || activeUser));
+        toast.info('Tài khoản này đã được liên kết với Google trước đó.');
+      } else if (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use') {
+        const msg = 'Tài khoản Google này đã được liên kết với một tài khoản (UID) FAST E-Learning khác. Hệ thống không tự động gộp dữ liệu và giữ nguyên phiên đăng nhập hiện tại.';
+        setMessage({ type: 'error', text: msg });
+        toast.error('Tài khoản Google này đang gắn với tài khoản khác.');
+      } else if (code === 'auth/popup-closed-by-user') {
+        const msg = 'Bạn đã đóng cửa sổ Google trước khi hoàn tất. Phiên đăng nhập hiện tại vẫn được giữ nguyên.';
+        setMessage({ type: 'error', text: msg });
+        toast.info(msg);
+      } else if (code === 'auth/popup-blocked') {
+        const msg = 'Trình duyệt đã chặn cửa sổ bật lên Google. Vui lòng bật quyền popup và thử lại.';
+        setMessage({ type: 'error', text: msg });
+        toast.error(msg);
+      } else {
+        const msg = err?.message || 'Không thể liên kết tài khoản Google lúc này.';
+        setMessage({ type: 'error', text: msg });
+        toast.error('Liên kết Google thất bại.');
+      }
     } finally {
-      setIsLoading(false);
+      setIsLinkingProvider(null);
     }
   };
 
   const handleDeleteMyAccount = async () => {
-    if (!user || !user.email) return;
+    if (!user) return;
+    const expectedConfirmKey = (user.email || user.uid || '').toLowerCase();
+    if (!expectedConfirmKey) return;
 
-    if (deleteSelfEmail.toLowerCase() !== user.email.toLowerCase()) {
-      const notMatchMsg = 'Email xác nhận không khớp. Vui lòng nhập đúng email của bạn.';
+    if (deleteSelfEmail.trim().toLowerCase() !== expectedConfirmKey) {
+      const notMatchMsg = user.email
+        ? 'Email xác nhận không khớp. Vui lòng nhập đúng email của bạn.'
+        : 'Mã UID xác nhận không khớp. Vui lòng nhập đúng mã xác nhận.';
       setMessage({ type: 'error', text: notMatchMsg });
       toast.error(notMatchMsg);
       return;
@@ -443,8 +487,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     setMessage(null);
 
     try {
-      const email = user.email.toLowerCase();
-      await deleteDoc(doc(db, "users", email));
+      await deleteDoc(doc(db, "users", expectedConfirmKey));
       await deleteUser(user);
       toast.success('Tài khoản của bạn đã được xóa vĩnh viễn!');
       navigate('/');
@@ -464,6 +507,199 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   };
 
   if (!user) return null;
+
+  const hasUnlinkedMethod =
+    !providerStatus.isFacebookLinked ||
+    !providerStatus.isGoogleLinked ||
+    !providerStatus.isPasswordSet;
+
+  const renderLinkedMethodsSection = () => (
+    <div className="bg-slate-50/80 rounded-3xl border border-slate-200/90 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsLinksExpanded((prev) => !prev)}
+        className="w-full p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left hover:bg-slate-100/70 transition-colors cursor-pointer"
+      >
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-tight">
+              Phương thức đăng nhập &amp; Liên kết tài khoản
+            </h3>
+            {hasUnlinkedMethod && (
+              <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider">
+                Có mục chưa liên kết
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                providerStatus.isGoogleLinked
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-white text-slate-500 border-slate-200'
+              }`}
+            >
+              Google: {providerStatus.isGoogleLinked ? 'Đã liên kết' : 'Chưa liên kết'}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                providerStatus.isPasswordSet
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-white text-slate-500 border-slate-200'
+              }`}
+            >
+              Email/Password: {providerStatus.isPasswordSet ? 'Đã thiết lập' : 'Chưa thiết lập'}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                providerStatus.isFacebookLinked
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-blue-50 text-[#1877F2] border-blue-200'
+              }`}
+            >
+              Facebook: {providerStatus.isFacebookLinked ? 'Đã liên kết' : 'Chưa liên kết'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+          <span className="text-[11px] font-extrabold text-[#007c76]">
+            {isLinksExpanded ? 'Thu gọn' : 'Kéo xuống để liên kết'}
+          </span>
+          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600">
+            <ChevronDown
+              className={`w-4 h-4 transition-transform duration-200 ${isLinksExpanded ? 'rotate-180' : ''}`}
+            />
+          </div>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isLinksExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-slate-200/80 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                <p className="text-xs text-slate-500 font-medium">
+                  Tất cả phương thức đã liên kết dùng chung một mã tài khoản (UID) và bảo toàn toàn bộ khóa học của bạn.
+                </p>
+                <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto shrink-0">
+                  UID: {user.uid}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {/* Google */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                      <img
+                        src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg"
+                        alt="Google"
+                        className="w-5 h-5"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-800">Google</p>
+                      <p className={`text-xs font-bold ${providerStatus.isGoogleLinked ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {providerStatus.isGoogleLinked ? 'Đã liên kết' : 'Chưa liên kết'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {providerStatus.isGoogleLinked ? (
+                    <span className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold self-start sm:self-auto">
+                      Đã liên kết Google
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLinkGoogle}
+                      disabled={isLinkingProvider !== null}
+                      className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-60 self-start sm:self-auto"
+                    >
+                      {isLinkingProvider === 'google' ? 'Đang liên kết...' : 'Liên kết Google'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Email / Password */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-[#007c76] flex items-center justify-center shrink-0">
+                      <KeyRound className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-800">Email/Password</p>
+                      <p className={`text-xs font-bold ${providerStatus.isPasswordSet ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {providerStatus.isPasswordSet ? 'Đã thiết lập' : 'Chưa thiết lập'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {providerStatus.isPasswordSet ? (
+                    <span className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold self-start sm:self-auto">
+                      Đã thiết lập
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('security')}
+                      className="px-4 py-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200 text-xs font-bold transition-all cursor-pointer self-start sm:self-auto"
+                    >
+                      Thiết lập mật khẩu
+                    </button>
+                  )}
+                </div>
+
+                {/* Facebook */}
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#1877F2] text-white flex items-center justify-center shrink-0">
+                      <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-800">Facebook</p>
+                      <p className={`text-xs font-bold ${providerStatus.isFacebookLinked ? 'text-emerald-600' : 'text-slate-400'}`}>
+                        {providerStatus.isFacebookLinked ? 'Đã liên kết' : 'Chưa liên kết'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLinkFacebook}
+                    disabled={isLinkingProvider !== null}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60 self-start sm:self-auto ${
+                      providerStatus.isFacebookLinked
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                        : 'bg-[#1877F2] hover:bg-[#166FE5] text-white shadow-sm'
+                    }`}
+                  >
+                    {isLinkingProvider === 'facebook' ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang liên kết...</span>
+                      </>
+                    ) : (
+                      <span>{providerStatus.isFacebookLinked ? 'Đã liên kết Facebook' : 'Liên kết Facebook'}</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 
   return (
     <div className={embed ? "animate-in fade-in duration-300" : "min-h-screen bg-slate-50 py-8 md:py-16 px-4 sm:px-6 transition-colors duration-300 animate-in fade-in duration-300"}>
@@ -516,7 +752,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 </div>
                 <p className="text-xs text-teal-100 font-mono mt-1 flex items-center justify-center sm:justify-start gap-1.5 opacity-90">
                   <Mail className="w-3.5 h-3.5 text-teal-300" />
-                  <span>{user.email}</span>
+                  <span>{user.email || `Tài khoản Facebook (ID: ${user.uid.slice(0, 8)})`}</span>
                 </p>
               </div>
 
@@ -525,10 +761,6 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-xl text-[11px] font-bold text-teal-100 border border-white/10 flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5 text-teal-300" />
                   <span>{userStatus.coursesCount} khóa học sở hữu</span>
-                </div>
-                <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-xl text-[11px] font-bold text-amber-200 border border-white/10 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{userStatus.unlockedCombosCount} gói Combo kích hoạt</span>
                 </div>
                 {userStatus.joinedDate && (
                   <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-xl text-[11px] font-bold text-slate-300 border border-white/10 flex items-center gap-1.5">
@@ -546,45 +778,23 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
           <button 
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 min-w-[120px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'profile' ? 'bg-[#007c76] text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <UserIcon className="w-4 h-4" />
-            <span>Hồ sơ</span>
-          </button>
-
-          <button 
-            type="button"
-            onClick={() => setActiveTab('combo')}
-            className={`flex-1 min-w-[140px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'combo' ? 'bg-[#007c76] text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Layers className="w-4 h-4 text-amber-300" />
-            <span>Quản Lý Combo</span>
+            <span>Hồ sơ &amp; Liên kết</span>
           </button>
 
           <button 
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`flex-1 min-w-[120px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-[140px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'security' ? 'bg-[#007c76] text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <KeyRound className="w-4 h-4" />
             <span>Bảo mật</span>
-          </button>
-
-          <button 
-            type="button"
-            onClick={() => setActiveTab('appearance')}
-            className={`flex-1 min-w-[120px] py-2.5 sm:py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'appearance' ? 'bg-[#007c76] text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Palette className="w-4 h-4" />
-            <span>Giao diện</span>
           </button>
         </div>
 
@@ -602,10 +812,12 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
           </div>
         )}
 
-        {/* TAB 1: PROFILE EDIT */}
+        {/* TAB 1: PROFILE EDIT & LINKED ACCOUNTS */}
         {activeTab === 'profile' && (
           <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            {renderLinkedMethodsSection()}
+
+            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2 pt-2">
               <span className="w-1.5 h-5 bg-[#007c76] rounded-full"></span>
               Chỉnh Sửa Hồ Sơ Cá Nhân
             </h2>
@@ -682,9 +894,9 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Email đăng nhập (Cố định)</label>
                 <input
-                  type="email"
+                  type="text"
                   disabled
-                  value={email}
+                  value={email || `Tài khoản Facebook chưa cấp email (UID: ${user.uid})`}
                   className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-500 text-sm cursor-not-allowed"
                 />
               </div>
@@ -701,142 +913,6 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
           </div>
         )}
 
-        {/* TAB 2: PERSONALIZED COMBO MANAGEMENT */}
-        {activeTab === 'combo' && (
-          <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in duration-250">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-150 pb-5">
-              <div>
-                <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                  <span className="w-1.5 h-5 bg-amber-500 rounded-full"></span>
-                  Quản Lý Gói Combo Cá Nhân Hóa
-                </h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Cấu hình định hướng học tập, ngành nghề ưu tiên và quản lý danh sách các gói Combo đã mở khóa
-                </p>
-              </div>
-              <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-wider self-start sm:self-auto">
-                ⚡ Personalized Combo Engine
-              </span>
-            </div>
-
-            {/* Section A: Registered / Unlocked Combos */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <Crown className="w-4 h-4 text-amber-500" />
-                Gói Combo Đã Mở Khóa ({unlockedCombos.length})
-              </h3>
-
-              {unlockedCombos.length === 0 ? (
-                <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center space-y-3">
-                  <Layers className="w-8 h-8 text-slate-300 mx-auto" />
-                  <p className="text-xs text-slate-500 font-bold">Bạn chưa đăng ký gói Combo nào.</p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/khoa-hoc')}
-                    className="px-4 py-2 bg-[#007c76] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <span>Khám phá các gói Combo ưu đãi</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {unlockedCombos.map(combo => (
-                    <div key={combo.id} className="p-4 bg-teal-50/50 border border-teal-200 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-black uppercase text-teal-700 bg-teal-100 px-2 py-0.5 rounded">
-                          Đã sở hữu
-                        </span>
-                        <h4 className="text-xs font-black text-slate-900 mt-1 line-clamp-1">{combo.title}</h4>
-                        <p className="text-[11px] font-bold text-[#007c76]">{combo.price}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/khoa-hoc')}
-                        className="px-3 py-1.5 bg-[#007c76] text-white rounded-xl text-[11px] font-bold shrink-0 cursor-pointer"
-                      >
-                        Vào học ngay
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Section B: Sector Preferences & Custom Learning Roadmap */}
-            <form onSubmit={handleSaveComboPreferences} className="space-y-6 pt-4 border-t border-slate-150">
-              {/* Sector Selection */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
-                  <Briefcase className="w-4 h-4 text-[#007c76]" />
-                  Phân loại Ngành nghề Ưu tiên ghép Combo <span className="text-slate-400 font-normal">(Chọn nhiều)</span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {SECTOR_OPTIONS.map((sec) => {
-                    const isSelected = preferredSectors.includes(sec);
-                    return (
-                      <button
-                        key={sec}
-                        type="button"
-                        onClick={() => handleToggleSector(sec)}
-                        className={`p-3 rounded-2xl border text-left text-xs font-bold transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                          isSelected
-                            ? 'bg-teal-50/90 text-[#007c76] border-teal-300 shadow-2xs'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="line-clamp-1">{sec}</span>
-                        {isSelected ? (
-                          <CheckCircle2 className="w-4 h-4 text-[#007c76] shrink-0" />
-                        ) : (
-                          <span className="w-4 h-4 rounded-full border border-slate-300 shrink-0"></span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Learning Goal Target */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-[#007c76]" />
-                  Mục tiêu Học tập &amp; Phát triển Năng lực Combo
-                </label>
-                <input
-                  type="text"
-                  value={comboGoal}
-                  onChange={(e) => setComboGoal(e.target.value)}
-                  placeholder="VD: Đạt chứng chỉ Trưởng đoàn Đánh giá ISO 22000 trong 6 tháng..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:bg-white focus:border-[#007c76] transition-all"
-                />
-              </div>
-
-              {/* Personal Notes / Custom Request */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Ghi chú &amp; Yêu cầu Cấu hình Combo Thiết kế Riêng
-                </label>
-                <textarea
-                  rows={3}
-                  value={comboNotes}
-                  onChange={(e) => setComboNotes(e.target.value)}
-                  placeholder="Ghi chú các khóa học bạn muốn ghép thành Combo ưu đãi riêng biệt với Chuyên gia FAST..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-[#007c76] transition-all leading-relaxed"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3.5 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-md shadow-[#007c76]/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>Lưu Cấu Hình Combo Cá Nhân</span>
-              </button>
-            </form>
-          </div>
-        )}
-
         {/* TAB 3: SECURITY TAB */}
         {activeTab === 'security' && (
           <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
@@ -845,13 +921,15 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
               Cài Đặt Mật Khẩu &amp; Bảo Mật
             </h2>
 
+            {renderLinkedMethodsSection()}
+
             <form onSubmit={handleUpdateSecurity} className="space-y-6">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Email tài khoản</label>
                 <input
-                  type="email"
+                  type="text"
                   disabled
-                  value={email}
+                  value={email || `Tài khoản Facebook chưa cấp email (UID: ${user.uid})`}
                   className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-500 text-sm cursor-not-allowed opacity-70"
                 />
               </div>
@@ -929,12 +1007,12 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
               ) : (
                 <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 space-y-3 animate-in fade-in">
                   <p className="text-xs font-bold text-rose-900 leading-relaxed">
-                    Hành động này sẽ xóa vĩnh viễn tài khoản của bạn khỏi hệ thống. Vui lòng nhập email <strong className="text-slate-900">{user.email}</strong> để xác nhận.
+                    Hành động này sẽ xóa vĩnh viễn tài khoản của bạn khỏi hệ thống. Vui lòng nhập <strong className="text-slate-900">{user.email || user.uid}</strong> để xác nhận.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input 
                       type="text" 
-                      placeholder={user.email || ''}
+                      placeholder={user.email || user.uid}
                       value={deleteSelfEmail}
                       onChange={(e) => setDeleteSelfEmail(e.target.value)}
                       className="flex-1 px-3.5 py-2.5 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-800"
@@ -942,7 +1020,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                     <button 
                       type="button"
                       onClick={handleDeleteMyAccount}
-                      disabled={deleteSelfEmail !== user.email || isLoading}
+                      disabled={deleteSelfEmail.trim().toLowerCase() !== (user.email || user.uid).toLowerCase() || isLoading}
                       className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-50 cursor-pointer"
                     >
                       Xóa Vĩnh Viễn
@@ -957,38 +1035,6 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: APPEARANCE TAB */}
-        {activeTab === 'appearance' && (
-          <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-[#007c76] rounded-full"></span>
-              Tùy Chỉnh Giao Diện Ứng Dụng
-            </h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div 
-                onClick={() => theme !== 'default' && toggleTheme()}
-                className={`cursor-pointer rounded-2xl border-2 p-5 transition-all ${
-                  theme === 'default' ? 'border-[#007c76] bg-teal-50/40 shadow-xs' : 'border-slate-200 hover:border-teal-300'
-                }`}
-              >
-                <h3 className="text-sm font-black text-slate-800 mb-1">Mặc định (Giao diện Sáng)</h3>
-                <p className="text-xs text-slate-500 font-medium">Nền sáng chuẩn mực FAST CONSULTING.</p>
-              </div>
-
-              <div 
-                onClick={() => theme !== 'inverted' && toggleTheme()}
-                className={`cursor-pointer rounded-2xl border-2 p-5 transition-all ${
-                  theme === 'inverted' ? 'border-[#007c76] bg-[#007c76] text-white shadow-xs' : 'border-slate-200 hover:border-teal-300'
-                }`}
-              >
-                <h3 className={`text-sm font-black mb-1 ${theme === 'inverted' ? 'text-white' : 'text-slate-800'}`}>FAST Signature (Giao diện Đậm)</h3>
-                <p className={`text-xs font-medium ${theme === 'inverted' ? 'text-teal-100' : 'text-slate-500'}`}>Nền xanh ngọc đậm thương hiệu.</p>
-              </div>
             </div>
           </div>
         )}

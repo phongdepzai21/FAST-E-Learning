@@ -87,17 +87,9 @@ class PurchaseModalErrorBoundary extends Component<{ children: ReactNode; onClos
             <div className="space-y-2">
               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Sự Cố Cập Nhật Trạng Thái Thanh Toán</h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium max-w-md mx-auto">
-                Hệ thống đã tự động ngăn chặn lỗi giao diện ({this.state.error?.name || "React Error"}). Dữ liệu thanh toán của bạn vẫn an toàn.
+                Hệ thống đã tự động bảo vệ giao diện thanh toán. Dữ liệu thanh toán của bạn vẫn an toàn.
               </p>
             </div>
-
-            {this.state.error && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left">
-                <p className="text-[11px] font-mono text-red-600 font-bold truncate">
-                  {this.state.error.message || "Minified React Error #310 or State Synchronization Issue"}
-                </p>
-              </div>
-            )}
 
             <div className="flex gap-3 pt-2">
               <button

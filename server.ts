@@ -2434,32 +2434,35 @@ async function startServer() {
   // Secure server-side user profile synchronizer to bypass client security rule & token constraints
   app.post("/api/user/sync-profile", async (req, res) => {
     try {
-      const { email, displayName, photoURL } = req.body || {};
-      if (!email) {
-        return res.status(400).json({ success: false, error: "Email is required" });
+      const { uid, email, displayName, photoURL, providerId } = req.body || {};
+      const normalizedEmail = typeof email === 'string' ? email.toLowerCase().trim() : '';
+      const cleanUid = typeof uid === 'string' ? uid.trim() : '';
+      const docKey = normalizedEmail || cleanUid;
+
+      if (!docKey) {
+        return res.status(400).json({ success: false, error: "Email or UID is required" });
       }
 
-      const normalizedEmail = email.toLowerCase().trim();
       const firestore = getServerFirestore();
-      const userRef = firestore.collection("users").doc(normalizedEmail);
+      const userRef = firestore.collection("users").doc(docKey);
       const userDoc = await userRef.get();
 
       const admins = ['h1h4phong@gmail.com', 'hkc.qms@gmail.com', 'trdung153@gmail.com', 'lediem.ngo@gmail.com'];
-      const isHardcodedAdmin = admins.includes(normalizedEmail);
-      const isHardcodedTeacher = admins.includes(normalizedEmail);
+      const isHardcodedAdmin = normalizedEmail ? admins.includes(normalizedEmail) : false;
+      const isHardcodedTeacher = normalizedEmail ? admins.includes(normalizedEmail) : false;
       const isOwner = normalizedEmail === 'h1h4phong@gmail.com' || normalizedEmail === 'trdung153@gmail.com';
       const determinedRole = isOwner ? 'Owner' : (isHardcodedAdmin ? 'Admin' : 'User');
 
       const updateData: Record<string, any> = {
-        email: normalizedEmail,
         updatedAt: new Date().toISOString()
       };
-
-      if (displayName) updateData.displayName = displayName;
-      if (photoURL) updateData.photoURL = photoURL;
+      if (normalizedEmail) updateData.email = normalizedEmail;
+      if (cleanUid) updateData.uid = cleanUid;
+      if (providerId) updateData.providerId = providerId;
 
       if (!userDoc.exists) {
-        // Create new user profile document
+        if (displayName) updateData.displayName = displayName;
+        if (photoURL) updateData.photoURL = photoURL;
         updateData.createdAt = new Date().toISOString();
         updateData.isVip = false;
         updateData.isAdmin = isHardcodedAdmin || isOwner;
@@ -2467,11 +2470,18 @@ async function startServer() {
         updateData.isOwner = isOwner;
         updateData.role = determinedRole;
         updateData.status = "approved";
-        
+
         await userRef.set(updateData);
       } else {
-        // Merge updates safely
-        updateData.role = determinedRole;
+        const existingData = userDoc.data() || {};
+        // Preserve user-customized displayName and photoURL if already set
+        if (displayName && (!existingData.displayName || existingData.displayName === 'Học viên' || existingData.displayName === 'Học viên FAST')) {
+          updateData.displayName = displayName;
+        }
+        if (photoURL && !existingData.photoURL) {
+          updateData.photoURL = photoURL;
+        }
+        if (!existingData.role) updateData.role = determinedRole;
         if (isOwner) {
           updateData.isOwner = true;
           updateData.isAdmin = true;
@@ -2481,15 +2491,16 @@ async function startServer() {
       }
 
       // Also persist to local disk cache so offline/restricted queries succeed
-      saveUserToDisk(normalizedEmail, updateData);
+      saveUserToDisk(docKey, updateData);
 
       res.json({ success: true, message: "Profile synchronized on the server successfully." });
     } catch (err: any) {
       console.warn("[sync-profile] Firestore API restricted or quota reached, proceeding in local session mode:", err.message);
       try {
-        const { email: fbEmail, displayName: fbName } = req.body || {};
-        if (fbEmail) {
-          saveUserToDisk(String(fbEmail).toLowerCase().trim(), { email: fbEmail, displayName: fbName });
+        const { uid: fbUid, email: fbEmail, displayName: fbName } = req.body || {};
+        const fallbackKey = (typeof fbEmail === 'string' && fbEmail.toLowerCase().trim()) || (typeof fbUid === 'string' && fbUid.trim()) || '';
+        if (fallbackKey) {
+          saveUserToDisk(fallbackKey, { ...(fbEmail ? { email: fbEmail } : {}), ...(fbUid ? { uid: fbUid } : {}), displayName: fbName });
         }
       } catch {}
       res.json({ success: true, bypassed: true, message: "Profile synchronized in local session mode." });
