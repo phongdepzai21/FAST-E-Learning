@@ -97,8 +97,9 @@ const Footer: React.FC = () => {
                 <li><Link to="/ve-chung-toi" className="hover:text-[#007c76] transition-colors">Về chúng tôi</Link></li>
                 <li><Link to="/lien-he" className="hover:text-[#007c76] transition-colors">Liên hệ</Link></li>
                 <li><Link to="/faq" className="hover:text-[#007c76] transition-colors">Câu hỏi thường gặp (FAQ)</Link></li>
-                <li><Link to="/dieu-khoan-su-dung" className="hover:text-[#007c76] transition-colors">Điều khoản dịch vụ</Link></li>
-                <li><Link to="/chinh-sach-bao-mat" className="hover:text-[#007c76] transition-colors">Chính sách & Quyền riêng tư</Link></li>
+                <li><Link to="/terms" className="hover:text-[#007c76] transition-colors">Điều khoản dịch vụ</Link></li>
+                <li><Link to="/privacy-policy" className="hover:text-[#007c76] transition-colors">Chính sách & Quyền riêng tư</Link></li>
+                <li><Link to="/data-deletion" className="hover:text-[#007c76] transition-colors">Hướng dẫn xóa dữ liệu</Link></li>
               </ul>
             </div>
           </div>

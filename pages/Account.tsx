@@ -682,7 +682,13 @@ const Account: React.FC = () => {
         });
     }, 8000);
 
+    let unsubUserDoc: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser: User | null) => {
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
+      }
       try {
         if (currentUser) {
             // Reload user to ensure claims are up to date
@@ -718,7 +724,7 @@ const Account: React.FC = () => {
 
                 // Real-time listener on user doc
                 const userDocRef = doc(db, "users", profileDocKey);
-                onSnapshot(userDocRef, async (userDocSnap) => {
+                unsubUserDoc = onSnapshot(userDocRef, async (userDocSnap) => {
                     let curVip = isVipStatus;
                     let curAdmin = isAdminStatus;
                     let curTeacher = isTeacherStatus;
@@ -908,6 +914,10 @@ const Account: React.FC = () => {
 
     return () => {
       unsubscribeAuth();
+      if (unsubUserDoc) {
+        unsubUserDoc();
+        unsubUserDoc = null;
+      }
       clearTimeout(safetyTimer);
       window.removeEventListener('fast_auth_changed', handleFastAuthEvent);
       window.removeEventListener('user_providers_updated', handleProvidersUpdated);
@@ -931,10 +941,14 @@ const Account: React.FC = () => {
         const cachedIds = JSON.parse(cachedStr);
         if (Array.isArray(cachedIds) && cachedIds.length > 0) {
           setPurchasedCourses(cachedIds.map((id: string) => ({ courseId: id, progress: 0 })));
+        } else {
+          setPurchasedCourses([]);
         }
       } else if (hasClaimedAll && allCoursesRef.current.length > 0) {
         const allActiveIds = allCoursesRef.current.filter(c => c.status !== 'draft' && c.status !== 'inactive').map(c => c.id);
         setPurchasedCourses(allActiveIds.map(id => ({ courseId: id, progress: 0 })));
+      } else {
+        setPurchasedCourses([]);
       }
     } catch (e) {}
 
@@ -1009,16 +1023,13 @@ const Account: React.FC = () => {
     if (!accountKey) return;
 
     let localIsVip = false;
-    let localUnlockedVip = false;
     try {
-      localIsVip = Boolean(localStorage.getItem('user_is_vip'));
-      localUnlockedVip = Boolean(localStorage.getItem('course_unlocked_khoa-vip'));
+      localIsVip = localStorage.getItem(`user_is_vip_${accountKey}`) === 'true';
     } catch (e) {}
 
     const isVipUser = user?.isVip === true || 
       localIsVip || 
-      localUnlockedVip || 
-      purchasedCourses.some(c => c.id === 'khoa-vip' || c.id === 'vip-lifetime-access');
+      purchasedCourses.some(c => c.courseId === 'khoa-vip' || c.courseId === 'vip-lifetime-access');
 
     // Load initial local data
     try {
@@ -1080,6 +1091,14 @@ const Account: React.FC = () => {
   const handleLogout = async () => {
     try {
       clearFastSessionUser();
+      try {
+        localStorage.removeItem('user_is_vip');
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith('course_unlocked_')) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch (e) {}
       await signOut(auth);
       setUser(null);
       setPurchasedCourses([]);
@@ -2382,8 +2401,8 @@ const Account: React.FC = () => {
       if (deletedIds.includes(c.id)) return false;
       // Khóa học đã bị ẩn (inactive hoặc draft) phải ẩn hoàn toàn khỏi danh mục trên trang tài khoản
       if (c.status === 'inactive' || c.status === 'draft') return false;
-      if (isVip || isAdmin || isTeacher || purchasedCourses.length === 0) return true;
-      return c.id === 'basic-principles' || purchasedCourses.some(pc => pc.courseId === c.id);
+      if (isVip || isAdmin || isTeacher) return true;
+      return purchasedCourses.some(pc => pc.courseId === c.id);
     });
   }, [purchasedCourses, allCourses, isVip, isAdmin, isTeacher]);
   

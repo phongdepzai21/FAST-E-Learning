@@ -177,7 +177,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
   };
 
   // Curriculum State (Flat Lessons with videoUrl)
-  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; content?: string }[]>(DEFAULT_FLAT_LESSONS);
+  const [flatLessons, setFlatLessons] = useState<{ title: string; videoUrl: string; content?: string; isPreview?: boolean; duration?: string }[]>(DEFAULT_FLAT_LESSONS);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [bulkImportText, setBulkImportText] = useState('');
   const [bulkImportMode, setBulkImportMode] = useState<'append' | 'replace'>('append');
@@ -587,10 +587,13 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     const cleanLessons = inputLessons.map((les, lIdx) => {
       const vUrl = les?.videoUrl ? String(les.videoUrl).trim() : '';
       const cContent = les?.content ? String(les.content).trim() : '';
+      const dDuration = les?.duration ? String(les.duration).trim() : '';
       return {
         title: String(les?.title || `Bài học ${lIdx + 1}`).trim(),
         videoUrl: vUrl,
-        content: cContent
+        content: cContent,
+        ...(les?.isPreview === true ? { isPreview: true } : {}),
+        ...(dDuration ? { duration: dDuration } : {})
       };
     });
     return [{ title: "Danh sách bài giảng", lessons: cleanLessons }];
@@ -1187,6 +1190,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     ]);
   };
 
+  const addPreviewLessonAtStart = () => {
+    setFlatLessons(prev => [
+      {
+        title: 'Bài Preview: Giới thiệu nội dung khóa học',
+        videoUrl: '',
+        content: '',
+        isPreview: true,
+        duration: 'Dưới 5 phút'
+      },
+      ...prev
+    ]);
+  };
+
   const handleProcessBulkImport = () => {
     if (!bulkImportText.trim()) {
       setShowBulkImportModal(false);
@@ -1261,7 +1277,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
     });
   };
 
-  const updateFlatLesson = (lIdx: number, field: 'title' | 'videoUrl' | 'content', value: string) => {
+  const updateFlatLesson = (
+    lIdx: number,
+    field: 'title' | 'videoUrl' | 'content' | 'duration' | 'isPreview',
+    value: string | boolean
+  ) => {
     setFlatLessons(prev => {
       const result = [...prev];
       result[lIdx] = { ...result[lIdx], [field]: value };
@@ -1917,15 +1937,22 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   2. Danh sách bài giảng ({flatLessons.length} bài)
                 </h3>
                 <p className="text-gray-400 text-xs font-semibold mt-1">
-                  Quản lý và sắp xếp các bài giảng hiển thị trực tiếp trong khóa học.
+                  Quản lý bài giảng chính thức và bài giảng Preview (video dưới 5 phút, miễn phí, không cần đăng nhập).
                 </p>
               </div>
               
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={addPreviewLessonAtStart}
+                  className="px-4 py-2 bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-[#007c76]/30 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  + Thêm bài Preview ở đầu
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowBulkImportModal(true)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -1935,7 +1962,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                 <button
                   type="button"
                   onClick={addFlatLesson}
-                  className="px-4 py-2 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+                  className="px-4 py-2 bg-[#007c76] hover:bg-[#00605b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm whitespace-nowrap"
                 >
                   + Thêm 1 bài giảng
                 </button>
@@ -1956,15 +1983,79 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
               </div>
             ) : (
               <div className="space-y-4">
-                {flatLessons.map((lesson, lIdx) => (
-                  <div key={lIdx} className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                {flatLessons.map((lesson, lIdx) => {
+                  const isPreviewLesson = lesson.isPreview === true;
+                  return (
+                  <div
+                    key={lIdx}
+                    className={`p-4 md:p-5 rounded-2xl border shadow-xs flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition-colors ${
+                      isPreviewLesson
+                        ? 'bg-teal-50/40 border-[#007c76]/40'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                      <span className="w-8 h-8 rounded-xl bg-[#007c76]/10 text-[#007c76] font-black text-xs flex items-center justify-center shrink-0">
+                      <span className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${
+                        isPreviewLesson
+                          ? 'bg-[#007c76] text-white'
+                          : 'bg-[#007c76]/10 text-[#007c76]'
+                      }`}>
                         {lIdx + 1}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 w-full">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Lesson Type Selector */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Loại bài giảng</span>
+                          <select
+                            value={isPreviewLesson ? 'preview' : 'standard'}
+                            onChange={(e) => {
+                              const nextIsPreview = e.target.value === 'preview';
+                              updateFlatLesson(lIdx, 'isPreview', nextIsPreview);
+                              if (nextIsPreview && !lesson.duration) {
+                                updateFlatLesson(lIdx, 'duration', 'Dưới 5 phút');
+                              }
+                            }}
+                            className={`w-full text-xs font-bold py-2.5 px-3 border rounded-xl outline-none transition-all cursor-pointer ${
+                              isPreviewLesson
+                                ? 'bg-white border-[#007c76]/40 text-[#007c76]'
+                                : 'bg-gray-50 border-gray-200 text-gray-700 focus:border-[#007c76] focus:bg-white'
+                            }`}
+                          >
+                            <option value="standard">Bài học chính thức (Cần đăng ký khóa học)</option>
+                            <option value="preview">Bài Preview (Video &lt; 5 phút · Miễn phí · Không cần đăng nhập)</option>
+                          </select>
+                        </div>
+
+                        {/* Optional Duration for Preview (recommended < 5 mins) */}
+                        {isPreviewLesson ? (
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-black text-[#007c76] uppercase tracking-widest block">Thời lượng Preview (khuyên dùng &lt; 5 phút)</span>
+                            <input
+                              type="text"
+                              value={lesson.duration || ''}
+                              onChange={(e) => updateFlatLesson(lIdx, 'duration', e.target.value)}
+                              placeholder="VD: 03:45 (Dưới 5 phút)"
+                              className="w-full bg-white text-xs font-bold text-[#007c76] py-2.5 px-3 border border-[#007c76]/30 rounded-xl focus:border-[#007c76] outline-none transition-all"
+                            />
+                          </div>
+                        ) : (
+                          <div className="hidden md:flex items-end pb-1">
+                            <span className="text-[11px] font-medium text-gray-400">
+                              Bài học khóa — chỉ học viên đã đăng ký mới xem được.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {isPreviewLesson && (
+                        <p className="text-[11px] font-semibold text-[#007c76]">
+                          Video Preview nên dưới 5 phút — khách chưa đăng nhập chỉ xem được đúng bài có gắn loại Preview này.
+                        </p>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {/* Lesson Title Input */}
                         <div className="space-y-1">
@@ -2034,7 +2125,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                       </button>
                     </div>
                   </div>
-                ))}
+                );})}
 
                 <button
                   type="button"

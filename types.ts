@@ -4,6 +4,8 @@ export interface Lesson {
   videoUrl?: string;
   isHidden?: boolean;
   content?: string;
+  isPreview?: boolean;
+  duration?: string;
 }
 
 export interface LessonNote {

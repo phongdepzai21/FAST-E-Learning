@@ -13,7 +13,7 @@ import { CustomVideoPlayer } from "../components/CustomVideoPlayer";
 import { Helmet } from 'react-helmet-async';
 import { recordDailyLearningActivity, updateLearningMilestone } from '../utils/gamificationService';
 import { useToast } from '../contexts/ToastContext';
-import { WifiOff } from 'lucide-react';
+import { WifiOff, Lock, PlayCircle } from 'lucide-react';
 
 import { useSignedVideoUrl } from '../utils/useSignedVideoUrl';
 
@@ -274,24 +274,39 @@ const Classroom: React.FC = () => {
     };
   }, [courseId, location.search]);
 
-  // Tự động lưu vị trí bài học hiện tại mỗi khi chuyển bài
+  const firstPreviewIdx = useMemo(
+    () => curriculum.findIndex(l => l.isPreview === true),
+    [curriculum]
+  );
+
+  // Khi người dùng chưa sở hữu khóa học và truy cập phòng học (không chỉ định bài khóa cụ thể hoặc có ?preview=1), tự động mở đúng bài Preview đầu tiên nếu có
   useEffect(() => {
-    if (!courseId || curriculum.length === 0) return;
+    if (!isDataLoaded || isOwned || curriculum.length === 0) return;
+    const params = new URLSearchParams(location.search);
+    const hasExplicitBai = Boolean(params.get('bai') || params.get('lesson'));
+    const wantsPreview = params.get('preview') === '1' || params.get('preview') === 'true';
+    if (firstPreviewIdx !== -1 && (wantsPreview || (!hasExplicitBai && !curriculum[currentIdx]?.isPreview))) {
+      setCurrentIdx(firstPreviewIdx);
+    }
+  }, [isDataLoaded, isOwned, curriculum, currentIdx, firstPreviewIdx, location.search]);
+
+  // Tự động lưu vị trí bài học hiện tại mỗi khi chuyển bài (CHỈ khi đã sở hữu)
+  useEffect(() => {
+    if (!courseId || curriculum.length === 0 || !isOwned) return;
     const targetLesson = curriculum[currentIdx];
     if (targetLesson) {
       saveLastAccessedLesson(courseId, currentIdx, targetLesson.title, currentUser?.email);
     }
-  }, [courseId, currentIdx, curriculum, currentUser?.email]);
+  }, [courseId, currentIdx, curriculum, currentUser?.email, isOwned]);
 
-  // Saved Notes from LocalStorage
+  // Saved Notes from LocalStorage (chỉ nạp khi đã đăng nhập)
   useEffect(() => {
-    if (courseId) {
+    if (courseId && currentUser?.email) {
       const notes = localStorage.getItem(`notes_${courseId}`);
       if (notes) {
         try {
           const parsed = JSON.parse(notes);
           if (Array.isArray(parsed)) {
-            // Support legacy string arrays or object array
             const formatted = parsed.map((item: any, i: number) => {
               if (typeof item === 'string') {
                 return { id: `note-${i}`, text: item, date: 'Gần đây' };
@@ -303,15 +318,36 @@ const Classroom: React.FC = () => {
         } catch (e) {}
       }
     }
-  }, [courseId]);
+  }, [courseId, currentUser?.email]);
 
   const currentLesson = useMemo(() => curriculum[currentIdx] || curriculum[0], [curriculum, currentIdx]);
+  const canViewCurrentLesson = isOwned || Boolean(currentLesson?.isPreview);
   const isCurrentCompleted = useMemo(() => 
     completedLessons.includes(`${currentIdx}`) || completedLessons.includes(`0-${currentIdx}`),
     [completedLessons, currentIdx]
   );
 
+  const handleSelectLesson = (targetIdx: number) => {
+    const targetLesson = curriculum[targetIdx];
+    if (!isOwned && !targetLesson?.isPreview) {
+      toast.warning(
+        firstPreviewIdx !== -1
+          ? 'Bạn chỉ xem được bài giảng Preview miễn phí (< 5 phút). Vui lòng đăng ký khóa học để mở khóa bài này.'
+          : 'Vui lòng đăng ký khóa học để mở khóa toàn bộ bài giảng.',
+        4500,
+        'Bài giảng bị khóa'
+      );
+      return;
+    }
+    setCurrentIdx(targetIdx);
+  };
+
   const handleUpdateProgress = async (lessonIndex: number) => {
+    if (!isOwned) {
+      toast.warning('Vui lòng đăng ký khóa học để lưu tiến độ học tập.', 3500);
+      return;
+    }
+
     const lessonKey = `${lessonIndex}`;
     let newCompleted = [...completedLessons];
 
@@ -346,6 +382,10 @@ const Classroom: React.FC = () => {
   };
 
   const handleSaveNote = async () => {
+    if (!isOwned) {
+      toast.warning('Vui lòng đăng ký khóa học để lưu ghi chú cá nhân.', 3500);
+      return;
+    }
     if (!userNote.trim() || !courseId) return;
     const now = new Date();
     const formattedDate = `${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • ${now.toLocaleDateString('vi-VN')}`;
@@ -403,6 +443,16 @@ const Classroom: React.FC = () => {
       // 1. Next lesson: ArrowRight, 'n', 'N', 'l', 'L'
       if (e.key === 'ArrowRight' || e.key === 'n' || e.key === 'N' || e.key === 'l' || e.key === 'L') {
         e.preventDefault();
+        if (!isOwned) {
+          const nextPreviewIdx = curriculum.findIndex((l, i) => i > currentIdx && l.isPreview === true);
+          if (nextPreviewIdx !== -1) {
+            setCurrentIdx(nextPreviewIdx);
+            triggerFeedback(`Preview: ${curriculum[nextPreviewIdx]?.title || 'Bài Preview'}`, '→');
+          } else {
+            triggerFeedback('Chỉ xem được bài Preview miễn phí (< 5 phút)', '🔒');
+          }
+          return;
+        }
         if (currentIdx < curriculum.length - 1) {
           const nextIdx = currentIdx + 1;
           setCurrentIdx(nextIdx);
@@ -417,6 +467,22 @@ const Classroom: React.FC = () => {
       // 2. Previous lesson: ArrowLeft, 'p', 'P', 'j', 'J'
       if (e.key === 'ArrowLeft' || e.key === 'p' || e.key === 'P' || e.key === 'j' || e.key === 'J') {
         e.preventDefault();
+        if (!isOwned) {
+          let prevPreviewIdx = -1;
+          for (let i = currentIdx - 1; i >= 0; i--) {
+            if (curriculum[i]?.isPreview === true) {
+              prevPreviewIdx = i;
+              break;
+            }
+          }
+          if (prevPreviewIdx !== -1) {
+            setCurrentIdx(prevPreviewIdx);
+            triggerFeedback(`Preview: ${curriculum[prevPreviewIdx]?.title || 'Bài Preview'}`, '←');
+          } else {
+            triggerFeedback('Chỉ xem được bài Preview miễn phí (< 5 phút)', '🔒');
+          }
+          return;
+        }
         if (currentIdx > 0) {
           const prevIdx = currentIdx - 1;
           setCurrentIdx(prevIdx);
@@ -442,6 +508,10 @@ const Classroom: React.FC = () => {
       // 3. Mark completed: 'm' or 'M'
       if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
+        if (!isOwned) {
+          triggerFeedback('Đăng ký khóa học để đánh dấu hoàn thành', '🔒');
+          return;
+        }
         handleUpdateProgress(currentIdx);
         triggerFeedback('Đã cập nhật hoàn thành bài học!', '✅');
         return;
@@ -480,21 +550,26 @@ const Classroom: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser, savedNotes]);
+  }, [currentIdx, curriculum, isCurrentCompleted, completedLessons, courseId, currentUser, savedNotes, isOwned]);
 
+  // Strict video URL gate: non-owners can ONLY ever resolve video URLs for lessons marked isPreview === true
   const rawVideoUrl = useMemo(() => {
+    if (!isOwned && !currentLesson?.isPreview) {
+      return "";
+    }
     return currentLesson?.videoUrl ? String(currentLesson.videoUrl).trim() : "";
-  }, [currentLesson]);
+  }, [isOwned, currentLesson]);
 
   const { signedUrl: activeVideoUrl, isLoading: isVideoLoading } = useSignedVideoUrl(rawVideoUrl);
 
   const videoEmbed = useMemo(() => {
     if (!activeVideoUrl) return { isEmbed: false, embedUrl: "" };
-    return getVideoEmbedInfo(activeVideoUrl, true);
-  }, [activeVideoUrl]);
+    return getVideoEmbedInfo(activeVideoUrl, canViewCurrentLesson);
+  }, [activeVideoUrl, canViewCurrentLesson]);
 
   // Picture-in-Picture & Background Media Session
   const handleTimestampUpdate = (time: number) => {
+    if (!isOwned) return;
     if (Math.abs(time - (videoTimestampsRef.current[`${currentIdx}`] || 0)) < 1) return;
     
     setVideoTimestamps(prev => {
@@ -539,7 +614,7 @@ const Classroom: React.FC = () => {
   };
 
   useEffect(() => {
-    if ('mediaSession' in navigator && currentLesson) {
+    if ('mediaSession' in navigator && canViewCurrentLesson && currentLesson) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: currentLesson.title || 'Bài giảng',
@@ -557,16 +632,20 @@ const Classroom: React.FC = () => {
           if (videoRef.current) videoRef.current.pause();
         });
         navigator.mediaSession.setActionHandler('previoustrack', () => {
-          if (currentIdx > 0) setCurrentIdx(prev => prev - 1);
+          if (currentIdx > 0 && (isOwned || curriculum[currentIdx - 1]?.isPreview)) {
+            setCurrentIdx(prev => prev - 1);
+          }
         });
         navigator.mediaSession.setActionHandler('nexttrack', () => {
-          if (currentIdx < curriculum.length - 1) setCurrentIdx(prev => prev + 1);
+          if (currentIdx < curriculum.length - 1 && (isOwned || curriculum[currentIdx + 1]?.isPreview)) {
+            setCurrentIdx(prev => prev + 1);
+          }
         });
       } catch (err) {
         // MediaSession fallback
       }
     }
-  }, [currentLesson, course, currentIdx, curriculum.length]);
+  }, [currentLesson, course, currentIdx, curriculum, canViewCurrentLesson, isOwned]);
 
   const filteredCurriculum = useMemo(() => {
     if (!searchQuery.trim()) return curriculum;
@@ -726,15 +805,16 @@ const Classroom: React.FC = () => {
           )}
         </div>
       </header>)}
-      {/* NOT OWNED NOTICE BANNER */}
+      {/* NOT OWNED PREVIEW NOTICE BANNER */}
       {!isOwned && (
-        <div className="relative z-10 bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border-b border-amber-500/20 px-4 py-2.5 text-center flex items-center justify-center gap-3">
-          <span className="text-amber-300 font-bold text-xs md:text-sm flex items-center gap-2">
-            <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            Bạn đang xem thử bài giảng mẫu. Hãy đăng ký khóa học để lưu tiến độ và nhận Giấy chứng nhận hoàn thành!
+        <div className="relative z-10 bg-teal-950/70 border-b border-teal-500/25 px-4 py-2.5 text-center flex flex-wrap items-center justify-center gap-3">
+          <span className="text-teal-200 font-bold text-xs md:text-sm">
+            {firstPreviewIdx !== -1
+              ? `Bạn đang xem thử bài giảng Preview miễn phí (< 5 phút · Không cần đăng nhập). Đăng ký khóa học để mở khóa toàn bộ ${curriculum.length} bài giảng.`
+              : `Bạn đang xem thử phòng học. Đăng ký khóa học để mở khóa toàn bộ ${curriculum.length} bài giảng.`}
           </span>
-          <Link to={`/khoa-hoc/${courseId}`} className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-lg transition-all shadow hover:shadow-amber-400/20 active:scale-95 shrink-0">
-            Đăng ký ngay
+          <Link to={`/khoa-hoc/${courseId}`} className="bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-lg transition-all shadow active:scale-95 shrink-0 whitespace-nowrap">
+            Đăng ký khóa học
           </Link>
         </div>
       )}
@@ -748,7 +828,7 @@ const Classroom: React.FC = () => {
           }}
           className="fixed top-4 right-4 z-[100] flex items-center gap-2 text-sm font-bold bg-[#0f172a]/90 backdrop-blur-xl border border-white/[0.12] text-white px-4 py-2 rounded-2xl shadow-2xl hover:bg-[#1e293b] hover:scale-105 transition-all group animate-fade-in"
         >
-          <span className="group-hover:animate-pulse">🎯</span>
+          <span>🎯</span>
           Thoát tập trung
           <kbd className="text-[10px] font-mono px-1.5 py-0.5 bg-black/40 rounded border border-white/20 text-teal-300 ml-1">F</kbd>
         </button>
@@ -776,10 +856,10 @@ const Classroom: React.FC = () => {
               webkit-playsinline="true"
             />
 
-            <div className="w-full aspect-video bg-black flex items-center justify-center relative">
+            <div className="aspect-video w-full bg-black flex items-center justify-center relative">
               {/* HUD NOTIFICATION OVERLAY FOR KEYBOARD SHORTCUTS */}
               {shortcutFeedback && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-slate-900/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl border border-teal-500/40 shadow-2xl flex items-center gap-2.5 animate-bounce text-xs sm:text-sm font-bold pointer-events-none">
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 bg-slate-900/90 text-white backdrop-blur-md px-4 py-2 rounded-2xl border border-teal-500/40 shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold pointer-events-none">
                   <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center font-black border border-teal-500/30">
                     {shortcutFeedback.icon}
                   </span>
@@ -795,29 +875,56 @@ const Classroom: React.FC = () => {
               ) : isVideoLoading ? (
                 <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 gap-4 p-8 text-center min-h-[400px]">
                   <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm font-bold text-teal-400 uppercase tracking-wider animate-pulse">Đang tải video bài giảng...</p>
+                  <p className="text-sm font-bold text-teal-400 uppercase tracking-wider">Đang tải video bài giảng...</p>
                 </div>
-              ) : !isOwned ? (
+              ) : !canViewCurrentLesson ? (
                   <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-400 p-8 text-center min-h-[400px]">
                     <svg className="w-16 h-16 text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                     <p className="text-lg font-bold text-white mb-2">Nội dung đã bị khóa</p>
-                    <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">Vui lòng đăng ký khóa học để truy cập bài giảng và tài liệu đính kèm.</p>
-                    <Link to={`/khoa-hoc/${courseId}`} className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black px-6 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-teal-500/20 active:scale-95 uppercase tracking-wider text-xs">
-                        Đăng ký ngay
-                    </Link>
+                    <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+                      {firstPreviewIdx !== -1
+                        ? 'Bạn chỉ có thể xem miễn phí bài giảng Preview (< 5 phút). Vui lòng đăng ký khóa học để xem bài giảng này.'
+                        : 'Vui lòng đăng ký khóa học để truy cập bài giảng và tài liệu đính kèm.'}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                      {firstPreviewIdx !== -1 && (
+                        <button
+                          type="button"
+                          onClick={() => setCurrentIdx(firstPreviewIdx)}
+                          className="bg-white/10 hover:bg-white/20 text-teal-300 font-bold px-5 py-2.5 rounded-xl transition-all border border-teal-400/30 uppercase tracking-wider text-xs cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <PlayCircle className="w-4 h-4 shrink-0" />
+                          <span>Xem bài Preview miễn phí</span>
+                        </button>
+                      )}
+                      <Link to={`/khoa-hoc/${courseId}`} className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-black px-6 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-teal-500/20 active:scale-95 uppercase tracking-wider text-xs whitespace-nowrap">
+                          Đăng ký ngay
+                      </Link>
+                    </div>
                   </div>
               ) : canUseReactPlayer ? (
                 <CustomVideoPlayer
                   key={parsedVideoUrl}
                   parsedVideoUrl={parsedVideoUrl}
                   course={course}
-                  savedTime={videoTimestampsRef.current[`${currentIdx}`] || 0}
+                  savedTime={isOwned ? (videoTimestampsRef.current[`${currentIdx}`] || 0) : 0}
                   onProgress={(playedSeconds) => {
-                    handleTimestampUpdate(playedSeconds);
+                    if (isOwned) {
+                      handleTimestampUpdate(playedSeconds);
+                    }
                   }}
                   onEnded={() => {
+                    if (!isOwned) {
+                      const nextPreviewIdx = curriculum.findIndex((l, i) => i > currentIdx && l.isPreview === true);
+                      if (nextPreviewIdx !== -1) {
+                        setCurrentIdx(nextPreviewIdx);
+                      } else {
+                        triggerFeedback('Đã xem xong bài Preview! Đăng ký để mở khóa toàn bộ khóa học.', '🎓');
+                      }
+                      return;
+                    }
                     handleUpdateProgress(currentIdx);
                     if (currentIdx < curriculum.length - 1) {
                       setCurrentIdx(currentIdx + 1);
@@ -849,7 +956,7 @@ const Classroom: React.FC = () => {
                   key={activeVideoUrl}
                   src={videoEmbed.embedUrl || activeVideoUrl} 
                   controls 
-                  autoPlay
+                  autoPlay={canViewCurrentLesson}
                   playsInline
                   
                   webkit-playsinline="true"
@@ -857,12 +964,16 @@ const Classroom: React.FC = () => {
                   className="w-full h-full object-contain"
                   poster={course?.image}
                   onTimeUpdate={(e) => {
-                    handleTimestampUpdate(e.currentTarget.currentTime);
+                    if (isOwned) {
+                      handleTimestampUpdate(e.currentTarget.currentTime);
+                    }
                   }}
                   onLoadedMetadata={(e) => {
-                    const savedTime = videoTimestampsRef.current[`${currentIdx}`] || 0;
-                    if (savedTime > 0 && e.currentTarget.seekable.length > 0) {
-                      e.currentTarget.currentTime = savedTime;
+                    if (isOwned) {
+                      const savedTime = videoTimestampsRef.current[`${currentIdx}`] || 0;
+                      if (savedTime > 0 && e.currentTarget.seekable.length > 0) {
+                        e.currentTarget.currentTime = savedTime;
+                      }
                     }
                   }}
                   onPlay={() => {
@@ -878,6 +989,15 @@ const Classroom: React.FC = () => {
                   // @ts-ignore
                   onLeavePictureInPicture={() => setIsPiPActive(false)}
                   onEnded={() => {
+                    if (!isOwned) {
+                      const nextPreviewIdx = curriculum.findIndex((l, i) => i > currentIdx && l.isPreview === true);
+                      if (nextPreviewIdx !== -1) {
+                        setCurrentIdx(nextPreviewIdx);
+                      } else {
+                        triggerFeedback('Đã xem xong bài Preview! Đăng ký để mở khóa toàn bộ khóa học.', '🎓');
+                      }
+                      return;
+                    }
                     handleUpdateProgress(currentIdx);
                     if (currentIdx < curriculum.length - 1) {
                       setCurrentIdx(currentIdx + 1);
@@ -908,17 +1028,27 @@ const Classroom: React.FC = () => {
           {/* SLEEK LESSON CONTROL TOOLBAR */}
           <div className="bg-[#111827]/90 backdrop-blur-md p-5 rounded-2xl border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
             <div className="min-w-0">
-              <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-                <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
-                  Bài {currentIdx + 1} / {curriculum.length}
-                </span>
-                <span className="text-[11px] font-bold text-slate-400">
-                  {isCurrentCompleted ? '• Đã xem xong' : '• Đang tiếp tục'}
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Âm thanh phát khi chuyển web
-                </span>
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap text-xs font-bold">
+                {currentLesson?.isPreview && !isOwned ? (
+                  <>
+                    <span className="text-[10px] font-black text-teal-300 uppercase tracking-widest bg-teal-500/15 px-2.5 py-0.5 rounded-full border border-teal-500/30">
+                      Preview · Miễn phí
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-300">
+                      · {currentLesson.duration || 'Video < 5 phút'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
+                      Bài {currentIdx + 1} / {curriculum.length}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {currentLesson?.isPreview ? '· Preview · ' : ''}
+                      {isCurrentCompleted ? '· Đã xem xong' : '· Đang tiếp tục'}
+                    </span>
+                  </>
+                )}
               </div>
               <h2 className="text-lg md:text-xl font-extrabold text-white line-clamp-1 tracking-tight">
                 {currentLesson?.title || 'Bài giảng'}
@@ -927,11 +1057,11 @@ const Classroom: React.FC = () => {
 
             {/* ACTION CONTROLS */}
             <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto justify-end shrink-0">
-              {!videoEmbed.isEmbed && (
+              {!videoEmbed.isEmbed && activeVideoUrl && (
                 <button
                   type="button"
                   onClick={togglePiP}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border whitespace-nowrap ${
                     isPiPActive 
                       ? 'bg-teal-500 text-slate-950 border-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.4)]' 
                       : 'bg-white/[0.06] text-slate-300 border-white/[0.08] hover:text-white hover:bg-white/[0.1]'
@@ -945,47 +1075,59 @@ const Classroom: React.FC = () => {
                 </button>
               )}
 
-              <button
-                disabled={currentIdx === 0}
-                onClick={() => {
-                  if (currentIdx > 0) setCurrentIdx(currentIdx - 1);
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
-                title="Bài trước (Phím tắt: ← hoặc P)"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
-                <span>Bài trước</span>
-                <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">←</kbd>
-              </button>
+              {!isOwned ? (
+                <Link
+                  to={`/khoa-hoc/${courseId}`}
+                  className="px-4 py-2.5 rounded-xl text-xs font-black bg-teal-500 hover:bg-teal-400 text-slate-950 flex items-center gap-2 transition-all shadow-lg whitespace-nowrap"
+                >
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  <span>Đăng ký mở khóa toàn bộ</span>
+                </Link>
+              ) : (
+                <>
+                  <button
+                    disabled={currentIdx === 0}
+                    onClick={() => {
+                      if (currentIdx > 0) setCurrentIdx(currentIdx - 1);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95 whitespace-nowrap"
+                    title="Bài trước (Phím tắt: ← hoặc P)"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
+                    <span>Bài trước</span>
+                    <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">←</kbd>
+                  </button>
 
-              <button
-                onClick={() => handleUpdateProgress(currentIdx)}
-                className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
-                  isCurrentCompleted 
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-emerald-950/40' 
-                    : 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 shadow-teal-900/40'
-                }`}
-                title="Đánh dấu hoàn thành bài học (Phím tắt: M)"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                <span>{isCurrentCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}</span>
-                <kbd className={`hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono rounded border ${
-                  isCurrentCompleted ? 'bg-black/30 text-emerald-300 border-emerald-500/30' : 'bg-slate-950/30 text-slate-900 border-slate-950/20'
-                }`}>M</kbd>
-              </button>
+                  <button
+                    onClick={() => handleUpdateProgress(currentIdx)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all shadow-lg active:scale-95 whitespace-nowrap ${
+                      isCurrentCompleted 
+                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-emerald-950/40' 
+                        : 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 shadow-teal-900/40'
+                    }`}
+                    title="Đánh dấu hoàn thành bài học (Phím tắt: M)"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                    <span>{isCurrentCompleted ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}</span>
+                    <kbd className={`hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono rounded border ${
+                      isCurrentCompleted ? 'bg-black/30 text-emerald-300 border-emerald-500/30' : 'bg-slate-950/30 text-slate-900 border-slate-950/20'
+                    }`}>M</kbd>
+                  </button>
 
-              <button
-                disabled={currentIdx >= curriculum.length - 1}
-                onClick={() => {
-                  if (currentIdx < curriculum.length - 1) setCurrentIdx(currentIdx + 1);
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95"
-                title="Bài tiếp theo (Phím tắt: → hoặc N)"
-              >
-                <span>Bài tiếp</span>
-                <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">→</kbd>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
-              </button>
+                  <button
+                    disabled={currentIdx >= curriculum.length - 1}
+                    onClick={() => {
+                      if (currentIdx < curriculum.length - 1) setCurrentIdx(currentIdx + 1);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed border border-white/[0.08] active:scale-95 whitespace-nowrap"
+                    title="Bài tiếp theo (Phím tắt: → hoặc N)"
+                  >
+                    <span>Bài tiếp</span>
+                    <kbd className="hidden md:inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-mono bg-black/40 text-slate-400 rounded border border-white/10">→</kbd>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={() => setShowShortcutsModal(true)}
@@ -1011,7 +1153,7 @@ const Classroom: React.FC = () => {
 
           {/* MODERN LESSON TABS: OVERVIEW, NOTES, DISCUSSION */}
           <div className="bg-[#111827]/90 backdrop-blur-md rounded-3xl border border-white/[0.08] p-6 shadow-xl space-y-6">
-            <div className="flex border-b border-white/[0.08] gap-8">
+            <div className="flex border-b border-white/[0.08] gap-8 overflow-x-auto">
               {[
                 { id: 'overview', label: 'Tổng quan bài học', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
                 { id: 'notes', label: `Ghi chú cá nhân (${savedNotes.length})`, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
@@ -1020,7 +1162,7 @@ const Classroom: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`pb-3.5 text-xs sm:text-sm font-extrabold flex items-center gap-2 border-b-2 transition-all ${
+                  className={`pb-3.5 text-xs sm:text-sm font-extrabold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
                     activeTab === tab.id 
                       ? 'border-teal-400 text-teal-300 shadow-[0_2px_12px_rgba(45,212,191,0.2)]' 
                       : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -1035,13 +1177,13 @@ const Classroom: React.FC = () => {
             {/* TAB CONTENT: OVERVIEW */}
             {activeTab === 'overview' && (
               <div className="space-y-4 text-slate-300 text-sm leading-relaxed">
-                {currentLesson?.content ? (
+                {canViewCurrentLesson && currentLesson?.content ? (
                   <div className="p-5 bg-white/[0.03] rounded-2xl border border-white/[0.06] space-y-3">
                     <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2.5">
                       <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
-                      <span className="text-xs font-black uppercase tracking-wider text-teal-400">Nội dung bài giảng & Tài liệu bổ trợ</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-teal-400">Nội dung bài giảng &amp; Tài liệu bổ trợ</span>
                     </div>
                     <p className="text-slate-200 text-xs sm:text-sm whitespace-pre-line leading-relaxed">
                       {currentLesson.content}
@@ -1066,7 +1208,7 @@ const Classroom: React.FC = () => {
                     <span className="text-[10px] font-black uppercase tracking-wider text-teal-400">Tài liệu tham khảo chuyên ngành</span>
                     <p className="text-xs text-slate-300">Đọc cẩm nang tiêu chuẩn hoặc xem bài viết bổ trợ đi kèm khóa học.</p>
                   </div>
-                  <Link to="/cam-nang" className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-teal-300 text-xs font-bold border border-white/[0.08] transition-all shrink-0">
+                  <Link to="/cam-nang" className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-teal-300 text-xs font-bold border border-white/[0.08] transition-all shrink-0 whitespace-nowrap">
                     Xem cẩm nang
                   </Link>
                 </div>
@@ -1076,22 +1218,38 @@ const Classroom: React.FC = () => {
             {/* TAB CONTENT: NOTES */}
             {activeTab === 'notes' && (
               <div className="space-y-5">
-                <div className="flex gap-2.5">
-                  <input
-                    type="text"
-                    value={userNote}
-                    onChange={(e) => setUserNote(e.target.value)}
-                    placeholder="Viết ghi chú quan trọng cho bài học này (Nhấn Enter để lưu)..."
-                    className="flex-1 bg-[#090d16] border border-white/[0.1] rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 transition-all"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSaveNote()}
-                  />
-                  <button
-                    onClick={handleSaveNote}
-                    className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-lg active:scale-95 shrink-0"
-                  >
-                    Lưu ghi chú
-                  </button>
-                </div>
+                {!isOwned ? (
+                  <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-center space-y-3">
+                    <Lock className="w-8 h-8 text-slate-500 mx-auto" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white">Tính năng ghi chú dành cho học viên đã đăng ký</p>
+                      <p className="text-xs text-slate-400">Đăng ký khóa học để lưu ghi chú cá nhân và đồng bộ lên tài khoản của bạn.</p>
+                    </div>
+                    <Link
+                      to={`/khoa-hoc/${courseId}`}
+                      className="inline-flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all"
+                    >
+                      Đăng ký khóa học
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex gap-2.5">
+                    <input
+                      type="text"
+                      value={userNote}
+                      onChange={(e) => setUserNote(e.target.value)}
+                      placeholder="Viết ghi chú quan trọng cho bài học này (Nhấn Enter để lưu)..."
+                      className="flex-1 bg-[#090d16] border border-white/[0.1] rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveNote()}
+                    />
+                    <button
+                      onClick={handleSaveNote}
+                      className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-lg active:scale-95 shrink-0"
+                    >
+                      Lưu ghi chú
+                    </button>
+                  </div>
+                )}
 
                 {savedNotes.length > 0 ? (
                   <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
@@ -1161,11 +1319,11 @@ const Classroom: React.FC = () => {
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <span>📺 Danh sách bài</span>
+              <span>Danh sách bài</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                 sidebarView === 'playlist' ? 'bg-black/30 text-slate-900 font-black' : 'bg-white/10 text-slate-300'
               }`}>
-                {completedLessons.length}/{curriculum.length}
+                {isOwned ? `${completedLessons.length}/${curriculum.length}` : `${curriculum.length} bài`}
               </span>
             </button>
 
@@ -1194,8 +1352,8 @@ const Classroom: React.FC = () => {
                 courseTitle={course?.title || 'Khóa học'}
                 currentLessonIdx={currentIdx}
                 currentLessonTitle={currentLesson?.title || `Bài ${currentIdx + 1}`}
-                userEmail={currentUser?.email}
-                onSelectLesson={(idx) => setCurrentIdx(idx)}
+                userEmail={isOwned ? currentUser?.email : undefined}
+                onSelectLesson={(idx) => handleSelectLesson(idx)}
                 onClose={() => setSidebarView('playlist')}
               />
             </div>
@@ -1206,19 +1364,22 @@ const Classroom: React.FC = () => {
               <div className="pb-4 border-b border-white/[0.08] mb-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-extrabold text-white text-base flex items-center gap-2 tracking-tight">
-                      <span className="w-1.5 h-4 bg-teal-400 rounded-full"></span>
+                    <h3 className="font-extrabold text-white text-base tracking-tight">
                       Danh sách bài giảng
                     </h3>
-                    <span className="text-[11px] font-bold text-slate-400">{curriculum.length} bài học video</span>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {firstPreviewIdx !== -1 ? 'Có bài Preview miễn phí · ' : ''}{curriculum.length} bài học chuyên sâu
+                    </span>
                   </div>
-                  <button
-                    onClick={() => setSidebarView('notes')}
-                    className="text-[11px] font-bold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1 rounded-lg border border-teal-500/20 flex items-center gap-1 transition-all"
-                    title="Mở ghi chú bài học"
-                  >
-                    <span>📝 Ghi chú ({savedNotes.length})</span>
-                  </button>
+                  {isOwned && (
+                    <button
+                      onClick={() => setSidebarView('notes')}
+                      className="text-[11px] font-bold text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1 rounded-lg border border-teal-500/20 flex items-center gap-1 transition-all"
+                      title="Mở ghi chú bài học"
+                    >
+                      <span>Ghi chú ({savedNotes.length})</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* SEARCH LESSONS */}
@@ -1238,32 +1399,38 @@ const Classroom: React.FC = () => {
               <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 max-h-[560px] custom-scrollbar">
                 {filteredCurriculum.map((lesson, originalIdx) => {
                   // Find actual index in real curriculum array
-                  const idx = curriculum.findIndex(c => c.title === lesson.title);
+                  const idx = curriculum.findIndex(c => c === lesson || c.title === lesson.title);
                   const actualIdx = idx !== -1 ? idx : originalIdx;
-                  const isCompleted = completedLessons.includes(`${actualIdx}`) || completedLessons.includes(`0-${actualIdx}`);
-                  const isPlaying = currentIdx === actualIdx;
-                  const lessonNoteCount = savedNotes.filter(n => n.lessonIdx === actualIdx).length;
+                  const isLessonPreview = lesson.isPreview === true;
+                  const isLockedForViewer = !isOwned && !isLessonPreview;
+                  const isCompleted = isOwned && (completedLessons.includes(`${actualIdx}`) || completedLessons.includes(`0-${actualIdx}`));
+                  const isPlaying = canViewCurrentLesson && currentIdx === actualIdx;
+                  const lessonNoteCount = isOwned ? savedNotes.filter(n => n.lessonIdx === actualIdx).length : 0;
 
                   return (
                     <div
                       key={actualIdx}
-                      onClick={() => setCurrentIdx(actualIdx)}
+                      onClick={() => handleSelectLesson(actualIdx)}
                       className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 flex items-center justify-between gap-3 group relative overflow-hidden ${
-                        isPlaying 
+                        isLockedForViewer
+                          ? 'bg-white/[0.015] hover:bg-white/[0.04] border-white/[0.05] opacity-80'
+                          : isPlaying 
                           ? 'bg-gradient-to-r from-teal-950/60 to-slate-900/90 border-teal-500/40 shadow-lg shadow-teal-950/30' 
+                          : isLessonPreview
+                          ? 'bg-teal-500/[0.06] hover:bg-teal-500/[0.12] border-teal-500/25'
                           : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/[0.06]'
                       }`}
                     >
-                      {isPlaying && (
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 to-emerald-400"></div>
-                      )}
-
                       <div className="flex items-center gap-3 min-w-0">
                         <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 transition-all ${
-                          isPlaying 
+                          isLockedForViewer
+                            ? 'bg-white/[0.04] text-slate-500 border border-white/[0.06]'
+                            : isPlaying 
                             ? 'bg-teal-400 text-slate-950 shadow-md shadow-teal-400/20 font-black' 
                             : isCompleted
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : isLessonPreview
+                            ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                             : 'bg-white/[0.05] text-slate-400 border border-white/[0.08] group-hover:text-slate-200'
                         }`}>
                           {actualIdx + 1}
@@ -1271,25 +1438,36 @@ const Classroom: React.FC = () => {
 
                         <div className="min-w-0">
                           <p className={`text-xs md:text-sm font-bold line-clamp-1 transition-colors ${
-                            isPlaying ? 'text-teal-300 font-extrabold' : 'text-slate-200 group-hover:text-white'
+                            isLockedForViewer
+                              ? 'text-slate-400 group-hover:text-slate-200'
+                              : isPlaying
+                              ? 'text-teal-300 font-extrabold'
+                              : 'text-slate-200 group-hover:text-white'
                           }`}>
                             {lesson.title}
                           </p>
                           <div className="text-[10px] font-medium text-slate-400 mt-0.5 flex items-center gap-2">
-                            {isPlaying ? (
-                              <span className="text-teal-400 font-bold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping"></span>
-                                Đang phát
+                            {isLockedForViewer ? (
+                              <span className="text-slate-500 font-semibold">Đã khóa · Cần đăng ký khóa học</span>
+                            ) : isLessonPreview && !isOwned ? (
+                              <span className="text-emerald-300 font-bold">
+                                Preview · Miễn phí ({lesson.duration || '< 5 phút'})
+                              </span>
+                            ) : isPlaying ? (
+                              <span className="text-teal-400 font-bold">
+                                {isLessonPreview ? 'Preview · ' : ''}Đang phát
                               </span>
                             ) : isCompleted ? (
-                              <span className="text-emerald-400 font-bold">✓ Đã học xong</span>
+                              <span className="text-emerald-400 font-bold">Đã học xong</span>
+                            ) : isLessonPreview ? (
+                              <span className="text-teal-300 font-semibold">Preview · {lesson.duration || '< 5 phút'}</span>
                             ) : (
                               'Chưa học'
                             )}
 
                             {lessonNoteCount > 0 && (
-                              <span className="text-teal-300 font-bold flex items-center gap-0.5 bg-teal-500/10 px-1.5 py-0.2 rounded border border-teal-500/20">
-                                📝 {lessonNoteCount}
+                              <span className="text-teal-300 font-bold">
+                                · {lessonNoteCount} ghi chú
                               </span>
                             )}
                           </div>
@@ -1297,16 +1475,16 @@ const Classroom: React.FC = () => {
                       </div>
 
                       <div className="shrink-0">
-                        {isCompleted ? (
+                        {isLockedForViewer ? (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.04] text-slate-500 flex items-center justify-center border border-white/[0.06]">
+                            <Lock className="w-3.5 h-3.5" />
+                          </div>
+                        ) : isCompleted ? (
                           <div className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                           </div>
                         ) : isPlaying ? (
-                          <div className="flex items-end gap-0.5 h-4 px-1">
-                            <span className="w-1 h-3.5 bg-teal-400 rounded-full animate-pulse"></span>
-                            <span className="w-1 h-2 bg-teal-300 rounded-full animate-pulse delay-75"></span>
-                            <span className="w-1 h-4 bg-teal-400 rounded-full animate-pulse delay-150"></span>
-                          </div>
+                          <PlayCircle className="w-5 h-5 text-teal-400" />
                         ) : (
                           <div className="w-6 h-6 rounded-full bg-white/[0.04] group-hover:bg-white/[0.1] text-slate-500 group-hover:text-slate-300 flex items-center justify-center transition-all">
                             <svg className="w-3 h-3 translate-x-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>

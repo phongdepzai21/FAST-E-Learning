@@ -65,6 +65,7 @@ const AccountSettings = lazyWithRetry(() => import('./pages/AccountSettings'));
 const VipUpgrade = lazyWithRetry(() => import('./pages/VipUpgrade'));
 const TermsOfService = lazyWithRetry(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazyWithRetry(() => import('./pages/PrivacyPolicy'));
+const DataDeletion = lazyWithRetry(() => import('./pages/DataDeletion'));
 const Classroom = lazyWithRetry(() => import('./pages/Classroom'));
 const LiveCourseRegistration = lazyWithRetry(() => import('./components/LiveCourseRegistration'));
 const NotFound = lazyWithRetry(() => import('./pages/NotFound'));
@@ -352,9 +353,13 @@ const AppLayout: React.FC = () => {
             <Route path="/dang-ky-truc-tiep" element={<LiveCourseRegistration isStandalonePage={true} />} />
             <Route path="/live-training" element={<LiveCourseRegistration isStandalonePage={true} />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
+            <Route path="/terms" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />
             <Route path="/chinh-sach-quyen-rieng-tu" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="/huong-dan-xoa-du-lieu" element={<DataDeletion />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

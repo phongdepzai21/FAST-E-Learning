@@ -5,24 +5,16 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  Printer,
   Link2,
   Check,
-  Download,
-  ExternalLink,
-  Send,
   ShieldCheck,
-  SlidersHorizontal,
   Database,
   Cookie,
-  FileText,
-  ArrowRight
+  FileText
 } from 'lucide-react';
-import { auth } from '../firebase';
-import { getFastSessionUser } from '../utils/sessionAuth';
 import { useToast } from '../contexts/ToastContext';
 
-type HubTab = 'policy' | 'data-matrix' | 'cookies' | 'controls';
+type HubTab = 'policy' | 'data-matrix' | 'cookies';
 
 interface PolicyExample {
   title: string;
@@ -93,41 +85,41 @@ const POLICY_SECTIONS: PolicySection[] = [
     number: '02',
     title: 'Thông tin chúng tôi thu thập',
     summary:
-      'Phân loại chi tiết dữ liệu bạn cung cấp trực tiếp, dữ liệu phát sinh trong quá trình học tập và dữ liệu kỹ thuật tự động.',
-    keywords: 'thu thập dữ liệu họ tên email số điện thoại otp tiến độ video ip thanh toán vietqr',
+      'Phân loại chi tiết dữ liệu bạn cung cấp trực tiếp (tên, email), thông tin xác thực Facebook / Google, dữ liệu học tập và dữ liệu giao dịch.',
+    keywords: 'thu thập dữ liệu họ tên email số điện thoại facebook login public_profile xác thực otp tiến độ video ip thanh toán giao dịch vietqr',
     paragraphs: [
-      'Chúng tôi chỉ thu thập dữ liệu cần thiết, tương xứng với mục đích cung ứng dịch vụ đào tạo, xác thực danh tính, đối soát học phí và phát hành chứng nhận hoàn thành khóa học. Tùy thuộc vào cách bạn tương tác với nền tảng, các nhóm dữ liệu có thể bao gồm:'
+      'FAST E-Learning chỉ thu thập các thông tin thực sự cần thiết, tương xứng với mục đích xác thực tài khoản, cung ứng khóa học, quản lý tiến độ học tập, đối soát giao dịch và phát hành chứng nhận hoàn thành. Các nhóm dữ liệu cụ thể bao gồm:'
     ],
     bullets: [
       {
-        label: 'Thông tin định danh & liên hệ do bạn cung cấp',
-        text: 'Họ và tên đầy đủ (phục vụ in trên chứng nhận), địa chỉ email xác thực, số điện thoại / Zalo (nhận mã OTP, thông báo lớp học và hỗ trợ đối soát), tên doanh nghiệp/đơn vị công tác (khi đăng ký khóa doanh nghiệp hoặc yêu cầu xuất biên lai).'
+        label: '1. Họ tên, Email & Thông tin liên hệ',
+        text: 'Họ và tên đầy đủ (họ tên hiển thị trên tài khoản và in trên Giấy chứng nhận hoàn thành), địa chỉ email xác thực, số điện thoại / Zalo (nhận mã OTP, thông báo lịch lớp học và hỗ trợ kỹ thuật), cùng tên doanh nghiệp/đơn vị công tác (nếu đăng ký cho tổ chức).'
       },
       {
-        label: 'Thông tin xác thực tài khoản (Google OAuth / OTP)',
-        text: 'Khi đăng nhập bằng Google, chúng tôi chỉ tiếp nhận tên hiển thị, email và ảnh đại diện công khai từ Google Sign-In; chúng tôi không bao giờ truy cập mật khẩu Gmail, danh bạ hay tệp Drive cá nhân của bạn.'
+        label: '2. Thông tin xác thực Facebook (Facebook Login) & Google / Email',
+        text: 'Khi bạn chọn "Tiếp tục với Facebook" hoặc liên kết Facebook vào tài khoản hiện có, FAST E-Learning chỉ yêu cầu hai quyền cơ bản từ Meta/Facebook là public_profile (tên hiển thị, ảnh đại diện công khai và mã định danh người dùng Facebook trên ứng dụng) và email (địa chỉ email do Facebook cung cấp nếu bạn cho phép). Dữ liệu xác thực này được liên kết cùng một Firebase UID duy nhất với tài khoản Google Sign-In hoặc Email/Mật khẩu của bạn. Chúng tôi tuyệt đối không yêu cầu quyền đăng bài, danh sách bạn bè hay tin nhắn cá nhân trên Facebook.'
       },
       {
-        label: 'Dữ liệu hoạt động học tập & đánh giá năng lực',
-        text: 'Tiến độ hoàn thành từng bài giảng, mốc thời gian dừng video (timestamp), ghi chú cá nhân của học viên trong lớp học, kết quả bài kiểm tra trắc nghiệm, điểm số và mã chứng nhận hoàn thành 10 chữ số.'
+        label: '3. Dữ liệu học tập & Đánh giá năng lực',
+        text: 'Danh sách khóa học đã ghi danh hoặc mở khóa, lịch sử đăng ký khóa đào tạo trực tuyến/trực tiếp, tiến độ hoàn thành từng bài giảng, mốc thời gian dừng video (timestamp), ghi chú cá nhân trong lớp học, bài làm và điểm kiểm tra trắc nghiệm cuối khóa cùng mã Giấy chứng nhận hoàn thành 10 chữ số.'
       },
       {
-        label: 'Thông tin đăng ký lớp đào tạo & giao dịch VietQR',
-        text: 'Mã đơn đăng ký 10 số, tên khóa học, hình thức tham dự (Zoom/Trực tiếp), số lượng học viên, nội dung chuyển khoản định danh và trạng thái đối soát ngân hàng ACB/VietQR. Chúng tôi không thu thập và không lưu trữ số thẻ thanh toán, mã CVV hay mật khẩu e-Banking.'
+        label: '4. Dữ liệu giao dịch & Thanh toán (VietQR / ACB)',
+        text: 'Mã đơn đăng ký/đơn hàng 10 chữ số, tên khóa học hoặc gói dịch vụ đã chọn, số lượng học viên, số tiền thanh toán (VNĐ), nội dung chuyển khoản định danh qua VietQR / ngân hàng ACB, thời điểm và trạng thái đối soát giao dịch (chờ xác nhận, đã kích hoạt, hoàn tiền). Chúng tôi không thu thập và không lưu trữ số thẻ ngân hàng, mã CVV hay mật khẩu e-Banking.'
       },
       {
-        label: 'Dữ liệu kỹ thuật & bảo mật phiên',
-        text: 'Địa chỉ IP kết nối, loại trình duyệt/hệ điều hành, dấu thời gian đăng nhập và tín hiệu kiểm tra bot của Google reCAPTCHA v3 nhằm ngăn chặn spam và phát hiện đăng nhập chia sẻ tài khoản bất thường.'
+        label: '5. Dữ liệu kỹ thuật & An toàn phiên truy cập',
+        text: 'Địa chỉ IP kết nối, loại trình duyệt/thiết bị, dấu thời gian đăng nhập và tín hiệu chống bot của Google reCAPTCHA v3 nhằm bảo vệ tài khoản khỏi hành vi truy cập trái phép hoặc chia sẻ phiên bất thường.'
       }
     ],
     examples: [
       {
-        title: 'Ví dụ minh họa: Khi bạn đăng ký Khóa đào tạo qua Zoom',
-        body: 'Hệ thống ghi nhận họ tên, email, số điện thoại và hình thức học bạn đã chọn để tạo mã hồ sơ 10 số, gửi đường link phòng học Zoom về mục Thông báo tài khoản của bạn và hiển thị biên nhận điện tử. Khi lớp học kết thúc, thông tin điểm danh và đánh giá giúp bộ phận đào tạo xác nhận điều kiện cấp chứng nhận.'
+        title: 'Ví dụ minh họa: Khi bạn đăng nhập hoặc liên kết bằng Facebook Login',
+        body: 'Hệ thống nhận tên hiển thị, ảnh đại diện công khai (public_profile) và email từ Facebook thông qua cổng xác thực bảo mật Firebase Authentication (https://fast-e-learning.firebaseapp.com/__/auth/handler). Nếu email trùng với tài khoản Google hoặc Email/Mật khẩu bạn đã dùng trước đó, bạn có thể liên kết chúng về chung một Firebase UID để giữ nguyên toàn bộ khóa học và tiến độ đã có.'
       },
       {
-        title: 'Ví dụ minh họa: Khi bạn sử dụng Công cụ Checklist ISO / HACCP / ATTP',
-        body: 'Các hạng mục bạn đánh dấu đạt/chưa đạt và ghi chú kiểm toán chỉ được lưu gắn với phiên làm việc hoặc tài khoản của bạn để phục vụ việc xuất báo cáo nội bộ cho chính bạn, không dùng để quảng cáo cho bên thứ ba.'
+        title: 'Ví dụ minh họa: Khi bạn đăng ký Khóa đào tạo hoặc mua khóa học VietQR',
+        body: 'Hệ thống ghi nhận họ tên, email, số điện thoại, tên khóa học và mã đơn 10 số để đối soát giao dịch chuyển khoản ngân hàng ACB, gửi đường link phòng học Zoom về mục Thông báo tài khoản và mở khóa bài giảng ngay lập tức.'
       }
     ]
   },
@@ -203,7 +195,11 @@ const POLICY_SECTIONS: PolicySection[] = [
     bullets: [
       {
         label: 'Google LLC / Firebase (Authentication & Cloud Firestore)',
-        text: 'Cung cấp hạ tầng xác thực tài khoản an toàn, lưu trữ đám mây được mã hóa và dịch vụ Google reCAPTCHA v3 chống gửi biểu mẫu rác.'
+        text: 'Cung cấp hạ tầng xác thực tài khoản an toàn (Google, Email/Mật khẩu, Facebook Login), lưu trữ đám mây được mã hóa và dịch vụ Google reCAPTCHA v3 chống gửi biểu mẫu rác.'
+      },
+      {
+        label: 'Meta Platforms, Inc. (Facebook Login OAuth)',
+        text: 'Chỉ xử lý quy trình xác thực đăng nhập/liên kết tài khoản khi bạn chủ động bấm nút "Tiếp tục với Facebook" với quyền tối thiểu public_profile và email.'
       },
       {
         label: 'Ngân hàng TMCP Á Châu (ACB) & Cổng VietQR',
@@ -215,7 +211,7 @@ const POLICY_SECTIONS: PolicySection[] = [
       },
       {
         label: 'Dịch vụ gửi Email giao dịch (Resend / SMTP)',
-        text: 'Chỉ xử lý địa chỉ email và nội dung phản hồi khi bạn gửi yêu cầu hỗ trợ, nhận mã OTP hoặc nhận xác nhận đăng ký.'
+        text: 'Chỉ xử lý địa chỉ email và nội dung phản hồi khi bạn gửi yêu cầu hỗ trợ, yêu cầu xóa dữ liệu, nhận mã OTP hoặc nhận xác nhận đăng ký.'
       },
       {
         label: 'Yêu cầu pháp lý bắt buộc',
@@ -318,14 +314,14 @@ const POLICY_SECTIONS: PolicySection[] = [
       },
       {
         label: '4. Quyền yêu cầu xóa dữ liệu (Quyền được lãng quên)',
-        text: 'Yêu cầu xóa tài khoản và dữ liệu cá nhân liên quan khi không còn nhu cầu sử dụng dịch vụ, ngoại trừ các chứng từ tài chính bắt buộc phải lưu theo Luật Kế toán.'
+        text: 'Bạn có thể tự xóa tài khoản trực tiếp tại mục Cài đặt tài khoản -> Bảo mật, thu hồi quyền ứng dụng trên Facebook, hoặc gửi yêu cầu xóa tài khoản & toàn bộ dữ liệu liên quan theo hướng dẫn chi tiết tại trang Hướng dẫn xóa dữ liệu (/data-deletion), ngoại trừ chứng từ tài chính bắt buộc phải lưu theo Luật Kế toán.'
       },
       {
         label: '5. Quyền hạn chế xử lý, phản đối & yêu cầu bồi thường / khiếu nại',
         text: 'Yêu cầu tạm ngừng xử lý dữ liệu đang tranh chấp hoặc gửi khiếu nại tới Bộ phận Bảo vệ Dữ liệu của chúng tôi hoặc cơ quan chuyên trách bảo vệ dữ liệu cá nhân theo luật định.'
       }
     ],
-    note: 'Thời hạn phản hồi yêu cầu: Bộ phận Bảo vệ Dữ liệu (DPO) xác nhận tiếp nhận trong vòng 24 giờ làm việc và hoàn tất xử lý yêu cầu hợp lệ trong vòng 72 giờ (tối đa 15 ngày đối với yêu cầu phức tạp cần đối soát kỹ thuật).'
+    note: 'Thời hạn phản hồi yêu cầu: Bộ phận Bảo vệ Dữ liệu (DPO) xác nhận tiếp nhận trong vòng 24 giờ làm việc và hoàn tất xử lý yêu cầu xóa/chỉnh sửa dữ liệu hợp lệ trong vòng 72 giờ (tối đa 15–30 ngày đối với trường hợp cần đối soát kỹ thuật).'
   },
   {
     id: 'quyen-rieng-tu-tre-em',
@@ -409,37 +405,37 @@ const POLICY_SECTIONS: PolicySection[] = [
 
 const DATA_MATRIX_ROWS = [
   {
-    category: 'Định danh & Liên hệ',
-    fields: 'Họ tên, Email, Số điện thoại / Zalo, Đơn vị công tác',
+    category: 'Họ tên, Email & Liên hệ',
+    fields: 'Họ và tên, địa chỉ Email, Số điện thoại / Zalo, Đơn vị công tác',
     purpose: 'Tạo tài khoản, xác thực OTP, cấp chứng nhận đúng tên và gửi thông báo link lớp học',
     legalBasis: 'Thực hiện hợp đồng & Sự đồng ý',
     retention: 'Suốt thời gian tài khoản hoạt động (+ tối đa 30 ngày sau yêu cầu xóa)'
   },
   {
-    category: 'Tài khoản & Phiên xác thực',
-    fields: 'UID Firebase, Ảnh đại diện Google, Thời điểm đăng nhập, Địa chỉ IP',
-    purpose: 'Đăng nhập 1 chạm an toàn, ngăn chặn chia sẻ tài khoản song song bất thường',
+    category: 'Thông tin xác thực Facebook, Google & Phiên',
+    fields: 'Firebase UID, Facebook App-scoped ID, tên & ảnh đại diện Facebook (public_profile), email Facebook (nếu cấp), ảnh đại diện Google, thời điểm đăng nhập, IP',
+    purpose: 'Đăng nhập 1 chạm / liên kết đa phương thức chung 1 tài khoản, ngăn chia sẻ tài khoản bất thường',
     legalBasis: 'Thực hiện hợp đồng & Lợi ích bảo mật hợp pháp',
-    retention: 'Trong phiên làm việc; nhật ký phiên lưu tối đa 90 ngày'
+    retention: 'Trong thời gian liên kết; xóa ngay khi gỡ kết nối hoặc xóa tài khoản'
   },
   {
-    category: 'Hoạt động học tập & Chứng nhận',
-    fields: 'Tiến độ video, Ghi chú học viên, Bài thi trắc nghiệm, Mã chứng nhận 10 số',
+    category: 'Dữ liệu học tập & Chứng nhận',
+    fields: 'Khóa học đã ghi danh, tiến độ video, ghi chú học viên, bài thi trắc nghiệm, mã chứng nhận 10 số',
     purpose: 'Đồng bộ tiến độ đa thiết bị, chấm điểm tự động và tra cứu xác thực chứng nhận',
     legalBasis: 'Thực hiện hợp đồng đào tạo',
     retention: 'Tiến độ lưu theo tài khoản; Mã chứng nhận lưu để tra cứu xác thực'
   },
   {
-    category: 'Thanh toán & Đối soát VietQR',
-    fields: 'Mã đơn 10 số, Số tiền, Nội dung chuyển khoản định danh, Thời gian đối soát',
+    category: 'Dữ liệu giao dịch & Đối soát VietQR',
+    fields: 'Mã đơn 10 số, tên khóa học/gói, số lượng học viên, số tiền (VNĐ), nội dung chuyển khoản ACB/VietQR, trạng thái đối soát',
     purpose: 'Kích hoạt khóa học tự động trong 1–3 giây, xuất biên nhận & xử lý hoàn tiền',
     legalBasis: 'Nghĩa vụ pháp lý (Luật Kế toán & Thuế)',
     retention: '10 năm theo quy định chứng từ kế toán'
   },
   {
-    category: 'Tư vấn & Yêu cầu quyền riêng tư',
-    fields: 'Mã tiếp nhận 10 số, Chủ đề, Nội dung liên hệ/yêu cầu DPO',
-    purpose: 'Phản hồi tư vấn ISO/HACCP hoặc xử lý yêu cầu chỉnh sửa/xóa dữ liệu cá nhân',
+    category: 'Tư vấn & Yêu cầu xóa dữ liệu',
+    fields: 'Mã tiếp nhận 10 số, chủ đề, email/tài khoản, nội dung yêu cầu xóa dữ liệu (/data-deletion)',
+    purpose: 'Phản hồi tư vấn ISO/HACCP hoặc tiếp nhận & thực thi yêu cầu xóa tài khoản/dữ liệu cá nhân',
     legalBasis: 'Sự đồng ý & Tuân thủ Luật 91/2025/QH15',
     retention: '24 tháng kể từ ngày đóng hồ sơ xử lý'
   }
@@ -451,6 +447,12 @@ const SUBPROCESSOR_ROWS = [
     role: 'Xác thực OAuth 2.0 & Cơ sở dữ liệu đám mây mã hóa',
     dataShared: 'Email, tên hiển thị, UID, tiến độ học tập, đăng ký khóa học',
     location: 'Hạ tầng Google Cloud (Châu Á / Hoa Kỳ)'
+  },
+  {
+    provider: 'Meta Platforms, Inc. (Facebook Login)',
+    role: 'Xác thực đăng nhập / liên kết tài khoản Facebook',
+    dataShared: 'Quyền public_profile (tên, ảnh đại diện, ID ứng dụng) và email (nếu người dùng cấp)',
+    location: 'Toàn cầu (Meta Privacy Policy)'
   },
   {
     provider: 'Google reCAPTCHA v3',
@@ -478,7 +480,7 @@ const COOKIE_REGISTRY = [
     provider: 'FAST E-Learning & Firebase',
     category: 'Thiết yếu',
     duration: 'Theo phiên / 30 ngày',
-    purpose: 'Duy trì trạng thái đăng nhập hợp lệ của tài khoản Google hoặc OTP.'
+    purpose: 'Duy trì trạng thái đăng nhập hợp lệ của tài khoản Google, Facebook hoặc OTP.'
   },
   {
     key: '_GRECAPTCHA',
@@ -526,26 +528,7 @@ const PrivacyPolicy: React.FC = () => {
     return DEFAULT_PREFERENCES;
   });
 
-  // Data Subject Request form state
-  const [dsrType, setDsrType] = useState('Yêu cầu truy cập / Xuất bản sao dữ liệu cá nhân');
-  const [dsrName, setDsrName] = useState('');
-  const [dsrEmail, setDsrEmail] = useState('');
-  const [dsrPhone, setDsrPhone] = useState('');
-  const [dsrDetails, setDsrDetails] = useState('');
-  const [dsrSubmitting, setDsrSubmitting] = useState(false);
-  const [dsrTicketId, setDsrTicketId] = useState<string | null>(null);
-
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  // Prefill user session email/name for Privacy Controls form
-  useEffect(() => {
-    const fastUser = getFastSessionUser();
-    const firebaseUser = auth.currentUser;
-    const email = (firebaseUser?.email || fastUser?.email || '').trim();
-    const name = (firebaseUser?.displayName || fastUser?.displayName || '').trim();
-    if (email && !dsrEmail) setDsrEmail(email);
-    if (name && !dsrName) setDsrName(name);
-  }, []);
 
   // Scroll to hash if linked directly like /chinh-sach-bao-mat#quyen-cua-ban
   useEffect(() => {
@@ -608,7 +591,8 @@ const PrivacyPolicy: React.FC = () => {
   };
 
   const handleCopyAnchor = async (id: string) => {
-    const url = `${window.location.origin}/chinh-sach-bao-mat#${id}`;
+    const basePath = location.pathname || '/privacy-policy';
+    const url = `${window.location.origin}${basePath}#${id}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedAnchorId(id);
@@ -634,87 +618,15 @@ const PrivacyPolicy: React.FC = () => {
     toast.showToast('Đã lưu thiết lập quyền riêng tư & cookie trên thiết bị này.', 'success');
   };
 
-  const handleExportLocalData = () => {
-    const fastUser = getFastSessionUser();
-    const firebaseUser = auth.currentUser;
-    const exportPayload = {
-      exportedAt: new Date().toISOString(),
-      controller: 'CÔNG TY TNHH TƯ VẤN FAST (MST 0314568146)',
-      legalCompliance: 'Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15',
-      account: {
-        email: firebaseUser?.email || fastUser?.email || 'Chưa đăng nhập',
-        displayName: firebaseUser?.displayName || fastUser?.displayName || null,
-        uid: firebaseUser?.uid || null
-      },
-      privacyPreferences: preferences,
-      browserStorageKeys: Object.keys(localStorage).filter(
-        (k) =>
-          k.startsWith('fast_') ||
-          k.startsWith('course_') ||
-          k.startsWith('viewed_') ||
-          k.startsWith('user_')
-      )
-    };
-
-    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `fast-elearning-personal-data-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.showToast('Đã xuất bản sao dữ liệu quyền riêng tư định dạng JSON.', 'success');
-  };
-
-  const handleSubmitDsr = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dsrName.trim() || !dsrPhone.trim() || !dsrEmail.trim()) {
-      toast.showToast('Vui lòng nhập đầy đủ họ tên, email tài khoản và số điện thoại xác minh.', 'error');
-      return;
-    }
-
-    setDsrSubmitting(true);
-    const ticketId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-    try {
-      const response = await fetch('/api/send-contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticketId,
-          name: dsrName.trim(),
-          email: dsrEmail.trim(),
-          phone: dsrPhone.trim(),
-          company: 'Yêu cầu Quyền riêng tư (DPO)',
-          topic: `[DPO] ${dsrType}`,
-          preferredContact: 'email',
-          message:
-            dsrDetails.trim() ||
-            `Người dùng gửi yêu cầu thực thi quyền chủ thể dữ liệu: ${dsrType}`
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Gửi yêu cầu không thành công');
-      }
-
-      setDsrTicketId(ticketId);
-      setDsrDetails('');
-      toast.showToast(`Đã tiếp nhận yêu cầu quyền riêng tư #${ticketId}.`, 'success');
-    } catch {
-      toast.showToast('Không thể gửi yêu cầu lúc này. Vui lòng thử lại hoặc gửi email trực tiếp tới Bộ phận DPO.', 'error');
-    } finally {
-      setDsrSubmitting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 select-text transition-colors duration-200">
       <Helmet>
         <title>Chính sách & Quyền riêng tư | FAST E-Learning</title>
         <meta
           name="description"
-          content="Trung tâm Chính sách, Quyền riêng tư và Bảo vệ dữ liệu cá nhân của FAST E-Learning (Công ty TNHH Tư Vấn FAST) tuân thủ Luật 91/2025/QH15."
+          content="Chính sách quyền riêng tư của FAST E-Learning: minh bạch việc thu thập tên, email, thông tin xác thực Facebook Login, dữ liệu học tập và dữ liệu giao dịch."
         />
+        <link rel="canonical" href="https://fastelearning.com.vn/privacy-policy" />
       </Helmet>
 
       {/* Top Editorial Header Banner */}
@@ -729,7 +641,7 @@ const PrivacyPolicy: React.FC = () => {
                 <span aria-hidden="true">·</span>
                 <span className="tabular-nums">Có hiệu lực: 01/01/2026</span>
                 <span aria-hidden="true">·</span>
-                <span className="tabular-nums">Cập nhật: 13/11/2026</span>
+                <span className="tabular-nums">Cập nhật: 14/11/2026</span>
                 <span aria-hidden="true">·</span>
                 <span>Tuân thủ Luật 91/2025/QH15</span>
               </div>
@@ -742,27 +654,25 @@ const PrivacyPolicy: React.FC = () => {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-                Minh bạch về dữ liệu chúng tôi thu thập, lý do xử lý, cách bảo mật và các công cụ giúp bạn toàn quyền kiểm soát thông tin cá nhân trên nền tảng FAST E-Learning.
+                Minh bạch về tên, email, thông tin xác thực Facebook, dữ liệu học tập và dữ liệu giao dịch mà FAST E-Learning thu thập, cách bảo mật và quyền kiểm soát của bạn.
               </p>
             </div>
 
             {/* Utility Actions */}
             <div className="flex flex-wrap items-center gap-3 print:hidden">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#007c76] hover:text-[#007c76] dark:hover:text-teal-400 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <Printer className="w-4 h-4" />
-                <span>In / Lưu PDF</span>
-              </button>
-
               <Link
-                to="/dieu-khoan-su-dung"
+                to="/terms"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#007c76] hover:text-[#007c76] dark:hover:text-teal-400 transition-colors whitespace-nowrap shrink-0"
               >
                 <FileText className="w-4 h-4" />
                 <span>Điều khoản dịch vụ</span>
+              </Link>
+              <Link
+                to="/data-deletion"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#007c76] hover:text-[#007c76] dark:hover:text-teal-400 transition-colors whitespace-nowrap shrink-0"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Hướng dẫn xóa dữ liệu</span>
               </Link>
             </div>
           </div>
@@ -775,8 +685,7 @@ const PrivacyPolicy: React.FC = () => {
             {[
               { id: 'policy' as HubTab, label: 'Chính sách quyền riêng tư', icon: ShieldCheck },
               { id: 'data-matrix' as HubTab, label: 'Minh bạch dữ liệu & Lưu trữ', icon: Database },
-              { id: 'cookies' as HubTab, label: 'Công nghệ & Cookie', icon: Cookie },
-              { id: 'controls' as HubTab, label: 'Trung tâm kiểm soát quyền riêng tư', icon: SlidersHorizontal }
+              { id: 'cookies' as HubTab, label: 'Công nghệ & Cookie', icon: Cookie }
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -864,18 +773,6 @@ const PrivacyPolicy: React.FC = () => {
                     )}
                   </ul>
                 </div>
-
-                {/* Quick Jump to Privacy Controls */}
-                <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('controls')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-[#007c76] hover:bg-[#00645f] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <span>Thực hiện quyền dữ liệu của bạn</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
             </aside>
 
@@ -898,11 +795,16 @@ const PrivacyPolicy: React.FC = () => {
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-white mb-1">Tối thiểu & Minh bạch</p>
-                    <p>Chỉ thu thập thông tin cần thiết để học, đối soát VietQR, nhận link lớp và cấp chứng nhận.</p>
+                    <p>Chỉ thu thập tên, email, thông tin xác thực Facebook/Google (public_profile, email), dữ liệu học tập và dữ liệu giao dịch VietQR để phục vụ học tập và cấp chứng nhận.</p>
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900 dark:text-white mb-1">Toàn quyền kiểm soát</p>
-                    <p>Bạn có thể tải dữ liệu JSON, chỉnh sửa hồ sơ hoặc gửi yêu cầu xóa dữ liệu bất kỳ lúc nào.</p>
+                    <p className="font-semibold text-slate-900 dark:text-white mb-1">Toàn quyền kiểm soát & Xóa dữ liệu</p>
+                    <p>
+                      Bạn có thể chỉnh sửa hồ sơ hoặc gửi yêu cầu xóa tài khoản và dữ liệu bất kỳ lúc nào tại{' '}
+                      <Link to="/data-deletion" className="text-[#007c76] dark:text-teal-400 font-semibold underline underline-offset-2">
+                        Hướng dẫn xóa dữ liệu
+                      </Link>.
+                    </p>
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-white mb-1">Bảo mật chuẩn quốc tế</p>
@@ -1233,200 +1135,6 @@ const PrivacyPolicy: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: PRIVACY CONTROLS & DATA SUBJECT REQUEST CENTER */}
-        {activeTab === 'controls' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left column: Self-service tools */}
-            <div className="lg:col-span-5 space-y-6">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Công cụ tự kiểm soát dữ liệu
-                </h2>
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Tương tự Google Takeout và Meta Privacy Center, bạn có thể xuất bản sao dữ liệu phiên hiện tại hoặc truy cập trang quản lý hồ sơ tài khoản để cập nhật thông tin.
-                </p>
-
-                <div className="space-y-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleExportLocalData}
-                    className="w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-[#007c76] text-slate-900 dark:text-white text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 transition-colors cursor-pointer"
-                  >
-                    <span>Tải xuống bản sao dữ liệu phiên (JSON)</span>
-                    <Download className="w-4 h-4 text-[#007c76]" />
-                  </button>
-
-                  <Link
-                    to="/account/settings"
-                    className="w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-[#007c76] text-slate-900 dark:text-white text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 transition-colors"
-                  >
-                    <span>Mở Cài đặt hồ sơ & bảo mật tài khoản</span>
-                    <ExternalLink className="w-4 h-4 text-[#007c76]" />
-                  </Link>
-
-                  <Link
-                    to="/account"
-                    className="w-full py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-[#007c76] text-slate-900 dark:text-white text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 transition-colors"
-                  >
-                    <span>Xem lịch sử khóa học & thông báo tài khoản</span>
-                    <ExternalLink className="w-4 h-4 text-[#007c76]" />
-                  </Link>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Liên hệ trực tiếp Bộ phận Bảo vệ Dữ liệu (DPO)
-                </h3>
-                <p>
-                  Email chuyên trách:{' '}
-                  <a
-                    href="mailto:support@fastelearning.com.vn"
-                    className="text-[#007c76] dark:text-teal-400 font-semibold hover:underline"
-                  >
-                    support@fastelearning.com.vn
-                  </a>
-                </p>
-                <p>
-                  Hotline xác minh khẩn cấp:{' '}
-                  <a
-                    href="tel:0927002668"
-                    className="text-[#007c76] dark:text-teal-400 font-semibold hover:underline tabular-nums"
-                  >
-                    0927 002 668
-                  </a>
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Mọi yêu cầu xóa tài khoản hoặc xuất dữ liệu đầy đủ đều được xác minh qua email/SĐT chính chủ nhằm bảo vệ tài khoản khỏi yêu cầu giả mạo.
-                </p>
-              </div>
-            </div>
-
-            {/* Right column: Interactive Data Subject Request Form */}
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6">
-              <div className="space-y-1.5">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Gửi yêu cầu thực thi quyền chủ thể dữ liệu
-                </h2>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Điền biểu mẫu dưới đây để gửi yêu cầu chính thức theo Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15. Bộ phận DPO sẽ phản hồi qua email của bạn trong vòng 24–72 giờ làm việc.
-                </p>
-              </div>
-
-              {dsrTicketId && (
-                <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs sm:text-sm text-emerald-900 dark:text-emerald-200 space-y-1">
-                  <p className="font-bold">
-                    Đã ghi nhận yêu cầu quyền riêng tư — Mã hồ sơ #{dsrTicketId}
-                  </p>
-                  <p>
-                    Bộ phận Bảo vệ Dữ liệu (Công ty TNHH Tư Vấn FAST) sẽ kiểm tra xác minh và phản hồi tới email <strong>{dsrEmail}</strong>.
-                  </p>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitDsr} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="dsr-type" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Loại yêu cầu quyền dữ liệu
-                  </label>
-                  <select
-                    id="dsr-type"
-                    value={dsrType}
-                    onChange={(e) => setDsrType(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76]"
-                  >
-                    <option value="Yêu cầu truy cập / Xuất bản sao dữ liệu cá nhân">
-                      Yêu cầu truy cập / Xuất bản sao dữ liệu cá nhân
-                    </option>
-                    <option value="Yêu cầu chỉnh sửa thông tin hồ sơ / chứng nhận">
-                      Yêu cầu chỉnh sửa thông tin hồ sơ / chứng nhận
-                    </option>
-                    <option value="Rút lại sự đồng ý nhận thông báo tiếp thị / khảo sát">
-                      Rút lại sự đồng ý nhận thông báo tiếp thị / khảo sát
-                    </option>
-                    <option value="Yêu cầu hạn chế hoặc phản đối xử lý dữ liệu">
-                      Yêu cầu hạn chế hoặc phản đối xử lý dữ liệu
-                    </option>
-                    <option value="Yêu cầu xóa vĩnh viễn tài khoản & dữ liệu cá nhân">
-                      Yêu cầu xóa vĩnh viễn tài khoản & dữ liệu cá nhân
-                    </option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="dsr-name" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Họ và tên chủ tài khoản *
-                    </label>
-                    <input
-                      id="dsr-name"
-                      type="text"
-                      required
-                      value={dsrName}
-                      onChange={(e) => setDsrName(e.target.value)}
-                      placeholder="Nguyễn Văn A"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76]"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label htmlFor="dsr-phone" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Số điện thoại xác minh *
-                    </label>
-                    <input
-                      id="dsr-phone"
-                      type="tel"
-                      required
-                      value={dsrPhone}
-                      onChange={(e) => setDsrPhone(e.target.value)}
-                      placeholder="09xxxxxxxx"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76]"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="dsr-email" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Email tài khoản đăng ký *
-                  </label>
-                  <input
-                    id="dsr-email"
-                    type="email"
-                    required
-                    value={dsrEmail}
-                    onChange={(e) => setDsrEmail(e.target.value)}
-                    placeholder="email@example.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label htmlFor="dsr-details" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Mô tả chi tiết phạm vi yêu cầu
-                  </label>
-                  <textarea
-                    id="dsr-details"
-                    rows={4}
-                    value={dsrDetails}
-                    onChange={(e) => setDsrDetails(e.target.value)}
-                    placeholder="Nêu rõ thông tin bạn muốn chỉnh sửa, xuất dữ liệu hoặc lý do yêu cầu..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={dsrSubmitting}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#007c76] hover:bg-[#00645f] disabled:opacity-60 text-white text-sm font-semibold transition-colors cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{dsrSubmitting ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu tới Bộ phận Bảo vệ Dữ liệu'}</span>
-                </button>
-              </form>
             </div>
           </div>
         )}

@@ -83,6 +83,12 @@ export function clearFastSessionUser(): void {
     try {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem('user_email');
+      localStorage.removeItem('user_is_vip');
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('course_unlocked_')) {
+          localStorage.removeItem(k);
+        }
+      });
       window.dispatchEvent(new CustomEvent('fast_auth_changed', { detail: null }));
       window.dispatchEvent(new CustomEvent('user_roles_updated'));
       window.dispatchEvent(new CustomEvent('courses_updated'));

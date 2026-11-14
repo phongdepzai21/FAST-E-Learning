@@ -310,7 +310,7 @@ export const DEFAULT_LESSONS: Array<{ title: string; videoUrl: string; content?:
   { title: "Quản lý rủi ro và đánh giá cơ hội cải tiến", videoUrl: "", content: "Tài liệu học tập: Phương pháp đánh giá mức độ nghiêm trọng và khả năng xảy ra của mối nguy hại." }
 ];
 
-export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string; content?: string }> => {
+export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUrl: string; content?: string; isPreview?: boolean; duration?: string }> => {
   if (!rawCurr) return DEFAULT_LESSONS;
   if (!Array.isArray(rawCurr)) {
     if (typeof rawCurr === 'object' && rawCurr.lessons && Array.isArray(rawCurr.lessons)) {
@@ -319,7 +319,7 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
     return DEFAULT_LESSONS;
   }
 
-  const result: Array<{ title: string; videoUrl: string; content?: string }> = [];
+  const result: Array<{ title: string; videoUrl: string; content?: string; isPreview?: boolean; duration?: string }> = [];
 
   rawCurr.forEach((item: any, itemIdx: number) => {
     if (!item) return;
@@ -335,7 +335,15 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
         const content = typeof l === 'object' && l?.content 
           ? String(l.content).trim() 
           : "";
-        result.push({ title, videoUrl, content });
+        const isPreview = typeof l === 'object' && l?.isPreview === true;
+        const duration = typeof l === 'object' && l?.duration ? String(l.duration).trim() : "";
+        result.push({
+          title,
+          videoUrl,
+          content,
+          ...(isPreview ? { isPreview: true } : {}),
+          ...(duration ? { duration } : {})
+        });
       });
     } 
     // Case 2: item is a direct lesson object { title, videoUrl }
@@ -347,7 +355,15 @@ export const extractLessonsFlat = (rawCurr: any): Array<{ title: string; videoUr
       const content = item.content 
         ? String(item.content).trim() 
         : "";
-      result.push({ title, videoUrl, content });
+      const isPreview = item.isPreview === true;
+      const duration = item.duration ? String(item.duration).trim() : "";
+      result.push({
+        title,
+        videoUrl,
+        content,
+        ...(isPreview ? { isPreview: true } : {}),
+        ...(duration ? { duration } : {})
+      });
     }
     // Case 3: item is a string
     else if (typeof item === 'string' && item.trim()) {
