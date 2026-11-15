@@ -28,11 +28,7 @@ const AUTH_METHODS = [
   'Không nhớ rõ phương thức đăng nhập'
 ];
 
-const DELETION_SCOPES = [
-  'Xóa toàn bộ tài khoản, thông tin xác thực Facebook/Google & dữ liệu học tập',
-  'Chỉ gỡ kết nối & xóa thông tin xác thực Facebook Login',
-  'Xóa lịch sử đăng ký khóa đào tạo / biểu mẫu tư vấn'
-];
+const DELETION_SCOPE = 'Xóa toàn bộ tài khoản & xóa toàn bộ dữ liệu liên quan';
 
 const DataDeletion: React.FC = () => {
   const toast = useToast();
@@ -42,7 +38,7 @@ const DataDeletion: React.FC = () => {
     email: '',
     phone: '',
     authMethod: AUTH_METHODS[0],
-    scope: DELETION_SCOPES[0],
+    scope: DELETION_SCOPE,
     note: ''
   });
   const [confirmedUnderstand, setConfirmedUnderstand] = useState(false);
@@ -141,7 +137,7 @@ const DataDeletion: React.FC = () => {
       email: '',
       phone: '',
       authMethod: AUTH_METHODS[0],
-      scope: DELETION_SCOPES[0],
+      scope: DELETION_SCOPE,
       note: ''
     });
     setConfirmedUnderstand(false);
@@ -175,14 +171,11 @@ const DataDeletion: React.FC = () => {
                 <span className="tabular-nums">Xử lý trong 24–72 giờ</span>
               </div>
 
-              <h1
-                className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
-                style={{ textWrap: 'balance' }}
-              >
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.02em] text-slate-900 dark:text-white leading-[1.45]">
                 Hướng dẫn xóa tài khoản &amp; dữ liệu
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
                 Bạn có toàn quyền xóa tài khoản FAST E-Learning, ngắt kết nối Facebook Login và yêu cầu xóa vĩnh viễn dữ liệu cá nhân, lịch sử học tập liên quan bất kỳ lúc nào.
               </p>
             </div>
@@ -446,22 +439,12 @@ const DataDeletion: React.FC = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="del-scope" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Phạm vi yêu cầu xóa
-                    </label>
-                    <select
-                      id="del-scope"
-                      name="scope"
-                      value={formData.scope}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#007c76] focus:ring-2 focus:ring-[#007c76]/15"
-                    >
-                      {DELETION_SCOPES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                    </span>
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      {DELETION_SCOPE}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">

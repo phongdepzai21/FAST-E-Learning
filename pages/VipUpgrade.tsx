@@ -237,9 +237,10 @@ const VipUpgrade: React.FC = () => {
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tight leading-none">
-            Nâng Tầm Sự Nghiệp <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-[0.025em] leading-[1.45]">
+            Nâng Tầm Sự Nghiệp
+            <br />
+            <span className="inline-block mt-2 sm:mt-3 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200">
               Với Gói Combo Đặc Quyền
             </span>
           </h1>
@@ -326,7 +327,7 @@ const VipUpgrade: React.FC = () => {
                     }`}>
                       {isVipPackage ? 'Gói Đặc Quyền VIP' : isProPackage ? 'Gói Combo Pro' : (combo.savings ? 'Gói Combo Tiết Kiệm' : 'Gói Combo Basic')}
                     </span>
-                    <h3 className="text-xl font-black uppercase text-white mt-1.5 leading-snug drop-shadow-sm">
+                    <h3 className="w-full text-xl font-black uppercase text-white mt-1.5 leading-[1.45] break-words [overflow-wrap:break-word] drop-shadow-sm">
                       {combo.title}
                     </h3>
                   </div>
@@ -382,8 +383,8 @@ const VipUpgrade: React.FC = () => {
                                   (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513104890138-7c749659a591';
                                 }}
                               />
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-gray-200 group-hover/course:text-teal-300 transition-colors line-clamp-1">
+                              <div className="min-w-0 flex-1">
+                                <p className="w-full text-xs font-bold text-gray-200 group-hover/course:text-teal-300 transition-colors leading-[1.45] break-words [overflow-wrap:break-word]">
                                   {c.title}
                                 </p>
                                 <span className="text-[10px] font-bold text-gray-400">

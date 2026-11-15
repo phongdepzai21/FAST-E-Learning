@@ -400,7 +400,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
                           ⭐ Nổi bật #{idx + 1}
                         </span>
                       </div>
-                      <h4 className={`text-xs font-black line-clamp-2 leading-snug ${isSelected ? 'text-[#007c76]' : 'text-slate-800'}`}>
+                      <h4 className={`w-full text-xs font-black leading-[1.45] break-words [overflow-wrap:break-word] ${isSelected ? 'text-[#007c76]' : 'text-slate-800'}`}>
                         {c.title}
                       </h4>
                     </div>

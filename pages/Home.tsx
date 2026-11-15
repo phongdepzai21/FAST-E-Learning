@@ -431,7 +431,7 @@ const Home: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <BookOpen className="w-6 h-6 text-teal-200" />
               </div>
-              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Chuẩn Hóa Quốc Tế</h3>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-[0.02em] leading-[1.35]">Chuẩn Hóa Quốc Tế</h3>
               <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
                 Chương trình bám sát tiêu chuẩn ISO 22000 &amp; Codex của Bộ Y Tế
               </p>
@@ -440,7 +440,7 @@ const Home: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Laptop className="w-6 h-6 text-teal-200" />
               </div>
-              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Học E-Learning 24/7</h3>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-[0.02em] leading-[1.35]">Học E-Learning 24/7</h3>
               <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
                 Video bài giảng 15-20 phút cô đọng, tự do học mọi lúc mọi nơi
               </p>
@@ -449,7 +449,7 @@ const Home: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Award className="w-6 h-6 text-teal-200" />
               </div>
-              <h3 className="text-lg md:text-xl font-black mb-1 tracking-tight">Nhận Chứng Nhận Ngay &amp; Liền</h3>
+              <h3 className="text-lg md:text-xl font-black mb-1 tracking-[0.02em] leading-[1.35]">Nhận Chứng Nhận Ngay &amp; Liền</h3>
               <p className="text-white/80 font-medium text-xs md:text-sm max-w-xs">
                 Nhận chứng nhận ngay và liền (không nhận chứng nhận online), xác thực năng lực chuyên môn
               </p>
@@ -470,7 +470,7 @@ const Home: React.FC = () => {
               <Sparkles className="w-3.5 h-3.5 text-[#007c76]" />
               <span>Chương Trình Đào Tạo Thực Chiến</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-snug">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-[0.025em] leading-[1.45]">
               Khóa Học <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#007c76] to-emerald-600">Nổi Bật</span>
             </h2>
             <p className="text-slate-500 font-medium text-xs sm:text-sm md:text-base max-w-2xl mx-auto mt-2.5 leading-relaxed">
@@ -539,7 +539,7 @@ const Home: React.FC = () => {
                   <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4 bg-white">
                     <div className="space-y-2">
                       <Link to={`/khoa-hoc/${c.id}`} className="block group-hover:text-[#007c76] transition-colors">
-                        <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug line-clamp-2">
+                        <h3 className="w-full text-base sm:text-lg font-black text-slate-900 leading-[1.5] tracking-[0.015em] break-words [overflow-wrap:break-word]">
                           {c.title}
                         </h3>
                       </Link>
@@ -604,7 +604,7 @@ const Home: React.FC = () => {
                         </span>
                       </div>
                       <Link to={`/khoa-hoc/${c.id}`} className="block">
-                        <h4 className="text-xs sm:text-sm font-black text-white hover:text-teal-200 transition-colors line-clamp-1 leading-snug">
+                        <h4 className="w-full text-xs sm:text-sm font-black text-white hover:text-teal-200 transition-colors leading-[1.45] break-words [overflow-wrap:break-word]">
                           {c.title}
                         </h4>
                       </Link>
@@ -632,7 +632,7 @@ const Home: React.FC = () => {
                                 {String(lIdx + 1).padStart(2, '0')}
                               </div>
                               <div className="min-w-0 flex-grow">
-                                <p className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-1 group-hover/item:text-teal-900 transition-colors">
+                                <p className="w-full text-[11px] sm:text-xs font-bold text-slate-800 leading-[1.45] break-words [overflow-wrap:break-word] group-hover/item:text-teal-900 transition-colors">
                                   {lesson.title}
                                 </p>
                                 {lesson.content && (
@@ -688,7 +688,7 @@ const Home: React.FC = () => {
           <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 mb-10 border border-teal-500/30 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="space-y-2 text-center md:text-left relative z-10">
-              <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white leading-tight">
+              <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-[0.025em] text-white leading-[1.45]">
                 Gói Combo Đào Tạo Trọn Gói
               </h3>
               <p className="text-slate-300 text-xs sm:text-sm font-medium max-w-xl">
@@ -756,7 +756,7 @@ const Home: React.FC = () => {
                   {/* Body Info */}
                   <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-2">
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-[#007c76] transition-colors leading-snug line-clamp-1">
+                      <h3 className="w-full text-base sm:text-lg font-black text-slate-900 group-hover:text-[#007c76] transition-colors leading-[1.45] break-words [overflow-wrap:break-word]">
                         {combo.title}
                       </h3>
                       <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">
@@ -773,7 +773,7 @@ const Home: React.FC = () => {
                       {comboCourses.length > 0 ? (
                         comboCourses.map((c, cIdx) => (
                           <div key={c.id || cIdx} className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800 bg-white p-2 rounded-xl border border-slate-100 shadow-2xs">
-                            <span className="truncate">{c.title}</span>
+                            <span className="min-w-0 flex-1 leading-[1.4] break-words [overflow-wrap:break-word]">{c.title}</span>
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-50 text-[#007c76] font-bold shrink-0">{c.category || 'ISO'}</span>
                           </div>
                         ))
@@ -833,7 +833,7 @@ const Home: React.FC = () => {
               <Sparkles className="w-3.5 h-3.5 text-teal-600" />
               Lộ trình chuẩn hóa thực chiến
             </span>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight uppercase">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-[0.025em] leading-[1.45] uppercase">
               Bắt Đầu Cùng <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-emerald-600">FAST</span>
             </h2>
             <p className="text-slate-500 font-medium text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
@@ -944,15 +944,15 @@ const Home: React.FC = () => {
             <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
             <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-              <div className="space-y-3 text-center lg:text-left max-w-2xl">
+              <div className="space-y-3 text-center lg:text-left flex-1 min-w-0">
                 <span className="text-teal-400 font-bold uppercase tracking-[0.25em] text-xs inline-flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   Đồng Hành Toàn Diện Cùng FAST E-Learning
                 </span>
-                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tight text-white leading-tight">
+                <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-[0.025em] text-white leading-[1.45]">
                   Sẵn Sàng Nâng Tầm Năng Lực Cùng FAST?
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed max-w-2xl">
                   Khám phá ngay kho bài giảng thực tế và kiến thức chuẩn hóa vận hành an toàn thực phẩm. Kích hoạt tài khoản để vào học ngay trong hôm nay.
                 </p>
 

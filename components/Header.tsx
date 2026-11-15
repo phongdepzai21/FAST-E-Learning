@@ -73,9 +73,14 @@ const Header: React.FC = () => {
             setIsAdmin(currentIsAdmin);
             setIsTeacher(currentIsTeacher);
 
+            const hasFirestorePhoto = typeof data.photoURL === 'string' || typeof data.avatar === 'string';
+            const firestorePhoto = typeof data.photoURL === 'string'
+              ? data.photoURL
+              : (typeof data.avatar === 'string' ? data.avatar : '');
+
             setUserProfile({
               name: data.fullName || data.displayName || data.name || effectiveUser.displayName || 'Học viên',
-              avatar: data.avatar || data.photoURL || effectiveUser.photoURL || ''
+              avatar: hasFirestorePhoto ? firestorePhoto : (effectiveUser.photoURL || '')
             });
           } else {
             setIsVip(currentIsVip);
@@ -99,7 +104,7 @@ const Header: React.FC = () => {
         }, () => {});
         unsubs.push(unsubPurchased);
 
-        // Listen to local user_roles_updated
+        // Listen to local user_roles_updated & user_profile_updated
         const handleLocalRoleUpdate = () => {
           try {
             const str = localStorage.getItem(`user_roles_${accountDocKey}`);
@@ -114,11 +119,25 @@ const Header: React.FC = () => {
             setIsTeacher(currentIsTeacher);
           } catch (e) {}
         };
+        const handleProfileUpdated = (ev: any) => {
+          const detail = ev?.detail;
+          if (!detail) return;
+          setUserProfile(prev => ({
+            name: typeof detail.displayName === 'string' && detail.displayName.trim()
+              ? detail.displayName
+              : (prev?.name || 'Học viên'),
+            avatar: typeof detail.photoURL === 'string'
+              ? detail.photoURL
+              : (prev?.avatar || '')
+          }));
+        };
         window.addEventListener('user_roles_updated', handleLocalRoleUpdate);
         window.addEventListener('storage', handleLocalRoleUpdate);
+        window.addEventListener('user_profile_updated', handleProfileUpdated);
         unsubs.push(() => {
           window.removeEventListener('user_roles_updated', handleLocalRoleUpdate);
           window.removeEventListener('storage', handleLocalRoleUpdate);
+          window.removeEventListener('user_profile_updated', handleProfileUpdated);
         });
       } else {
         setUserProfile(null);

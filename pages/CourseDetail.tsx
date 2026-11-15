@@ -361,7 +361,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
       </div>
       <div className="space-y-2">
-        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Khóa học tạm khóa</h3>
+        <h3 className="text-xl font-black text-gray-800 uppercase tracking-[0.02em] leading-[1.35]">Khóa học tạm khóa</h3>
         <p className="text-gray-500 text-xs font-semibold leading-relaxed">
           Khóa học này hiện đã tạm ngưng hoạt động hoặc được đưa vào trạng thái nháp bởi Quản trị viên. Bạn không thể tiếp tục xem nội dung vào lúc này.
         </p>
@@ -399,7 +399,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-wider">Đã sở hữu</span>
                             <span className="text-teal-200 text-xs font-semibold">· Bạn có quyền truy cập toàn bộ bài học</span>
                         </div>
-                        <h4 className="text-base md:text-lg font-black tracking-tight mt-0.5">Phòng học trực tuyến chuẩn tập trung</h4>
+                        <h4 className="text-base md:text-lg font-black tracking-tight mt-0.5">Phòng học trực tuyến</h4>
                     </div>
                 </div>
                 <Link
@@ -414,12 +414,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
         {/* VIDEO PLAYER SECTION */}
         <section className={`transition-all duration-1000 delay-200 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <div id="video-player-section" className="aspect-video rounded-[32px] overflow-hidden shadow-2xl border-4 border-white bg-slate-950 relative group hover:shadow-primary/20 transition-all duration-500">
+            <div
+                id="video-player-section"
+                className={`rounded-[32px] overflow-hidden shadow-2xl border-4 border-white bg-slate-950 relative group hover:shadow-primary/20 transition-all duration-500 ${
+                    activePreviewLesson || isOwned ? 'aspect-video' : 'min-h-[300px] sm:aspect-video'
+                }`}
+            >
                 {activePreviewLesson ? (
                     (() => {
                         if (isVideoLoading) {
                             return (
-                                <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-slate-900 flex flex-col items-center justify-center">
+                                <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center p-6">
                                     <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                                     <p className="text-teal-400 font-bold tracking-wider uppercase text-sm">Đang tải video Preview...</p>
                                 </div>
@@ -430,13 +435,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
                         if (embedInfo.isEmbed && embedInfo.embedUrl) {
                             return (
-                                <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-black">
+                                <div className="relative w-full h-full bg-black">
                                     <iframe
                                         key={embedInfo.embedUrl}
                                         src={embedInfo.embedUrl}
                                         width="100%"
                                         height="100%"
-                                        className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
+                                        className="w-full h-full border-0"
                                         title={activePreviewLesson.title || "Video Preview"}
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
                                         allowFullScreen
@@ -470,7 +475,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         return (
                             <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900 text-slate-400 p-8 text-center">
                                 <p className="text-sm font-bold text-white">Chưa có video cho bài học Preview này</p>
-                                <p className="text-xs text-slate-400 mt-1">Giảng viên đang cập nhật video xem thử (dưới 5 phút).</p>
+                                <p className="text-xs text-slate-400 mt-1">Giảng viên đang cập nhật video giới thiệu khóa học.</p>
                             </div>
                         );
                     })()
@@ -478,7 +483,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                     (() => {
                             if (isVideoLoading) {
                                 return (
-                                    <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-slate-900 flex flex-col items-center justify-center">
+                                    <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center p-6">
                                         <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                                         <p className="text-teal-400 font-bold tracking-wider uppercase text-sm">Đang tải video...</p>
                                     </div>
@@ -489,13 +494,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
                             if (embedInfo.isEmbed && embedInfo.embedUrl) {
                                 return (
-                                    <div className="relative w-full h-full min-h-[400px] md:min-h-[500px] bg-black">
+                                    <div className="relative w-full h-full bg-black">
                                         <iframe 
                                             key={embedInfo.embedUrl}
                                             src={embedInfo.embedUrl} 
                                             width="100%" 
                                             height="100%" 
-                                            className="w-full h-full min-h-[400px] md:min-h-[500px] border-0"
+                                            className="w-full h-full border-0"
                                             title={playingLesson ? playingLesson.title : "Video bài học"}
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen; speaker-selection; screen-wake-lock; execution-while-out-of-viewport; execution-while-not-rendered"
                                             allowFullScreen
@@ -546,14 +551,14 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         })()
                 ) : (() => {
                     return (
-                        <div className="relative h-full w-full bg-slate-900 flex items-center justify-center min-h-[400px] md:min-h-[500px]">
-                            <img src={course.image} alt={course.title} className="w-full h-full object-cover opacity-60" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 pt-20 flex flex-col items-center justify-end text-center">
-                                <h3 className="text-white text-xl font-black uppercase tracking-widest mb-2">{course.title}</h3>
-                                <p className="text-gray-300 font-bold max-w-md mx-auto text-sm mb-4">
+                        <div className="relative w-full h-full min-h-[300px] bg-slate-900 flex flex-col justify-end">
+                            <img src={course.image} alt={course.title} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                            <div className="relative z-10 w-full mt-auto bg-gradient-to-t from-black/95 via-black/65 to-transparent p-5 sm:p-8 pt-16 sm:pt-20 flex flex-col items-center justify-end text-center">
+                                <h3 className="w-full text-white text-lg sm:text-xl font-black uppercase tracking-wider sm:tracking-widest leading-[1.45] mb-2 break-words [overflow-wrap:break-word]">{course.title}</h3>
+                                <p className="text-gray-300 font-bold max-w-md mx-auto text-xs sm:text-sm mb-4">
                                     Vui lòng đăng ký tham gia khóa học để xem toàn bộ nội dung giáo trình.
                                 </p>
-                                <div className="flex flex-wrap items-center justify-center gap-3">
+                                <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 w-full">
                                     {firstPreviewLesson && (
                                         <button
                                             type="button"
@@ -561,13 +566,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                                 e.preventDefault();
                                                 setPlayingPreviewIdx(firstPreviewLesson.idx);
                                             }}
-                                            className="bg-white/95 hover:bg-white text-[#007c76] px-6 py-3 rounded-xl font-black uppercase tracking-wider text-sm shadow-xl hover:scale-105 transition-all duration-300 pointer-events-auto cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                                            className="bg-white/95 hover:bg-white text-[#007c76] px-5 py-2.5 sm:py-3 rounded-xl font-black uppercase tracking-wider text-xs sm:text-sm shadow-xl hover:scale-105 transition-all duration-300 pointer-events-auto cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap min-h-[42px]"
                                         >
                                             <PlayCircle className="w-4 h-4 shrink-0" />
                                             <span>Xem thử Preview</span>
                                         </button>
                                     )}
-                                    <button onClick={(e) => { e.preventDefault(); handleRegisterClick(); }} className="bg-primary text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto cursor-pointer whitespace-nowrap">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); handleRegisterClick(); }}
+                                        className="bg-primary text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-black uppercase tracking-wider sm:tracking-widest text-xs sm:text-sm shadow-2xl shadow-primary/40 hover:scale-105 hover:bg-[#00605b] transition-all duration-300 pointer-events-auto cursor-pointer whitespace-nowrap min-h-[42px]"
+                                    >
                                         {isVip ? 'NHẬN KHÓA HỌC MIỄN PHÍ' : 'ĐĂNG KÝ MỞ KHÓA NGAY'}
                                     </button>
                                 </div>
@@ -579,17 +588,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
             {/* COMPACT PREVIEW CONTROL BAR (WHEN NON-OWNER IS WATCHING A PREVIEW LESSON) */}
             {activePreviewLesson && playingPreviewIdx !== null && (
-                <div className="mt-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="min-w-0">
-                        <span className="text-xs font-bold text-[#007c76] uppercase tracking-wider block mb-1">
-                            Bài Preview · Miễn phí · {activePreviewLesson.duration || 'Video < 5 phút'}
+                <div className="mt-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="min-w-0 w-full">
+                        <span className="text-xs font-bold text-[#007c76] uppercase tracking-wider block mb-1.5">
+                            Bài Preview{activePreviewLesson.duration && !/5\s*phút/i.test(activePreviewLesson.duration) ? ` · ${activePreviewLesson.duration}` : ''}
                         </span>
-                        <h3 className="text-lg font-black text-gray-800 line-clamp-1">
+                        <h3 className="w-full text-lg font-black text-gray-800 tracking-[0.015em] leading-[1.5] break-words [overflow-wrap:break-word]">
                             {activePreviewLesson.title}
                         </h3>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap w-full justify-end pt-3 border-t border-gray-100">
                         <button
                             type="button"
                             onClick={() => setPlayingPreviewIdx(null)}
@@ -597,13 +606,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         >
                             Đóng xem thử
                         </button>
-                        <Link
-                            to={`/hoc/${id}?bai=${playingPreviewIdx + 1}`}
-                            className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-50 hover:bg-teal-100 text-[#007c76] border border-teal-200 transition-all flex items-center gap-1.5 whitespace-nowrap"
-                        >
-                            <PlayCircle className="w-4 h-4 shrink-0" />
-                            <span>Mở phòng học</span>
-                        </Link>
                         <button
                             type="button"
                             onClick={handleRegisterClick}
@@ -617,17 +619,17 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
 
             {/* LESSON CONTROL BAR (WHEN LEARNING OWNED PAID LESSONS) */}
             {isOwned && (
-                <div className="mt-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <span className="text-xs font-bold text-primary uppercase tracking-wider block mb-1">
+                <div className="mt-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="min-w-0 w-full">
+                        <span className="text-xs font-bold text-primary uppercase tracking-wider block mb-1.5">
                             Bài {currentIdx + 1} / {curriculum.length}
                         </span>
-                        <h3 className="text-lg font-black text-gray-800 line-clamp-1">
+                        <h3 className="w-full text-lg font-black text-gray-800 tracking-[0.015em] leading-[1.5] break-words [overflow-wrap:break-word]">
                             {currentLesson ? currentLesson.title : 'Bài giảng'}
                         </h3>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap w-full justify-end pt-3 border-t border-gray-100">
                         <button
                             disabled={currentIdx === 0}
                             onClick={() => {
@@ -688,11 +690,11 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
         {!isOwned && (
             <section className={`transition-all duration-1000 delay-300 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.35]">
                         Danh sách bài giảng
                     </h2>
                     <span className="text-xs font-bold text-gray-500">
-                        {previewLessons.length > 0 ? `${previewLessons.length} bài Preview miễn phí · ` : ''}{curriculum.length} bài học chuyên sâu
+                        {previewLessons.length > 0 ? `${previewLessons.length} bài Preview · ` : ''}{curriculum.length} bài học chuyên sâu
                     </span>
                 </div>
 
@@ -715,21 +717,19 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                             : 'bg-teal-50/50 hover:bg-teal-50 border-[#007c76]/30'
                                     }`}
                                 >
-                                    <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
                                         <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 bg-[#007c76] text-white">
                                             {lIdx + 1}
                                         </span>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-sm md:text-base text-gray-900">
-                                                    {lesson.title}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="w-full font-bold text-sm md:text-base text-gray-900 leading-[1.5] break-words [overflow-wrap:break-word]">
+                                                <span>{lesson.title}</span>
+                                                <span className="inline-flex items-center align-middle ml-2 text-[11px] font-black text-[#007c76] bg-white px-2 py-0.5 rounded-md border border-[#007c76]/25">
+                                                    Preview
                                                 </span>
-                                                <span className="text-[11px] font-black text-[#007c76] bg-white px-2 py-0.5 rounded-md border border-[#007c76]/25 shrink-0">
-                                                    Preview · Miễn phí
-                                                </span>
-                                            </div>
+                                            </p>
                                             <p className="text-xs font-medium text-[#007c76] mt-0.5">
-                                                {lesson.duration || 'Video < 5 phút'} · Không cần đăng nhập
+                                                {lesson.duration && !/5\s*phút/i.test(lesson.duration) ? `${lesson.duration} · ` : ''}Không cần đăng nhập
                                             </p>
                                         </div>
                                     </div>
@@ -738,13 +738,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                             <PlayCircle className="w-3.5 h-3.5 shrink-0" />
                                             <span>{isPlayingThisPreview ? 'Đang phát' : 'Xem Preview'}</span>
                                         </span>
-                                        <Link
-                                            to={`/hoc/${id}?bai=${lIdx + 1}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-lg bg-white hover:bg-gray-50 text-[#007c76] border border-[#007c76]/25 transition-colors whitespace-nowrap"
-                                        >
-                                            Phòng học
-                                        </Link>
                                     </div>
                                 </div>
                             );
@@ -756,13 +749,13 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                 onClick={handleLockedLessonClick}
                                 className="flex items-center justify-between gap-3 p-4 rounded-xl group cursor-pointer border transition-all duration-200 bg-gray-50/60 hover:bg-gray-100/70 border-gray-100 hover:border-gray-200"
                             >
-                                <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                                     <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 bg-white text-gray-500 border border-gray-200">
                                         {lIdx + 1}
                                     </span>
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                         <Lock className="w-4 h-4 text-gray-400 shrink-0" />
-                                        <span className="font-bold text-sm md:text-base text-gray-600 group-hover:text-gray-900 truncate">
+                                        <span className="min-w-0 flex-1 font-bold text-sm md:text-base text-gray-600 group-hover:text-gray-900 leading-[1.5] break-words [overflow-wrap:break-word]">
                                             {lesson.title}
                                         </span>
                                     </div>
@@ -783,12 +776,12 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
   if (embeddedCourseId) {
       return (
           <div className="animate-in slide-in-from-bottom-5 duration-700">
-              <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+              <div className="flex items-center justify-between gap-4 mb-8">
+                  <h3 className="flex-1 min-w-0 text-2xl font-black text-gray-800 tracking-[0.025em] leading-[1.45] flex items-center gap-3 uppercase">
                       <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
-                      {course.title}
+                      <span className="min-w-0 flex-1 break-words [overflow-wrap:break-word]">{course.title}</span>
                   </h3>
-                  <Link to="/account" state={{ tab: 'dashboard' }} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-primary transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                  <Link to="/account" state={{ tab: 'dashboard' }} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-primary transition-colors bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100 shrink-0 whitespace-nowrap">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                       Quay lại
                   </Link>
@@ -803,7 +796,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                           <div className="bg-white rounded-[32px] p-6 shadow-xl border border-gray-100 sticky top-28 space-y-6">
                               <div className="space-y-3 pb-4 border-b border-gray-100">
                                   <div className="flex items-center justify-between">
-                                      <h3 className="font-black text-gray-800 uppercase tracking-tight text-base flex items-center gap-2">
+                                      <h3 className="font-black text-gray-800 uppercase tracking-[0.02em] leading-[1.35] text-base flex items-center gap-2">
                                           <span className="w-1.5 h-5 bg-primary rounded-full"></span>
                                           Danh sách bài học
                                       </h3>
@@ -854,7 +847,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                                           : 'bg-gray-50/60 hover:bg-primary/5 border-gray-100 hover:border-primary/20'
                                                   }`}
                                               >
-                                                  <div className="flex items-center gap-3 min-w-0">
+                                                  <div className="flex items-center gap-3 min-w-0 flex-1">
                                                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                                                           isCurrentPlaying
                                                               ? 'bg-primary text-white shadow'
@@ -862,8 +855,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                                       }`}>
                                                           {lIdx + 1}
                                                       </span>
-                                                      <div className="min-w-0">
-                                                          <p className={`text-xs md:text-sm font-bold line-clamp-1 ${
+                                                      <div className="min-w-0 flex-1">
+                                                          <p className={`w-full text-xs md:text-sm font-bold leading-[1.45] break-words [overflow-wrap:break-word] ${
                                                               isCurrentPlaying ? 'text-primary font-black' : 'text-gray-700'
                                                           }`}>
                                                               {lesson.title}
@@ -922,15 +915,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                   >
                                       {isVip || isAdmin ? 'NHẬN KHÓA HỌC (VIP MIỄN PHÍ)' : 'ĐĂNG KÝ HỌC NGAY (QUÉT MÃ QR)'}
                                   </button>
-                                  {firstPreviewLesson && (
-                                    <Link
-                                      to={`/hoc/${id}?bai=${firstPreviewLesson.idx + 1}`}
-                                      className="w-full py-3 rounded-2xl border border-[#007c76]/30 bg-teal-50/70 hover:bg-teal-50 text-[#007c76] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
-                                    >
-                                      <PlayCircle className="w-4 h-4 shrink-0" />
-                                      <span>Xem thử bài Preview miễn phí</span>
-                                    </Link>
-                                  )}
                               </div>
                           </div>
                       )}
@@ -1030,9 +1014,9 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/80 to-transparent"></div>
          <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 transition-all duration-1000 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <div className="mb-6"><Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Khóa học', path: '/khoa-hoc' }, { label: course.title }]} /></div>
-            <div className="max-w-4xl space-y-6">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight">{course.title}</h1>
-              <p className="text-lg md:text-xl text-gray-300 font-medium leading-relaxed">{course.description || "Nắm vững các tiêu chuẩn và quy trình vận hành chuyên nghiệp."}</p>
+            <div className="space-y-6">
+              <h1 className="w-full text-3xl md:text-5xl lg:text-6xl font-black uppercase tracking-[0.025em] leading-[1.45] break-words [overflow-wrap:break-word]">{course.title}</h1>
+              <p className="text-lg md:text-xl text-gray-300 font-medium leading-relaxed max-w-4xl">{course.description || "Nắm vững các tiêu chuẩn và quy trình vận hành chuyên nghiệp."}</p>
             </div>
          </div>
       </div>
@@ -1043,7 +1027,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                 {learningContent}
 
                 <section className={`bg-white rounded-[32px] p-8 md:p-10 shadow-xl border border-gray-100 transition-all duration-1000 delay-400 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-                    <h2 className="text-2xl font-black text-gray-800 mb-8 uppercase tracking-tight">Bạn sẽ học được gì?</h2>
+                    <h2 className="text-2xl font-black text-gray-800 mb-8 uppercase tracking-[0.02em] leading-[1.45]">Bạn sẽ học được gì?</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {benefits.map((benefit, i) => (<div key={i} className="flex items-start gap-3 group"><svg className="w-5 h-5 text-green-500 mt-1 shrink-0 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg><span className="text-gray-600 font-medium leading-tight group-hover:text-gray-900 transition-colors">{benefit}</span></div>))}
                     </div>
@@ -1056,7 +1040,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                     <div className="bg-white rounded-[32px] p-6 shadow-xl border border-gray-100 sticky top-28 space-y-6">
                         <div className="space-y-3 pb-4 border-b border-gray-100">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-black text-gray-800 uppercase tracking-tight text-base flex items-center gap-2">
+                                <h3 className="font-black text-gray-800 uppercase tracking-[0.02em] leading-[1.45] text-base flex items-center gap-2">
                                     <span className="w-1.5 h-5 bg-primary rounded-full"></span>
                                     Danh sách bài học
                                 </h3>
@@ -1107,7 +1091,7 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                                     : 'bg-gray-50/60 hover:bg-primary/5 border-gray-100 hover:border-primary/20'
                                             }`}
                                         >
-                                            <div className="flex items-center gap-3 min-w-0">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
                                                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                                                     isCurrentPlaying
                                                         ? 'bg-primary text-white shadow'
@@ -1115,8 +1099,8 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                                                 }`}>
                                                     {lIdx + 1}
                                                 </span>
-                                                <div className="min-w-0">
-                                                    <p className={`text-xs md:text-sm font-bold line-clamp-1 ${
+                                                <div className="min-w-0 flex-1">
+                                                    <p className={`w-full text-xs md:text-sm font-bold leading-[1.45] break-words [overflow-wrap:break-word] ${
                                                         isCurrentPlaying ? 'text-primary font-black' : 'text-gray-700'
                                                     }`}>
                                                         {lesson.title}
@@ -1157,15 +1141,6 @@ const CourseDetail: React.FC<{ embeddedCourseId?: string }> = ({ embeddedCourseI
                         </div>
                         <div className="space-y-3">
                             <button onClick={handleRegisterClick} className="w-full bg-[#a50064] text-white py-4 rounded-2xl font-black text-base uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl shadow-[#a50064]/20 hover:bg-[#c40076] cursor-pointer">{isVip ? 'NHẬN KHÓA HỌC' : 'ĐĂNG KÝ HỌC NGAY'}</button>
-                            {firstPreviewLesson && (
-                                <Link
-                                    to={`/hoc/${id}?bai=${firstPreviewLesson.idx + 1}`}
-                                    className="w-full py-3 px-4 rounded-2xl border border-[#007c76]/30 bg-teal-50/70 hover:bg-teal-50 text-[#007c76] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
-                                >
-                                    <PlayCircle className="w-4 h-4 shrink-0" />
-                                    <span>Học thử bài Preview miễn phí</span>
-                                </Link>
-                            )}
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{isVip ? 'Nhận miễn phí với đặc quyền VIP' : 'Sở hữu trọn đời sau khi kích hoạt'}</p>
                         </div>
                     </div>

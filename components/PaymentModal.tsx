@@ -420,7 +420,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
                 <div className="bg-gradient-to-r from-slate-50 to-teal-50/40 p-4 rounded-2xl border border-slate-200/80 flex items-center justify-between shadow-xs">
                   <div className="flex-1 min-w-0 pr-3">
                     <span className="text-[10px] font-black uppercase text-teal-700 bg-teal-100 px-2 py-0.5 rounded-md">Khóa học đăng ký</span>
-                    <h3 className="font-bold text-slate-900 text-sm sm:text-base truncate mt-1">{course.title}</h3>
+                    <h3 className="w-full font-bold text-slate-900 text-sm sm:text-base leading-[1.45] break-words [overflow-wrap:break-word] mt-1">{course.title}</h3>
                     <p className="text-xs font-semibold text-slate-400 mt-0.5">
                       Mã đơn: <span className="font-mono text-slate-600 font-bold">{paymentCode || 'FAST...'}</span>
                     </p>

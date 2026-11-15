@@ -621,10 +621,10 @@ const PrivacyPolicy: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 select-text transition-colors duration-200">
       <Helmet>
-        <title>Chính sách & Quyền riêng tư | FAST E-Learning</title>
+        <title>Chính sách bảo vệ thông tin cá nhân | FAST E-Learning</title>
         <meta
           name="description"
-          content="Chính sách quyền riêng tư của FAST E-Learning: minh bạch việc thu thập tên, email, thông tin xác thực Facebook Login, dữ liệu học tập và dữ liệu giao dịch."
+          content="Chính sách bảo vệ thông tin cá nhân của người tiêu dùng tại FAST E-Learning (CÔNG TY TNHH TƯ VẤN FAST - MST 0314568146): quy định rõ thu thập, sử dụng, lưu trữ và bảo vệ thông tin khách hàng."
         />
         <link rel="canonical" href="https://fastelearning.com.vn/privacy-policy" />
       </Helmet>
@@ -646,15 +646,12 @@ const PrivacyPolicy: React.FC = () => {
                 <span>Tuân thủ Luật 91/2025/QH15</span>
               </div>
 
-              <h1
-                className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                Chính sách & Quyền riêng tư
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.02em] text-slate-900 dark:text-white leading-[1.45]">
+                Chính sách bảo vệ thông tin cá nhân của người tiêu dùng
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-                Minh bạch về tên, email, thông tin xác thực Facebook, dữ liệu học tập và dữ liệu giao dịch mà FAST E-Learning thu thập, cách bảo mật và quyền kiểm soát của bạn.
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
+                Quy định rõ cách thức thu thập, mục đích sử dụng, thời hạn lưu trữ và biện pháp bảo vệ thông tin cá nhân của khách hàng tại FAST E-Learning (Chủ sở hữu: CÔNG TY TNHH TƯ VẤN FAST · MST: 0314568146).
               </p>
             </div>
 

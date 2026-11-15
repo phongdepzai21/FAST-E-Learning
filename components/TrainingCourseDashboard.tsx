@@ -548,7 +548,7 @@ export const TrainingCourseDashboard: React.FC = () => {
 
                     {/* Nội dung chi tiết */}
                     <div className="p-5 space-y-3">
-                      <h3 className="font-black text-base text-slate-900 leading-snug line-clamp-2">
+                      <h3 className="w-full font-black text-base text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">
                         {course.title}
                       </h3>
 

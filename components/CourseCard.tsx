@@ -230,7 +230,7 @@ const CourseCard: React.FC<CourseCardProps> = React.memo(({
                     )}
                 </div>
 
-                <h3 className="font-black text-lg text-gray-800 mb-4 line-clamp-2 leading-[1.3] group-hover:text-[#007c76] transition-colors duration-200">
+                <h3 className="w-full font-black text-lg text-gray-800 mb-4 leading-[1.5] tracking-[0.015em] break-words [overflow-wrap:break-word] group-hover:text-[#007c76] transition-colors duration-200">
                     {course.title}
                 </h3>
                 

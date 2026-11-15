@@ -43,8 +43,10 @@ const Consulting: React.FC = () => {
               <Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Tư vấn doanh nghiệp' }]} />
             </div>
             
-            <h1 className="text-5xl lg:text-7xl font-black mb-6 tracking-tight leading-[1.1]">
-              Nâng tầm <span className="text-teal-400">Chất lượng</span><br/> Doanh nghiệp
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black mb-6 tracking-[0.025em] leading-[1.45]">
+              Nâng tầm <br />
+              <span className="text-teal-400">Chất lượng</span> <br />
+              Doanh nghiệp
             </h1>
             
             <p className="text-lg lg:text-xl text-slate-300 mb-10 max-w-2xl font-medium leading-relaxed">
@@ -72,7 +74,7 @@ const Consulting: React.FC = () => {
             <div className="lg:col-span-4 relative">
               <div className="lg:sticky lg:top-32">
                 <span className="text-teal-600 font-bold uppercase tracking-widest text-sm mb-3 block">Dịch vụ cốt lõi</span>
-                <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 leading-tight tracking-tight">Giải Pháp <br/>Đo Ni Đóng Giày</h2>
+                <h2 className="text-3xl lg:text-4xl font-black text-slate-900 mb-6 leading-[1.45] tracking-[0.02em]">Giải Pháp Đo Ni Đóng Giày</h2>
                 <div className="w-12 h-1.5 bg-teal-500 mb-6 rounded-full"></div>
                 <p className="text-slate-600 font-medium text-lg leading-relaxed">
                   Từ chứng nhận Vệ sinh an toàn thực phẩm đến hệ thống quản lý chuẩn ISO, chúng tôi thiết kế lộ trình riêng biệt phù hợp với quy mô và đặc thù của từng doanh nghiệp.
@@ -103,7 +105,7 @@ const Consulting: React.FC = () => {
 
                     {/* Content */}
                     <div className="flex-1">
-                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-4 tracking-tight">{service.title}</h3>
+                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 mb-4 tracking-[0.02em] leading-[1.45]">{service.title}</h3>
                       <p className="text-slate-600 mb-8 font-medium leading-relaxed">{service.description}</p>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-slate-100">
@@ -190,7 +192,7 @@ const Consulting: React.FC = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-20">
             <span className="text-teal-600 font-bold uppercase tracking-widest text-sm mb-3 block">Tiến trình chuẩn</span>
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight">Lộ Trình Triển Khai</h2>
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 tracking-[0.025em] leading-[1.45]">Lộ Trình Triển Khai</h2>
             <p className="text-slate-500 font-medium text-lg max-w-2xl mx-auto">Từng bước minh bạch, bài bản và cam kết đồng hành cùng doanh nghiệp cho đến khi nhận được chứng nhận.</p>
           </div>
 
@@ -240,8 +242,8 @@ const Consulting: React.FC = () => {
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }}></div>
         <div className="absolute top-0 left-1/2 w-full h-full bg-gradient-to-b from-transparent to-black/20 -translate-x-1/2 pointer-events-none"></div>
         
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight tracking-tight">Sẵn Sàng Nâng Tầm Doanh Nghiệp?</h2>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-6 leading-[1.45] tracking-[0.025em]">Sẵn Sàng Nâng Tầm Doanh Nghiệp?</h2>
           <p className="text-teal-100/90 text-lg md:text-xl font-medium mb-10 max-w-2xl mx-auto leading-relaxed">
             Liên hệ ngay với chuyên gia FAST để được phân tích thực trạng và nhận bản kế hoạch tối ưu chi phí, hoàn toàn miễn phí.
           </p>

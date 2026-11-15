@@ -8,6 +8,8 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   linkWithPopup,
+  sendEmailVerification,
+  applyActionCode,
   type User
 } from 'firebase/auth';
 import {
@@ -18,9 +20,12 @@ import {
   type LinkedProviderStatus
 } from '../utils/accountLinking';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore'; 
+import { doc, setDoc, deleteDoc, collection, getDocs, onSnapshot } from 'firebase/firestore'; 
 import { useToast } from '../contexts/ToastContext';
 import { ADMIN_EMAILS, TEACHER_EMAILS } from '../constants';
+import { getFastSessionUser, setFastSessionUser, createSyntheticFirebaseUser } from '../utils/sessionAuth';
+import { evaluatePasswordStrength } from '../utils/passwordValidation';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import {
   User as UserIcon, 
   ShieldCheck, 
@@ -34,12 +39,66 @@ import {
   Upload,
   Calendar,
   Mail,
+  MailCheck,
+  MailWarning,
+  Send,
   Lock,
   Eye,
   EyeOff,
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+const compressImageToDataUrl = (file: File, maxSize = 512, quality = 0.85): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh từ thiết bị.'));
+    reader.onload = () => {
+      const rawResult = typeof reader.result === 'string' ? reader.result : '';
+      if (!rawResult) {
+        reject(new Error('Dữ liệu ảnh trống.'));
+        return;
+      }
+      // Preserve GIF animations as-is when small enough
+      if (file.type === 'image/gif') {
+        resolve(rawResult);
+        return;
+      }
+      const img = new Image();
+      img.onerror = () => resolve(rawResult);
+      img.onload = () => {
+        try {
+          let { width, height } = img;
+          if (!width || !height) {
+            resolve(rawResult);
+            return;
+          }
+          if (width > maxSize || height > maxSize) {
+            const ratio = Math.min(maxSize / width, maxSize / height);
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawResult);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const outputMime = file.type === 'image/png' || file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+          const compressed = canvas.toDataURL(outputMime, quality);
+          resolve(compressed || rawResult);
+        } catch {
+          resolve(rawResult);
+        }
+      };
+      img.src = rawResult;
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   const navigate = useNavigate();
@@ -67,6 +126,14 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   // File upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const imageFileRef = React.useRef<File | null>(null);
+  const hasPendingAvatarRemovalRef = React.useRef(false);
+
+  // Email verification states
+  const [emailVerified, setEmailVerified] = useState<boolean>(false);
+  const [isSendingVerification, setIsSendingVerification] = useState<boolean>(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState<boolean>(false);
+  const [verificationCooldown, setVerificationCooldown] = useState<number>(0);
 
   // Delete Account States
   const [deleteSelfEmail, setDeleteSelfEmail] = useState('');
@@ -141,6 +208,16 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         if (d.isVip !== undefined) currentIsVip = !!d.isVip;
         if (d.isAdmin !== undefined) currentIsAdmin = !!d.isAdmin || (normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false);
         if (d.isTeacher !== undefined) currentIsTeacher = !!d.isTeacher || (normalizedEmail ? TEACHER_EMAILS.includes(normalizedEmail) : false);
+        if (typeof d.displayName === 'string' && d.displayName.trim()) {
+          setDisplayName(d.displayName);
+        }
+        if (!imageFileRef.current && !hasPendingAvatarRemovalRef.current) {
+          if ('photoURL' in d && typeof d.photoURL === 'string') {
+            setPhotoURL(d.photoURL);
+          } else if ('avatar' in d && typeof d.avatar === 'string') {
+            setPhotoURL(d.avatar);
+          }
+        }
       }
       updateStats();
     }, () => updateStats());
@@ -201,15 +278,33 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
       setProviderStatus(getLinkedProviderStatus(targetUser));
     };
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
-        setDisplayName(currentUser.displayName || '');
-        setPhotoURL(currentUser.photoURL || '');
-        setEmail(currentUser.email || '');
-        refreshProviderStatus(currentUser);
-      } else if (!embed) {
-        navigate('/account');
+        try { await currentUser.reload(); } catch {}
+        const freshUser = auth.currentUser || currentUser;
+        setUser(freshUser);
+        setDisplayName((prev) => prev || freshUser.displayName || '');
+        if (!imageFileRef.current && !hasPendingAvatarRemovalRef.current) {
+          setPhotoURL(freshUser.photoURL || '');
+        }
+        setEmail(freshUser.email || '');
+        setEmailVerified(Boolean(freshUser.emailVerified));
+        refreshProviderStatus(freshUser);
+      } else {
+        const sessionUser = getFastSessionUser();
+        if (sessionUser) {
+          const synthetic = createSyntheticFirebaseUser(sessionUser);
+          setUser(synthetic);
+          setDisplayName((prev) => prev || sessionUser.displayName || '');
+          if (!imageFileRef.current && !hasPendingAvatarRemovalRef.current) {
+            setPhotoURL(sessionUser.photoURL || sessionUser.avatar || '');
+          }
+          setEmail(sessionUser.email || '');
+          setEmailVerified(true);
+          refreshProviderStatus(synthetic);
+        } else if (!embed) {
+          navigate('/account');
+        }
       }
     });
 
@@ -224,6 +319,58 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     };
   }, [navigate, location, embed]);
 
+  // Keep imageFileRef synced
+  useEffect(() => {
+    imageFileRef.current = imageFile;
+  }, [imageFile]);
+
+  // Verification resend cooldown countdown
+  useEffect(() => {
+    if (verificationCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setVerificationCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [verificationCooldown]);
+
+  // Handle Firebase verifyEmail return link (?mode=verifyEmail&oobCode=...)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+    if (mode === 'verifyEmail' && oobCode) {
+      let cancelled = false;
+      (async () => {
+        try {
+          await applyActionCode(auth, oobCode);
+          if (auth.currentUser) {
+            try { await auth.currentUser.reload(); } catch {}
+            if (!cancelled) {
+              setUser(auth.currentUser);
+              setEmailVerified(Boolean(auth.currentUser.emailVerified));
+            }
+          } else if (!cancelled) {
+            setEmailVerified(true);
+          }
+          if (!cancelled) {
+            setMessage({ type: 'success', text: 'Email của bạn đã được xác thực thành công!' });
+            toast.success('Xác thực email thành công!');
+            navigate(location.pathname, { replace: true });
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            const msg = err?.code === 'auth/expired-action-code'
+              ? 'Liên kết xác thực email đã hết hạn. Vui lòng yêu cầu gửi lại liên kết mới.'
+              : 'Liên kết xác thực email không hợp lệ hoặc đã được sử dụng trước đó.';
+            setMessage({ type: 'error', text: msg });
+            toast.error(msg);
+          }
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+  }, [location.search, location.pathname, navigate, toast]);
+
   // Cleanup preview URL
   useEffect(() => {
     return () => {
@@ -233,33 +380,130 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
     };
   }, [previewUrl]);
 
+  const handleResendVerificationEmail = async () => {
+    const activeUser = auth.currentUser || user;
+    if (!activeUser || !activeUser.email) {
+      toast.error('Tài khoản hiện tại chưa có địa chỉ email để xác thực.');
+      return;
+    }
+    if (!isRealFirebaseUser(activeUser)) {
+      const msg = 'Tài khoản phiên cục bộ không hỗ trợ gửi email xác thực. Vui lòng đăng nhập lại bằng tài khoản chính.';
+      setMessage({ type: 'error', text: msg });
+      toast.info(msg);
+      return;
+    }
+    if (verificationCooldown > 0 || isSendingVerification) return;
+
+    setIsSendingVerification(true);
+    setMessage(null);
+    try {
+      try { await activeUser.reload(); } catch {}
+      const refreshed = auth.currentUser || activeUser;
+      if (refreshed.emailVerified) {
+        setEmailVerified(true);
+        setUser(refreshed);
+        setMessage({ type: 'success', text: 'Email của bạn đã được xác thực!' });
+        toast.success('Email của bạn đã được xác thực!');
+        return;
+      }
+
+      try {
+        await sendEmailVerification(refreshed, {
+          url: `${window.location.origin}/account/settings`
+        });
+      } catch (cfgErr: any) {
+        if (
+          cfgErr?.code === 'auth/unauthorized-continue-uri' ||
+          cfgErr?.code === 'auth/invalid-continue-uri' ||
+          cfgErr?.code === 'auth/missing-continue-uri'
+        ) {
+          await sendEmailVerification(refreshed);
+        } else {
+          throw cfgErr;
+        }
+      }
+
+      setVerificationCooldown(60);
+      const okMsg = `Đã gửi liên kết xác thực đến ${refreshed.email}. Vui lòng kiểm tra hộp thư đến (và mục Thư rác/Spam).`;
+      setMessage({ type: 'success', text: okMsg });
+      toast.success('Đã gửi lại email xác thực!');
+    } catch (err: any) {
+      let errMsg = 'Không thể gửi email xác thực lúc này. Vui lòng thử lại sau.';
+      if (err?.code === 'auth/too-many-requests') {
+        errMsg = 'Bạn đã yêu cầu gửi email xác thực quá nhiều lần. Vui lòng đợi vài phút trước khi gửi lại.';
+      } else if (err?.code === 'auth/network-request-failed') {
+        errMsg = 'Lỗi kết nối mạng. Vui lòng kiểm tra Internet và thử lại.';
+      } else if (err?.message) {
+        errMsg = err.message;
+      }
+      setMessage({ type: 'error', text: errMsg });
+      toast.error(errMsg);
+    } finally {
+      setIsSendingVerification(false);
+    }
+  };
+
+  const handleRefreshVerificationStatus = async () => {
+    const activeUser = auth.currentUser || user;
+    if (!activeUser) return;
+    if (!isRealFirebaseUser(activeUser)) return;
+    setIsCheckingVerification(true);
+    setMessage(null);
+    try {
+      await activeUser.reload();
+      const refreshed = auth.currentUser || activeUser;
+      setUser(refreshed);
+      const isNowVerified = Boolean(refreshed.emailVerified);
+      setEmailVerified(isNowVerified);
+      if (isNowVerified) {
+        setMessage({ type: 'success', text: 'Email của bạn đã được xác thực thành công!' });
+        toast.success('Email đã được xác thực!');
+      } else {
+        const infoMsg = 'Email vẫn chưa được xác thực. Vui lòng mở hộp thư và nhấp vào liên kết trong email.';
+        setMessage({ type: 'error', text: infoMsg });
+        toast.info(infoMsg);
+      }
+    } catch (err: any) {
+      toast.error('Không thể kiểm tra trạng thái xác thực lúc này.');
+    } finally {
+      setIsCheckingVerification(false);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+    const files = e.target.files;
+    if (files && files[0]) {
+      const file = files[0];
       const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
       if (!validTypes.includes(file.type)) {
         toast.error('Vui lòng chọn định dạng ảnh hợp lệ (JPG, PNG, GIF, WEBP).');
         setMessage({ type: 'error', text: 'Vui lòng chọn định dạng ảnh hợp lệ (JPG, PNG, GIF, WEBP).' });
+        e.target.value = '';
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Kích thước ảnh quá lớn (Tối đa 5MB).');
         setMessage({ type: 'error', text: 'Kích thước ảnh quá lớn (Tối đa 5MB).' });
+        e.target.value = '';
         return;
       }
 
+      hasPendingAvatarRemovalRef.current = false;
       setImageFile(file);
+      imageFileRef.current = file;
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
       setMessage(null);
-      toast.info('Đã chọn ảnh đại diện mới. Nhấn "Lưu thay đổi" để hoàn tất.');
+      toast.info('Đã chọn ảnh đại diện mới. Nhấn "Lưu thay đổi hồ sơ" để hoàn tất.');
     }
+    e.target.value = '';
   };
 
   const handleCancelPreview = () => {
     setImageFile(null);
+    imageFileRef.current = null;
     setPreviewUrl(null);
     setMessage(null);
     toast.info('Đã hủy chọn ảnh mới.');
@@ -267,74 +511,169 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
 
   const handleDeleteAvatar = () => {
     if (window.confirm("Bạn có chắc chắn muốn gỡ ảnh đại diện hiện tại không?")) {
+      hasPendingAvatarRemovalRef.current = true;
       setImageFile(null);
+      imageFileRef.current = null;
       setPreviewUrl(null);
       setPhotoURL('');
-      setMessage({ type: 'success', text: 'Đã gỡ ảnh. Nhấn "Lưu thay đổi" để áp dụng.' });
-      toast.success('Đã gỡ ảnh. Nhấn "Lưu thay đổi" để áp dụng.');
+      setMessage({ type: 'success', text: 'Đã gỡ ảnh. Nhấn "Lưu Thay Đổi Hồ Sơ" để áp dụng.' });
+      toast.success('Đã gỡ ảnh. Nhấn "Lưu Thay Đổi Hồ Sơ" để áp dụng.');
     }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const trimmedName = displayName.trim();
+    if (!trimmedName) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập tên hiển thị.' });
+      toast.error('Vui lòng nhập tên hiển thị.');
+      return;
+    }
+
     setIsLoading(true);
     setMessage(null);
 
     try {
-      let finalPhotoURL = photoURL;
+      let finalPhotoURL = hasPendingAvatarRemovalRef.current ? '' : photoURL;
+      const normalizedEmail = (user.email || '').toLowerCase().trim();
+      const accountDocKey = normalizedEmail || user.uid;
 
       if (imageFile) {
+        let uploadedUrl = '';
+
+        // 1) Try client Firebase Storage first with a 5s timeout (fast failure if CORS/rules block preview domain)
+        if (isRealFirebaseUser(user)) {
+          try {
+            const safeExt = imageFile.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'jpg';
+            const fileRef = ref(storage, `avatars/${user.uid}/profile_${Date.now()}.${safeExt}`);
+            const uploadTask = uploadBytes(fileRef, imageFile).then((snap) => getDownloadURL(snap.ref));
+            const timeoutTask = new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error('Storage upload timeout')), 5000)
+            );
+            uploadedUrl = await Promise.race([uploadTask, timeoutTask]);
+          } catch (storageError: any) {
+            console.warn('Client Storage upload skipped/fallback to server:', storageError?.message || storageError);
+          }
+        }
+
+        // 2) Reliable backend upload fallback (compresses + stores via Admin Storage or /uploads/avatars/)
+        if (!uploadedUrl) {
+          const dataUrl = await compressImageToDataUrl(imageFile, 512, 0.85);
+          const uploadRes = await fetch('/api/user/upload-avatar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: dataUrl,
+              fileName: imageFile.name,
+              uid: user.uid,
+              email: normalizedEmail
+            })
+          });
+          const uploadData = await uploadRes.json().catch(() => null);
+          if (!uploadRes.ok || !uploadData?.success || !uploadData?.url) {
+            throw new Error(uploadData?.error || 'Không thể tải ảnh đại diện lên máy chủ.');
+          }
+          uploadedUrl = uploadData.url;
+        }
+
+        finalPhotoURL = uploadedUrl;
+      }
+
+      // Update Firebase Auth profile cleanly when real user (Auth requires absolute http(s) URL or empty)
+      if (isRealFirebaseUser(user)) {
+        const authSafePhoto =
+          !finalPhotoURL
+            ? ''
+            : finalPhotoURL.startsWith('http://') || finalPhotoURL.startsWith('https://')
+            ? finalPhotoURL
+            : `${window.location.origin}${finalPhotoURL.startsWith('/') ? '' : '/'}${finalPhotoURL}`;
+
         try {
-          const timestamp = Date.now();
-          const fileRef = ref(storage, `avatars/${user.uid}/profile_${timestamp}`);
-          const snapshot = await uploadBytes(fileRef, imageFile);
-          finalPhotoURL = await getDownloadURL(snapshot.ref);
-        } catch (storageError: any) {
-          console.error('Storage upload error:', storageError);
-          throw new Error('Lỗi tải ảnh lên Storage: ' + storageError.message);
+          await updateProfile(user, {
+            displayName: trimmedName,
+            photoURL: authSafePhoto
+          });
+        } catch (authProfErr: any) {
+          console.warn('Firebase Auth updateProfile note:', authProfErr?.message || authProfErr);
         }
       }
 
-      await updateProfile(user, {
-        displayName: displayName,
-        photoURL: finalPhotoURL
-      });
-
-      const normalizedEmail = (user.email || '').toLowerCase().trim();
-      const accountDocKey = normalizedEmail || user.uid;
+      // Persist to Firestore AND backend JSON store
+      let persistedAnywhere = false;
       if (accountDocKey) {
         try {
           const userRef = doc(db, "users", accountDocKey);
           await setDoc(userRef, {
-            displayName: displayName,
+            displayName: trimmedName,
             photoURL: finalPhotoURL,
+            avatar: finalPhotoURL,
             ...(normalizedEmail ? { email: normalizedEmail } : {}),
             updatedAt: new Date().toISOString()
           }, { merge: true });
+          persistedAnywhere = true;
         } catch (err) {
-          console.error("Lỗi đồng bộ Firestore:", err);
+          console.warn("Lỗi đồng bộ Firestore:", err);
+        }
+
+        try {
+          const apiRes = await fetch('/api/user/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: user.uid,
+              email: normalizedEmail,
+              displayName: trimmedName,
+              photoURL: finalPhotoURL
+            })
+          });
+          if (apiRes.ok) persistedAnywhere = true;
+        } catch (apiErr) {
+          console.warn("Lỗi đồng bộ /api/user/update-profile:", apiErr);
         }
       }
 
-      await user.reload(); 
-      const updatedUser = auth.currentUser;
-      if (updatedUser) {
-        setUser(updatedUser);
-        setPhotoURL(updatedUser.photoURL || '');
-      } else {
-        setPhotoURL(finalPhotoURL);
+      if (!persistedAnywhere && !isRealFirebaseUser(user)) {
+        throw new Error('Không thể lưu thay đổi hồ sơ vào cơ sở dữ liệu.');
       }
 
-      setPreviewUrl(null); 
-      setImageFile(null);  
+      // Sync synthetic session if active
+      const existingSession = getFastSessionUser();
+      if (existingSession && existingSession.email?.toLowerCase().trim() === normalizedEmail) {
+        setFastSessionUser({
+          ...existingSession,
+          displayName: trimmedName,
+          photoURL: finalPhotoURL,
+          avatar: finalPhotoURL
+        });
+      }
+
+      if (isRealFirebaseUser(user)) {
+        try { await user.reload(); } catch {}
+      }
+
+      setDisplayName(trimmedName);
+      setPhotoURL(finalPhotoURL);
+      setPreviewUrl(null);
+      setImageFile(null);
+      imageFileRef.current = null;
+      hasPendingAvatarRemovalRef.current = false;
+
+      window.dispatchEvent(new CustomEvent('user_profile_updated', {
+        detail: {
+          displayName: trimmedName,
+          photoURL: finalPhotoURL,
+          uid: user.uid,
+          email: normalizedEmail
+        }
+      }));
 
       setMessage({ type: 'success', text: 'Lưu thay đổi thành công! Hồ sơ cá nhân đã được cập nhật.' });
       toast.success('Hồ sơ cá nhân của bạn đã được cập nhật thành công!');
 
     } catch (error: any) {
       console.error("Update Profile Error:", error);
-      const errMsg = error.message || 'Vui lòng thử lại.';
+      const errMsg = error?.message || 'Vui lòng thử lại.';
       setMessage({ type: 'error', text: 'Lỗi cập nhật: ' + errMsg });
       toast.error('Cập nhật hồ sơ thất bại: ' + errMsg);
     } finally {
@@ -345,18 +684,35 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
   const handleUpdateSecurity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    setIsLoading(true);
     setMessage(null);
 
+    if (!newPassword) {
+      const emptyMsg = 'Vui lòng nhập mật khẩu mới.';
+      setMessage({ type: 'error', text: emptyMsg });
+      toast.error(emptyMsg);
+      return;
+    }
+
+    const strength = evaluatePasswordStrength(newPassword);
+    if (!strength.isValid) {
+      const ruleMsg = strength.firstError || 'Mật khẩu mới chưa đáp ứng đủ quy tắc bảo mật.';
+      setMessage({ type: 'error', text: ruleMsg });
+      toast.error(ruleMsg);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      const mismatchMsg = 'Mật khẩu xác nhận không khớp.';
+      setMessage({ type: 'error', text: mismatchMsg });
+      toast.error(mismatchMsg);
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      if (newPassword) {
-        if (newPassword.length < 6) throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
-        if (newPassword !== confirmPassword) throw new Error("Mật khẩu nhập lại không khớp.");
-        
-        await updatePassword(user, newPassword);
-        await syncLinkedProvidersMetadata(user);
-        setProviderStatus(getLinkedProviderStatus(auth.currentUser || user));
-      }
+      await updatePassword(user, newPassword);
+      await syncLinkedProvidersMetadata(user);
+      setProviderStatus(getLinkedProviderStatus(auth.currentUser || user));
       setMessage({ type: 'success', text: 'Cập nhật mật khẩu thành công! Bạn có thể cần đăng nhập lại.' });
       toast.success('Cập nhật mật khẩu thành công!');
       setNewPassword('');
@@ -481,25 +837,49 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
       return;
     }
     
-    if (!window.confirm("CẢNH BÁO: Tài khoản sẽ bị xóa vĩnh viễn. Bạn chắc chắn chứ?")) return;
+    if (!window.confirm("CẢNH BÁO: Tài khoản và toàn bộ dữ liệu cá nhân của bạn sẽ bị xóa vĩnh viễn. Bạn chắc chắn chứ?")) return;
 
     setIsLoading(true);
     setMessage(null);
 
     try {
-      await deleteDoc(doc(db, "users", expectedConfirmKey));
+      const keysToDelete = Array.from(
+        new Set([expectedConfirmKey, user.uid].filter((k): k is string => Boolean(k && k.trim())))
+      );
+
+      for (const docKey of keysToDelete) {
+        const subCollections = ['purchased_courses', 'notifications', 'gamification'];
+        for (const subCol of subCollections) {
+          try {
+            const snap = await getDocs(collection(db, 'users', docKey, subCol));
+            await Promise.all(snap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+          } catch (subErr) {
+            console.warn(`Không thể xóa subcollection ${subCol}:`, subErr);
+          }
+        }
+        try {
+          await deleteDoc(doc(db, 'users', docKey));
+        } catch (docErr) {
+          console.warn(`Không thể xóa hồ sơ users/${docKey}:`, docErr);
+        }
+        try {
+          localStorage.removeItem(`user_roles_${docKey}`);
+          localStorage.removeItem(`fast_user_profile_${docKey}`);
+        } catch (storageErr) {}
+      }
+
       await deleteUser(user);
-      toast.success('Tài khoản của bạn đã được xóa vĩnh viễn!');
+      toast.success('Tài khoản và dữ liệu của bạn đã được xóa vĩnh viễn!');
       navigate('/');
     } catch (e: any) {
       console.error(e);
       if (e.code === 'auth/requires-recent-login') {
-        const requireLoginMsg = 'Vui lòng Đăng xuất và Đăng nhập lại trước khi thực hiện hành động này.';
+        const requireLoginMsg = 'Vui lòng Đăng xuất và Đăng nhập lại trước khi thực hiện xóa tài khoản và dữ liệu.';
         setMessage({ type: 'error', text: requireLoginMsg });
         toast.error(requireLoginMsg);
       } else {
         setMessage({ type: 'error', text: 'Lỗi: ' + e.message });
-        toast.error('Xóa tài khoản thất bại: ' + e.message);
+        toast.error('Xóa tài khoản & dữ liệu thất bại: ' + e.message);
       }
     } finally {
       setIsLoading(false);
@@ -522,7 +902,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
       >
         <div className="space-y-1.5 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-tight">
+            <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-[0.02em] leading-[1.45]">
               Phương thức đăng nhập &amp; Liên kết tài khoản
             </h3>
             {hasUnlinkedMethod && (
@@ -742,13 +1122,27 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
             <div className="flex-1 space-y-3 min-w-0">
               <div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-[0.02em] leading-[1.45]">
                     {displayName || 'Học viên FAST'}
                   </h1>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[10px] font-bold">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    Đã xác thực
-                  </span>
+                  {user.email ? (
+                    emailVerified ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 rounded-full text-[11px] font-bold">
+                        <MailCheck className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Email đã xác thực</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-500/25 text-amber-200 border border-amber-400/40 rounded-full text-[11px] font-bold">
+                        <MailWarning className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Chưa xác thực email</span>
+                      </span>
+                    )
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-500/25 text-blue-200 border border-blue-400/40 rounded-full text-[11px] font-bold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-300" />
+                      <span>Tài khoản Facebook</span>
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-teal-100 font-mono mt-1 flex items-center justify-center sm:justify-start gap-1.5 opacity-90">
                   <Mail className="w-3.5 h-3.5 text-teal-300" />
@@ -817,7 +1211,97 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
           <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
             {renderLinkedMethodsSection()}
 
-            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2 pt-2">
+            {/* Email Verification Status Card */}
+            {user.email && (
+              <div
+                className={`p-4 sm:p-5 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                  emailVerified
+                    ? 'bg-emerald-50/70 border-emerald-200'
+                    : 'bg-amber-50/80 border-amber-200'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                      emailVerified
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {emailVerified ? (
+                      <MailCheck className="w-5 h-5" />
+                    ) : (
+                      <MailWarning className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-black text-slate-800">
+                        Xác thực địa chỉ Email
+                      </h3>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                          emailVerified
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                        }`}
+                      >
+                        {emailVerified ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Đã xác thực</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Chưa xác thực</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      {emailVerified
+                        ? `Email ${user.email} đã được xác thực và sẵn sàng khôi phục tài khoản khi cần.`
+                        : `Email ${user.email} chưa được xác thực. Hãy xác thực để tăng cường bảo mật và hỗ trợ khôi phục mật khẩu nhanh chóng.`}
+                    </p>
+                  </div>
+                </div>
+
+                {!emailVerified && (
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleResendVerificationEmail}
+                      disabled={isSendingVerification || verificationCooldown > 0}
+                      className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                    >
+                      {isSendingVerification ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>
+                        {verificationCooldown > 0
+                          ? `Gửi lại (${verificationCooldown}s)`
+                          : 'Gửi lại liên kết xác thực'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRefreshVerificationStatus}
+                      disabled={isCheckingVerification}
+                      className="px-3.5 py-2.5 bg-white hover:bg-amber-50 text-slate-700 border border-amber-300 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60 whitespace-nowrap shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCheckingVerification ? 'animate-spin' : ''}`} />
+                      <span>Kiểm tra lại</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-[0.02em] leading-[1.45] flex items-center gap-2 pt-2">
               <span className="w-1.5 h-5 bg-[#007c76] rounded-full"></span>
               Chỉnh Sửa Hồ Sơ Cá Nhân
             </h2>
@@ -916,7 +1400,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
         {/* TAB 3: SECURITY TAB */}
         {activeTab === 'security' && (
           <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-[0.02em] leading-[1.45] flex items-center gap-2">
               <span className="w-1.5 h-5 bg-rose-500 rounded-full"></span>
               Cài Đặt Mật Khẩu &amp; Bảo Mật
             </h2>
@@ -943,7 +1427,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full px-4 py-3 pr-11 bg-white border border-amber-300 rounded-xl font-bold text-slate-800 text-sm focus:outline-none focus:border-[#007c76]"
-                      placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+                      placeholder="Nhập mật khẩu mạnh (tối thiểu 8 ký tự)"
                     />
                     <button
                       type="button"
@@ -953,6 +1437,12 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+
+                  {newPassword.length > 0 && (
+                    <div className="mt-3">
+                      <PasswordStrengthMeter password={newPassword} />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -991,9 +1481,9 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
 
             {/* Danger Zone */}
             <div className="pt-8 border-t border-rose-200">
-              <h3 className="text-base font-black text-rose-600 uppercase tracking-tight flex items-center gap-2 mb-3">
+              <h3 className="text-base font-black text-rose-600 uppercase tracking-[0.02em] leading-[1.45] flex items-center gap-2 mb-3">
                 <AlertTriangle className="w-4 h-4 text-rose-600" />
-                Vùng Nguy Hiểm - Xóa Tài Khoản
+                Vùng Nguy Hiểm - Xóa Tài Khoản &amp; Xóa Dữ Liệu
               </h3>
               
               {!showDeleteZone ? (
@@ -1002,12 +1492,12 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                   onClick={() => setShowDeleteZone(true)}
                   className="text-rose-600 font-bold hover:underline text-xs cursor-pointer"
                 >
-                  Tôi muốn xóa tài khoản này khỏi hệ thống
+                  Tôi muốn xóa tài khoản và toàn bộ dữ liệu khỏi hệ thống
                 </button>
               ) : (
                 <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 space-y-3 animate-in fade-in">
                   <p className="text-xs font-bold text-rose-900 leading-relaxed">
-                    Hành động này sẽ xóa vĩnh viễn tài khoản của bạn khỏi hệ thống. Vui lòng nhập <strong className="text-slate-900">{user.email || user.uid}</strong> để xác nhận.
+                    Hành động này sẽ xóa vĩnh viễn tài khoản và toàn bộ dữ liệu cá nhân, tiến độ học tập của bạn khỏi hệ thống. Vui lòng nhập <strong className="text-slate-900">{user.email || user.uid}</strong> để xác nhận.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input 
@@ -1023,7 +1513,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                       disabled={deleteSelfEmail.trim().toLowerCase() !== (user.email || user.uid).toLowerCase() || isLoading}
                       className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-50 cursor-pointer"
                     >
-                      Xóa Vĩnh Viễn
+                      Xóa Tài Khoản &amp; Dữ Liệu
                     </button>
                     <button 
                       type="button"

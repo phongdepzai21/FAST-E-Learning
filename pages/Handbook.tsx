@@ -252,7 +252,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
               <span>Sổ Tay Kỹ Thuật An Toàn &amp; Kiểm Soát Chất Lượng F&amp;B</span>
             </div>
 
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight mb-4 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-[0.03em] mb-4 leading-[1.45]">
               Cẩm Nang <span className="text-yellow-300">An Toàn Thực Phẩm</span>
             </h1>
 
@@ -333,7 +333,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                   <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                     Chuyên đề 01 • Trọng tâm kiểm soát vi sinh
                   </span>
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                     Vùng Nhiệt Độ Nguy Hiểm (The Danger Zone: 5°C - 60°C)
                   </h2>
                   <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -411,7 +411,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
               <div className="space-y-4 pt-2">
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-[#007c76]" />
-                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                  <h3 className="text-lg font-black text-slate-900 uppercase tracking-[0.02em] leading-[1.35]">
                     Quy Tắc Vàng 2 Giờ / 4 Giờ (The 2-Hour / 4-Hour Rule)
                   </h3>
                 </div>
@@ -472,7 +472,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                 <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                   Chuyên đề 02 • Kiểm soát kho lạnh
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                   Nguyên Tắc Phân Tầng Tủ Lạnh 5 Tầng &amp; Quản Lý FIFO
                 </h2>
                 <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -585,7 +585,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                 <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                   Chuyên đề 03 • Tiêu chuẩn nhiệt tâm
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                   Nhiệt Độ Đun Nấu Cốt Lõi (Minimum Internal Cooking Core Temp)
                 </h2>
                 <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -655,7 +655,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                 <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                   Chuyên đề 04 • Quy tắc vận hành sơ chế
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                   Quy Chuẩn Thớt 6 Màu HACCP &amp; 4 Tuyến Phòng Vệ Bếp
                 </h2>
                 <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -752,7 +752,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                 <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                   Chuyên đề 05 • Chuẩn mực quốc tế
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                   5 Chìa Khóa Vàng An Toàn Thực Phẩm Của WHO
                 </h2>
                 <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -821,7 +821,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
                 <span className="inline-block px-3 py-1 bg-teal-50 text-[#007c76] border border-teal-200 rounded-lg text-[11px] font-black uppercase tracking-wider mb-2">
                   Chuyên đề 06 • Quy trình kiểm soát SSOP
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                   Quy Trình Vệ Sinh Cá Nhân &amp; Khử Trùng Hóa Chất (SSOP)
                 </h2>
                 <p className="text-slate-600 text-sm sm:text-base leading-relaxed mt-1">
@@ -874,7 +874,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
 
               {/* Chemical Sanitizer Concentration Table */}
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-[0.02em] leading-[1.35]">
                   Nồng Độ Pha Chế Dung Dịch Khử Trùng Tiêu Chuẩn (PPM)
                 </h3>
 
@@ -919,7 +919,7 @@ const Handbook: React.FC<HandbookProps> = ({ embed }) => {
         <div className="bg-gradient-to-r from-slate-900 via-[#004f4a] to-[#007c76] rounded-[36px] p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl">
           <div className="space-y-2 text-center md:text-left">
             <span className="text-yellow-300 text-xs font-black uppercase tracking-widest">Đào Tạo &amp; Cấp Chứng Chỉ FAST</span>
-            <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight leading-tight">
+            <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-[0.025em] leading-[1.35]">
               Bạn Cần Đào Tạo Chuẩn Hóa <br className="hidden sm:block" />
               Cho Đội Ngũ Bếp &amp; Nhân Viên?
             </h3>

@@ -38,16 +38,10 @@ const Hero: React.FC = () => {
               </span>
             </div>
             
-            <h1 className="flex flex-col text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter leading-tight space-y-1 md:space-y-2">
-              <span className="text-white leading-none">
-                Nền Tảng
-              </span>
-              <span className="text-primary leading-none">
-                Vận Hành
-              </span>
-              <span className="text-white leading-none">
-                Chuyên Nghiệp
-              </span>
+            <h1 className="flex flex-col gap-5 sm:gap-6 md:gap-3 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-[0.03em] leading-[1.45]">
+              <span className="text-white">Nền Tảng</span>
+              <span className="text-primary">Vận Hành</span>
+              <span className="text-white">Chuyên Nghiệp</span>
             </h1>
 
             <p className="text-base sm:text-lg md:text-2xl text-gray-200 font-medium leading-relaxed max-w-2xl md:max-w-3xl pt-4">

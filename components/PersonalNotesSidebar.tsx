@@ -483,8 +483,8 @@ export const PersonalNotesSidebar: React.FC<PersonalNotesSidebarProps> = ({
 
                 {/* LESSON BADGE (IF IN 'ALL' MODE AND FROM DIFFERENT LESSON) */}
                 {filterMode === 'all' && (
-                  <div className="flex items-center justify-between text-[10px] bg-black/30 px-2 py-1 rounded-lg border border-white/[0.04]">
-                    <span className="text-slate-300 truncate font-semibold">
+                  <div className="flex items-center justify-between gap-2 text-[10px] bg-black/30 px-2 py-1 rounded-lg border border-white/[0.04]">
+                    <span className="min-w-0 flex-1 text-slate-300 font-semibold leading-[1.4] break-words [overflow-wrap:break-word]">
                       📚 {note.lessonTitle || `Bài ${note.lessonIdx + 1}`}
                     </span>
                     {!isCurrentLessonNote && onSelectLesson && (

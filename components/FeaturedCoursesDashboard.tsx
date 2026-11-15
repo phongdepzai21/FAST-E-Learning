@@ -555,7 +555,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                     <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md bg-slate-900 text-teal-200 inline-block">
                       {c.category || 'ISO/ATTP'}
                     </span>
-                    <h4 className="font-black text-sm text-slate-900 line-clamp-2 leading-snug">
+                    <h4 className="w-full font-black text-sm text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">
                       {c.title}
                     </h4>
                     <p className="text-xs text-slate-500 line-clamp-1 font-medium">{c.description}</p>
@@ -653,8 +653,8 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                                   (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=200';
                                 }}
                               />
-                              <div className="min-w-0">
-                                <span className="font-black text-slate-900 block truncate max-w-xs sm:max-w-md">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-black text-slate-900 block leading-[1.45] break-words [overflow-wrap:break-word]">
                                   {c.title}
                                 </span>
                                 <span className="font-mono text-[10px] text-slate-400">ID: {c.id}</span>
@@ -925,7 +925,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                     <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 inline-block mb-1">
                       {c.category || 'ATTP'}
                     </span>
-                    <h4 className="font-black text-xs text-slate-900 line-clamp-2">{c.title}</h4>
+                    <h4 className="w-full font-black text-xs text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">{c.title}</h4>
                   </div>
                 </div>
 

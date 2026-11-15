@@ -303,9 +303,9 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
             </span>
           </div>
           
-          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter leading-tight mb-8 md:mb-12">
-            <span className="text-white block leading-none mb-2">Nâng Tầm Kiến Thức</span>
-            <span className="text-yellow-300 block leading-none">An Toàn Thực Phẩm</span>
+          <h1 className="flex flex-col gap-3 sm:gap-4 text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-[0.025em] leading-[1.45] mb-8 md:mb-12">
+            <span className="block text-white">Nâng Tầm Kiến Thức</span>
+            <span className="block text-yellow-300">An Toàn Thực Phẩm</span>
           </h1>
 
           {/* Search Bar Container */}
@@ -357,7 +357,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
         {showRegularCourses && (
           <>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
+                <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] flex items-center gap-3">
                     <span className="w-2 h-8 bg-[#007c76] rounded-full"></span>
                     {activeCategory === 'Tất cả' ? 'Tất cả bài học' : `Khóa học ${activeCategory}`}
                     <span className="text-sm font-bold text-gray-300 ml-2">({filteredCourses.length})</span>
@@ -419,7 +419,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
         {showTrainingCourses && (
           <div id="khoa-dao-tao-section" className={showRegularCourses ? 'mt-16' : ''}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
+                <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] flex items-center gap-3">
                     <span className="w-2 h-8 bg-[#007c76] rounded-full"></span>
                     Khóa đào tạo
                     <span className="text-sm font-bold text-gray-300 ml-2">({filteredTrainingCourses.length})</span>
@@ -474,7 +474,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
         <div className="mt-20 space-y-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-l-4 border-[#007c76] pl-4">
                 <div>
-                    <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
+                    <h2 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] flex items-center gap-2">
                         <span>🎁 Gói Combo Đào Tạo Trọn Gói</span>
                     </h2>
                     <p className="text-gray-500 text-xs sm:text-sm font-medium mt-1">
@@ -530,7 +530,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
 
                             <div className="p-6 flex-1 flex flex-col space-y-4">
                                 <div className="space-y-1.5">
-                                    <h3 className="text-base sm:text-lg font-black text-gray-900 group-hover:text-[#007c76] transition-colors leading-snug line-clamp-1">
+                                    <h3 className="w-full text-base sm:text-lg font-black text-gray-900 group-hover:text-[#007c76] transition-colors leading-[1.45] tracking-[0.015em] break-words [overflow-wrap:break-word]">
                                         {combo.title}
                                     </h3>
                                     <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">
@@ -564,7 +564,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
                                                                 onClick={() => trackCourseView(c, currentUserEmail)}
                                                                 className="p-2 rounded-xl bg-white border border-slate-100 flex items-center justify-between gap-2 text-xs shadow-2xs hover:border-teal-300 transition"
                                                             >
-                                                                <span className="font-bold text-slate-800 truncate">{c.title}</span>
+                                                                <span className="min-w-0 flex-1 font-bold text-slate-800 leading-[1.4] break-words [overflow-wrap:break-word]">{c.title}</span>
                                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-50 text-[#007c76] font-bold shrink-0">
                                                                     {c.category || 'ISO'}
                                                                 </span>
@@ -619,7 +619,7 @@ const Courses: React.FC<CoursesProps> = ({ initialCategory = 'Tất cả' }) => 
         {/* Support Section */}
         <section className="mt-12 bg-gray-900 rounded-[48px] p-8 md:p-16 text-white flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="space-y-4 text-center md:text-left">
-                <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tight leading-none">Bạn cần lộ trình <br/> <span className="text-[#007c76]">Riêng Biệt?</span></h3>
+                <h3 className="text-3xl md:text-4xl font-black uppercase tracking-[0.025em] leading-[1.45]">Bạn cần lộ trình <span className="text-[#007c76]">Riêng Biệt?</span></h3>
                 <p className="text-gray-400 font-bold max-w-md">Liên hệ ngay để chuyên gia FAST thiết kế chương trình chuyên sâu riêng cho doanh nghiệp của bạn.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">

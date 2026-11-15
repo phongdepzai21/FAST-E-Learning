@@ -24,6 +24,65 @@ interface TermSection {
 
 const TERM_SECTIONS: TermSection[] = [
   {
+    id: 'chu-so-huu-va-nguyen-tac-chung',
+    number: '00',
+    title: 'Thông tin Chủ sở hữu website & Nguyên tắc chung về hoạt động',
+    summary:
+      'Công khai thông tin pháp lý chủ sở hữu website FAST E-Learning và phạm vi điều chỉnh của chính sách hoạt động.',
+    keywords: 'chủ sở hữu công ty tnhh tư vấn fast mst 0314568146 địa chỉ số điện thoại email nguyên tắc chung',
+    paragraphs: [
+      'Website fastelearning.com.vn là nền tảng đào tạo trực tuyến và cung cấp học liệu, công cụ quản lý an toàn thực phẩm & tiêu chuẩn quốc tế (ISO, HACCP) thuộc quyền sở hữu và quản lý trực tiếp của CÔNG TY TNHH TƯ VẤN FAST.',
+      'Bằng việc truy cập, đăng ký tài khoản hoặc giao dịch trên website, bạn xác nhận đã đọc, hiểu và đồng ý tuân thủ toàn bộ Chính sách chung về hoạt động (Điều khoản sử dụng) này.'
+    ],
+    bullets: [
+      {
+        label: 'Tên chủ sở hữu website',
+        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED)'
+      },
+      {
+        label: 'Mã số thuế / Số đăng ký kinh doanh',
+        text: '0314568146'
+      },
+      {
+        label: 'Địa chỉ trụ sở',
+        text: 'Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam'
+      },
+      {
+        label: 'Số điện thoại & Email liên hệ chính thức',
+        text: 'Hotline / Zalo: 0927 002 668 · Email hỗ trợ: support@fastelearning.com.vn · Email doanh nghiệp: hkc.qms@gmail.com'
+      }
+    ]
+  },
+  {
+    id: 'quyen-va-nghia-vu-cac-ben',
+    number: '00B',
+    title: 'Quyền và nghĩa vụ của các bên liên quan',
+    summary:
+      'Phân định minh bạch quyền lợi hợp pháp và trách nhiệm tương ứng giữa Chủ sở hữu website (Công ty TNHH Tư Vấn FAST) và Người sử dụng / Học viên.',
+    keywords: 'quyền nghĩa vụ các bên liên quan chủ sở hữu người dùng học viên trách nhiệm',
+    paragraphs: [
+      'Hoạt động cung cấp dịch vụ đào tạo trực tuyến trên FAST E-Learning được thiết lập trên nguyên tắc bình đẳng, minh bạch và tôn trọng pháp luật Việt Nam giữa hai bên:'
+    ],
+    bullets: [
+      {
+        label: '1. Quyền của Chủ sở hữu website (CÔNG TY TNHH TƯ VẤN FAST)',
+        text: 'Yêu cầu người dùng cung cấp thông tin chính xác khi đăng ký tài khoản và khóa học; tạm ngừng hoặc chấm dứt quyền truy cập đối với tài khoản vi phạm bản quyền, chia sẻ trái phép hoặc gian lận thanh toán; chủ động cập nhật, nâng cấp giáo trình, giao diện và điều chỉnh biểu phí niêm yết công khai cho các đơn đăng ký mới.'
+      },
+      {
+        label: '2. Nghĩa vụ của Chủ sở hữu website',
+        text: 'Cung cấp đầy đủ nội dung khóa học, tài liệu và quyền truy cập phòng học đúng như mô tả sau khi xác nhận thanh toán; bảo vệ thông tin cá nhân và dữ liệu giao dịch của khách hàng theo Chính sách bảo vệ thông tin cá nhân; tiếp nhận, giải quyết khiếu nại và thực hiện hoàn tiền đúng cam kết; đảm bảo tính ổn định kỹ thuật của hệ thống.'
+      },
+      {
+        label: '3. Quyền của Người sử dụng / Khách hàng / Học viên',
+        text: 'Được tham khảo thông tin khóa học, học phí, xem bài giảng giới thiệu (nếu có) trước khi đăng ký; được truy cập đầy đủ bài giảng, học liệu, cập nhật kiến thức và nhận Giấy chứng nhận hoàn thành khi đáp ứng điều kiện khóa học; được bảo mật thông tin cá nhân, yêu cầu chỉnh sửa hoặc xóa tài khoản/dữ liệu (/data-deletion) và yêu cầu hoàn tiền theo Chính sách hoàn tiền.'
+      },
+      {
+        label: '4. Nghĩa vụ của Người sử dụng / Khách hàng / Học viên',
+        text: 'Cung cấp trung thực thông tin cá nhân; tự bảo mật tài khoản, mật khẩu và thiết bị đăng nhập; không chia sẻ, chuyển nhượng, bán lại tài khoản hoặc sao chép, quay màn hình, phát tán trái phép video bài giảng, slide và tài liệu độc quyền của Công ty TNHH Tư Vấn FAST; thanh toán đúng và đủ học phí theo phương thức niêm yết.'
+      }
+    ]
+  },
+  {
     id: 'dang-ky',
     number: '01',
     title: 'Quy định về Đăng ký tài khoản & Đăng ký khóa đào tạo',
@@ -273,15 +332,12 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection }) => {
                 <span>CÔNG TY TNHH TƯ VẤN FAST</span>
               </div>
 
-              <h1
-                className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight"
-                style={{ textWrap: 'balance' }}
-              >
-                Điều khoản dịch vụ
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.02em] text-slate-900 dark:text-white leading-[1.45]">
+                Chính sách chung về hoạt động &amp; Điều khoản sử dụng
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-                Quy định đầy đủ về việc đăng ký tài khoản & khóa đào tạo, mua khóa học, thanh toán VietQR, chính sách hoàn tiền và nguyên tắc sử dụng tài khoản tại FAST E-Learning.
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
+                Điều khoản sử dụng website FAST E-Learning, thông tin chủ sở hữu (CÔNG TY TNHH TƯ VẤN FAST · MST: 0314568146), quyền và nghĩa vụ của các bên liên quan, chính sách thanh toán VietQR và hoàn tiền.
               </p>
             </div>
 

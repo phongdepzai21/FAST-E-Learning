@@ -844,7 +844,7 @@ export const ComboManagement: React.FC = () => {
                           <p className="text-[10px] font-extrabold uppercase tracking-widest text-teal-300">
                             MÃ COMBO: {combo.id}
                           </p>
-                          <h3 className="text-lg font-black leading-snug drop-shadow-sm">
+                          <h3 className="w-full text-lg font-black leading-[1.45] break-words [overflow-wrap:break-word] drop-shadow-sm">
                             {combo.title}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
@@ -909,8 +909,8 @@ export const ComboManagement: React.FC = () => {
                                               'https://images.unsplash.com/photo-1513104890138-7c749659a591';
                                           }}
                                         />
-                                        <div className="min-w-0">
-                                          <p className="text-xs font-bold text-gray-800 line-clamp-1">
+                                        <div className="min-w-0 flex-1">
+                                          <p className="w-full text-xs font-bold text-gray-800 leading-[1.45] break-words [overflow-wrap:break-word]">
                                             {c.title}
                                           </p>
                                           <span className="text-[10px] font-bold text-gray-400">
@@ -1022,8 +1022,8 @@ export const ComboManagement: React.FC = () => {
                             }}
                           />
                         </td>
-                        <td className="py-4 px-6 min-w-[280px]">
-                          <p className="font-black text-gray-900">{combo.title}</p>
+                        <td className="py-4 px-6 min-w-[240px]">
+                          <p className="w-full font-black text-gray-900 leading-[1.45] break-words [overflow-wrap:break-word]">{combo.title}</p>
                           <span className="text-[10px] font-bold text-gray-400 block uppercase">ID: {combo.id}</span>
                         </td>
                         <td className="py-4 px-6 font-black text-[#007c76] text-sm sm:text-base">
@@ -1563,8 +1563,8 @@ export const ComboManagement: React.FC = () => {
                                         'https://images.unsplash.com/photo-1513104890138-7c749659a591';
                                     }}
                                   />
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold leading-snug truncate group-hover:text-[#007c76] transition-colors">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="w-full text-xs font-bold leading-[1.45] break-words [overflow-wrap:break-word] group-hover:text-[#007c76] transition-colors">
                                       {course.title}
                                     </p>
                                     <p className="text-[10px] text-gray-400 font-medium">

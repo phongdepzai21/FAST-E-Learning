@@ -7,6 +7,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { randomBytes, timingSafeEqual } from "crypto";
 import { verifyPaymentWebhookToken, processWebhookTransaction, verifyHMACSignature, logFailedWebhookAttempt } from "./utils/paymentService";
 
 const FIREBASE_PROJECT_ID = "fast-e-learning";
@@ -1846,6 +1847,7 @@ async function startServer() {
 
   const otpStore = loadOtpFromDisk();
   const otpSendCooldowns = new Map<string, number>();
+  const passwordResetTokens = new Map<string, { token: string; expiresAt: number; attempts: number }>();
 
   // OTP Send Endpoint
   app.post("/api/otp/send", async (req, res) => {
@@ -1961,6 +1963,15 @@ async function startServer() {
         });
       } else {
         console.warn(`[OTP] EmailJS dispatch failed for ${emailKey} (flow: ${flow}). Details:`, emailErrorDetails);
+        if (flow === 'reset') {
+          otpStore.delete(flowKey);
+          otpStore.delete(emailKey);
+          saveOtpToDisk(otpStore);
+          return res.status(503).json({
+            success: false,
+            error: "Không thể gửi mã OTP xác thực đến email lúc này. Vui lòng thử lại sau."
+          });
+        }
         return res.json({ 
           success: true, 
           fallback: true,
@@ -2017,6 +2028,21 @@ async function startServer() {
       otpStore.delete(emailKey);
       saveOtpToDisk(otpStore);
 
+      // For password reset flow: do NOT change password yet; issue a short-lived single-use resetToken
+      if (flow === 'reset') {
+        const resetToken = randomBytes(32).toString('hex');
+        passwordResetTokens.set(emailKey, {
+          token: resetToken,
+          expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes to finish setting new password
+          attempts: 0
+        });
+        return res.json({
+          success: true,
+          resetToken,
+          message: "Xác thực OTP thành công! Bạn có thể nhập mật khẩu mới ngay bây giờ."
+        });
+      }
+
       // Determine user roles and attributes
       const isOwner = emailKey === 'h1h4phong@gmail.com' || emailKey === 'trdung153@gmail.com';
       const isAdmin = isOwner || SYSTEM_ADMIN_EMAILS.includes(emailKey);
@@ -2070,6 +2096,127 @@ async function startServer() {
     } catch (error: any) {
       console.error("Server OTP Verify Error:", error);
       res.status(500).json({ error: "Lỗi hệ thống khi xác minh mã OTP." });
+    }
+  });
+
+  // Reset Password after OTP verification (Requires valid single-use resetToken issued by /api/otp/verify)
+  app.post("/api/auth/reset-password-with-otp", async (req, res) => {
+    try {
+      const { email, resetToken, newPassword } = req.body || {};
+      if (!email || !resetToken || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: "Thiếu thông tin xác thực hoặc mật khẩu mới."
+        });
+      }
+
+      const emailKey = String(email).toLowerCase().trim();
+      const tokenStr = String(resetToken).trim();
+      const pw = String(newPassword);
+
+      // Verify password strength on server
+      if (
+        pw.length < 8 ||
+        !/[A-Z]/.test(pw) ||
+        !/[a-z]/.test(pw) ||
+        !/[0-9]/.test(pw) ||
+        !/[^A-Za-z0-9]/.test(pw)
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: "Mật khẩu mới phải dài tối thiểu 8 ký tự và bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt."
+        });
+      }
+
+      const tokenRecord = passwordResetTokens.get(emailKey);
+      if (!tokenRecord) {
+        return res.status(403).json({
+          success: false,
+          error: "Phiên đặt lại mật khẩu không tồn tại hoặc đã hết hạn. Vui lòng xác thực lại bằng mã OTP."
+        });
+      }
+
+      if (Date.now() > tokenRecord.expiresAt) {
+        passwordResetTokens.delete(emailKey);
+        return res.status(403).json({
+          success: false,
+          error: "Phiên đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu gửi lại mã OTP mới."
+        });
+      }
+
+      let isTokenMatch = false;
+      try {
+        const expectedBuf = Buffer.from(tokenRecord.token, "utf8");
+        const providedBuf = Buffer.from(tokenStr, "utf8");
+        isTokenMatch =
+          expectedBuf.length === providedBuf.length &&
+          timingSafeEqual(expectedBuf, providedBuf);
+      } catch {
+        isTokenMatch = false;
+      }
+
+      if (!isTokenMatch) {
+        tokenRecord.attempts = (tokenRecord.attempts || 0) + 1;
+        if (tokenRecord.attempts >= 5) {
+          passwordResetTokens.delete(emailKey);
+        }
+        return res.status(403).json({
+          success: false,
+          error: "Mã phiên đặt lại mật khẩu không hợp lệ. Vui lòng xác thực lại OTP."
+        });
+      }
+
+      // Consume token immediately (single-use)
+      passwordResetTokens.delete(emailKey);
+
+      // Update Firebase Auth password via Admin SDK
+      const adminAuth = getAuth();
+      try {
+        const existingAuthUser = await adminAuth.getUserByEmail(emailKey);
+        await adminAuth.updateUser(existingAuthUser.uid, {
+          password: pw,
+          emailVerified: true
+        });
+      } catch (authErr: any) {
+        if (authErr?.code === 'auth/user-not-found') {
+          const diskUsers = loadUsersFromDisk();
+          const diskUser = diskUsers[emailKey];
+          await adminAuth.createUser({
+            email: emailKey,
+            password: pw,
+            emailVerified: true,
+            ...(diskUser?.displayName ? { displayName: diskUser.displayName } : {})
+          });
+        } else {
+          console.error("[reset-password-with-otp] Firebase Admin updateUser error:", authErr);
+          return res.status(500).json({
+            success: false,
+            error: "Không thể cập nhật mật khẩu trên hệ thống xác thực lúc này. Vui lòng thử lại sau."
+          });
+        }
+      }
+
+      // Sync disk cache & Firestore timestamp (never store raw password in Firestore)
+      saveUserToDisk(emailKey, { password: pw });
+      try {
+        await getServerFirestore().collection("users").doc(emailKey).set({
+          passwordUpdatedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (fsErr: any) {
+        console.warn("[reset-password-with-otp] Firestore timestamp sync note:", fsErr?.message || fsErr);
+      }
+
+      return res.json({
+        success: true,
+        message: "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ."
+      });
+    } catch (error: any) {
+      console.error("[/api/auth/reset-password-with-otp] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Lỗi hệ thống khi đặt lại mật khẩu. Vui lòng thử lại sau."
+      });
     }
   });
 
@@ -2504,6 +2651,143 @@ async function startServer() {
         }
       } catch {}
       res.json({ success: true, bypassed: true, message: "Profile synchronized in local session mode." });
+    }
+  });
+
+  // Upload user avatar reliably (tries Firebase Admin Storage first, falls back to local /uploads/avatars/ disk)
+  app.post("/api/user/upload-avatar", async (req, res) => {
+    try {
+      const { image, fileName, uid, email } = req.body || {};
+      if (!image || typeof image !== "string") {
+        return res.status(400).json({ success: false, error: "Dữ liệu ảnh đại diện không hợp lệ." });
+      }
+
+      const matches = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let mime = "image/jpeg";
+      let ext = "jpg";
+
+      if (matches && matches.length === 3) {
+        mime = matches[1].toLowerCase();
+        if (mime.includes("png")) ext = "png";
+        else if (mime.includes("webp")) ext = "webp";
+        else if (mime.includes("gif")) ext = "gif";
+        buffer = Buffer.from(matches[2], "base64");
+      } else {
+        buffer = Buffer.from(image.replace(/^data:[^;]+;base64,/, ""), "base64");
+      }
+
+      if (!buffer || buffer.length === 0) {
+        return res.status(400).json({ success: false, error: "Tệp ảnh trống hoặc bị lỗi." });
+      }
+
+      if (buffer.length > 6 * 1024 * 1024) {
+        return res.status(400).json({ success: false, error: "Kích thước ảnh vượt quá giới hạn 6MB." });
+      }
+
+      const normalizedEmail = typeof email === "string" ? email.toLowerCase().trim() : "";
+      const cleanUid = typeof uid === "string" ? uid.trim() : "";
+      const safeOwner = (cleanUid || normalizedEmail || "user")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .substring(0, 48);
+      const safeBase = (fileName || "avatar")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .substring(0, 32);
+      const uniqueName = `avatar_${safeOwner}_${safeBase}_${Date.now()}.${ext}`;
+
+      let finalUrl = "";
+
+      // Try saving to Firebase Admin Storage bucket first (returns durable download URL)
+      try {
+        const bucket = getStorage().bucket("fast-e-learning.firebasestorage.app");
+        const storagePath = `avatars/${cleanUid || safeOwner}/${uniqueName}`;
+        const fileObj = bucket.file(storagePath);
+        const { randomUUID } = await import("crypto");
+        const downloadToken = randomUUID();
+
+        await fileObj.save(buffer, {
+          metadata: {
+            contentType: mime,
+            metadata: {
+              firebaseStorageDownloadTokens: downloadToken
+            }
+          }
+        });
+
+        finalUrl = `https://firebasestorage.googleapis.com/v0/b/fast-e-learning.firebasestorage.app/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+      } catch (storageErr: any) {
+        console.warn("[upload-avatar] Admin Storage unavailable, saving to local uploads/avatars:", storageErr?.message || storageErr);
+      }
+
+      // Fallback to local server disk (/uploads/avatars/...) if Admin Storage is unavailable
+      if (!finalUrl) {
+        const avatarsDir = path.join(UPLOADS_DIR, "avatars");
+        if (!fs.existsSync(avatarsDir)) {
+          fs.mkdirSync(avatarsDir, { recursive: true });
+        }
+        const diskPath = path.join(avatarsDir, uniqueName);
+        fs.writeFileSync(diskPath, buffer);
+        finalUrl = `/uploads/avatars/${uniqueName}`;
+      }
+
+      // Persist updated photoURL directly to Firestore & disk store if owner key is provided
+      const docKey = normalizedEmail || cleanUid;
+      if (docKey) {
+        try {
+          const firestore = getServerFirestore();
+          await firestore.collection("users").doc(docKey).set({
+            photoURL: finalUrl,
+            avatar: finalUrl,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (dbErr: any) {
+          console.warn("[upload-avatar] Firestore sync note:", dbErr?.message || dbErr);
+        }
+        saveUserToDisk(docKey, { photoURL: finalUrl, avatar: finalUrl });
+      }
+
+      return res.json({ success: true, url: finalUrl });
+    } catch (err: any) {
+      console.error("[upload-avatar] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Không thể tải ảnh đại diện lên máy chủ." });
+    }
+  });
+
+  // Explicit user profile update endpoint (persists displayName and photoURL even when client SDK token refresh lags)
+  app.post("/api/user/update-profile", async (req, res) => {
+    try {
+      const { uid, email, displayName, photoURL } = req.body || {};
+      const normalizedEmail = typeof email === "string" ? email.toLowerCase().trim() : "";
+      const cleanUid = typeof uid === "string" ? uid.trim() : "";
+      const docKey = normalizedEmail || cleanUid;
+
+      if (!docKey) {
+        return res.status(400).json({ success: false, error: "Thiếu thông tin định danh tài khoản." });
+      }
+
+      const updates: Record<string, any> = {
+        updatedAt: new Date().toISOString()
+      };
+      if (typeof displayName === "string") {
+        updates.displayName = displayName.trim();
+      }
+      if (typeof photoURL === "string") {
+        updates.photoURL = photoURL;
+        updates.avatar = photoURL;
+      }
+
+      try {
+        const firestore = getServerFirestore();
+        await firestore.collection("users").doc(docKey).set(updates, { merge: true });
+      } catch (dbErr: any) {
+        console.warn("[update-profile] Firestore update note:", dbErr?.message || dbErr);
+      }
+
+      saveUserToDisk(docKey, updates);
+      return res.json({ success: true, profile: updates });
+    } catch (err: any) {
+      console.error("[update-profile] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi cập nhật hồ sơ." });
     }
   });
 

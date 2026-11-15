@@ -495,7 +495,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                     Lịch: {course.startDate || 'Chủ Nhật hàng tuần'}
                   </span>
                 </div>
-                <h4 className="text-sm font-black text-slate-900 truncate">{course.title}</h4>
+                <h4 className="w-full text-sm font-black text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">{course.title}</h4>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-emerald-700">{course.price}</span>
                   {course.originalPrice && course.originalPrice !== course.price && (

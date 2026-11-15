@@ -6,10 +6,10 @@ const TermsOfService: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Điều khoản dịch vụ | FAST E-Learning</title>
+        <title>Chính sách chung &amp; Điều khoản sử dụng | FAST E-Learning</title>
         <meta
           name="description"
-          content="Điều khoản dịch vụ của FAST E-Learning quy định việc đăng ký tài khoản & khóa đào tạo, mua khóa học, thanh toán VietQR, hoàn tiền và sử dụng tài khoản."
+          content="Chính sách chung về hoạt động và Điều khoản sử dụng website FAST E-Learning (CÔNG TY TNHH TƯ VẤN FAST - MST: 0314568146), quy định quyền và nghĩa vụ của các bên liên quan."
         />
         <link rel="canonical" href="https://fastelearning.com.vn/terms" />
       </Helmet>

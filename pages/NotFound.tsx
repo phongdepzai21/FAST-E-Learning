@@ -41,10 +41,10 @@ const NotFound: React.FC = () => {
 
         {/* Heading */}
         <div className="space-y-3">
-          <h1 className="text-8xl font-black tracking-tighter bg-gradient-to-r from-rose-400 via-amber-400 to-rose-400 bg-clip-text text-transparent select-none animate-pulse">
+          <h1 className="text-8xl font-black tracking-[0.04em] leading-[1.3] bg-gradient-to-r from-rose-400 via-amber-400 to-rose-400 bg-clip-text text-transparent select-none animate-pulse">
             404
           </h1>
-          <h2 className="text-2xl font-black uppercase text-white tracking-wide">
+          <h2 className="text-2xl font-black uppercase text-white tracking-[0.03em] leading-[1.35]">
             Đường dẫn không hợp lệ
           </h2>
           <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed font-semibold">

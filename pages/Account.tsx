@@ -46,7 +46,8 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
+  sendEmailVerification,
+  applyActionCode,
   updateProfile,
   type User,
   type AuthCredential
@@ -65,6 +66,8 @@ import { authDebugger } from '../utils/authDebugger';
 import { otpLogger } from '../auth/otp-logger';
 import { sendOtp, verifyOtp } from '../utils/otpService';
 import { getFastSessionUser, setFastSessionUser, clearFastSessionUser, createSyntheticFirebaseUser } from '../utils/sessionAuth';
+import { evaluatePasswordStrength } from '../utils/passwordValidation';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import { ReCaptcha } from '../components/ReCaptcha';
 
 interface UserProfile {
@@ -112,7 +115,7 @@ const MyOwnedCoursesView: React.FC<{
     <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+          <h3 className="text-2xl font-black text-gray-800 tracking-[0.025em] leading-[1.45] flex items-center gap-3 uppercase">
             <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
             Khóa học của tôi
           </h3>
@@ -248,7 +251,7 @@ const BuyCoursesView: React.FC<{
     <section className="animate-in slide-in-from-bottom-5 duration-700 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+          <h3 className="text-2xl md:text-3xl font-black text-gray-800 tracking-[0.025em] leading-[1.45] flex items-center gap-3 uppercase">
             <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
             Mua khóa học / Danh mục học tập
           </h3>
@@ -613,7 +616,13 @@ const Account: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<'email' | 'otp' | 'new-password' | 'done'>('email');
+  const [resetVerifiedToken, setResetVerifiedToken] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState('');
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
 
   // Google reCAPTCHA states
@@ -628,29 +637,62 @@ const Account: React.FC = () => {
   const [otpFormError, setOtpFormError] = useState<string | null>(null);
   const [otpAttemptsLeft, setOtpAttemptsLeft] = useState(5);
 
-  // --- EFFECT: OTP COUNTDOWN TIMER ---
+  // --- EFFECT: HANDLE FIREBASE EMAIL VERIFICATION ACTION LINK (?mode=verifyEmail) ---
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+    if (!mode || !oobCode) return;
+
+    if (mode === 'verifyEmail') {
+      let cancelled = false;
+      applyActionCode(auth, oobCode)
+        .then(async () => {
+          if (auth.currentUser) {
+            try { await auth.currentUser.reload(); } catch {}
+          }
+          if (!cancelled) {
+            toast.success('Xác thực email thành công!');
+            navigate(location.pathname, { replace: true });
+          }
+        })
+        .catch((err: any) => {
+          if (!cancelled) {
+            const msg = err?.code === 'auth/expired-action-code'
+              ? 'Liên kết xác thực email đã hết hạn. Vui lòng vào Cài đặt tài khoản để gửi lại.'
+              : 'Liên kết xác thực email không hợp lệ hoặc đã được sử dụng.';
+            toast.error(msg);
+          }
+        });
+      return () => { cancelled = true; };
+    }
+  }, [location.search, location.pathname, navigate, toast]);
+
+  // --- EFFECT: OTP COUNTDOWN TIMER (Registration & Forgot Password OTP) ---
+  const isOtpStepActive = isOtpPending || (isForgotPassword && forgotPasswordStep === 'otp');
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isOtpPending && otpCountdown > 0) {
+    if (isOtpStepActive && otpCountdown > 0) {
       timer = setInterval(() => {
-        setOtpCountdown(prev => prev - 1);
+        setOtpCountdown(prev => Math.max(0, prev - 1));
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isOtpPending, otpCountdown]);
+  }, [isOtpStepActive, otpCountdown]);
 
   // Auto-focus first OTP input when OTP screen opens
   useEffect(() => {
-    if (isOtpPending) {
+    if (isOtpStepActive) {
       const timer = setTimeout(() => {
         const firstEmptyIndex = otpDigits.findIndex(d => !d);
         const targetIndex = firstEmptyIndex !== -1 ? firstEmptyIndex : 0;
-        const targetInput = document.getElementById(`otp-input-${targetIndex}`) as HTMLInputElement;
+        const prefix = isForgotPassword ? 'forgot-otp-input-' : 'otp-input-';
+        const targetInput = document.getElementById(`${prefix}${targetIndex}`) as HTMLInputElement;
         if (targetInput) targetInput.focus();
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOtpPending]);
+  }, [isOtpStepActive, isForgotPassword]);
 
   // Real-time Diagnostic hook for Account registration OTP
   useEffect(() => {
@@ -733,6 +775,7 @@ const Account: React.FC = () => {
                     let curLockReason: string | undefined = undefined;
                     let customDisplayName: string | undefined = undefined;
                     let customPhotoURL: string | undefined = undefined;
+                    let hasCustomPhotoField = false;
 
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data() as any;
@@ -747,10 +790,12 @@ const Account: React.FC = () => {
                         } else if (typeof userData.fullName === 'string' && userData.fullName.trim()) {
                           customDisplayName = userData.fullName;
                         }
-                        if (typeof userData.photoURL === 'string' && userData.photoURL.trim()) {
+                        if ('photoURL' in userData && typeof userData.photoURL === 'string') {
                           customPhotoURL = userData.photoURL;
-                        } else if (typeof userData.avatar === 'string' && userData.avatar.trim()) {
+                          hasCustomPhotoField = true;
+                        } else if ('avatar' in userData && typeof userData.avatar === 'string') {
                           customPhotoURL = userData.avatar;
+                          hasCustomPhotoField = true;
                         }
                         
                         localStorage.setItem(`user_roles_${profileDocKey}`, JSON.stringify({
@@ -799,7 +844,7 @@ const Account: React.FC = () => {
                       providerId,
                       linkedProviders: latestProviders.length > 0 ? latestProviders : prev.linkedProviders,
                       name: customDisplayName || prev.name,
-                      avatar: customPhotoURL || prev.avatar,
+                      avatar: hasCustomPhotoField ? (customPhotoURL ?? '') : prev.avatar,
                       isVip: curVip,
                       isAdmin: curAdmin,
                       isTeacher: curTeacher,
@@ -905,6 +950,17 @@ const Account: React.FC = () => {
     };
     window.addEventListener('user_providers_updated', handleProvidersUpdated);
 
+    const handleProfileUpdated = (e: any) => {
+      const detail = e?.detail;
+      if (!detail) return;
+      setUser(prev => prev ? {
+        ...prev,
+        name: typeof detail.displayName === 'string' && detail.displayName.trim() ? detail.displayName : prev.name,
+        avatar: typeof detail.photoURL === 'string' ? detail.photoURL : prev.avatar
+      } : prev);
+    };
+    window.addEventListener('user_profile_updated', handleProfileUpdated);
+
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
@@ -921,6 +977,7 @@ const Account: React.FC = () => {
       clearTimeout(safetyTimer);
       window.removeEventListener('fast_auth_changed', handleFastAuthEvent);
       window.removeEventListener('user_providers_updated', handleProvidersUpdated);
+      window.removeEventListener('user_profile_updated', handleProfileUpdated);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [location]);
@@ -1119,11 +1176,12 @@ const Account: React.FC = () => {
       if (!fullName.trim()) {
         throw new Error("Vui lòng nhập họ và tên của bạn.");
       }
-      if (!email.trim() || !email.includes('@')) {
+      if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
         throw new Error("Vui lòng nhập địa chỉ email hợp lệ.");
       }
-      if (password.length < 6) {
-        throw new Error("Mật khẩu của bạn phải có độ dài từ 6 ký tự trở lên.");
+      const pwStrength = evaluatePasswordStrength(password);
+      if (!pwStrength.isValid) {
+        throw new Error(pwStrength.firstError || "Mật khẩu chưa đáp ứng đủ quy tắc bảo mật.");
       }
       
       const normalizedEmail = email.toLowerCase().trim();
@@ -1165,53 +1223,6 @@ const Account: React.FC = () => {
     }
   };
 
-  const startResetOtpFlow = async () => {
-    setIsAuthenticating(true);
-    setError(null);
-    setOtpFormError(null);
-    try {
-      if (!email.trim() || !email.includes('@')) {
-        throw new Error("Vui lòng nhập địa chỉ email hợp lệ.");
-      }
-      if (password.length < 6) {
-        throw new Error("Mật khẩu mới của bạn phải có độ dài từ 6 ký tự trở lên.");
-      }
-
-      const normalizedEmail = email.toLowerCase().trim();
-      setEmail(normalizedEmail);
-      setOtpDigits(['', '', '', '', '', '']);
-      setOtpAttemptsLeft(5);
-      setOtpCountdown(60);
-
-      const sendResult = await sendOtp({
-        email: normalizedEmail,
-        name: fullName.trim() || 'Học viên',
-        flow: 'reset'
-      });
-
-      if (sendResult.success) {
-        setIsOtpPending(true);
-        if (sendResult.fallback && sendResult.otp) {
-          setOtpDigits(sendResult.otp.split(''));
-          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP đã được khởi tạo tự động. Hệ thống đã tự động điền mã cho bạn.`);
-          toast.success('Hệ thống tự động điền mã OTP dự phòng!');
-        } else {
-          setOtpStatusMessage(sendResult.message || `Mã xác thực OTP đặt lại mật khẩu đã được gửi đến email [${normalizedEmail}]. Vui lòng mở email để lấy mã.`);
-          toast.success('Mã OTP đặt lại mật khẩu đã được gửi đến email!');
-        }
-      } else {
-        throw new Error(sendResult?.error || "Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra lại email.");
-      }
-    } catch (err: any) {
-      console.error("Reset OTP Flow error:", err);
-      const errMsg = err?.message || "Có lỗi xảy ra khi yêu cầu mã OTP đặt lại mật khẩu.";
-      setError(errMsg);
-      toast.error(errMsg);
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
-
   const handleVerifiedRegister = async () => {
     const enteredCode = otpDigits.join('');
     if (enteredCode.length !== 6) {
@@ -1223,13 +1234,11 @@ const Account: React.FC = () => {
     setIsAuthenticating(true);
     setOtpFormError(null);
 
-    const activeFlow = isResettingPassword ? 'reset' : 'register';
-
     try {
       const verifyRes = await verifyOtp({
         email: email.toLowerCase().trim(),
         otp: enteredCode,
-        flow: activeFlow
+        flow: 'register'
       });
 
       if (!verifyRes.success) {
@@ -1251,27 +1260,29 @@ const Account: React.FC = () => {
         return;
       }
 
-      // OTP matches! Attempt creating or updating user in Firebase Auth
+      // OTP matches! Attempt creating user in Firebase Auth
       let newUser: any = null;
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         newUser = userCredential.user;
         const nameToSet = fullName.trim() || newUser.displayName || email.split('@')[0];
         await updateProfile(newUser, { displayName: nameToSet });
+        try {
+          await sendEmailVerification(newUser, { url: `${window.location.origin}/account/settings` });
+        } catch {
+          try { await sendEmailVerification(newUser); } catch {}
+        }
       } catch (authCreateErr: any) {
         if (authCreateErr.code === 'auth/email-already-in-use') {
-          // Account already exists in Firebase Auth!
           try {
             const loginCredential = await signInWithEmailAndPassword(auth, email, password);
             newUser = loginCredential.user;
-          } catch (loginErr: any) {
-            // Account exists in Firebase Auth with different password
-            try {
-              await sendPasswordResetEmail(auth, email);
-              toast.info(`Tài khoản đã có trên Firebase Auth. Hệ thống đã gửi email khôi phục mật khẩu đến ${email}. Vui lòng kiểm tra hộp thư.`);
-            } catch (e) {}
+          } catch {
             setIsOtpPending(false);
-            setIsResettingPassword(false);
+            setIsRegistering(false);
+            setEmailError('Email này đã được đăng ký trước đó.');
+            setError('Email này đã có tài khoản. Vui lòng đăng nhập hoặc dùng chức năng Quên mật khẩu để đặt lại bằng OTP.');
+            toast.error('Email này đã được sử dụng.');
             setIsAuthenticating(false);
             return;
           }
@@ -1346,13 +1357,9 @@ const Account: React.FC = () => {
       }
 
       const welcomeName = fullName.trim() || email.split('@')[0];
-      toast.success(isResettingPassword 
-        ? `Thiết lập mật khẩu thành công! Chào mừng ${welcomeName} quay trở lại.` 
-        : `Xác nhận thành công! Chào mừng ${welcomeName} gia nhập FAST E-Learning.`
-      );
+      toast.success(`Xác nhận thành công! Chào mừng ${welcomeName} gia nhập FAST E-Learning.`);
 
       setIsOtpPending(false);
-      setIsResettingPassword(false);
 
       if (newUser && isRealFirebaseUser(newUser)) {
         await resolvePendingFacebookLink(newUser);
@@ -1364,7 +1371,7 @@ const Account: React.FC = () => {
           navigate('/account');
       }
     } catch (err: any) {
-      console.error("Firebase registration/reset error after OTP verification:", err);
+      console.error("Firebase registration error after OTP verification:", err);
       let msg = "Lỗi xác thực và tạo tài khoản.";
       if (err.code === 'auth/email-already-in-use') {
         msg = "Email này hiện đã được sử dụng bởi học viên khác.";
@@ -1373,7 +1380,7 @@ const Account: React.FC = () => {
       } else if (err.code === 'auth/invalid-email') {
         msg = "Địa chỉ email không khả dụng hoặc không chính xác.";
       } else if (err.code === 'auth/weak-password') {
-        msg = "Mật khẩu quá yếu. Vui lòng chọn mật khẩu từ 6 ký tự trở lên.";
+        msg = "Mật khẩu quá yếu. Vui lòng chọn mật khẩu từ 8 ký tự trở lên.";
       } else if (err.message && err.message.toLowerCase().includes("permission")) {
         msg = "Lỗi phân quyền hệ thống (Permission Denied). Vui lòng tải lại trang hoặc thử lại.";
       }
@@ -1392,12 +1399,11 @@ const Account: React.FC = () => {
     setOtpFormError(null);
 
     const normalizedEmail = email.toLowerCase().trim();
-    const activeFlow = isResettingPassword ? 'reset' : 'register';
     try {
       const sendResult = await sendOtp({
         email: normalizedEmail,
         name: fullName.trim() || 'Học viên',
-        flow: activeFlow
+        flow: 'register'
       });
 
       if (sendResult.success) {
@@ -1416,6 +1422,284 @@ const Account: React.FC = () => {
     } catch (err: any) {
       setOtpFormError("Lỗi kết nối tới máy chủ gửi OTP.");
       toast.error("Gửi lại mã OTP thất bại!");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const openForgotPasswordFlow = () => {
+    setIsForgotPassword(true);
+    setForgotPasswordStep('email');
+    setResetVerifiedToken('');
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    setResetPasswordError('');
+    setShowResetPassword(false);
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpFormError(null);
+    setOtpStatusMessage(null);
+    setOtpCountdown(0);
+    setOtpAttemptsLeft(5);
+    setIsRegistering(false);
+    setError(null);
+    setEmailError('');
+    setPasswordError('');
+  };
+
+  const closeForgotPasswordFlow = () => {
+    setIsForgotPassword(false);
+    setForgotPasswordStep('email');
+    setResetVerifiedToken('');
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+    setResetPasswordError('');
+    setShowResetPassword(false);
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpFormError(null);
+    setOtpStatusMessage(null);
+    setError(null);
+    setEmailError('');
+    setPasswordError('');
+  };
+
+  const handleForgotSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
+    setEmailError('');
+    setOtpFormError(null);
+
+    const cleanEmail = email.toLowerCase().trim();
+    setEmail(cleanEmail);
+
+    if (!cleanEmail) {
+      const msg = 'Vui lòng nhập địa chỉ email của tài khoản cần khôi phục.';
+      setEmailError(msg);
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      const msg = 'Định dạng email không hợp lệ. Vui lòng nhập đúng địa chỉ email (ví dụ: ten@domain.com).';
+      setEmailError(msg);
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      // Check if account exists on the system first
+      let checkExists: boolean | null = null;
+      try {
+        const res = await fetch('/api/user/exists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data?.exists === 'boolean') checkExists = data.exists;
+        }
+      } catch {}
+
+      if (checkExists === false) {
+        const notFoundMsg = 'Không tìm thấy tài khoản nào gắn với email này. Vui lòng kiểm tra lại email hoặc đăng ký tài khoản mới.';
+        setEmailError(notFoundMsg);
+        setError(notFoundMsg);
+        toast.error('Email chưa được đăng ký trên hệ thống.');
+        return;
+      }
+
+      const sendResult = await sendOtp({
+        email: cleanEmail,
+        name: 'Học viên',
+        flow: 'reset'
+      });
+
+      if (!sendResult.success) {
+        const msg = sendResult.error || 'Không thể gửi mã OTP qua email lúc này. Vui lòng thử lại sau.';
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      setOtpDigits(['', '', '', '', '', '']);
+      setOtpAttemptsLeft(5);
+      setOtpCountdown(60);
+      setOtpFormError(null);
+      setResetVerifiedToken('');
+      setOtpStatusMessage(
+        sendResult.message ||
+        `Mã OTP 6 chữ số đã được gửi tới email ${cleanEmail}. Vui lòng kiểm tra hộp thư (kể cả mục Spam) và nhập mã để xác thực.`
+      );
+      setForgotPasswordStep('otp');
+      toast.success(`Đã gửi mã OTP xác thực tới ${cleanEmail}!`);
+    } catch (err: any) {
+      const msg = err?.message || 'Lỗi kết nối khi gửi mã OTP khôi phục mật khẩu.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleForgotVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const enteredCode = otpDigits.join('');
+    if (enteredCode.length !== 6) {
+      const msg = 'Vui lòng nhập đầy đủ 6 chữ số OTP từ email của bạn.';
+      setOtpFormError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setOtpFormError(null);
+    setError(null);
+
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const verifyRes = await verifyOtp({
+        email: cleanEmail,
+        otp: enteredCode,
+        flow: 'reset'
+      });
+
+      if (!verifyRes.success || !verifyRes.resetToken) {
+        const left = otpAttemptsLeft - 1;
+        setOtpAttemptsLeft(Math.max(0, left));
+        if (left <= 0) {
+          const msg = 'Bạn đã nhập sai mã OTP quá số lần cho phép. Vui lòng yêu cầu gửi lại mã OTP mới.';
+          setForgotPasswordStep('email');
+          setOtpDigits(['', '', '', '', '', '']);
+          setError(msg);
+          toast.error(msg);
+        } else {
+          const msg = verifyRes.error || `Mã OTP không chính xác hoặc đã hết hạn. Bạn còn ${left} lần thử.`;
+          setOtpFormError(msg);
+          toast.error(msg);
+        }
+        return;
+      }
+
+      setResetVerifiedToken(verifyRes.resetToken);
+      setResetNewPassword('');
+      setResetConfirmPassword('');
+      setResetPasswordError('');
+      setOtpFormError(null);
+      setError(null);
+      setForgotPasswordStep('new-password');
+      toast.success('Xác thực OTP thành công! Bây giờ bạn có thể đặt mật khẩu mới.');
+    } catch (err: any) {
+      const msg = err?.message || 'Không thể xác thực mã OTP lúc này. Vui lòng thử lại.';
+      setOtpFormError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleForgotResendOtp = async () => {
+    if (otpCountdown > 0 || isAuthenticating) return;
+    setIsAuthenticating(true);
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpFormError(null);
+    setError(null);
+
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const sendResult = await sendOtp({
+        email: cleanEmail,
+        name: 'Học viên',
+        flow: 'reset'
+      });
+      if (sendResult.success) {
+        setOtpAttemptsLeft(5);
+        setOtpCountdown(60);
+        setOtpStatusMessage(
+          sendResult.message ||
+          `Mã OTP mới đã được gửi tới email ${cleanEmail}. Mã cũ không còn hiệu lực.`
+        );
+        toast.success('Đã gửi lại mã OTP mới tới email của bạn!');
+      } else {
+        const msg = sendResult.error || 'Không thể gửi lại mã OTP lúc này.';
+        setOtpFormError(msg);
+        toast.error(msg);
+      }
+    } catch {
+      const msg = 'Lỗi kết nối máy chủ gửi OTP.';
+      setOtpFormError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleForgotSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetPasswordError('');
+    setError(null);
+
+    if (!resetVerifiedToken) {
+      setForgotPasswordStep('email');
+      const msg = 'Phiên xác thực OTP không hợp lệ hoặc đã hết hạn. Vui lòng xác thực lại OTP.';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const strength = evaluatePasswordStrength(resetNewPassword);
+    if (!strength.isValid) {
+      const msg = strength.firstError || 'Mật khẩu mới chưa đáp ứng đủ quy tắc bảo mật.';
+      setResetPasswordError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      const msg = 'Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.';
+      setResetPasswordError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const res = await fetch('/api/auth/reset-password-with-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          resetToken: resetVerifiedToken,
+          newPassword: resetNewPassword
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Không thể cập nhật mật khẩu mới lúc này. Vui lòng thử lại.';
+        setResetPasswordError(msg);
+        toast.error(msg);
+        if (res.status === 403) {
+          setResetVerifiedToken('');
+        }
+        return;
+      }
+
+      setResetVerifiedToken('');
+      setResetNewPassword('');
+      setResetConfirmPassword('');
+      setResetPasswordError('');
+      setPassword('');
+      setError(null);
+      setForgotPasswordStep('done');
+      toast.success('Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ.');
+    } catch (err: any) {
+      const msg = err?.message || 'Lỗi kết nối máy chủ khi cập nhật mật khẩu.';
+      setResetPasswordError(msg);
+      toast.error(msg);
     } finally {
       setIsAuthenticating(false);
     }
@@ -1442,23 +1726,27 @@ const Account: React.FC = () => {
     if (!cleanEmail) {
       setEmailError("Vui lòng nhập địa chỉ email.");
       hasError = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setEmailError("Định dạng email không hợp lệ (ví dụ: ten@domain.com).");
+      hasError = true;
     }
     
     if (!password) {
       setPasswordError("Vui lòng nhập mật khẩu.");
       hasError = true;
+    } else if (isRegistering) {
+      const pwStrength = evaluatePasswordStrength(password);
+      if (!pwStrength.isValid) {
+        setPasswordError(pwStrength.firstError || "Mật khẩu chưa đạt đủ điều kiện bảo mật.");
+        hasError = true;
+      }
     }
     
     if (hasError) {
         setIsAuthenticating(false);
-        toast.error("Vui lòng điền đầy đủ thông tin vào các trường được đánh dấu đỏ.");
+        setError("Vui lòng kiểm tra và điền đúng thông tin ở các trường được đánh dấu đỏ bên dưới.");
+        toast.error("Thông tin nhập chưa hợp lệ. Vui lòng kiểm tra lại!");
         return;
-    }
-
-    if (isResettingPassword) {
-      setIsAuthenticating(false);
-      await startResetOtpFlow();
-      return;
     }
 
     if (isRegistering) {
@@ -1469,6 +1757,26 @@ const Account: React.FC = () => {
         return;
       }
       setCaptchaError("");
+
+      // Check existing account before launching OTP registration
+      try {
+        const res = await fetch('/api/user/exists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.exists === true) {
+            const existsMsg = 'Email này đã được đăng ký tài khoản. Vui lòng đăng nhập hoặc nhấn Quên mật khẩu.';
+            setEmailError(existsMsg);
+            setError(existsMsg);
+            setIsAuthenticating(false);
+            toast.error('Email này đã được sử dụng!');
+            return;
+          }
+        }
+      } catch {}
     }
 
     try {
@@ -1486,35 +1794,30 @@ const Account: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Authentication error:", err);
-      let errMsg = "Đăng nhập thất bại. Vui lòng thử lại.";
+      let errMsg = "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.";
       let msg: React.ReactNode = "Lỗi xác thực. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.";
       
       if (err.code === 'auth/wrong-password') {
         errMsg = "Mật khẩu không chính xác.";
+        setPasswordError("Mật khẩu bạn vừa nhập không chính xác.");
         msg = (
           <div className="space-y-2 text-left">
-            <p className="font-extrabold uppercase text-amber-600">MẬT KHẨU KHÔNG CHÍNH XÁC</p>
+            <p className="font-extrabold uppercase text-red-700">SAI MẬT KHẨU ĐĂNG NHẬP</p>
             <p className="font-medium text-gray-700 leading-snug text-xs">
-              Mật khẩu bạn vừa nhập chưa chính xác. Bạn có thể thử lại hoặc sử dụng chức năng Đặt lại mật khẩu bằng mã OTP.
+              Mật khẩu cho tài khoản <strong>{cleanEmail}</strong> chưa chính xác. Vui lòng kiểm tra lại (tắt Caps Lock nếu đang bật) hoặc đặt lại mật khẩu bằng mã OTP qua email.
             </p>
             <div className="pt-1.5 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setIsResettingPassword(true);
-                  setIsRegistering(false);
-                  setError(null);
-                }}
+                onClick={openForgotPasswordFlow}
                 className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3 py-1.5 rounded-lg font-black text-[11px] uppercase tracking-wider transition-all shadow-sm cursor-pointer"
               >
-                🔑 Đặt lại mật khẩu bằng OTP
+                🔑 Quên mật khẩu? Đặt lại bằng OTP
               </button>
             </div>
           </div>
         );
       } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        // Modern Firebase Auth throws 'auth/invalid-credential' for both wrong password and non-existent users.
-        // We call our server endpoint /api/user/exists which uses Admin SDK to check if user really exists!
         let userExists = false;
         try {
           const res = await fetch("/api/user/exists", {
@@ -1528,7 +1831,6 @@ const Account: React.FC = () => {
           }
         } catch (fErr) {
           console.warn("Could not check if user exists via API:", fErr);
-          // Fallback to checking local storage roles
           try {
             if (localStorage.getItem(`user_roles_${cleanEmail}`)) {
               userExists = true;
@@ -1537,43 +1839,43 @@ const Account: React.FC = () => {
         }
 
         if (userExists) {
-          errMsg = "Mật khẩu không chính xác hoặc chưa thiết lập.";
+          errMsg = "Sai mật khẩu hoặc email chưa chính xác.";
+          setPasswordError("Mật khẩu không đúng hoặc chưa được kích hoạt cho email này.");
           msg = (
             <div className="space-y-2 text-left">
-              <p className="font-extrabold uppercase text-amber-600">MẬT KHẨU KHÔNG CHÍNH XÁC HOẶC CHƯA THIẾT LẬP</p>
+              <p className="font-extrabold uppercase text-red-700">EMAIL HOẶC MẬT KHẨU KHÔNG CHÍNH XÁC</p>
               <p className="font-medium text-gray-700 leading-snug text-xs">
-                Mật khẩu bạn vừa nhập chưa chính xác hoặc tài khoản này chưa được kích hoạt mật khẩu trên hệ thống mới.
+                Thông tin đăng nhập cho <strong>{cleanEmail}</strong> không khớp. Vui lòng nhập lại mật khẩu chính xác hoặc xác thực OTP để đặt lại mật khẩu.
               </p>
               <div className="pt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsResettingPassword(true);
-                    setIsRegistering(false);
-                    setError(null);
-                  }}
+                  onClick={openForgotPasswordFlow}
                   className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3.5 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer"
                 >
-                  🔑 Đặt lại / Kích hoạt mật khẩu bằng OTP
+                  🔑 Quên mật khẩu? Đặt lại bằng OTP
                 </button>
               </div>
             </div>
           );
         } else {
-          errMsg = "Tài khoản chưa tồn tại.";
+          errMsg = "Email chưa được đăng ký trên hệ thống.";
+          setEmailError("Không tìm thấy tài khoản với địa chỉ email này.");
           msg = (
             <div className="space-y-2 text-left">
-              <p className="font-extrabold uppercase text-amber-600">TÀI KHOẢN CHƯA KHẢ DỤNG / CHƯA TỒN TẠI</p>
+              <p className="font-extrabold uppercase text-red-700">EMAIL CHƯA ĐƯỢC ĐĂNG KÝ</p>
               <p className="font-medium text-gray-700 leading-snug text-xs">
-                Hệ thống không tìm thấy tài khoản học viên này. Nếu bạn chưa có tài khoản trên FAST E-Learning, hãy tạo tài khoản mới để bắt đầu học tập ngay nhé!
+                Địa chỉ email <strong>{cleanEmail}</strong> chưa tồn tại trên hệ thống FAST E-Learning. Vui lòng kiểm tra lại lỗi chính tả hoặc tạo tài khoản mới.
               </p>
               <div className="pt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsRegistering(true);
-                    setIsResettingPassword(false);
+                    setIsForgotPassword(false);
                     setError(null);
+                    setEmailError('');
+                    setPasswordError('');
                   }}
                   className="inline-flex items-center gap-1.5 bg-[#007c76] text-white hover:bg-[#005f5b] px-3.5 py-2 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer"
                 >
@@ -1583,6 +1885,10 @@ const Account: React.FC = () => {
             </div>
           );
         }
+      } else if (err.code === 'auth/user-disabled') {
+        errMsg = "Tài khoản này đã bị tạm khóa hoặc vô hiệu hóa.";
+        setEmailError(errMsg);
+        msg = errMsg;
       } else if (err.code === 'auth/operation-not-allowed') {
         errMsg = "Phương thức Email/Mật khẩu chưa được bật trên Firebase.";
         msg = (
@@ -1605,7 +1911,7 @@ const Account: React.FC = () => {
           </div>
         );
       } else if (err.code === 'auth/network-request-failed') {
-        errMsg = "Lỗi kết nối mạng tới Firebase.";
+        errMsg = "Lỗi kết nối mạng tới máy chủ xác thực.";
         msg = (
           <div className="space-y-2 text-left">
             <p className="font-extrabold uppercase text-red-600">LỖI KẾT NỐI MẠNG (NETWORK ERROR)</p>
@@ -1615,21 +1921,28 @@ const Account: React.FC = () => {
           </div>
         );
       } else if (err.code === 'auth/too-many-requests') {
-        errMsg = "Quá nhiều lần thử thất bại.";
+        errMsg = "Quá nhiều lần đăng nhập thất bại.";
+        setPasswordError("Tạm khóa đăng nhập do nhập sai nhiều lần.");
         msg = (
           <div className="space-y-2 text-left">
-            <p className="font-extrabold uppercase text-amber-600">TẠM KHÓA DO THỬ QUÁ NHIỀU LẦN</p>
+            <p className="font-extrabold uppercase text-red-700">TẠM KHÓA DO THỬ QUÁ NHIỀU LẦN</p>
             <p className="font-medium text-gray-700 leading-snug text-xs">
-              Hệ thống tạm khóa do nhập sai thông tin nhiều lần liên tiếp. Vui lòng đợi ít phút hoặc sử dụng chức năng Quên mật khẩu.
+              Hệ thống tạm khóa do nhập sai thông tin nhiều lần liên tiếp. Vui lòng đợi ít phút hoặc đặt lại mật khẩu qua email.
             </p>
           </div>
         );
       } else if (err.code === 'auth/email-already-in-use') {
         errMsg = "Email đã được sử dụng.";
+        setEmailError("Email này đã được đăng ký cho một tài khoản khác.");
         msg = "Email này đã được đăng ký cho một tài khoản khác.";
       } else if (err.code === 'auth/invalid-email') {
-        errMsg = "Email không hợp lệ.";
-        msg = "Định dạng email của bạn không hợp lệ. Vui lòng nhập lại (ví dụ: hocko@example.com).";
+        errMsg = "Địa chỉ email không hợp lệ.";
+        setEmailError("Định dạng email không hợp lệ. Vui lòng kiểm tra lại (ví dụ: ten@domain.com).");
+        msg = "Định dạng email của bạn không hợp lệ. Vui lòng nhập lại (ví dụ: hocvien@example.com).";
+      } else if (err.code === 'auth/weak-password') {
+        errMsg = "Mật khẩu quá yếu.";
+        setPasswordError("Mật khẩu phải đủ mạnh (ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt).");
+        msg = "Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn.";
       }
       setError(msg);
       toast.error(errMsg);
@@ -3088,7 +3401,7 @@ const Account: React.FC = () => {
                     <section className="relative overflow-hidden bg-white rounded-[40px] p-8 md:p-12 border border-gray-100 shadow-sm animate-in slide-in-from-bottom-5 duration-700">
                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                         <div className="text-center md:text-left">
-                          <h2 className="text-3xl md:text-5xl font-black text-gray-800 tracking-tight leading-none">Chào {(user.name || 'Học viên').split(' ').pop()}! 👋</h2>
+                          <h2 className="text-3xl md:text-5xl font-black text-gray-800 tracking-[0.025em] leading-[1.45]">Chào {(user.name || 'Học viên').split(' ').pop()}! 👋</h2>
                           <p className="text-gray-500 font-bold max-w-lg leading-relaxed mt-4">
                             {isVip ? "Bạn đang có quyền truy cập không giới hạn. Tận hưởng việc học!" : "Tiếp tục hành trình chuẩn hóa kiến thức cùng FAST."}
                           </p>
@@ -3122,7 +3435,7 @@ const Account: React.FC = () => {
 
                 <section className="animate-in slide-in-from-bottom-5 duration-700 delay-150">
                   <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-2xl font-black text-gray-800 tracking-tight flex items-center gap-3 uppercase">
+                    <h3 className="text-2xl font-black text-gray-800 tracking-[0.025em] leading-[1.45] flex items-center gap-3 uppercase">
                       <span className="w-2 h-8 bg-[#007c76] rounded-full shrink-0"></span>
                       {isVip ? "Tất cả khóa học (VIP)" : "Lộ trình của tôi"}
                     </h3>
@@ -3211,8 +3524,8 @@ const Account: React.FC = () => {
               </svg>
             </div>
 
-            <h3 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-tighter mb-3">
-              {isResettingPassword ? 'Đặt lại mật khẩu' : 'Xác thực tài khoản'}
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] mb-3">
+              Xác thực tài khoản
             </h3>
             <p className="text-gray-500 text-xs md:text-sm font-semibold leading-relaxed mb-8">
               Mã xác thực gồm 6 chữ số đã được gửi qua hệ thống bảo mật FAST Security Gateway đến địa chỉ email: <br/>
@@ -3337,7 +3650,7 @@ const Account: React.FC = () => {
                   </svg>
                 ) : (
                   <>
-                    {isResettingPassword ? 'Xác nhận & Đổi mật khẩu' : 'Xác nhận & Kích hoạt tài khoản'}
+                    Xác nhận & Kích hoạt tài khoản
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
@@ -3409,7 +3722,7 @@ const Account: React.FC = () => {
                         <span className="font-bold tracking-[0.2em] text-xs uppercase opacity-80">FAST E-Learning</span>
                     </div>
                     
-                    <h2 className="text-4xl lg:text-5xl font-black uppercase leading-[1.1] tracking-tighter mb-6">
+                    <h2 className="text-4xl lg:text-5xl font-black uppercase leading-[1.45] tracking-[0.025em] mb-6">
                         Kiến tạo <br/> 
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-white">Tương lai</span> <br/> 
                         Bền Vững
@@ -3427,27 +3740,55 @@ const Account: React.FC = () => {
                 <div className="max-w-md mx-auto w-full">
                     
                     <div className="text-center mb-8">
-                        <h3 className="text-3xl font-black text-gray-800 uppercase tracking-tighter mb-2">
-                            {isResettingPassword 
-                              ? 'Đặt lại mật khẩu' 
+                        <h3 className="text-3xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] mb-2">
+                            {isForgotPassword
+                              ? forgotPasswordStep === 'otp'
+                                ? 'Xác thực mã OTP'
+                                : forgotPasswordStep === 'new-password'
+                                  ? 'Đặt mật khẩu mới'
+                                  : forgotPasswordStep === 'done'
+                                    ? 'Hoàn tất khôi phục'
+                                    : 'Quên mật khẩu'
                               : (isRegistering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại!')}
                         </h3>
                         <p className="text-gray-500 text-sm font-medium">
-                            {isResettingPassword 
-                              ? 'Nhập email và mật khẩu mới bạn muốn tạo để nhận mã OTP xác thực qua email.' 
+                            {isForgotPassword
+                              ? forgotPasswordStep === 'otp'
+                                ? 'Nhập mã OTP 6 chữ số vừa được gửi về email để mở khóa bước đổi mật khẩu.'
+                                : forgotPasswordStep === 'new-password'
+                                  ? 'Mã OTP đã được xác thực. Vui lòng tạo mật khẩu mới đủ mạnh.'
+                                  : forgotPasswordStep === 'done'
+                                    ? 'Mật khẩu tài khoản của bạn đã được cập nhật an toàn.'
+                                    : 'Nhập địa chỉ email đã đăng ký để nhận mã xác thực OTP.'
                               : (isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.')}
                         </p>
                     </div>
 
-                    {isResettingPassword && (
-                        <div className="mb-6 p-4 bg-teal-50/80 border border-teal-200 rounded-2xl text-left text-xs text-teal-900 space-y-1.5 shadow-2xs">
-                            <p className="font-extrabold text-[#007c76] uppercase tracking-wide flex items-center gap-1.5">
-                              <span>🔑</span>
-                              <span>HƯỚNG DẪN ĐỔI / ĐẶT LẠI MẬT KHẨU</span>
-                            </p>
-                            <p className="font-medium text-slate-700 leading-relaxed">
-                              Vui lòng điền <strong>Email của bạn</strong> và <strong>Mật khẩu mới bạn muốn cài đặt</strong> bên dưới. Sau đó nhấn nút nhận mã OTP, hệ thống sẽ gửi mã xác thực 6 chữ số đến email của bạn để xác nhận cập nhật mật khẩu mới này.
-                            </p>
+                    {isForgotPassword && forgotPasswordStep !== 'done' && (
+                        <div className="mb-6 flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
+                            {[
+                              { id: 'email', label: '1. Nhập Email' },
+                              { id: 'otp', label: '2. Xác thực OTP' },
+                              { id: 'new-password', label: '3. Đổi mật khẩu' }
+                            ].map((step, idx) => {
+                              const order = { email: 0, otp: 1, 'new-password': 2, done: 3 }[forgotPasswordStep];
+                              const isCurrent = idx === order;
+                              const isCompleted = idx < order;
+                              return (
+                                <div
+                                  key={step.id}
+                                  className={`flex-1 text-center py-1.5 px-2 rounded-xl transition-all ${
+                                    isCurrent
+                                      ? 'bg-[#007c76] text-white shadow-xs'
+                                      : isCompleted
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'text-slate-400'
+                                  }`}
+                                >
+                                  {isCompleted ? `✓ ${step.label}` : step.label}
+                                </div>
+                              );
+                            })}
                         </div>
                     )}
 
@@ -3459,7 +3800,7 @@ const Account: React.FC = () => {
                     )}
                     
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 text-red-500 rounded-2xl text-xs font-bold border border-red-100 flex items-start gap-3">
+                        <div role="alert" className="mb-6 p-4 bg-red-50 text-red-700 rounded-2xl text-xs font-bold border border-red-200 flex items-start gap-3">
                             <svg className="w-5 h-5 shrink-0 text-red-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <div className="flex-1 min-w-0">
                                 {error}
@@ -3467,65 +3808,377 @@ const Account: React.FC = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleAuthAction} className="space-y-5">
-                        {isRegistering && (
+                    {isForgotPassword ? (
+                      forgotPasswordStep === 'email' ? (
+                        <form onSubmit={handleForgotSendOtp} noValidate className="space-y-5">
+                          <div className="space-y-1 text-left">
+                            <label className="block text-xs font-black text-slate-700 ml-1">
+                              Email tài khoản của bạn
+                            </label>
                             <div className="group relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                </div>
+                              <div className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors ${emailError ? 'text-red-500' : 'text-gray-400 group-focus-within:text-[#007c76]'}`}>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                              </div>
+                              <input
+                                type="email"
+                                autoComplete="email"
+                                value={email}
+                                onChange={e => {
+                                  setEmail(e.target.value);
+                                  if (emailError) setEmailError('');
+                                  if (error) setError(null);
+                                }}
+                                placeholder="Nhập email đã đăng ký"
+                                aria-invalid={!!emailError}
+                                className={`w-full py-4 pl-12 pr-4 rounded-2xl font-bold text-gray-700 outline-none transition-all placeholder-gray-400 border ${
+                                  emailError
+                                    ? 'bg-red-50/40 border-red-400 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
+                                    : 'bg-gray-50 border-transparent focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10'
+                                }`}
+                              />
+                            </div>
+                            {emailError && (
+                              <p className="text-xs font-bold text-red-600 mt-1.5 ml-1">{emailError}</p>
+                            )}
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {isAuthenticating ? (
+                              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            ) : (
+                              <>
+                                <span>Gửi mã OTP xác thực</span>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                              </>
+                            )}
+                          </button>
+
+                          <div className="pt-1 text-left">
+                            <button
+                              type="button"
+                              onClick={closeForgotPasswordFlow}
+                              className="text-xs text-slate-600 hover:text-[#007c76] font-bold cursor-pointer"
+                            >
+                              ← Quay lại đăng nhập
+                            </button>
+                          </div>
+                        </form>
+                      ) : forgotPasswordStep === 'otp' ? (
+                        <form onSubmit={handleForgotVerifyOtp} noValidate className="space-y-5">
+                          {otpStatusMessage && (
+                            <div className="p-3.5 bg-teal-50 border border-teal-200 text-teal-900 rounded-2xl text-xs font-bold text-left">
+                              {otpStatusMessage}
+                            </div>
+                          )}
+
+                          {otpFormError && (
+                            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-bold text-left">
+                              {otpFormError}
+                            </div>
+                          )}
+
+                          <div className="text-left space-y-2">
+                            <label className="block text-xs font-black text-slate-700 ml-1">
+                              Nhập mã OTP 6 chữ số gửi tới <span className="text-[#007c76]">{email}</span>
+                            </label>
+                            <div className="flex justify-center gap-2">
+                              {otpDigits.map((digit, index) => (
                                 <input
- 
-                                    value={fullName} 
-                                    onChange={e => setFullName(e.target.value)} 
-                                    placeholder="Họ và tên đầy đủ" 
-                                    className="w-full py-4 pl-12 pr-4 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
+                                  key={index}
+                                  id={`forgot-otp-input-${index}`}
+                                  type="text"
+                                  maxLength={1}
+                                  pattern="[0-9]*"
+                                  inputMode="numeric"
+                                  value={digit}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    const newDigits = [...otpDigits];
+                                    newDigits[index] = val ? val[0] : '';
+                                    setOtpDigits(newDigits);
+                                    setOtpFormError(null);
+                                    if (val && index < 5) {
+                                      const nextInput = document.getElementById(`forgot-otp-input-${index + 1}`);
+                                      if (nextInput) (nextInput as HTMLInputElement).focus();
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleForgotVerifyOtp();
+                                    } else if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+                                      const newDigits = [...otpDigits];
+                                      newDigits[index - 1] = '';
+                                      setOtpDigits(newDigits);
+                                      const prevInput = document.getElementById(`forgot-otp-input-${index - 1}`);
+                                      if (prevInput) (prevInput as HTMLInputElement).focus();
+                                    }
+                                  }}
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+                                    if (pastedData.length > 0) {
+                                      const newDigits = [...otpDigits];
+                                      for (let i = 0; i < 6; i++) {
+                                        newDigits[i] = pastedData[i] || '';
+                                      }
+                                      setOtpDigits(newDigits);
+                                      setOtpFormError(null);
+                                      const targetIdx = Math.min(5, pastedData.length - 1);
+                                      const targetInput = document.getElementById(`forgot-otp-input-${targetIdx}`);
+                                      if (targetInput) (targetInput as HTMLInputElement).focus();
+                                    }
+                                  }}
+                                  className="w-11 h-14 text-center text-xl font-black text-[#007c76] bg-gray-50 border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all"
                                 />
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {isAuthenticating ? (
+                              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            ) : (
+                              <>
+                                <span>Xác thực mã OTP</span>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              </>
+                            )}
+                          </button>
+
+                          <div className="flex items-center justify-between text-xs pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForgotPasswordStep('email');
+                                setOtpFormError(null);
+                                setOtpStatusMessage(null);
+                                setError(null);
+                              }}
+                              className="text-slate-600 hover:text-[#007c76] font-bold cursor-pointer"
+                            >
+                              ← Đổi email khác
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleForgotResendOtp}
+                              disabled={otpCountdown > 0 || isAuthenticating}
+                              className={`font-black uppercase tracking-wider cursor-pointer ${otpCountdown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-[#007c76] hover:underline'}`}
+                            >
+                              Gửi lại mã {otpCountdown > 0 ? `(${otpCountdown}s)` : ''}
+                            </button>
+                          </div>
+                        </form>
+                      ) : forgotPasswordStep === 'new-password' ? (
+                        <form onSubmit={handleForgotSetNewPassword} noValidate className="space-y-4 text-left">
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 flex items-center gap-2">
+                            <svg className="w-4 h-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <span>OTP hợp lệ cho tài khoản <strong className="break-all">{email}</strong></span>
+                          </div>
+
+                          {resetPasswordError && (
+                            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700 space-y-2">
+                              <p>{resetPasswordError}</p>
+                              {!resetVerifiedToken && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setForgotPasswordStep('email');
+                                    setResetPasswordError('');
+                                  }}
+                                  className="inline-flex items-center gap-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-black uppercase cursor-pointer"
+                                >
+                                  Yêu cầu mã OTP mới
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-1.5 ml-1">
+                              Mật khẩu mới
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showResetPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={resetNewPassword}
+                                onChange={(e) => {
+                                  setResetNewPassword(e.target.value);
+                                  if (resetPasswordError) setResetPasswordError('');
+                                }}
+                                placeholder="Nhập mật khẩu mạnh (≥ 8 ký tự)"
+                                className="w-full py-3.5 pl-4 pr-14 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-800 text-sm focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowResetPassword(!showResetPassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 hover:text-[#007c76] cursor-pointer"
+                              >
+                                {showResetPassword ? 'Ẩn' : 'Hiện'}
+                              </button>
+                            </div>
+                            {resetNewPassword.length > 0 && (
+                              <div className="mt-3">
+                                <PasswordStrengthMeter password={resetNewPassword} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-1.5 ml-1">
+                              Xác nhận mật khẩu mới
+                            </label>
+                            <input
+                              type={showResetPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              value={resetConfirmPassword}
+                              onChange={(e) => {
+                                setResetConfirmPassword(e.target.value);
+                                if (resetPasswordError) setResetPasswordError('');
+                              }}
+                              placeholder="Nhập lại mật khẩu mới"
+                              className="w-full py-3.5 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-800 text-sm focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none"
+                            />
+                            {resetNewPassword && resetConfirmPassword && resetNewPassword !== resetConfirmPassword && (
+                              <p className="text-xs font-bold text-red-600 mt-1.5 ml-1">Mật khẩu xác nhận không khớp.</p>
+                            )}
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {isAuthenticating ? 'Đang cập nhật mật khẩu...' : 'Lưu mật khẩu mới'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={closeForgotPasswordFlow}
+                            className="w-full py-2 text-xs font-bold text-slate-500 hover:text-[#007c76] cursor-pointer text-center"
+                          >
+                            Hủy & Quay lại đăng nhập
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-4">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-black text-emerald-900 uppercase">
+                              Đặt lại mật khẩu thành công!
+                            </h4>
+                            <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                              Mật khẩu cho tài khoản <strong className="break-all">{email}</strong> đã được cập nhật. Bạn có thể đăng nhập bằng mật khẩu mới ngay bây giờ.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={closeForgotPasswordFlow}
+                            className="w-full py-3.5 px-4 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer"
+                          >
+                            Đăng nhập ngay
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                    <form onSubmit={handleAuthAction} noValidate className="space-y-5">
+                        {isRegistering && (
+                            <div className="space-y-1 text-left">
+                                <div className="group relative">
+                                    <div className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors ${nameError ? 'text-red-500' : 'text-gray-400 group-focus-within:text-[#007c76]'}`}>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                    </div>
+                                    <input
+                                        autoComplete="name"
+                                        value={fullName} 
+                                        onChange={e => {
+                                          setFullName(e.target.value);
+                                          if (nameError) setNameError('');
+                                          if (error) setError(null);
+                                        }} 
+                                        placeholder="Họ và tên đầy đủ" 
+                                        aria-invalid={!!nameError}
+                                        className={`w-full py-4 pl-12 pr-4 rounded-2xl font-bold text-gray-700 outline-none transition-all placeholder-gray-400 border ${
+                                          nameError
+                                            ? 'bg-red-50/40 border-red-400 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
+                                            : 'bg-gray-50 border-transparent focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10'
+                                        }`}
+                                    />
+                                </div>
+                                {nameError && (
+                                  <p className="text-xs font-bold text-red-600 mt-1 ml-1">{nameError}</p>
+                                )}
                             </div>
                         )}
                         
                         <div className="space-y-1 text-left">
-                            {isResettingPassword && (
-                              <label className="block text-xs font-black text-slate-700 ml-1">
-                                Email đăng nhập tài khoản:
-                              </label>
-                            )}
                             <div className="group relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
+                                <div className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors ${emailError ? 'text-red-500' : 'text-gray-400 group-focus-within:text-[#007c76]'}`}>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                                 </div>
                                 <input
-     
-                                    type="email" 
+                                    type="email"
+                                    autoComplete="email"
                                     value={email} 
-                                    onChange={e => setEmail(e.target.value)} 
+                                    onChange={e => {
+                                      setEmail(e.target.value);
+                                      if (emailError) setEmailError('');
+                                      if (error) setError(null);
+                                    }} 
                                     placeholder="Email đăng nhập" 
-                                    className="w-full py-4 pl-12 pr-4 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
+                                    aria-invalid={!!emailError}
+                                    className={`w-full py-4 pl-12 pr-4 rounded-2xl font-bold text-gray-700 outline-none transition-all placeholder-gray-400 border ${
+                                      emailError
+                                        ? 'bg-red-50/40 border-red-400 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
+                                        : 'bg-gray-50 border-transparent focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10'
+                                    }`}
                                 />
                             </div>
+                            {emailError && (
+                              <p className="text-xs font-bold text-red-600 mt-1 ml-1">{emailError}</p>
+                            )}
                         </div>
                         
                         <div className="space-y-1 text-left">
-                            {isResettingPassword && (
-                              <label className="block text-xs font-black text-slate-700 ml-1">
-                                Mật khẩu mới bạn muốn đổi thành (≥ 6 ký tự):
-                              </label>
-                            )}
                             <div className="group relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#007c76] transition-colors">
+                                <div className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors ${passwordError ? 'text-red-500' : 'text-gray-400 group-focus-within:text-[#007c76]'}`}>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                                 </div>
                                 <input
-      
-                                    type={showPassword ? "text" : "password"} 
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete={isRegistering ? "new-password" : "current-password"}
                                     value={password} 
-                                    onChange={e => setPassword(e.target.value)} 
-                                    placeholder={isResettingPassword ? "Nhập mật khẩu mới bạn muốn tạo" : "Mật khẩu"} 
-                                    className="w-full py-4 pl-12 pr-12 bg-gray-50 border border-transparent rounded-2xl font-bold text-gray-700 focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10 outline-none transition-all placeholder-gray-400" 
+                                    onChange={e => {
+                                      setPassword(e.target.value);
+                                      if (passwordError) setPasswordError('');
+                                      if (error) setError(null);
+                                    }} 
+                                    placeholder={isRegistering ? "Tạo mật khẩu mạnh (≥ 8 ký tự)" : "Mật khẩu"} 
+                                    aria-invalid={!!passwordError}
+                                    className={`w-full py-4 pl-12 pr-12 rounded-2xl font-bold text-gray-700 outline-none transition-all placeholder-gray-400 border ${
+                                      passwordError
+                                        ? 'bg-red-50/40 border-red-400 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10'
+                                        : 'bg-gray-50 border-transparent focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10'
+                                    }`}
                                 />
                                 <button 
                                     type="button" 
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#007c76] transition-colors p-1"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#007c76] transition-colors p-1 cursor-pointer"
+                                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                                 >
                                     {showPassword ? (
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
@@ -3534,16 +4187,21 @@ const Account: React.FC = () => {
                                     )}
                                 </button>
                             </div>
+                            {passwordError && (
+                              <p className="text-xs font-bold text-red-600 mt-1 ml-1">{passwordError}</p>
+                            )}
 
-                            {!isRegistering && !isResettingPassword && (
+                            {isRegistering && password.length > 0 && (
+                              <div className="pt-2">
+                                <PasswordStrengthMeter password={password} />
+                              </div>
+                            )}
+
+                            {!isRegistering && (
                                 <div className="flex justify-start items-center text-xs px-1 pt-1">
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setIsResettingPassword(true);
-                                            setIsRegistering(false);
-                                            setError(null);
-                                        }}
+                                        onClick={openForgotPasswordFlow}
                                         className="text-[#007c76] hover:underline font-bold transition-colors cursor-pointer"
                                     >
                                         Quên mật khẩu?
@@ -3567,6 +4225,7 @@ const Account: React.FC = () => {
                         )}
 
                         <button 
+                            type="submit"
                             disabled={isAuthenticating}
                             className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                         >
@@ -3574,16 +4233,15 @@ const Account: React.FC = () => {
                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                             ) : (
                                 <>
-                                    {isResettingPassword 
-                                      ? 'NHẬN MÃ OTP ĐỔI MẬT KHẨU MỚI' 
-                                      : (isRegistering ? 'ĐĂNG KÝ NGAY' : 'ĐĂNG NHẬP')}
+                                    {isRegistering ? 'ĐĂNG KÝ NGAY' : 'ĐĂNG NHẬP'}
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                                 </>
                             )}
                         </button>
                     </form>
+                    )}
                     
-                    {!isResettingPassword && (
+                    {!isForgotPassword && (
                         <>
                             <div className="relative my-8">
                                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
@@ -3630,15 +4288,11 @@ const Account: React.FC = () => {
                     )}
                     
                     <div className="mt-8 text-center">
-                        {isResettingPassword ? (
+                        {isForgotPassword ? (
                             <p className="text-sm font-bold text-gray-500">
                                 Bạn đã nhớ mật khẩu?
                                 <span 
-                                    onClick={() => {
-                                        setIsResettingPassword(false);
-                                        setIsRegistering(false);
-                                        setError(null);
-                                    }}
+                                    onClick={closeForgotPasswordFlow}
                                     className="ml-1 text-[#007c76] cursor-pointer hover:underline uppercase tracking-wide font-extrabold"
                                 >
                                     Quay lại Đăng nhập
@@ -3650,7 +4304,7 @@ const Account: React.FC = () => {
                                 <span 
                                     onClick={() => {
                                         setIsRegistering(!isRegistering);
-                                        setIsResettingPassword(false);
+                                        setIsForgotPassword(false);
                                         setError(null);
                                         setCaptchaToken('');
                                         setCaptchaError('');

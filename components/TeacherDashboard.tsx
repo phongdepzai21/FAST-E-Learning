@@ -1197,7 +1197,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
         videoUrl: '',
         content: '',
         isPreview: true,
-        duration: 'Dưới 5 phút'
+        duration: ''
       },
       ...prev
     ]);
@@ -1937,7 +1937,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                   2. Danh sách bài giảng ({flatLessons.length} bài)
                 </h3>
                 <p className="text-gray-400 text-xs font-semibold mt-1">
-                  Quản lý bài giảng chính thức và bài giảng Preview (video dưới 5 phút, miễn phí, không cần đăng nhập).
+                  Quản lý bài giảng chính thức và bài giảng Preview (không cần đăng nhập).
                 </p>
               </div>
               
@@ -2014,9 +2014,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             onChange={(e) => {
                               const nextIsPreview = e.target.value === 'preview';
                               updateFlatLesson(lIdx, 'isPreview', nextIsPreview);
-                              if (nextIsPreview && !lesson.duration) {
-                                updateFlatLesson(lIdx, 'duration', 'Dưới 5 phút');
-                              }
                             }}
                             className={`w-full text-xs font-bold py-2.5 px-3 border rounded-xl outline-none transition-all cursor-pointer ${
                               isPreviewLesson
@@ -2025,19 +2022,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
                             }`}
                           >
                             <option value="standard">Bài học chính thức (Cần đăng ký khóa học)</option>
-                            <option value="preview">Bài Preview (Video &lt; 5 phút · Miễn phí · Không cần đăng nhập)</option>
+                            <option value="preview">Bài Preview (Xem trước · Không cần đăng nhập)</option>
                           </select>
                         </div>
 
-                        {/* Optional Duration for Preview (recommended < 5 mins) */}
+                        {/* Optional Duration for Preview */}
                         {isPreviewLesson ? (
                           <div className="space-y-1">
-                            <span className="text-[10px] font-black text-[#007c76] uppercase tracking-widest block">Thời lượng Preview (khuyên dùng &lt; 5 phút)</span>
+                            <span className="text-[10px] font-black text-[#007c76] uppercase tracking-widest block">Thời lượng Preview (tùy chọn)</span>
                             <input
                               type="text"
                               value={lesson.duration || ''}
                               onChange={(e) => updateFlatLesson(lIdx, 'duration', e.target.value)}
-                              placeholder="VD: 03:45 (Dưới 5 phút)"
+                              placeholder="VD: 03:45"
                               className="w-full bg-white text-xs font-bold text-[#007c76] py-2.5 px-3 border border-[#007c76]/30 rounded-xl focus:border-[#007c76] outline-none transition-all"
                             />
                           </div>
@@ -2052,7 +2049,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ userEmail }) => {
 
                       {isPreviewLesson && (
                         <p className="text-[11px] font-semibold text-[#007c76]">
-                          Video Preview nên dưới 5 phút — khách chưa đăng nhập chỉ xem được đúng bài có gắn loại Preview này.
+                          Khách chưa đăng nhập chỉ xem được đúng bài có gắn loại Preview này.
                         </p>
                       )}
 

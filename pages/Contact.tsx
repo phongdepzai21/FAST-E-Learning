@@ -17,7 +17,8 @@ import {
   User, 
   MessageSquare,
   ShieldCheck,
-  Headphones
+  Headphones,
+  FileText
 } from 'lucide-react';
 
 // EmailJS config
@@ -190,7 +191,7 @@ const Contact: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-teal-300" />
             <span>Đồng Hành Cùng Doanh Nghiệp F&amp;B &amp; Học Viên</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight mb-4 drop-shadow-sm">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-[0.03em] leading-[1.45] mb-4 drop-shadow-sm">
             Kết Nối Cùng Đội Ngũ <span className="text-teal-200">FAST</span>
           </h1>
           <p className="text-sm sm:text-base md:text-lg text-teal-50 max-w-2xl mx-auto font-medium leading-relaxed">
@@ -207,8 +208,22 @@ const Contact: React.FC = () => {
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
-                <span className="text-[11px] font-black uppercase tracking-wider text-[#007c76]">Thông tin liên lạc</span>
-                <h3 className="text-xl font-black text-slate-900 mt-1">Văn Phòng &amp; Kênh Hỗ Trợ</h3>
+                <span className="text-[11px] font-black uppercase tracking-wider text-[#007c76]">Thông tin liên hệ chủ sở hữu website</span>
+                <h3 className="text-xl font-black text-slate-900 mt-1 tracking-[0.02em] leading-[1.45]">CÔNG TY TNHH TƯ VẤN FAST</h3>
+              </div>
+
+              {/* MST / ĐKKD */}
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200/60 flex items-center justify-center text-[#007c76] shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Mã số thuế / Số ĐKKD</p>
+                  <p className="text-base sm:text-lg font-black text-slate-900 tabular-nums mt-0.5">
+                    0314568146
+                  </p>
+                  <span className="text-xs text-slate-500 font-medium">Cấp phép hoạt động đào tạo &amp; tư vấn</span>
+                </div>
               </div>
 
               {/* Hotline */}
@@ -297,7 +312,7 @@ const Contact: React.FC = () => {
                     <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-mono font-black uppercase tracking-widest">
                       Mã tiếp nhận: {ticketId}
                     </span>
-                    <h3 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                    <h3 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                       Gửi Yêu Cầu Thành Công!
                     </h3>
                     <p className="text-slate-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
@@ -315,7 +330,7 @@ const Contact: React.FC = () => {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-[0.025em] leading-[1.35]">
                       Đăng Ký Tư Vấn &amp; Hỗ Trợ
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">

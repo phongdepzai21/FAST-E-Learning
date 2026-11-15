@@ -207,7 +207,7 @@ const FAQ: React.FC = () => {
             <span>Trung Tâm Trợ Giúp &amp; Giải Đáp Thắc Mắc</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight mb-4 drop-shadow-sm">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-[0.03em] leading-[1.45] mb-4 drop-shadow-sm">
             Câu Hỏi <span className="text-teal-200">Thường Gặp</span>
           </h1>
 
@@ -355,7 +355,7 @@ const FAQ: React.FC = () => {
               <span className="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-black uppercase tracking-widest border border-teal-500/30">
                 Chưa Có Câu Trả Lời Bạn Cần?
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-[0.025em] leading-[1.35]">
                 Gửi Thắc Mắc Cho Chuyên Gia FAST
               </h2>
               <p className="text-slate-300 text-sm leading-relaxed">

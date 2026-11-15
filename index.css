@@ -3,6 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Khoảng cách chữ ngang và dọc vừa phải và ngắt dòng chuẩn cho tiêu đề trên toàn bộ các trang */
+h1, h2, h3, h4 {
+  letter-spacing: 0.02em;
+  word-spacing: 0.05em;
+  line-height: 1.48;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: normal;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   height: 6px;
   width: 6px;

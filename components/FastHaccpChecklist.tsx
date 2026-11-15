@@ -666,7 +666,7 @@ export const FastHaccpChecklist: React.FC = () => {
           color: var(--text-main);
           line-height: 1.6;
           border-radius: var(--radius);
-          overflow: hidden;
+          overflow-x: clip;
         }
 
         .fast-haccp-wrapper * {
@@ -773,6 +773,7 @@ export const FastHaccpChecklist: React.FC = () => {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
+          max-width: 100%;
         }
 
         .fast-haccp-wrapper button {
@@ -783,6 +784,8 @@ export const FastHaccpChecklist: React.FC = () => {
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
+          max-width: 100%;
+          min-height: 40px;
         }
 
         .fast-haccp-wrapper .btn-primary {
@@ -1464,7 +1467,7 @@ export const FastHaccpChecklist: React.FC = () => {
           <div className="modal-content" style={{ maxWidth: '1050px', padding: '24px' }}>
             {/* Top Toolbar (Excluded from print) */}
             <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', borderBottom: '1px solid #ddd', paddingBottom: '16px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setReportType('comprehensive')}
@@ -1499,7 +1502,7 @@ export const FastHaccpChecklist: React.FC = () => {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={handlePrintReport}

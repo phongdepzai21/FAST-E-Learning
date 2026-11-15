@@ -30,6 +30,7 @@ export interface VerifyOtpResponse {
   message?: string;
   error?: string;
   user?: any;
+  resetToken?: string;
 }
 
 const envServiceId = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_EMAILJS_SERVICE_ID) || "service_q86r4ap";
@@ -222,6 +223,14 @@ export async function sendOtp(options: SendOtpOptions): Promise<SendOtpResponse>
       }
     }
 
+    // For password reset, NEVER allow insecure client-side OTP fallback
+    if (flow === 'reset') {
+      return {
+        success: false,
+        error: 'Không thể kết nối máy chủ gửi mã OTP đặt lại mật khẩu. Vui lòng thử lại sau.'
+      };
+    }
+
     // --- CLIENT-SIDE ENGINE (For Netlify, Vercel, or when backend API is offline) ---
     console.log('[otpService] Executing Client-Side OTP Engine for:', email, flow);
 
@@ -322,8 +331,17 @@ export async function verifyOtp(options: VerifyOtpOptions): Promise<VerifyOtpRes
     return {
       success: true,
       message: serverData.message || 'Xác thực OTP thành công!',
-      user: serverData?.user
+      user: serverData?.user,
+      resetToken: serverData?.resetToken
     };
+  }
+
+  // Password reset MUST be verified strictly on the server (never fall back to client storage)
+  if (flow === 'reset') {
+    if (isServerJson && serverData?.error) {
+      return { success: false, error: serverData.error };
+    }
+    return { success: false, error: 'Không thể xác thực mã OTP đặt lại mật khẩu lúc này. Vui lòng thử lại.' };
   }
 
   // 2. Dual check: verify against client-side record (in case server failed, was bypassed, or client fallback was triggered)

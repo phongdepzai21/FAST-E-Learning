@@ -581,7 +581,7 @@ export const AdminStudentConsole: React.FC = () => {
                             <tr key={c.courseId} className="hover:bg-gray-50/50 transition-all">
                               <td className="py-4 px-4">
                                 <div className="space-y-1">
-                                  <p className="text-xs font-black text-gray-800 leading-snug">{c.courseTitle}</p>
+                                  <p className="w-full text-xs font-black text-gray-800 leading-[1.45] break-words [overflow-wrap:break-word]">{c.courseTitle}</p>
                                   <p className="font-mono text-[9px] text-gray-400 uppercase font-semibold">{c.courseId}</p>
                                 </div>
                               </td>

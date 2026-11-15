@@ -57,7 +57,7 @@ const About: React.FC = () => {
           <div className="flex justify-center mb-6">
             <Breadcrumbs theme="dark" items={[{ label: 'Trang chủ', path: '/' }, { label: 'Về chúng tôi' }]} />
           </div>
-          <h1 className="text-3xl md:text-6xl font-black text-white mb-6 uppercase tracking-tight">
+          <h1 className="text-3xl md:text-6xl font-black text-white mb-6 uppercase tracking-[0.03em] leading-[1.45]">
             VỀ CHÚNG TÔI
           </h1>
           <p className="text-lg md:text-2xl text-[#e6f4f3] max-w-4xl mx-auto leading-relaxed font-semibold">
@@ -113,7 +113,7 @@ const About: React.FC = () => {
               <span className="text-[#007c76] text-xs md:text-sm font-black uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full inline-block">
                 Kính gửi Quý Đối tác và Khách hàng
               </span>
-              <h2 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight uppercase">
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 tracking-[0.025em] leading-[1.45] uppercase">
                 Giao Thoa Giữa Chuẩn Mực Quốc Tế & Thực Tiễn Thực Chiến
               </h2>
               
@@ -161,7 +161,7 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16 space-y-4">
             <span className="text-emerald-400 text-xs font-black uppercase tracking-widest">Triết Lý Của Chúng Tôi</span>
-            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-white">4 Trụ Cột Vận Hành FAST</h2>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-[0.025em] leading-[1.35] text-white">4 Trụ Cột Vận Hành FAST</h2>
             <p className="text-slate-400 max-w-2xl mx-auto text-sm md:text-base font-medium">Kim chỉ nam chuyển hóa mọi tiêu chuẩn quốc tế phức tạp thành giải pháp tinh gọn, dễ làm.</p>
             <div className="w-16 h-1 bg-amber-400 mx-auto rounded-full mt-4"></div>
           </div>
@@ -223,7 +223,7 @@ const About: React.FC = () => {
               <span className="text-[#007c76] text-xs font-black uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full inline-block">
                 Chính Sách Chất Lượng
               </span>
-              <h2 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight uppercase">
+              <h2 className="text-2xl md:text-4xl font-black text-slate-900 leading-[1.35] tracking-[0.02em] uppercase">
                 Cam Kết Mang Lại Giá Trị Bền Vững Cho Khách Hàng
               </h2>
               <p className="text-slate-500 font-medium text-sm md:text-base leading-relaxed">
@@ -299,7 +299,7 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16 space-y-4">
             <span className="text-[#007c76] text-xs font-black uppercase tracking-widest">Danh mục Hoạt Động</span>
-            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-slate-900">Mảng Dịch Vụ Chủ Chốt</h2>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-[0.025em] leading-[1.35] text-slate-900">Mảng Dịch Vụ Chủ Chốt</h2>
             <div className="w-16 h-1 bg-[#007c76] mx-auto rounded-full mt-4"></div>
           </div>
 
@@ -363,7 +363,7 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16 space-y-4">
             <span className="text-emerald-300 text-xs font-black uppercase tracking-widest">Đội ngũ Cốt Cán</span>
-            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight">Ban Thường Trực Dự Án</h2>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-[0.025em] leading-[1.35]">Ban Thường Trực Dự Án</h2>
             <div className="w-16 h-1.5 bg-amber-400 mx-auto rounded-full"></div>
             <p className="text-white/80 font-bold max-w-2xl mx-auto text-xs md:text-sm leading-relaxed">
               Chúng tôi không chỉ là những người tư vấn lý thuyết suông; chúng tôi là những Chuyên gia Đánh giá trưởng (Lead Auditor) quốc tế và những nhà quản lý trực tiếp lăn lộn tại hiện trường nhà máy.
