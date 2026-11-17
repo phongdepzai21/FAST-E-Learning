@@ -95,9 +95,11 @@ const Footer: React.FC = () => {
             <h4 className="text-[#374151] mb-5 md:mb-6 text-sm font-black uppercase tracking-wider border-l-4 border-[#007c76] pl-3">HỖ TRỢ &amp; CHÍNH SÁCH</h4>
             <ul className="space-y-3 text-gray-600 leading-relaxed">
               <li><Link to="/ve-chung-toi" className="hover:text-[#007c76] transition-colors">Về chúng tôi</Link></li>
-              <li><Link to="/lien-he" className="hover:text-[#007c76] transition-colors">Liên hệ</Link></li>
+              <li><Link to="/lien-he" className="hover:text-[#007c76] transition-colors">Liên hệ &amp; Tiếp nhận khiếu nại</Link></li>
               <li><Link to="/faq" className="hover:text-[#007c76] transition-colors">Câu hỏi thường gặp (FAQ)</Link></li>
-              <li><Link to="/terms" className="hover:text-[#007c76] transition-colors lg:whitespace-nowrap">Chính sách chung &amp; Điều khoản sử dụng</Link></li>
+              <li><Link to="/terms" className="hover:text-[#007c76] transition-colors lg:whitespace-nowrap">Chính sách chung &amp; Điều kiện giao dịch</Link></li>
+              <li><Link to="/terms#giao-nhan-va-cung-ung-dich-vu" className="hover:text-[#007c76] transition-colors">Chính sách giao nhận &amp; Kích hoạt dịch vụ</Link></li>
+              <li><Link to="/terms#thanh-toan" className="hover:text-[#007c76] transition-colors">Phương thức thanh toán &amp; Hoàn tiền</Link></li>
               <li><Link to="/privacy-policy" className="hover:text-[#007c76] transition-colors lg:whitespace-nowrap">Chính sách bảo vệ thông tin cá nhân</Link></li>
               <li><Link to="/data-deletion" className="hover:text-[#007c76] transition-colors">Hướng dẫn xóa dữ liệu</Link></li>
             </ul>
@@ -106,14 +108,20 @@ const Footer: React.FC = () => {
           <div className="lg:col-span-4 text-sm font-bold">
             <h4 className="text-[#374151] mb-5 md:mb-6 text-sm font-black uppercase tracking-wider border-l-4 border-[#007c76] pl-3">THÔNG TIN CHỦ SỞ HỮU WEBSITE</h4>
             <div className="space-y-3.5 text-left">
-              <p className="text-sm md:text-base font-black text-slate-900 tracking-[0.02em]">CÔNG TY TNHH TƯ VẤN FAST</p>
-              <div className="flex items-center space-x-3">
-                <div className="w-5 h-5 text-[#007c76] shrink-0">
+              <div className="space-y-1">
+                <p className="text-sm md:text-base font-black text-slate-900 tracking-[0.02em]">CÔNG TY TNHH TƯ VẤN FAST</p>
+                <p className="text-xs text-slate-500 font-medium">Website TMĐT bán hàng / Cung ứng dịch vụ đào tạo trực tuyến: fastelearning.com.vn</p>
+              </div>
+              <div className="flex items-start space-x-3">
+                <div className="w-5 h-5 text-[#007c76] shrink-0 mt-0.5">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
                   </svg>
                 </div>
-                <span className="text-sm text-[#374151] font-normal tabular-nums">MST / Số ĐKKD: 0314568146</span>
+                <div className="text-sm text-[#374151] font-normal space-y-0.5">
+                  <span className="block tabular-nums">MST / Số ĐKKD: 0314568146</span>
+                  <span className="block text-xs text-slate-500">Nơi cấp: Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh</span>
+                </div>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="w-5 h-5 text-[#007c76] shrink-0">
@@ -134,15 +142,18 @@ const Footer: React.FC = () => {
                 <div className="w-5 h-5 text-[#007c76] mt-0.5 shrink-0">
                     <svg fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
                 </div>
-                <span className="text-sm text-[#374151] leading-snug font-normal">Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, TP. Hồ Chí Minh, Việt Nam</span>
+                <span className="text-sm text-[#374151] leading-snug font-normal">Trụ sở chính: Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, TP. Hồ Chí Minh, Việt Nam</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 md:mt-16 pt-8 border-t border-gray-200 text-center">
+        <div className="mt-12 md:mt-16 pt-8 border-t border-gray-200 text-center space-y-2">
+            <p className="text-xs text-gray-500 font-semibold leading-relaxed">
+                Thông tin chủ sở hữu website và các nội dung giao dịch được công bố đầy đủ theo Điều 28 Nghị định 52/2013/NĐ-CP, được sửa đổi bởi Nghị định 85/2021/NĐ-CP.
+            </p>
             <p className="text-xs md:text-sm text-gray-400 font-medium">
-                © {new Date().getFullYear()} FAST E-Learning. Nâng tầm chuẩn mực An toàn thực phẩm Việt Nam.
+                © {new Date().getFullYear()} CÔNG TY TNHH TƯ VẤN FAST (FAST E-Learning). Nâng tầm chuẩn mực An toàn thực phẩm Việt Nam.
             </p>
         </div>
       </div>

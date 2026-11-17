@@ -65,6 +65,23 @@ export async function handler(event, context) {
 
       if (!qSnap.empty) {
         orderDoc = qSnap.docs[0].data();
+      } else {
+        // 4. Check live_course_registrations directly
+        const regSnap = await adminDb.collection("live_course_registrations").where("paymentCode", "==", cleanCode).limit(1).get();
+        if (!regSnap.empty) {
+          const rData = regSnap.docs[0].data();
+          orderDoc = {
+            orderId: regSnap.docs[0].id,
+            registrationId: regSnap.docs[0].id,
+            paymentCode: rData.paymentCode || cleanCode,
+            courseId: rData.courseId,
+            courseTitle: rData.courseTitle,
+            amount: rData.totalNumericPrice || 0,
+            status: rData.paymentStatus === "PAID" || rData.status === "confirmed" ? "PAID" : "PENDING",
+            email: rData.email || rData.userEmail || "",
+            paidAt: rData.paidAt || null,
+          };
+        }
       }
     }
 
@@ -82,6 +99,7 @@ export async function handler(event, context) {
       body: JSON.stringify({
         success: true,
         orderId: orderDoc.orderId,
+        registrationId: orderDoc.registrationId || null,
         paymentCode: orderDoc.paymentCode,
         courseId: orderDoc.courseId,
         courseTitle: orderDoc.courseTitle,

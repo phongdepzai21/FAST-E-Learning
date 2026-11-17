@@ -6,16 +6,24 @@ interface SecureDocViewerModalProps {
   onClose: () => void;
   documentTitle?: string;
   documentSubtitle?: string;
+  hideChecklistTab?: boolean;
 }
 
 export const SecureDocViewerModal: React.FC<SecureDocViewerModalProps> = ({
   isOpen,
   onClose,
   documentTitle = 'Mẫu Hồ Sơ Xin Cấp Giấy Chứng Nhận Cơ Sở Đủ Điều Kiện ATTP',
-  documentSubtitle = 'Ban hành kèm theo Nghị định số 15/2018/NĐ-CP và Thông tư hướng dẫn chuyên ngành ATTP'
+  documentSubtitle = 'Ban hành kèm theo Nghị định số 15/2018/NĐ-CP và Thông tư hướng dẫn chuyên ngành ATTP',
+  hideChecklistTab = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'form1' | 'form2' | 'checklist'>('form1');
   const [showCopyNotice, setShowCopyNotice] = useState(false);
+
+  useEffect(() => {
+    if (hideChecklistTab && activeTab === 'checklist') {
+      setActiveTab('form1');
+    }
+  }, [hideChecklistTab, activeTab]);
 
   // Chặn phím tắt In ấn (Ctrl+P, Cmd+P) và Lưu file (Ctrl+S, Cmd+S)
   useEffect(() => {
@@ -126,18 +134,20 @@ export const SecureDocViewerModal: React.FC<SecureDocViewerModalProps> = ({
             <Stamp className="w-3.5 h-3.5" />
             <span>Mẫu 02a: Thuyết Minh Cơ Sở Vật Chất</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('checklist')}
-            className={`pb-2.5 px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'checklist'
-                ? 'border-[#007c76] text-[#007c76] font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Danh mục Hồ Sơ Bắt Buộc Kèm Theo</span>
-          </button>
+          {!hideChecklistTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('checklist')}
+              className={`pb-2.5 px-4 border-b-2 transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTab === 'checklist'
+                  ? 'border-[#007c76] text-[#007c76] font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Danh mục Hồ Sơ Bắt Buộc Kèm Theo</span>
+            </button>
+          )}
         </div>
 
         {/* Khung Nội dung Tài liệu có Watermark */}
@@ -266,7 +276,7 @@ export const SecureDocViewerModal: React.FC<SecureDocViewerModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'checklist' && (
+          {!hideChecklistTab && activeTab === 'checklist' && (
             <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-sm border border-slate-200 text-slate-800 space-y-5 text-sm leading-relaxed max-w-3xl mx-auto relative z-10">
               <h2 className="text-base sm:text-lg font-black uppercase text-slate-900 text-center">
                 DANH MỤC THẨM ĐỊNH HỒ SƠ CẤP CHỨNG NHẬN CƠ SỞ ĐỦ ĐIỀU KIỆN ATTP

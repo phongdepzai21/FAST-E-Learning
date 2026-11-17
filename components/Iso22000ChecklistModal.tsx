@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Printer, FileText, CheckCircle2, Download, AlertTriangle, Search } from 'lucide-react';
+import { X, FileText, CheckCircle2, Download, AlertTriangle, Search } from 'lucide-react';
 
 interface Iso22000ChecklistModalProps {
   isOpen: boolean;
@@ -104,10 +104,6 @@ export const Iso22000ChecklistModal: React.FC<Iso22000ChecklistModalProps> = ({ 
   const completedCount = Object.keys(evaluations).length;
   const percentage = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleDownloadReport = () => {
     let rows = '';
     let majorCount = 0, minorCount = 0, obsCount = 0;
@@ -197,14 +193,6 @@ export const Iso22000ChecklistModal: React.FC<Iso22000ChecklistModalProps> = ({ 
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span className="hidden sm:inline">In Checklist</span>
-          </button>
           <button
             type="button"
             onClick={handleDownloadReport}

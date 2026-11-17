@@ -124,26 +124,28 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ course, isOpen, onClose, on
         .then(res => res.json())
         .then(data => {
           if (data.success && data.paymentCode) {
-            safeSetState(setPaymentCode, data.paymentCode);
+            const normalizedCode = String(data.paymentCode).trim().toUpperCase();
+            safeSetState(setPaymentCode, normalizedCode.startsWith('FAST') ? normalizedCode : `FAST${normalizedCode}`);
             if (data.orderId) safeSetState(setOrderId, data.orderId);
             if (data.bankAccount) {
               safeSetState(setConfig, prev => ({
                 ...prev,
                 accountNo: data.bankAccount,
-                bankName: data.bankCode || 'ACB',
+                bankId: data.bankCode || 'ACB',
+                bankName: data.bankCode || 'ACB (Á Châu)',
                 accountName: data.bankAccountName || prev.accountName
               }));
             }
           }
         })
         .catch(err => {
-          console.warn("[PaymentModal] Create order API error, fallback to random code:", err);
-          const chars = '0123456789';
+          console.warn("[PaymentModal] Create order API error, fallback to FAST code:", err);
+          const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
           let result = '';
-          for (let i = 0; i < 6; i++) {
+          for (let i = 0; i < 8; i++) {
             result += chars.charAt(Math.floor(Math.random() * chars.length));
           }
-          safeSetState(setPaymentCode, result);
+          safeSetState(setPaymentCode, `FAST${result}`);
         });
       } else {
         safeSetState(setPaymentCode, 'FREE');

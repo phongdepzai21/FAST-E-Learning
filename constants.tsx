@@ -60,14 +60,6 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
     ],
     attachments: [
       {
-        id: 'iso22000-full-checklist',
-        name: 'Checklist Đánh Giá Tiêu Chuẩn ISO 22000:2018 (Full Audit Checklist)',
-        size: '1.2 MB',
-        type: 'html',
-        description: 'Bảng kiểm tra trực tuyến toàn bộ điều khoản 4 đến 10 chuẩn mực FAST CONSULTING, tích hợp chấm điểm NCR & CAPA.',
-        isInteractive: true
-      },
-      {
         id: 'attp-registration-form',
         name: 'Mẫu Hồ Sơ Xin Cấp Giấy Chứng Nhận Cơ Sở Đủ Điều Kiện ATTP',
         size: '480 KB',
@@ -94,13 +86,6 @@ export const CONSULTING_SERVICES: ConsultingService[] = [
         size: '850 KB',
         type: 'pdf',
         description: 'Sơ đồ cây quyết định CCP, bảng phân tích mối nguy sinh học/hóa học/vật lý chuẩn hóa.'
-      },
-      {
-        id: 'iso-gap-analysis',
-        name: 'Bảng Tự Đánh Giá Khảo Sát Hiện Trạng Cơ Sở ISO/FSSC 22000',
-        size: '620 KB',
-        type: 'xlsx',
-        description: 'Bảng tính tự kiểm tra khoảng cách hiện trạng nhà máy trước khi đăng ký chứng nhận.'
       }
     ]
   }
@@ -1016,8 +1001,8 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     description: 'Chương trình đào tạo cấp chứng nhận kiến thức ATTP chuẩn Bộ Y tế & Codex. Hướng dẫn thiết lập quy trình kiểm soát vệ sinh cơ sở, trang thiết bị và nhân sự thực phẩm.',
     status: 'active',
     trainingFormat: 'both',
-    startDate: 'Chủ Nhật hàng tuần (08:30 - 16:30)',
-    scheduleDetails: 'Sáng: 08:30 - 11:30 | Chiều: 13:30 - 16:30',
+    startDate: 'Chủ Nhật, 22/11/2026',
+    scheduleDetails: '08:30 - 16:30 (Sáng 08:30 - 11:30 | Chiều 13:30 - 16:30)',
     venueAddress: 'Tòa nhà FAST E-Learning, Số 18 Phố Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Online Zoom',
     meetingLink: 'https://zoom.us/j/84927002668',
     instructor: 'ThS. Nguyễn Văn Thành (Chuyên gia QMS & ATTP 15 năm kinh nghiệm)',
@@ -1035,8 +1020,8 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     description: 'Khóa đào tạo chuyên sâu hướng dẫn 12 bước xây dựng hệ thống và 7 nguyên tắc HACCP Codex 2020. Bài tập tình huống nhận diện mối nguy và lập bảng HACCP Plan thực tế.',
     status: 'active',
     trainingFormat: 'zoom',
-    startDate: 'Tối Thứ 7 & Chủ Nhật (19:30 - 21:30)',
-    scheduleDetails: 'Trực tuyến có tương tác hai chiều qua Zoom HD',
+    startDate: 'Thứ Bảy, 28/11/2026 & Chủ Nhật, 29/11/2026',
+    scheduleDetails: '19:30 - 21:30 · Trực tuyến Zoom HD',
     venueAddress: 'Phòng học trực tuyến Zoom FAST Academy',
     meetingLink: 'https://zoom.us/j/84927002668',
     instructor: 'TS. Trần Hạnh (Chuyên gia Kiểm định Thực phẩm)',
@@ -1054,8 +1039,8 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     description: 'Trang bị kỹ năng lập kế hoạch đánh giá nội bộ, viết báo cáo NCR và thực hiện hành động khắc phục CAPA theo chuẩn ISO 19011 và ISO 22000.',
     status: 'active',
     trainingFormat: 'both',
-    startDate: 'Khai giảng ngày 15 và 30 hàng tháng',
-    scheduleDetails: 'Thứ 7 & Chủ Nhật',
+    startDate: 'Thứ Bảy, 05/12/2026 & Chủ Nhật, 06/12/2026',
+    scheduleDetails: '08:30 - 16:30',
     venueAddress: 'Hội trường Tầng 6, Tòa nhà Mộc Gia, 238-242 Nguyễn Oanh, Gò Vấp, TP.HCM',
     meetingLink: 'https://meet.google.com/fast-iso22000-live',
     instructor: 'Chuyên gia Đặng Minh Trí',
@@ -1073,7 +1058,7 @@ export const DEFAULT_TRAINING_COURSES: TrainingCourse[] = [
     description: 'Hướng dẫn quy chuẩn phân luồng sơ chế, chế biến nhiệt, phân phối và lưu mẫu thức ăn 24h. Tối ưu chi phí vận hành và vượt qua các đợt kiểm tra liên ngành.',
     status: 'active',
     trainingFormat: 'direct',
-    startDate: 'Thứ 7 tuần thứ 2 hàng tháng',
+    startDate: 'Thứ Bảy, 12/12/2026',
     scheduleDetails: '09:00 - 17:00',
     venueAddress: 'Trung tâm Đào tạo FAST, Nam Từ Liêm, Hà Nội',
     meetingLink: 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi',

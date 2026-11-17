@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ExternalLink, Phone, ChevronDown, ChevronUp, Clock, Share2, Printer, Search, Clipboard, FileText, Database, Plus, Trash2, Edit } from 'lucide-react';
-import { db as firestoreDb, auth } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth } from '../firebase';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { getFastSessionUser } from '../utils/sessionAuth';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
   value: string;
@@ -184,14 +185,16 @@ export const FastFoodSafetyManagement: React.FC = () => {
     }
   }, [dbSyncStatus]);
 
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('guest');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
+    const raw = auth.currentUser?.email || getFastSessionUser()?.email || '';
+    return raw ? raw.toLowerCase().trim().replace(/[^a-z0-9]/g, '_') : 'guest';
+  });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user && user.email) {
-        setCurrentUserEmail(user.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
-      } else {
-        setCurrentUserEmail('guest');
+      const raw = user?.email || getFastSessionUser()?.email || '';
+      if (raw) {
+        setCurrentUserEmail(raw.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
       }
     });
     return () => unsubscribe();
@@ -500,9 +503,9 @@ export const FastFoodSafetyManagement: React.FC = () => {
     setCurrentCustomerId(freshId);
     setSyncStatus('Đã tạo mới');
     showSuccessToast("Đã làm mới biểu mẫu, sẵn sàng nhập hồ sơ mới!", 3500);
-    const formEl = document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card');
+    const formEl = (document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card')) as HTMLElement | null;
     if (formEl) {
-      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToAttpSection(formEl);
       const firstInput = formEl.querySelector('input') as HTMLInputElement;
       if (firstInput) setTimeout(() => firstInput.focus(), 300);
     }
@@ -529,8 +532,8 @@ export const FastFoodSafetyManagement: React.FC = () => {
     setChecklist(found.checklist || {});
 
     setSyncStatus('Đang xem: ' + found.name);
-    const formEl = document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card');
-    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const formEl = (document.getElementById('attp-customer-form') || document.querySelector('.customer-profile-card')) as HTMLElement | null;
+    if (formEl) scrollToAttpSection(formEl);
   };
 
   const handleDeleteCustomerRecord = (id: string) => {
@@ -650,7 +653,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        alert('Đã sao chép thành công Danh mục hồ sơ ATTP! Bạn có thể dán (Paste) vào Zalo hoặc Email để gửi ngay cho khách hàng.');
+        showSuccessToast('Đã sao chép thành công Danh mục hồ sơ ATTP! Bạn có thể dán vào Zalo hoặc Email để gửi ngay cho khách hàng.');
       }).catch(() => fallbackCopy(text));
     } else {
       fallbackCopy(text);
@@ -664,7 +667,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    alert('Đã sao chép thành công Danh mục hồ sơ ATTP! Bạn có thể dán (Paste) vào Zalo hoặc Email để gửi ngay cho khách hàng.');
+    showSuccessToast('Đã sao chép thành công Danh mục hồ sơ ATTP! Bạn có thể dán vào Zalo hoặc Email để gửi ngay cho khách hàng.');
   };
 
   const formatDateVN = (dateStr: string) => {
@@ -676,8 +679,17 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
     return dateStr;
   };
 
+  const { scrollTo: scrollToAttpSection } = useSmoothScrollTo({
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+
   const toggleSection = (sectionId: string) => {
-    setOpenSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+    const willOpen = !openSections[sectionId];
+    setOpenSections(prev => ({ ...prev, [sectionId]: willOpen }));
+    if (willOpen) {
+      scrollToAttpSection(`attp-${sectionId}`);
+    }
   };
 
   // Deduplicate records to strictly prevent double counting or duplicate display
@@ -1167,7 +1179,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
         <div className="space-y-4">
           
           {/* Accordion 1: Checklist hồ sơ */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div id="attp-sec-checklist" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <button onClick={() => toggleSection('sec-checklist')} className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">1</span>
@@ -1235,7 +1247,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           {/* Accordion 2: Quy trình 20 ngày */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div id="attp-sec-process" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <button onClick={() => toggleSection('sec-process')} className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">2</span>
@@ -1280,7 +1292,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           {/* Accordion 3: Phương thức & Lệ phí */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div id="attp-sec-methods" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <button onClick={() => toggleSection('sec-methods')} className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">3</span>
@@ -1327,7 +1339,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           {/* Accordion 4: Quy chuẩn kỹ thuật */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div id="attp-sec-technical" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <button onClick={() => toggleSection('sec-technical')} className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">4</span>
@@ -1350,7 +1362,7 @@ THÔNG TIN LIÊN HỆ & TƯ VẤN 24/7:${staffLine}
           </div>
 
           {/* Accordion 5: Căn cứ pháp lý */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div id="attp-sec-legal" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <button onClick={() => toggleSection('sec-legal')} className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200">
               <div className="flex items-center gap-2.5">
                 <span className="w-6 h-6 rounded-full bg-[#005c56] text-white font-bold text-xs flex items-center justify-center">5</span>

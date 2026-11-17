@@ -41,7 +41,7 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
             CỔNG THÔNG TIN PHÁP LÝ & CHÍNH SÁCH
           </h1>
           <p className="text-sm text-gray-500 font-semibold leading-relaxed">
-            FAST Elearning cam kết minh bạch, bảo mật tối đa quyền lợi người học và tuân thủ tuyệt đối các quy định pháp luật thương mại điện tử nước Cộng hòa Xã hội Chủ nghĩa Việt Nam.
+            FAST E-Learning cam kết minh bạch, bảo mật tối đa quyền lợi người học và tuân thủ đầy đủ các nội dung theo Điều 28 Nghị định 52/2013/NĐ-CP, được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP về thương mại điện tử.
           </p>
         </div>
 
@@ -79,7 +79,8 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
             </div>
             
             <div className="pt-4 border-t border-gray-100 space-y-2 text-[11px] text-gray-400 font-semibold">
-              <p>📍 Đại diện pháp lý: Công ty TNHH FAST Consulting Việt Nam</p>
+              <p>📍 Chủ sở hữu: CÔNG TY TNHH TƯ VẤN FAST</p>
+              <p>🏛️ MST / ĐKKD: 0314568146</p>
               <p>📅 Ngày cập nhật: {currentDateStr}</p>
             </div>
           </div>
@@ -91,32 +92,33 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
             {activeTab === 'owner' && (
               <div className="space-y-6">
                 <div className="border-b border-gray-100 pb-4">
-                  <h2 className="text-2xl font-black text-slate-900 uppercase">1. Thông tin doanh nghiệp</h2>
+                  <h2 className="text-2xl font-black text-slate-900 uppercase">1. Thông tin chủ sở hữu website (Điều 28 &amp; 29 NĐ 52/2013/NĐ-CP, sửa đổi NĐ 85/2021/NĐ-CP)</h2>
                   <p className="text-xs text-gray-400 font-bold mt-1">Cập nhật lần cuối: {currentDateStr}</p>
                 </div>
                 
                 <div className="space-y-6 text-sm md:text-base">
                   <div className="space-y-2">
                     <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">1.1. Thông tin website</h3>
-                    <p><strong>Tên website:</strong> FAST Elearning</p>
+                    <p><strong>Tên website:</strong> FAST E-Learning</p>
                     <p><strong>Tên miền:</strong> fastelearning.com.vn</p>
-                    <p><strong>Loại website:</strong> Website thương mại điện tử cung ứng dịch vụ học tập trực tuyến</p>
+                    <p><strong>Loại website:</strong> Website thương mại điện tử bán hàng cung ứng dịch vụ đào tạo trực tuyến &amp; trực tiếp</p>
                     <p><strong>Lĩnh vực hoạt động:</strong> Học trực tuyến, tư vấn tiêu chuẩn ISO, HACCP, an toàn thực phẩm và hỗ trợ doanh nghiệp kiểm toán chất lượng dịch vụ.</p>
                   </div>
 
                   <div className="space-y-2 pt-2">
-                    <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">1.2. Pháp nhân doanh nghiệp</h3>
-                    <p><strong>Mã số thuế:</strong> 0314568146</p>
+                    <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">1.2. Pháp nhân chủ sở hữu website</h3>
+                    <p><strong>Tên tổ chức:</strong> CÔNG TY TNHH TƯ VẤN FAST</p>
                     <p><strong>Tên quốc tế:</strong> FAST CONSULTING COMPANY LIMITED</p>
-                    <p><strong>Tên viết tắt:</strong> FAST CONSULTING CO., LTD</p>
-                    <p><strong>Địa chỉ:</strong> Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam</p>
+                    <p><strong>Mã số thuế / Số ĐKKD:</strong> 0314568146</p>
+                    <p><strong>Cơ quan cấp ĐKKD:</strong> Sở Kế hoạch và Đầu tư Thành phố Hồ Chí Minh</p>
+                    <p><strong>Địa chỉ trụ sở:</strong> Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242, đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam</p>
                     <p><strong>Điện thoại:</strong> 0927 002 668</p>
                     <p><strong>Email chính thức:</strong> hkc.qms@gmail.com</p>
                     <p><strong>Email hỗ trợ học tập:</strong> support@fastelearning.com.vn</p>
                   </div>
 
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-500 font-medium">
-                    Các thông tin trên được công bố minh bạch và cập nhật chuẩn xác theo quy định pháp luật thương mại điện tử nhằm bảo đảm quyền lợi tối đa cho người học và các đối tác tham gia giao dịch.
+                    Các thông tin trên được công bố đầy đủ và minh bạch theo Điều 28, Điều 29 Nghị định 52/2013/NĐ-CP (được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP) nhằm bảo đảm quyền lợi tối đa cho người học và các đối tác tham gia giao dịch.
                   </div>
                 </div>
               </div>
@@ -194,9 +196,9 @@ export const PolicyHub: React.FC<PolicyHubProps> = ({ initialTab = 'terms' }) =>
                   </section>
 
                   <section className="space-y-2">
-                    <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">3.3. Quy trình mua hàng & Kích hoạt</h3>
+                    <h3 className="font-extrabold text-base text-slate-900 border-l-4 border-[#007c76] pl-3">3.3. Quy trình mua hàng, Giao nhận &amp; Kích hoạt dịch vụ số (Điều 33 NĐ 52/2013/NĐ-CP)</h3>
                     <p>
-                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản qua mã QR ngân hàng ACB ➔ Hệ thống đối soát thông tin tự động trong 1-3 giây ➔ Khóa học được kích hoạt vĩnh viễn trên tài khoản.
+                      Khách hàng chọn khóa học ➔ Đăng ký thông tin (Email + Số điện thoại) ➔ Thanh toán chuyển khoản qua mã VietQR ngân hàng ACB (STK 0989499568) ➔ Hệ thống đối soát thông tin tự động trong 1–3 giây và kích hoạt khóa học / gửi thông báo lịch học trực tuyến ngay trên tài khoản (không thu phí vận chuyển vật lý).
                     </p>
                   </section>
                 </div>

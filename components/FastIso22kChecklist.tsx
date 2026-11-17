@@ -1,6 +1,53 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { db } from '../firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { useToast } from '../contexts/ToastContext';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
+
+enum IsoOperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+function logIsoFirestoreError(error: unknown, operationType: IsoOperationType, path: string) {
+  const info = {
+    error: error instanceof Error ? error.message : String(error),
+    operationType,
+    path,
+    authInfo: {
+      userId: auth.currentUser?.uid || null,
+      email: auth.currentUser?.email || null,
+    },
+  };
+  console.warn('[FastIso22k:Firestore]', JSON.stringify(info));
+}
+
+function isMeaningfulIsoSession(data: Record<string, any> | null | undefined): boolean {
+  if (!data || typeof data !== 'object') return false;
+  if (data._isExplicitReset) return true;
+  const textKeys = [
+    'clientName',
+    'contactName',
+    'contactPhone',
+    'leadAuditor',
+    'auditType',
+    'auditAddress',
+    'fsmsScope',
+    'auditDate',
+    'reportNo',
+  ];
+  if (textKeys.some((k) => typeof data[k] === 'string' && data[k].trim() !== '')) {
+    return true;
+  }
+  return Object.keys(data).some(
+    (k) =>
+      (k.startsWith('comp_') || k.startsWith('sev_') || k.startsWith('cmt_') || k.startsWith('capa_')) &&
+      Boolean(data[k])
+  );
+}
 
 export interface ChecklistItem {
   id: string;
@@ -98,6 +145,8 @@ export const ISO22K_CHECKLIST_DATA: ChecklistSection[] = [
 ];
 
 export const FastIso22kChecklist: React.FC = () => {
+  const toast = useToast();
+
   // Client & Audit Form State
   const [clientName, setClientName] = useState<string>('');
   const [contactName, setContactName] = useState<string>('');
@@ -118,12 +167,49 @@ export const FastIso22kChecklist: React.FC = () => {
   // Search filter
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // CRM Modal State
+  // CRM & Report Panel State
   const [isCrmOpen, setIsCrmOpen] = useState<boolean>(false);
-  const [crmRecords, setCrmRecords] = useState<Record<string, any>>({});
+  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
 
-  // Sync state debounce ref
-  const saveTimeoutRef = useRef<any>(null);
+  const { scrollTo: scrollToIsoSection } = useSmoothScrollTo({
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+
+  useSmoothScrollTo({
+    targetId: 'iso22k-crm-panel',
+    triggerKey: isCrmOpen,
+    enabled: isCrmOpen,
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+
+  useSmoothScrollTo({
+    targetId: 'iso22k-report-panel',
+    triggerKey: isReportOpen,
+    enabled: isReportOpen,
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+  const [crmRecords, setCrmRecords] = useState<Record<string, any>>({});
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Sync guards to avoid stale closures, mount overwrites, and infinite echo loops
+  const tabWriterIdRef = useRef<string>(`iso22k_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const hasHydratedRef = useRef<boolean>(false);
+  const hasUserEditedRef = useRef<boolean>(false);
+  const isApplyingRemoteRef = useRef<boolean>(false);
+  const lastLocalTsRef = useRef<number>(Number(localStorage.getItem('fast_iso22000_full_ts') || 0));
+  const lastCrmTsRef = useRef<number>(Number(localStorage.getItem('fast_iso22000_full_crm_ts') || 0));
+  const crmRecordsRef = useRef<Record<string, any>>({});
+  crmRecordsRef.current = crmRecords;
+  const activeCrmIdRef = useRef<string | null>(null);
+  const latestPayloadRef = useRef<Record<string, any> | null>(null);
 
   // Total items count
   const totalItemsCount = useMemo(() => {
@@ -149,94 +235,21 @@ export const FastIso22kChecklist: React.FC = () => {
     return Math.round((completedItemsCount / totalItemsCount) * 100);
   }, [completedItemsCount, totalItemsCount]);
 
-  // 1. Initial Load & Listen to LocalStorage + Firestore Sync
-  useEffect(() => {
-    // A. Load local state
-    try {
-      const savedLocal = localStorage.getItem('fast_iso22000_full_current');
-      if (savedLocal) {
-        const parsed = JSON.parse(savedLocal);
-        applyStateData(parsed);
-      }
-    } catch (e) {
-      console.warn('[FastIso22k] Local load error:', e);
-    }
-
-    try {
-      const savedCrm = localStorage.getItem('fast_iso22000_full_crm');
-      if (savedCrm) {
-        setCrmRecords(JSON.parse(savedCrm));
-      }
-    } catch (e) {}
-
-    // B. Server API Preload (if local is empty)
-    fetch('/api/fast-iso22k/session')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.session && data.session._lastUpdated) {
-          const localTs = localStorage.getItem('fast_iso22000_full_ts');
-          if (!localTs || Number(data.session._lastUpdated) > Number(localTs)) {
-            applyStateData(data.session);
-            localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data.session));
-            localStorage.setItem('fast_iso22000_full_ts', String(data.session._lastUpdated));
-          }
-        }
-      })
-      .catch(() => {});
-
-    fetch('/api/fast-iso22k/crm')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.records && Object.keys(data.records).length > 0) {
-          setCrmRecords(prev => ({ ...data.records, ...prev }));
-          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(data.records));
-        }
-      })
-      .catch(() => {});
-
-    // C. Firestore Real-time Listeners (multi-user / multi-tab cloud sync)
-    const unsubSession = onSnapshot(doc(db, 'fast_iso22k_crm', 'current_session'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data && data._lastUpdated) {
-          const localTimestamp = localStorage.getItem('fast_iso22000_full_ts');
-          if (!localTimestamp || Number(data._lastUpdated) > Number(localTimestamp)) {
-            applyStateData(data);
-            localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
-            localStorage.setItem('fast_iso22000_full_ts', String(data._lastUpdated));
-          }
-        }
-      }
-    }, (err) => console.warn('[FastIso22k] Session listener error:', err));
-
-    const unsubCrm = onSnapshot(doc(db, 'fast_iso22k_crm', 'database'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data && data.records) {
-          setCrmRecords(data.records);
-          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(data.records));
-        }
-      }
-    }, (err) => console.warn('[FastIso22k] CRM listener error:', err));
-
-    return () => {
-      unsubSession();
-      unsubCrm();
-    };
-  }, []);
-
-  // Helper to apply state data object into React state
+  // Helper to apply state data object into React state cleanly
   const applyStateData = (data: Record<string, any>) => {
-    if (!data) return;
-    if (data.clientName !== undefined) setClientName(data.clientName || '');
-    if (data.contactName !== undefined) setContactName(data.contactName || '');
-    if (data.contactPhone !== undefined) setContactPhone(data.contactPhone || '');
-    if (data.leadAuditor !== undefined) setLeadAuditor(data.leadAuditor || '');
-    if (data.auditType !== undefined) setAuditType(data.auditType || '');
-    if (data.auditAddress !== undefined) setAuditAddress(data.auditAddress || '');
-    if (data.fsmsScope !== undefined) setFsmsScope(data.fsmsScope || '');
-    if (data.auditDate !== undefined) setAuditDate(data.auditDate || '');
-    if (data.reportNo !== undefined) setReportNo(data.reportNo || '');
+    if (!data || typeof data !== 'object') return;
+    isApplyingRemoteRef.current = true;
+    hasUserEditedRef.current = false;
+    activeCrmIdRef.current = data._loadedFromCrmId || null;
+    setClientName(data.clientName || '');
+    setContactName(data.contactName || '');
+    setContactPhone(data.contactPhone || '');
+    setLeadAuditor(data.leadAuditor || '');
+    setAuditType(data.auditType || '');
+    setAuditAddress(data.auditAddress || '');
+    setFsmsScope(data.fsmsScope || '');
+    setAuditDate(data.auditDate || '');
+    setReportNo(data.reportNo || '');
 
     const newComp: Record<string, string> = {};
     const newSev: Record<string, string> = {};
@@ -244,18 +257,14 @@ export const FastIso22kChecklist: React.FC = () => {
     const newCapa: Record<string, string> = {};
 
     Object.keys(data).forEach((key) => {
-      if (key.startsWith('comp_')) {
-        const id = key.replace('comp_', '');
-        newComp[id] = data[key];
-      } else if (key.startsWith('sev_')) {
-        const id = key.replace('sev_', '');
-        newSev[id] = data[key];
-      } else if (key.startsWith('cmt_')) {
-        const id = key.replace('cmt_', '');
-        newCmt[id] = data[key];
-      } else if (key.startsWith('capa_')) {
-        const id = key.replace('capa_', '');
-        newCapa[id] = data[key];
+      if (key.startsWith('comp_') && data[key]) {
+        newComp[key.slice(5)] = String(data[key]);
+      } else if (key.startsWith('sev_') && data[key]) {
+        newSev[key.slice(4)] = String(data[key]);
+      } else if (key.startsWith('cmt_') && data[key]) {
+        newCmt[key.slice(4)] = String(data[key]);
+      } else if (key.startsWith('capa_') && data[key]) {
+        newCapa[key.slice(5)] = String(data[key]);
       }
     });
 
@@ -263,10 +272,175 @@ export const FastIso22kChecklist: React.FC = () => {
     setSeverities(newSev);
     setComments(newCmt);
     setCapa(newCapa);
+
+    queueMicrotask(() => {
+      isApplyingRemoteRef.current = false;
+    });
   };
 
-  // Compile current state data into object matching attached HTML key names
-  const getCurrentStateDataObject = () => {
+  // Persist session to both Firestore and Server API without overwriting deleted keys
+  const persistSessionToCloudAndServer = async (payload: Record<string, any>, keepalive = false) => {
+    const cleanPayload = { ...payload };
+    let firestoreOk = false;
+    let serverOk = false;
+
+    try {
+      await setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), cleanPayload);
+      firestoreOk = true;
+    } catch (err) {
+      logIsoFirestoreError(err, IsoOperationType.WRITE, 'fast_iso22k_crm/current_session');
+    }
+
+    try {
+      const res = await fetch('/api/fast-iso22k/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanPayload),
+        keepalive,
+      });
+      serverOk = res.ok;
+    } catch {}
+
+    return { firestoreOk, serverOk };
+  };
+
+  // 1. Initial Load & Listen to LocalStorage + Server API + Firestore Real-time Sync
+  useEffect(() => {
+    let active = true;
+    try {
+      const savedLocal = localStorage.getItem('fast_iso22000_full_current');
+      if (savedLocal) {
+        const parsed = JSON.parse(savedLocal);
+        if (isMeaningfulIsoSession(parsed)) {
+          applyStateData(parsed);
+        } else {
+          // Discard stale empty non-reset placeholder so cloud/server can restore real data
+          lastLocalTsRef.current = 0;
+          localStorage.removeItem('fast_iso22000_full_current');
+          localStorage.removeItem('fast_iso22000_full_ts');
+        }
+      } else {
+        lastLocalTsRef.current = 0;
+      }
+    } catch (e) {
+      console.warn('[FastIso22k] Local load error:', e);
+      lastLocalTsRef.current = 0;
+    }
+
+    try {
+      const savedCrm = localStorage.getItem('fast_iso22000_full_crm');
+      if (savedCrm) {
+        const parsedCrm = JSON.parse(savedCrm);
+        if (parsedCrm && typeof parsedCrm === 'object') {
+          setCrmRecords(parsedCrm);
+          crmRecordsRef.current = parsedCrm;
+        }
+      }
+    } catch {}
+
+    hasHydratedRef.current = true;
+
+    const applyRemoteSessionIfNewer = (data: Record<string, any> | null | undefined) => {
+      if (!active || !data || typeof data !== 'object') return;
+      if (data._writerId && data._writerId === tabWriterIdRef.current) return;
+      if (hasUserEditedRef.current) return;
+
+      const remoteTs = Number(data._lastUpdated || 0);
+      const meaningful = isMeaningfulIsoSession(data);
+      const shouldApply =
+        remoteTs > lastLocalTsRef.current ||
+        (lastLocalTsRef.current === 0 && meaningful);
+
+      if (shouldApply && (meaningful || lastLocalTsRef.current > 0)) {
+        lastLocalTsRef.current = remoteTs || Date.now();
+        applyStateData(data);
+        try {
+          localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
+          localStorage.setItem('fast_iso22000_full_ts', String(lastLocalTsRef.current));
+        } catch {}
+      }
+    };
+
+    const applyRemoteCrmIfNewer = (
+      records: Record<string, any> | null | undefined,
+      remoteTsRaw: unknown,
+      writerId?: string
+    ) => {
+      if (!active || !records || typeof records !== 'object') return;
+      if (writerId && writerId === tabWriterIdRef.current) return;
+
+      const remoteTs = Number(remoteTsRaw || 0);
+      const remoteCount = Object.keys(records).length;
+      const localCount = Object.keys(crmRecordsRef.current).length;
+
+      // Never wipe local records with an un-timestamped empty object from cold server disk
+      if (remoteCount === 0 && remoteTs === 0 && localCount > 0) return;
+
+      const shouldApply =
+        remoteTs > lastCrmTsRef.current ||
+        (lastCrmTsRef.current === 0 && remoteCount > 0);
+
+      if (shouldApply) {
+        lastCrmTsRef.current = remoteTs || Date.now();
+        crmRecordsRef.current = records;
+        setCrmRecords(records);
+        try {
+          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(records));
+          localStorage.setItem('fast_iso22000_full_crm_ts', String(lastCrmTsRef.current));
+        } catch {}
+      }
+    };
+
+    // Server API Preload
+    fetch('/api/fast-iso22k/session', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.session) {
+          applyRemoteSessionIfNewer(data.session);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/fast-iso22k/crm', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.records) {
+          applyRemoteCrmIfNewer(data.records, data._lastUpdated);
+        }
+      })
+      .catch(() => {});
+
+    // Firestore Real-time Listeners
+    const unsubSession = onSnapshot(
+      doc(db, 'fast_iso22k_crm', 'current_session'),
+      (snap) => {
+        if (!active || !snap.exists()) return;
+        applyRemoteSessionIfNewer(snap.data());
+      },
+      (err) => logIsoFirestoreError(err, IsoOperationType.GET, 'fast_iso22k_crm/current_session')
+    );
+
+    const unsubCrm = onSnapshot(
+      doc(db, 'fast_iso22k_crm', 'database'),
+      (snap) => {
+        if (!active || !snap.exists()) return;
+        const data = snap.data();
+        if (data?.records && typeof data.records === 'object') {
+          applyRemoteCrmIfNewer(data.records, data._lastUpdated, data._writerId);
+        }
+      },
+      (err) => logIsoFirestoreError(err, IsoOperationType.GET, 'fast_iso22k_crm/database')
+    );
+
+    return () => {
+      active = false;
+      unsubSession();
+      unsubCrm();
+    };
+  }, []);
+
+  // Compile current state data into object
+  const buildStateDataObject = (timestamp = Date.now()) => {
     const data: Record<string, any> = {
       clientName,
       contactName,
@@ -280,7 +454,9 @@ export const FastIso22kChecklist: React.FC = () => {
       _progress: `${progressPercentage}%`,
       _completed: completedItemsCount,
       _total: totalItemsCount,
-      _lastUpdated: Date.now()
+      _lastUpdated: timestamp,
+      _writerId: tabWriterIdRef.current,
+      ...(activeCrmIdRef.current ? { _loadedFromCrmId: activeCrmIdRef.current } : {}),
     };
 
     Object.keys(compliance).forEach((id) => {
@@ -299,160 +475,331 @@ export const FastIso22kChecklist: React.FC = () => {
     return data;
   };
 
-  // Save state debounced
-  const triggerSaveState = () => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(async () => {
-      const data = getCurrentStateDataObject();
-      // 1. LocalStorage
-      localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
-      localStorage.setItem('fast_iso22000_full_ts', String(data._lastUpdated));
+  // Reactive debounced auto-save ONLY after actual user edits (never on initial mount/hydration!)
+  useEffect(() => {
+    if (!hasHydratedRef.current || isApplyingRemoteRef.current || !hasUserEditedRef.current) return;
 
-      // 2. Cloud Firestore Sync & Server API Dual Write
+    const snapshotPayload = buildStateDataObject(Date.now());
+    latestPayloadRef.current = snapshotPayload;
+
+    const timer = setTimeout(async () => {
+      if (!hasUserEditedRef.current) return;
+      hasUserEditedRef.current = false;
+      const nowTs = Date.now();
+      lastLocalTsRef.current = nowTs;
+      const data = { ...snapshotPayload, _lastUpdated: nowTs };
+      latestPayloadRef.current = data;
+
       try {
-        await setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), data, { merge: true });
-        fetch('/api/fast-iso22k/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }).catch(() => {});
-      } catch (err) {
-        console.warn('[FastIso22k] Cloud save error:', err);
+        localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
+        localStorage.setItem('fast_iso22000_full_ts', String(nowTs));
+      } catch {}
+
+      await persistSessionToCloudAndServer(data);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [
+    clientName,
+    contactName,
+    contactPhone,
+    leadAuditor,
+    auditType,
+    auditAddress,
+    fsmsScope,
+    auditDate,
+    reportNo,
+    compliance,
+    severities,
+    comments,
+    capa,
+    progressPercentage,
+    completedItemsCount,
+    totalItemsCount
+  ]);
+
+  // Flush any pending unsaved edits when switching tabs or unloading the page
+  useEffect(() => {
+    const flushIfDirty = () => {
+      if (hasUserEditedRef.current && latestPayloadRef.current) {
+        hasUserEditedRef.current = false;
+        const nowTs = Date.now();
+        lastLocalTsRef.current = nowTs;
+        const data = { ...latestPayloadRef.current, _lastUpdated: nowTs };
+        try {
+          localStorage.setItem('fast_iso22000_full_current', JSON.stringify(data));
+          localStorage.setItem('fast_iso22000_full_ts', String(nowTs));
+        } catch {}
+        void persistSessionToCloudAndServer(data, true);
       }
-    }, 300);
-  };
+    };
 
-  // New Client Action (Reset)
-  const newClient = () => {
-    if (window.confirm("Tạo mới sẽ xóa trắng form hiện tại (hãy chắc chắn bạn đã 'Lưu CRM' nếu cần). Tiếp tục?")) {
-      localStorage.removeItem('fast_iso22000_full_current');
-      localStorage.removeItem('fast_iso22000_full_ts');
-      setClientName('');
-      setContactName('');
-      setContactPhone('');
-      setLeadAuditor('');
-      setAuditType('');
-      setAuditAddress('');
-      setFsmsScope('');
-      setAuditDate('');
-      setReportNo('');
-      setCompliance({});
-      setSeverities({});
-      setComments({});
-      setCapa({});
+    window.addEventListener('beforeunload', flushIfDirty);
+    return () => {
+      window.removeEventListener('beforeunload', flushIfDirty);
+      flushIfDirty();
+    };
+  }, []);
 
-      // Reset Cloud Session
-      const resetObj = {
-        clientName: '',
-        contactName: '',
-        contactPhone: '',
-        leadAuditor: '',
-        auditType: '',
-        auditAddress: '',
-        fsmsScope: '',
-        auditDate: '',
-        reportNo: '',
-        _progress: '0%',
-        _lastUpdated: Date.now()
-      };
-
-      try {
-        setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), resetObj);
-        fetch('/api/fast-iso22k/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(resetObj)
-        }).catch(() => {});
-      } catch (e) {}
+  // Mark form dirty synchronously when user interacts with any field
+  const triggerSaveState = () => {
+    if (!isApplyingRemoteRef.current) {
+      hasUserEditedRef.current = true;
     }
   };
 
-  // Save to CRM Action
+  // New Client Action (Reset via inline confirmation)
+  const newClient = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Tạo hồ sơ đánh giá mới',
+      message: "Tạo mới sẽ xóa trắng form hiện tại (hãy chắc chắn bạn đã 'Lưu CRM' nếu cần giữ dữ liệu). Tiếp tục?",
+      onConfirm: () => {
+        const resetTs = Date.now();
+        lastLocalTsRef.current = resetTs;
+        hasUserEditedRef.current = false;
+        isApplyingRemoteRef.current = true;
+        activeCrmIdRef.current = null;
+
+        const resetObj: Record<string, any> = {
+          clientName: '',
+          contactName: '',
+          contactPhone: '',
+          leadAuditor: '',
+          auditType: '',
+          auditAddress: '',
+          fsmsScope: '',
+          auditDate: '',
+          reportNo: '',
+          _progress: '0%',
+          _completed: 0,
+          _total: totalItemsCount,
+          _lastUpdated: resetTs,
+          _writerId: tabWriterIdRef.current,
+          _isExplicitReset: true,
+        };
+
+        try {
+          localStorage.setItem('fast_iso22000_full_current', JSON.stringify(resetObj));
+          localStorage.setItem('fast_iso22000_full_ts', String(resetTs));
+        } catch {}
+
+        setClientName('');
+        setContactName('');
+        setContactPhone('');
+        setLeadAuditor('');
+        setAuditType('');
+        setAuditAddress('');
+        setFsmsScope('');
+        setAuditDate('');
+        setReportNo('');
+        setCompliance({});
+        setSeverities({});
+        setComments({});
+        setCapa({});
+        setIsReportOpen(false);
+        latestPayloadRef.current = resetObj;
+
+        queueMicrotask(() => {
+          isApplyingRemoteRef.current = false;
+        });
+
+        void persistSessionToCloudAndServer(resetObj);
+        toast.showToast('Đã làm mới biểu mẫu ISO 22000:2018.', 'info');
+        scrollToIsoSection('#iso22k-client-form');
+      }
+    });
+  };
+
+  // Save to CRM Action (merges cleanly with latest remote CRM map)
   const saveToCRM = async () => {
-    const currentData = getCurrentStateDataObject();
-    if (!currentData || !currentData.clientName || !currentData.clientName.trim()) {
-      alert("Vui lòng điền ít nhất 'Tên Khách Hàng' trước khi lưu vào CRM!");
+    if (!clientName || !clientName.trim()) {
+      toast.showToast("Vui lòng điền ít nhất 'Tên Khách Hàng' trước khi lưu vào CRM!", 'warning');
+      scrollToIsoSection('#iso22k-client-form');
       return;
     }
 
-    const recordId = `${currentData.clientName.trim()}_${new Date().getTime()}`;
+    const nowTs = Date.now();
+    const currentData = buildStateDataObject(nowTs);
+    const recordId = activeCrmIdRef.current || `${clientName.trim()}_${nowTs}`;
+    activeCrmIdRef.current = recordId;
     currentData._progress = `${progressPercentage}%`;
     currentData._savedAt = new Date().toLocaleString('vi-VN');
+    currentData._loadedFromCrmId = recordId;
+
+    let latestRemoteRecords: Record<string, any> = {};
+    let latestRemoteTs = 0;
+    try {
+      const remoteSnap = await getDoc(doc(db, 'fast_iso22k_crm', 'database'));
+      if (remoteSnap.exists() && remoteSnap.data()?.records && typeof remoteSnap.data()?.records === 'object') {
+        latestRemoteRecords = remoteSnap.data()!.records;
+        latestRemoteTs = Number(remoteSnap.data()?._lastUpdated || 0);
+      }
+    } catch {}
+
+    const mergedBase =
+      latestRemoteTs > lastCrmTsRef.current
+        ? { ...latestRemoteRecords }
+        : { ...latestRemoteRecords, ...crmRecordsRef.current };
 
     const updatedCrm = {
-      ...crmRecords,
+      ...mergedBase,
       [recordId]: currentData
     };
 
+    lastCrmTsRef.current = nowTs;
+    crmRecordsRef.current = updatedCrm;
     setCrmRecords(updatedCrm);
-    localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updatedCrm));
+    try {
+      localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updatedCrm));
+      localStorage.setItem('fast_iso22000_full_crm_ts', String(nowTs));
+    } catch {}
 
-    // Sync to Cloud Firestore + Server API
+    let cloudSaved = false;
+    let serverSaved = false;
+
     try {
       await setDoc(doc(db, 'fast_iso22k_crm', 'database'), {
         records: updatedCrm,
-        _lastUpdated: Date.now()
-      }, { merge: true });
-
-      fetch('/api/fast-iso22k/crm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records: updatedCrm })
-      }).catch(() => {});
+        _lastUpdated: nowTs,
+        _writerId: tabWriterIdRef.current,
+      });
+      cloudSaved = true;
     } catch (e) {
-      console.warn('[FastIso22k] CRM Cloud sync error:', e);
+      logIsoFirestoreError(e, IsoOperationType.WRITE, 'fast_iso22k_crm/database');
     }
 
-    alert("Đã lưu thông tin phiên đánh giá vào CRM thành công!");
+    try {
+      const res = await fetch('/api/fast-iso22k/crm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          records: updatedCrm,
+          _lastUpdated: nowTs,
+          _writerId: tabWriterIdRef.current,
+        })
+      });
+      serverSaved = res.ok;
+    } catch {}
+
+    // Also update current session with the linked CRM record ID
+    hasUserEditedRef.current = false;
+    lastLocalTsRef.current = nowTs;
+    try {
+      localStorage.setItem('fast_iso22000_full_current', JSON.stringify(currentData));
+      localStorage.setItem('fast_iso22000_full_ts', String(nowTs));
+    } catch {}
+    void persistSessionToCloudAndServer(currentData);
+
+    if (cloudSaved || serverSaved) {
+      toast.showToast(`Đã lưu & đồng bộ hồ sơ "${clientName.trim()}" vào CRM thành công!`, 'success');
+    } else {
+      toast.showToast('Đã lưu cục bộ, nhưng không thể đồng bộ lên máy chủ lúc này.', 'warning');
+    }
   };
 
-  // Open CRM Modal
+  // Toggle CRM Table Panel (scroll handled reactively by useSmoothScrollTo)
   const openCRM = () => {
     setIsCrmOpen(true);
+    scrollToIsoSection('#iso22k-crm-panel');
   };
 
-  // Close CRM Modal
   const closeCRM = () => {
     setIsCrmOpen(false);
   };
 
   // Load Record from CRM
   const loadRecord = (id: string) => {
-    if (window.confirm("Tải dữ liệu này sẽ ghi đè lên form làm việc hiện tại. Tiếp tục?")) {
-      const rec = crmRecords[id];
-      if (rec) {
-        applyStateData(rec);
-        localStorage.setItem('fast_iso22000_full_current', JSON.stringify(rec));
-        localStorage.setItem('fast_iso22000_full_ts', String(Date.now()));
+    const rec = crmRecordsRef.current[id];
+    if (!rec) return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Tải hồ sơ từ CRM',
+      message: `Tải dữ liệu của "${rec.clientName || 'khách hàng'}" sẽ ghi đè lên form làm việc hiện tại. Tiếp tục?`,
+      onConfirm: () => {
+        const nowTs = Date.now();
+        lastLocalTsRef.current = nowTs;
+        hasUserEditedRef.current = false;
+        const syncedRec = {
+          ...rec,
+          _loadedFromCrmId: id,
+          _lastUpdated: nowTs,
+          _writerId: tabWriterIdRef.current,
+        };
+        applyStateData(syncedRec);
+        latestPayloadRef.current = syncedRec;
         try {
-          setDoc(doc(db, 'fast_iso22k_crm', 'current_session'), {
-            ...rec,
-            _lastUpdated: Date.now()
-          }, { merge: true });
-        } catch (e) {}
+          localStorage.setItem('fast_iso22000_full_current', JSON.stringify(syncedRec));
+          localStorage.setItem('fast_iso22000_full_ts', String(nowTs));
+        } catch {}
+        void persistSessionToCloudAndServer(syncedRec);
         closeCRM();
+        toast.showToast(`Đã tải hồ sơ: ${rec.clientName || id}`, 'success');
+        scrollToIsoSection('#iso22k-client-form');
       }
-    }
+    });
   };
 
-  // Delete Record from CRM
-  const deleteRecord = async (id: string) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa dữ liệu khách hàng này khỏi hệ thống CRM?")) {
-      const updated = { ...crmRecords };
-      delete updated[id];
-      setCrmRecords(updated);
-      localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updated));
+  // Delete Record from CRM (Firestore + Server disk without merge:true so deletion persists)
+  const deleteRecord = (id: string) => {
+    const targetName = crmRecordsRef.current[id]?.clientName || 'khách hàng này';
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa dữ liệu CRM',
+      message: `Bạn có chắc chắn muốn xóa hồ sơ "${targetName}" khỏi hệ thống CRM?`,
+      onConfirm: async () => {
+        const nowTs = Date.now();
+        let baseRecords: Record<string, any> = { ...crmRecordsRef.current };
+        try {
+          const remoteSnap = await getDoc(doc(db, 'fast_iso22k_crm', 'database'));
+          if (remoteSnap.exists() && remoteSnap.data()?.records && typeof remoteSnap.data()?.records === 'object') {
+            const remoteTs = Number(remoteSnap.data()?._lastUpdated || 0);
+            baseRecords =
+              remoteTs >= lastCrmTsRef.current
+                ? { ...remoteSnap.data()!.records }
+                : { ...remoteSnap.data()!.records, ...baseRecords };
+          }
+        } catch {}
 
-      // Sync to Cloud Firestore
-      try {
-        await setDoc(doc(db, 'fast_iso22k_crm', 'database'), {
-          records: updated,
-          _lastUpdated: Date.now()
-        });
-      } catch (e) {}
-    }
+        const updated = { ...baseRecords };
+        delete updated[id];
+        if (activeCrmIdRef.current === id) {
+          activeCrmIdRef.current = null;
+        }
+
+        lastCrmTsRef.current = nowTs;
+        crmRecordsRef.current = updated;
+        setCrmRecords(updated);
+        try {
+          localStorage.setItem('fast_iso22000_full_crm', JSON.stringify(updated));
+          localStorage.setItem('fast_iso22000_full_crm_ts', String(nowTs));
+        } catch {}
+
+        try {
+          await setDoc(doc(db, 'fast_iso22k_crm', 'database'), {
+            records: updated,
+            _lastUpdated: nowTs,
+            _writerId: tabWriterIdRef.current,
+          });
+        } catch (e) {
+          logIsoFirestoreError(e, IsoOperationType.DELETE, 'fast_iso22k_crm/database');
+        }
+
+        try {
+          await fetch('/api/fast-iso22k/crm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              records: updated,
+              _lastUpdated: nowTs,
+              _writerId: tabWriterIdRef.current,
+            })
+          });
+        } catch {}
+
+        toast.showToast(`Đã xóa hồ sơ "${targetName}" khỏi CRM.`, 'success');
+      }
+    });
   };
 
   // Toggle All Sections Open / Closed
@@ -463,134 +810,83 @@ export const FastIso22kChecklist: React.FC = () => {
     });
   };
 
-  // Xuất Báo Cáo Lỗi & CAPA (NCR & CAPA Report Window Print matching attached HTML)
-  const generateReport = () => {
-    const data = getCurrentStateDataObject();
-
+  // Compute NCR & CAPA findings reactively
+  const reportFindings = useMemo(() => {
+    const rows: Array<{
+      id: string;
+      clause: string;
+      text: string;
+      status: string;
+      severity: 'Major' | 'Minor' | 'Observation';
+      notes: string;
+      capaText: string;
+    }> = [];
     let majorCount = 0;
     let minorCount = 0;
     let obsCount = 0;
-    let reportRows = '';
 
     ISO22K_CHECKLIST_DATA.forEach((section) => {
       section.items.forEach((item) => {
-        const severity = data[`sev_${item.id}`];
-        const notes = data[`cmt_${item.id}`] || '';
-        const itemCapa = data[`capa_${item.id}`] || '';
-        const status = data[`comp_${item.id}`] || 'Chưa đánh giá';
+        const sev = severities[item.id] as 'Major' | 'Minor' | 'Observation' | '' | undefined;
+        const status = compliance[item.id] || 'Chưa đánh giá';
+        const effectiveSev: 'Major' | 'Minor' | 'Observation' | null =
+          sev === 'Major' || sev === 'Minor' || sev === 'Observation'
+            ? sev
+            : status === 'N'
+              ? 'Minor'
+              : null;
 
-        if (severity === 'Major' || severity === 'Minor' || severity === 'Observation') {
-          if (severity === 'Major') majorCount++;
-          if (severity === 'Minor') minorCount++;
-          if (severity === 'Observation') obsCount++;
+        if (effectiveSev) {
+          if (effectiveSev === 'Major') majorCount++;
+          if (effectiveSev === 'Minor') minorCount++;
+          if (effectiveSev === 'Observation') obsCount++;
 
-          const badgeColor = severity === 'Major' ? '#d9534f' : (severity === 'Minor' ? '#f0ad4e' : '#0275d8');
-
-          reportRows += `
-            <tr>
-                <td style="text-align:center;"><strong>${item.clause}</strong></td>
-                <td>${item.text}</td>
-                <td style="text-align:center;"><strong>${status}</strong></td>
-                <td style="text-align:center; color:${badgeColor}; font-weight:bold;">${severity}</td>
-                <td>${notes}</td>
-                <td>${itemCapa}</td>
-            </tr>
-          `;
+          rows.push({
+            id: item.id,
+            clause: item.clause,
+            text: item.text,
+            status,
+            severity: effectiveSev,
+            notes: comments[item.id] || '',
+            capaText: capa[item.id] || '',
+          });
         }
       });
     });
 
-    if (!reportRows) {
-      alert("Hoàn hảo! Không có lỗi nào được phân loại (Major/Minor/Observation) để xuất báo cáo.");
+    return {
+      rows,
+      majorCount,
+      minorCount,
+      obsCount,
+      totalDefects: majorCount + minorCount + obsCount,
+    };
+  }, [compliance, severities, comments, capa]);
+
+  // Xuất Báo Cáo Lỗi & CAPA inline (no window.open popup blocking) + auto-scroll
+  const generateReport = () => {
+    if (reportFindings.rows.length === 0) {
+      toast.showToast(
+        'Hoàn hảo! Chưa có lỗi nào được phân loại (Major/Minor/Observation hoặc "N") để xuất báo cáo.',
+        'info'
+      );
       return;
     }
+    setIsReportOpen(true);
+    scrollToIsoSection('#iso22k-report-panel');
+  };
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Vui lòng cấp quyền mở tab mới để xuất báo cáo!");
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <meta charset="UTF-8">
-          <title>Báo Cáo NCR & CAPA - FAST CONSULTING</title>
-          <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; line-height: 1.5; }
-              h1 { color: #007c76; text-align: center; border-bottom: 2px solid #007c76; padding-bottom: 10px; margin-bottom: 25px; font-size: 20px;}
-              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background: #f4f8f8; padding: 15px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; }
-              .info-grid div { margin-bottom: 5px; }
-              .summary { display: flex; justify-content: space-around; margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; font-weight: bold; background: #fff; }
-              .badge-major { color: #d9534f; } .badge-minor { color: #f0ad4e; } .badge-obs { color: #0275d8; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-              th, td { border: 1px solid #000; padding: 10px; text-align: left; vertical-align: top; }
-              th { background-color: #007c76; color: white; text-align: center; }
-              @media print { 
-                  body { padding: 0; } 
-                  .info-grid { background: transparent; border: none; padding: 0; } 
-                  table { page-break-inside: auto; }
-                  tr { page-break-inside: avoid; page-break-after: auto; }
-              }
-          </style>
-      </head>
-      <body>
-          <h1>BÁO CÁO KẾT QUẢ ĐÁNH GIÁ VÀ HÀNH ĐỘNG KHẮC PHỤC (NCR & CAPA REPORT)</h1>
-          <div class="info-grid">
-              <div><strong>Khách hàng:</strong> ${data.clientName || '...........................................'}</div>
-              <div><strong>Tên liên hệ:</strong> ${data.contactName || '...........................................'}</div>
-              <div><strong>Điện thoại:</strong> ${data.contactPhone || '...........................................'}</div>
-              <div><strong>Chuyên gia (Lead Auditor):</strong> ${data.leadAuditor || '...........................................'}</div>
-              <div><strong>Loại đánh giá:</strong> ${data.auditType || '...........................................'}</div>
-              <div><strong>Ngày đánh giá:</strong> ${data.auditDate || '...........................................'}</div>
-              <div><strong>Địa chỉ:</strong> ${data.auditAddress || '...........................................'}</div>
-              <div><strong>Phạm vi (Scope):</strong> ${data.fsmsScope || '...........................................'}</div>
-              <div><strong>Số Report:</strong> ${data.reportNo || '...........................................'}</div>
-          </div>
-
-          <div class="summary">
-              <span>Tổng số lỗi phát hiện: ${majorCount + minorCount + obsCount}</span>
-              <span class="badge-major">Major: ${majorCount}</span>
-              <span class="badge-minor">Minor: ${minorCount}</span>
-              <span class="badge-obs">Observation: ${obsCount}</span>
-          </div>
-
-          <table>
-              <thead>
-                  <tr>
-                      <th style="width: 10%;">Điều khoản</th>
-                      <th style="width: 25%;">Nội dung Yêu cầu</th>
-                      <th style="width: 7%;">Kết quả</th>
-                      <th style="width: 10%;">Phân loại</th>
-                      <th style="width: 24%;">Bằng chứng & Ghi chú</th>
-                      <th style="width: 24%;">Hành động khắc phục (CAPA)</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  ${reportRows}
-              </tbody>
-          </table>
-          
-          <div style="margin-top: 50px; display: flex; justify-content: space-around;">
-              <div style="text-align: center;">
-                  <strong>Đại diện Khách Hàng</strong><br>
-                  <i>(Ký và ghi rõ họ tên)</i><br><br><br><br>
-                  <strong>${data.contactName || '.......................................'}</strong>
-              </div>
-              <div style="text-align: center;">
-                  <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br>
-                  <i>(Ký và ghi rõ họ tên)</i><br><br><br><br>
-                  <strong>${data.leadAuditor || '.......................................'}</strong>
-              </div>
-          </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+  const handlePrintReport = () => {
+    document.body.classList.add('printing-iso22k-report');
+    const cleanup = () => {
+      document.body.classList.remove('printing-iso22k-report');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
     setTimeout(() => {
-      printWindow.print();
-    }, 500);
+      window.print();
+      setTimeout(cleanup, 1200);
+    }, 120);
   };
 
   // Filtered Checklist Sections
@@ -639,7 +935,7 @@ export const FastIso22kChecklist: React.FC = () => {
           color: var(--text-main);
           line-height: 1.6;
           border-radius: var(--radius);
-          overflow: hidden;
+          overflow-x: clip;
         }
 
         .fast-iso22k-wrapper * {
@@ -1182,13 +1478,15 @@ export const FastIso22kChecklist: React.FC = () => {
         </div>
 
         {/* Client & CRM Info */}
-        <div className="client-section">
+        <div id="iso22k-client-form" className="client-section iso22k-main-checklist">
           <div className="client-header">
             <h2>Thông Tin Khách Hàng & Chuyên Gia</h2>
             <div className="btn-group">
-              <button className="btn-danger" onClick={newClient}>➕ Tạo mới</button>
-              <button className="btn-primary" onClick={saveToCRM}>💾 Lưu CRM</button>
-              <button className="btn-info" onClick={openCRM}>📊 Dữ liệu CRM</button>
+              <button type="button" className="btn-danger" onClick={newClient}>➕ Tạo mới</button>
+              <button type="button" className="btn-primary" onClick={saveToCRM}>💾 Lưu CRM</button>
+              <button type="button" className="btn-info" onClick={() => (isCrmOpen ? closeCRM() : openCRM())}>
+                📊 {isCrmOpen ? 'Ẩn Dữ liệu CRM' : `Dữ liệu CRM (${Object.keys(crmRecords).length})`}
+              </button>
             </div>
           </div>
           <div className="audit-info">
@@ -1317,8 +1615,214 @@ export const FastIso22kChecklist: React.FC = () => {
           </div>
         </div>
 
+        {/* Inline CRM Table Panel (smooth auto-scroll target) */}
+        {isCrmOpen && (
+          <div
+            id="iso22k-crm-panel"
+            className="client-section iso22k-main-checklist"
+            style={{ border: '2px solid #0275d8', background: '#ffffff' }}
+          >
+            <div className="client-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+              <h2>Thống Kê Khách Hàng (CRM) - ISO 22000:2018 ({Object.keys(crmRecords).length} hồ sơ)</h2>
+              <button type="button" className="btn-outline" onClick={closeCRM}>✕ Đóng bảng CRM</button>
+            </div>
+            <div className="table-responsive">
+              <table className="crm-table" id="crmTable">
+                <thead>
+                  <tr>
+                    <th>Ngày đánh giá</th>
+                    <th>Tên Khách Hàng</th>
+                    <th>Loại đánh giá</th>
+                    <th>Tiến độ</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(crmRecords).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                        Chưa có dữ liệu khách hàng nào được lưu trữ.
+                      </td>
+                    </tr>
+                  ) : (
+                    Object.keys(crmRecords).map((recId) => {
+                      const rec = crmRecords[recId];
+                      return (
+                        <tr key={recId}>
+                          <td>{rec.auditDate || (rec._savedAt ? rec._savedAt.split(' ')[1] : 'N/A')}</td>
+                          <td><strong>{rec.clientName}</strong></td>
+                          <td>{rec.auditType || 'N/A'}</td>
+                          <td><strong>{rec._progress || '0%'}</strong></td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn-outline"
+                              style={{ padding: '5px 10px', fontSize: '12px', marginRight: '6px' }}
+                              onClick={() => loadRecord(recId)}
+                            >
+                              Tải
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger"
+                              style={{ padding: '5px 10px', fontSize: '12px' }}
+                              onClick={() => deleteRecord(recId)}
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Inline NCR & CAPA Report Panel (White background, printable, auto-scroll target) */}
+        {isReportOpen && (
+          <div
+            id="iso22k-report-panel"
+            style={{
+              background: '#ffffff',
+              color: '#1e293b',
+              borderRadius: '12px',
+              border: '2px solid #007c76',
+              padding: '24px',
+              marginBottom: '25px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+            }}
+          >
+            <div
+              className="print:hidden"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '10px',
+                borderBottom: '1px solid #cbd5e1',
+                paddingBottom: '14px',
+                marginBottom: '18px',
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: '15px', color: '#007c76' }}>
+                BÁO CÁO KẾT QUẢ ĐÁNH GIÁ &amp; CAPA — ISO 22000:2018
+              </span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-primary" onClick={handlePrintReport}>
+                  🖨 In Báo Cáo (Nền trắng)
+                </button>
+                <button type="button" className="btn-outline" onClick={() => setIsReportOpen(false)}>
+                  ✕ Đóng Báo Cáo
+                </button>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center', borderBottom: '2px solid #007c76', paddingBottom: '12px', marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#007c76', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+                FAST CONSULTING · FOOD ALL STANDARD &amp; TRAINING
+              </div>
+              <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', margin: '6px 0 0' }}>
+                BÁO CÁO KẾT QUẢ ĐÁNH GIÁ &amp; HÀNH ĐỘNG KHẮC PHỤC (NCR &amp; CAPA)
+              </h2>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '10px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '14px',
+                marginBottom: '16px',
+                fontSize: '13px',
+              }}
+            >
+              <div><strong>Khách hàng:</strong> {clientName || '........................................'}</div>
+              <div><strong>Người liên hệ:</strong> {contactName || '........................................'}</div>
+              <div><strong>Điện thoại:</strong> {contactPhone || '........................................'}</div>
+              <div><strong>Lead Auditor:</strong> {leadAuditor || '........................................'}</div>
+              <div><strong>Loại đánh giá:</strong> {auditType || '........................................'}</div>
+              <div><strong>Ngày đánh giá:</strong> {auditDate || '........................................'}</div>
+              <div><strong>Địa chỉ:</strong> {auditAddress || '........................................'}</div>
+              <div><strong>Phạm vi (Scope):</strong> {fsmsScope || '........................................'}</div>
+              <div><strong>Số Report:</strong> {reportNo || '........................................'}</div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-around',
+                gap: '12px',
+                padding: '12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                background: '#ffffff',
+                fontWeight: 700,
+                fontSize: '14px',
+                marginBottom: '18px',
+              }}
+            >
+              <span>Tổng số lỗi phát hiện: {reportFindings.totalDefects}</span>
+              <span style={{ color: '#d9534f' }}>Major: {reportFindings.majorCount}</span>
+              <span style={{ color: '#d97706' }}>Minor: {reportFindings.minorCount}</span>
+              <span style={{ color: '#0275d8' }}>Observation: {reportFindings.obsCount}</span>
+            </div>
+
+            <div className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '11%', background: '#007c76', color: '#ffffff' }}>Điều khoản</th>
+                    <th style={{ width: '27%', background: '#007c76', color: '#ffffff' }}>Nội dung Yêu cầu</th>
+                    <th style={{ width: '8%', background: '#007c76', color: '#ffffff' }}>Kết quả</th>
+                    <th style={{ width: '11%', background: '#007c76', color: '#ffffff' }}>Phân loại</th>
+                    <th style={{ width: '21%', background: '#007c76', color: '#ffffff' }}>Bằng chứng &amp; Ghi chú</th>
+                    <th style={{ width: '22%', background: '#007c76', color: '#ffffff' }}>Hành động khắc phục (CAPA)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportFindings.rows.map((r) => {
+                    const sevColor =
+                      r.severity === 'Major' ? '#d9534f' : r.severity === 'Minor' ? '#d97706' : '#0275d8';
+                    return (
+                      <tr key={r.id}>
+                        <td style={{ textAlign: 'center', fontWeight: 700 }}>{r.clause}</td>
+                        <td>{r.text}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700 }}>{r.status}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, color: sevColor }}>{r.severity}</td>
+                        <td>{r.notes || '—'}</td>
+                        <td>{r.capaText || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ marginTop: '36px', display: 'flex', justifyContent: 'space-around', textAlign: 'center', fontSize: '13px' }}>
+              <div>
+                <strong>Đại diện Khách Hàng</strong><br />
+                <i>(Ký và ghi rõ họ tên)</i><br /><br /><br />
+                <strong>{contactName || '.......................................'}</strong>
+              </div>
+              <div>
+                <strong>Chuyên gia đánh giá (Lead Auditor)</strong><br />
+                <i>(Ký và ghi rõ họ tên)</i><br /><br /><br />
+                <strong>{leadAuditor || '.......................................'}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Checklist Sections */}
-        <div id="checklistContainer">
+        <div id="checklistContainer" className="iso22k-main-checklist">
           {filteredSections.map((sec, sIdx) => {
             if (!sec.visible) return null;
             return (
@@ -1430,72 +1934,43 @@ export const FastIso22kChecklist: React.FC = () => {
         </div>
       </div>
 
-      {/* CRM Modal */}
-      {isCrmOpen && (
-        <div id="crmModal" className="modal" onClick={(e) => {
-          if (e.target === e.currentTarget) closeCRM();
-        }}>
-          <div className="modal-content">
-            <span className="close" onClick={closeCRM}>&times;</span>
-            <h2 style={{ marginBottom: '20px', color: 'var(--primary-dark)', fontWeight: 'bold', fontSize: '20px' }}>
-              Thống Kê Khách Hàng (CRM) - ISO 22000
-            </h2>
-            <div className="table-responsive">
-              <table className="crm-table" id="crmTable">
-                <thead>
-                  <tr>
-                    <th>Ngày đánh giá</th>
-                    <th>Tên Khách Hàng</th>
-                    <th>Loại đánh giá</th>
-                    <th>Tiến độ</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(crmRecords).length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                        Chưa có dữ liệu khách hàng nào được lưu trữ.
-                      </td>
-                    </tr>
-                  ) : (
-                    Object.keys(crmRecords).map((recId) => {
-                      const rec = crmRecords[recId];
-                      return (
-                        <tr key={recId}>
-                          <td>{rec.auditDate || (rec._savedAt ? rec._savedAt.split(' ')[1] : 'N/A')}</td>
-                          <td><strong>{rec.clientName}</strong></td>
-                          <td>{rec.auditType || 'N/A'}</td>
-                          <td>{rec._progress || '0%'}</td>
-                          <td>
-                            <button
-                              className="btn-outline"
-                              style={{ padding: '5px 10px', fontSize: '12px', marginRight: '6px' }}
-                              onClick={() => loadRecord(recId)}
-                            >
-                              Tải
-                            </button>
-                            <button
-                              className="btn-danger"
-                              style={{ padding: '5px 10px', fontSize: '12px' }}
-                              onClick={() => deleteRecord(recId)}
-                            >
-                              Xóa
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+      {/* Custom Confirm Dialog (bypasses blocked native confirm popups) */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConfirmDialog(null);
+          }}
+        >
+          <div className="modal-content" style={{ maxWidth: '420px', background: '#ffffff', borderRadius: '16px', padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
+              {confirmDialog.title}
+            </h3>
+            <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, marginBottom: '20px' }}>
+              {confirmDialog.message}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" className="btn-outline" onClick={() => setConfirmDialog(null)}>
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  const fn = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  fn();
+                }}
+              >
+                Xác nhận
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <footer>
+      <footer className="iso22k-main-checklist">
         <p className="footer-brand">FAST CONSULTING - Food All Standard & Training</p>
         <p>&copy; Bản quyền của FAST. Tất cả các quyền được bảo lưu.</p>
       </footer>

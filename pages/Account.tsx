@@ -8,6 +8,7 @@ import CourseDetail from './CourseDetail';
 import { ViewedCoursesView } from '../components/ViewedCoursesView';
 import { NotificationDropdown } from '../components/NotificationDropdown';
 import { MyTrainingRegistrationsView } from '../components/MyTrainingRegistrationsView';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 // Lazy load heavy admin & CRM components to speed up student load time
 const TeacherDashboard = React.lazy(() => import('../components/TeacherDashboard'));
@@ -25,7 +26,9 @@ const DirectCourseDashboard = React.lazy(() => import('../components/DirectCours
 const FeaturedCoursesDashboard = React.lazy(() => import('../components/FeaturedCoursesDashboard').then(m => ({ default: m.FeaturedCoursesDashboard })));
 const TrainingCourseDashboard = React.lazy(() => import('../components/TrainingCourseDashboard').then(m => ({ default: m.TrainingCourseDashboard })));
 const FastCodeLookup = React.lazy(() => import('../components/FastCodeLookup').then(m => ({ default: m.FastCodeLookup })));
+const AdminPaymentDashboard = React.lazy(() => import('../components/AdminPaymentDashboard').then(m => ({ default: m.AdminPaymentDashboard })));
 const PurchaseHistory = React.lazy(() => import('../components/PurchaseHistory').then(m => ({ default: m.PurchaseHistory })));
+const ReceiptHistoryTable = React.lazy(() => import('../components/ReceiptHistoryTable').then(m => ({ default: m.ReceiptHistoryTable })));
 import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Course } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -69,6 +72,13 @@ import { getFastSessionUser, setFastSessionUser, clearFastSessionUser, createSyn
 import { evaluatePasswordStrength } from '../utils/passwordValidation';
 import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import { ReCaptcha } from '../components/ReCaptcha';
+import {
+  getStoredNotifications,
+  markNotificationAsRead,
+  formatTimeAgo,
+  getPreClassPreparationMeta
+} from '../utils/courseNotificationService';
+import { Bell, Calendar, Check, Clock, Copy, ExternalLink, KeyRound, LogIn, MapPin, Video, CheckCircle2 } from 'lucide-react';
 
 interface UserProfile {
   uid?: string;
@@ -403,12 +413,55 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'receipt-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'admin-payment-dashboard' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
   const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'student'>('student');
+  const [visitedAdminModes, setVisitedAdminModes] = useState<Set<string>>(() => new Set(['fsa']));
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
   const [qcClients, setQcClients] = useState<any[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [copiedScheduleNotifId, setCopiedScheduleNotifId] = useState<string | null>(null);
+
+  // Preload all 5 FastService chunks once an admin opens Account so FSA <-> HSQC switches immediately
+  useEffect(() => {
+    if (!user?.isAdmin) return;
+    import('../components/FastStandardsAudit').catch(() => {});
+    import('../components/AdProfileManagement').catch(() => {});
+    import('../components/FastFoodSafetyManagement').catch(() => {});
+    import('../components/FastHaccpChecklist').catch(() => {});
+    import('../components/FastIso22kChecklist').catch(() => {});
+  }, [user?.isAdmin]);
+
+  // Track visited FastService tabs cleanly
+  useEffect(() => {
+    if (adminViewMode !== 'student') {
+      setVisitedAdminModes((prev) => {
+        if (prev.has(adminViewMode)) return prev;
+        const next = new Set(prev);
+        next.add(adminViewMode);
+        return next;
+      });
+    }
+  }, [adminViewMode]);
+
+  // Detect dynamic Suspense/panel loading in FastService and scroll smoothly with bounce
+  useSmoothScrollTo({
+    targetId: 'fast-service-display-panel',
+    triggerKey: adminViewMode,
+    enabled: adminViewMode !== 'student',
+    offset: 20,
+    detectDynamicReveal: true,
+  });
+
+  // Detect dynamic content loading when switching main Account/Admin tabs
+  useSmoothScrollTo({
+    targetId: 'account-tab-workspace',
+    triggerKey: activeTab,
+    enabled: adminViewMode === 'student',
+    scrollOnMount: false,
+    offset: 88,
+    detectDynamicReveal: true,
+  });
 
   // Listen to CRM customer databases in Firestore in real-time
   useEffect(() => {
@@ -637,6 +690,17 @@ const Account: React.FC = () => {
   const [otpFormError, setOtpFormError] = useState<string | null>(null);
   const [otpAttemptsLeft, setOtpAttemptsLeft] = useState(5);
 
+  // OTP Login & Set Password Setup Flow States (for auto-provisioned learners)
+  const [isOtpSetupMode, setIsOtpSetupMode] = useState(false);
+  const [otpSetupStep, setOtpSetupStep] = useState<'email' | 'otp' | 'password'>('email');
+  const [otpSetupResetToken, setOtpSetupResetToken] = useState('');
+  const [otpSetupPassword, setOtpSetupPassword] = useState('');
+  const [otpSetupConfirmPassword, setOtpSetupConfirmPassword] = useState('');
+  const [showOtpSetupPassword, setShowOtpSetupPassword] = useState(false);
+  const [otpSetupError, setOtpSetupError] = useState('');
+  const otpSetupEmailSentRef = useRef<string>('');
+  const [learnerScheduleNotifs, setLearnerScheduleNotifs] = useState<any[]>([]);
+
   // --- EFFECT: HANDLE FIREBASE EMAIL VERIFICATION ACTION LINK (?mode=verifyEmail) ---
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -668,8 +732,62 @@ const Account: React.FC = () => {
     }
   }, [location.search, location.pathname, navigate, toast]);
 
-  // --- EFFECT: OTP COUNTDOWN TIMER (Registration & Forgot Password OTP) ---
-  const isOtpStepActive = isOtpPending || (isForgotPassword && forgotPasswordStep === 'otp');
+  // --- EFFECT: DETECT ?otpSetup=1 OR location.state.otpAccountSetup TO AUTO-START OTP LOGIN & PASSWORD SETUP ---
+  useEffect(() => {
+    if (user) return;
+    const params = new URLSearchParams(location.search);
+    const hasOtpSetupQuery = params.get('otpSetup') === '1';
+    const stateData = (location.state as any) || {};
+    if (!hasOtpSetupQuery && !stateData.otpAccountSetup) return;
+
+    const paramEmail = String(params.get('email') || stateData.email || '').toLowerCase().trim();
+    const paramName = String(params.get('name') || stateData.name || '').trim();
+    const isOtpReady = params.get('otpReady') === '1' || Boolean(stateData.otpReady);
+    const fallbackOtp = String(stateData.fallbackOtp || '').replace(/[^0-9]/g, '').slice(0, 6);
+
+    setIsOtpSetupMode(true);
+    setIsForgotPassword(false);
+    setIsRegistering(false);
+    setIsOtpPending(false);
+    setError(null);
+    setOtpFormError(null);
+    setOtpSetupError('');
+
+    if (paramName) setFullName(paramName);
+    if (paramEmail) {
+      setEmail(paramEmail);
+      if (isOtpReady) {
+        otpSetupEmailSentRef.current = paramEmail;
+        setOtpAttemptsLeft(5);
+        setOtpCountdown(60);
+        setOtpSetupResetToken('');
+        setOtpSetupStep('otp');
+        if (fallbackOtp.length === 6) {
+          setOtpDigits(fallbackOtp.split(''));
+          setOtpStatusMessage(
+            `Hệ thống đã khởi tạo và điền sẵn mã OTP xác thực cho ${paramEmail}. Bấm "Xác nhận OTP & Tiếp tục" để thêm mật khẩu.`
+          );
+        } else {
+          setOtpDigits(['', '', '', '', '', '']);
+          setOtpStatusMessage(
+            `Mã OTP 6 chữ số và thông tin tài khoản tự tạo đã được gửi đến email ${paramEmail}. Vui lòng kiểm tra hộp thư (kể cả Spam) để nhập mã.`
+          );
+        }
+      } else if (otpSetupEmailSentRef.current !== paramEmail) {
+        otpSetupEmailSentRef.current = paramEmail;
+        setOtpSetupStep('otp');
+        handleOtpSetupSendOtp(undefined, paramEmail, paramName);
+      }
+    } else {
+      setOtpSetupStep('email');
+    }
+  }, [location.search, location.state, user]);
+
+  // --- EFFECT: OTP COUNTDOWN TIMER (Registration, Forgot Password & OTP Account Setup) ---
+  const isOtpStepActive =
+    isOtpPending ||
+    (isForgotPassword && forgotPasswordStep === 'otp') ||
+    (isOtpSetupMode && otpSetupStep === 'otp');
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isOtpStepActive && otpCountdown > 0) {
@@ -686,13 +804,17 @@ const Account: React.FC = () => {
       const timer = setTimeout(() => {
         const firstEmptyIndex = otpDigits.findIndex(d => !d);
         const targetIndex = firstEmptyIndex !== -1 ? firstEmptyIndex : 0;
-        const prefix = isForgotPassword ? 'forgot-otp-input-' : 'otp-input-';
+        const prefix = isOtpSetupMode
+          ? 'setup-otp-input-'
+          : isForgotPassword
+            ? 'forgot-otp-input-'
+            : 'otp-input-';
         const targetInput = document.getElementById(`${prefix}${targetIndex}`) as HTMLInputElement;
         if (targetInput) targetInput.focus();
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isOtpStepActive, isForgotPassword]);
+  }, [isOtpStepActive, isForgotPassword, isOtpSetupMode]);
 
   // Real-time Diagnostic hook for Account registration OTP
   useEffect(() => {
@@ -1144,6 +1266,75 @@ const Account: React.FC = () => {
       window.removeEventListener('gamification_updated', handleGamificationEvent);
     };
   }, [user?.email, user?.uid, user?.isVip, purchasedCourses]);
+
+  // --- EFFECT: SYNC LEARNER STUDY SCHEDULE & TRAINING NOTIFICATIONS ---
+  useEffect(() => {
+    const emailKey = (user?.email || '').toLowerCase().trim();
+    if (!emailKey) {
+      setLearnerScheduleNotifs([]);
+      return;
+    }
+
+    let apiNotifs: any[] = [];
+    let fsNotifs: any[] = [];
+
+    const mergeAndSet = () => {
+      const localList = getStoredNotifications().filter(
+        (n) =>
+          (n.type === 'training_link' || n.type === 'approval') &&
+          (!n.userEmail || n.userEmail.toLowerCase().trim() === emailKey)
+      );
+      const map = new Map<string, any>();
+      [...localList, ...apiNotifs, ...fsNotifs].forEach((item) => {
+        if (!item) return;
+        const type = item.type;
+        if (type !== 'training_link' && type !== 'approval') return;
+        const itemEmail = item.userEmail ? String(item.userEmail).toLowerCase().trim() : '';
+        if (itemEmail && itemEmail !== emailKey) return;
+        const key = String(item.id || item.registrationId || `${item.courseId || ''}_${item.createdAt || item.timestamp || ''}`);
+        const prev = map.get(key);
+        map.set(key, prev ? { ...prev, ...item } : item);
+      });
+      const sorted = Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(b.createdAt || b.timestamp || 0).getTime() -
+          new Date(a.createdAt || a.timestamp || 0).getTime()
+      );
+      setLearnerScheduleNotifs(sorted);
+    };
+
+    const fetchApiNotifs = () => {
+      fetch(`/api/user/notifications?email=${encodeURIComponent(emailKey)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.success && Array.isArray(data.notifications)) {
+            apiNotifs = data.notifications;
+            mergeAndSet();
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchApiNotifs();
+
+    let unsubNotifs = () => {};
+    try {
+      unsubNotifs = onSnapshot(
+        collection(db, 'users', emailKey, 'notifications'),
+        (snap) => {
+          fsNotifs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          mergeAndSet();
+        },
+        () => {}
+      );
+    } catch {}
+
+    window.addEventListener('course_notifications_updated', mergeAndSet);
+    return () => {
+      unsubNotifs();
+      window.removeEventListener('course_notifications_updated', mergeAndSet);
+    };
+  }, [user?.email]);
 
   const handleLogout = async () => {
     try {
@@ -1699,6 +1890,262 @@ const Account: React.FC = () => {
     } catch (err: any) {
       const msg = err?.message || 'Lỗi kết nối máy chủ khi cập nhật mật khẩu.';
       setResetPasswordError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  // --- HANDLERS: OTP LOGIN & ADD PASSWORD FOR AUTO-PROVISIONED LEARNERS ---
+  const openOtpSetupFlow = () => {
+    setIsOtpSetupMode(true);
+    setOtpSetupStep('email');
+    setOtpSetupResetToken('');
+    setOtpSetupPassword('');
+    setOtpSetupConfirmPassword('');
+    setShowOtpSetupPassword(false);
+    setOtpSetupError('');
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpFormError(null);
+    setOtpStatusMessage(null);
+    setOtpCountdown(0);
+    setOtpAttemptsLeft(5);
+    setIsForgotPassword(false);
+    setIsRegistering(false);
+    setIsOtpPending(false);
+    setError(null);
+    setEmailError('');
+    setPasswordError('');
+  };
+
+  const closeOtpSetupFlow = () => {
+    setIsOtpSetupMode(false);
+    setOtpSetupStep('email');
+    setOtpSetupResetToken('');
+    setOtpSetupPassword('');
+    setOtpSetupConfirmPassword('');
+    setShowOtpSetupPassword(false);
+    setOtpSetupError('');
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpFormError(null);
+    setOtpStatusMessage(null);
+    setError(null);
+    setEmailError('');
+    setPasswordError('');
+    if (location.search.includes('otpSetup')) {
+      navigate('/account', { replace: true });
+    }
+  };
+
+  const handleOtpSetupSendOtp = async (e?: React.FormEvent, overrideEmail?: string, overrideName?: string) => {
+    if (e) e.preventDefault();
+    setError(null);
+    setEmailError('');
+    setOtpFormError(null);
+    setOtpSetupError('');
+
+    const cleanEmail = (overrideEmail ?? email).toLowerCase().trim();
+    const resolvedName = (overrideName ?? fullName).trim() || 'Học viên';
+    setEmail(cleanEmail);
+
+    if (!cleanEmail) {
+      const msg = 'Vui lòng nhập địa chỉ email đã dùng để đăng ký khóa học.';
+      setEmailError(msg);
+      setError(msg);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      const msg = 'Định dạng email không hợp lệ.';
+      setEmailError(msg);
+      setError(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      const sendResult = await sendOtp({
+        email: cleanEmail,
+        name: resolvedName,
+        flow: 'account_setup'
+      });
+
+      if (!sendResult.success) {
+        const msg = sendResult.error || 'Email này chưa có hồ sơ đăng ký hoặc chưa được tạo tài khoản.';
+        setError(msg);
+        setOtpFormError(msg);
+        setOtpSetupStep('email');
+        toast.error(msg);
+        return;
+      }
+
+      setOtpAttemptsLeft(5);
+      setOtpCountdown(60);
+      setOtpSetupResetToken('');
+      setOtpSetupStep('otp');
+
+      if (sendResult.fallback && sendResult.otp) {
+        setOtpDigits(sendResult.otp.split(''));
+        setOtpStatusMessage(
+          sendResult.message ||
+            `Hệ thống đã khởi tạo và điền sẵn mã OTP xác thực cho ${cleanEmail}. Bấm "Xác nhận OTP" để đặt mật khẩu.`
+        );
+        toast.success('Đã tạo mã OTP đăng nhập!');
+      } else {
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpStatusMessage(
+          sendResult.message ||
+            `Mã OTP 6 chữ số đã được gửi tới email ${cleanEmail}. Vui lòng kiểm tra hộp thư (kể cả Spam) để lấy mã.`
+        );
+        toast.success(`Đã gửi mã OTP tới ${cleanEmail}!`);
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Lỗi kết nối khi gửi mã OTP.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleOtpSetupVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const enteredCode = otpDigits.join('');
+    if (enteredCode.length !== 6) {
+      const msg = 'Vui lòng nhập đầy đủ 6 chữ số OTP.';
+      setOtpFormError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setOtpFormError(null);
+    setError(null);
+    const cleanEmail = email.toLowerCase().trim();
+
+    try {
+      const verifyRes = await verifyOtp({
+        email: cleanEmail,
+        otp: enteredCode,
+        flow: 'account_setup'
+      });
+
+      if (!verifyRes.success || !verifyRes.resetToken) {
+        const left = otpAttemptsLeft - 1;
+        setOtpAttemptsLeft(Math.max(0, left));
+        if (left <= 0) {
+          setOtpSetupStep('email');
+          setOtpDigits(['', '', '', '', '', '']);
+          const msg = 'Bạn đã nhập sai OTP quá 5 lần. Vui lòng yêu cầu gửi lại mã mới.';
+          setError(msg);
+          toast.error(msg);
+        } else {
+          const msg = verifyRes.error || `Mã OTP không chính xác. Còn ${left} lần thử.`;
+          setOtpFormError(msg);
+          toast.error(msg);
+        }
+        return;
+      }
+
+      setOtpSetupResetToken(verifyRes.resetToken);
+      setOtpSetupPassword('');
+      setOtpSetupConfirmPassword('');
+      setOtpSetupError('');
+      setOtpSetupStep('password');
+      toast.success('Xác thực OTP thành công! Vui lòng thêm mật khẩu cho tài khoản.');
+    } catch (err: any) {
+      const msg = err?.message || 'Không thể xác thực mã OTP.';
+      setOtpFormError(msg);
+      toast.error(msg);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleOtpSetupComplete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpSetupError('');
+    setError(null);
+
+    if (!otpSetupResetToken) {
+      setOtpSetupStep('email');
+      const msg = 'Phiên OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới.';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const strength = evaluatePasswordStrength(otpSetupPassword);
+    if (!strength.isValid) {
+      const msg = strength.firstError || 'Mật khẩu mới chưa đáp ứng đủ quy tắc bảo mật.';
+      setOtpSetupError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (otpSetupPassword !== otpSetupConfirmPassword) {
+      const msg = 'Mật khẩu xác nhận không khớp.';
+      setOtpSetupError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setIsAuthenticating(true);
+    const cleanEmail = email.toLowerCase().trim();
+    try {
+      const res = await fetch('/api/auth/otp-complete-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          resetToken: otpSetupResetToken,
+          newPassword: otpSetupPassword,
+          fullName: fullName.trim() || undefined
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success || !data?.user) {
+        const msg = data?.error || 'Không thể hoàn tất thiết lập mật khẩu.';
+        setOtpSetupError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      // Persist client session immediately so learner lands directly inside dashboard & schedule
+      setFastSessionUser({
+        uid: data.user.uid,
+        email: data.user.email,
+        displayName: data.user.displayName,
+        isAdmin: !!data.user.isAdmin,
+        isTeacher: !!data.user.isTeacher,
+        isVip: !!data.user.isVip
+      });
+
+      // Attempt Firebase Auth sign-in silently in parallel (ignore sandbox Identity Toolkit limits)
+      try {
+        await signInWithEmailAndPassword(auth, cleanEmail, otpSetupPassword);
+      } catch {}
+
+      setUser({
+        uid: data.user.uid,
+        linkedProviders: ['password'],
+        name: data.user.displayName || 'Học viên FAST',
+        email: cleanEmail,
+        avatar: '',
+        isVip: !!data.user.isVip,
+        isAdmin: !!data.user.isAdmin,
+        isTeacher: !!data.user.isTeacher
+      });
+
+      setIsOtpSetupMode(false);
+      setOtpSetupResetToken('');
+      setOtpSetupPassword('');
+      setOtpSetupConfirmPassword('');
+      toast.success('Đăng nhập & thêm mật khẩu thành công! Lịch trình học của bạn đã sẵn sàng.');
+      navigate('/account', { replace: true });
+    } catch (err: any) {
+      const msg = err?.message || 'Lỗi kết nối khi hoàn tất tài khoản.';
+      setOtpSetupError(msg);
       toast.error(msg);
     } finally {
       setIsAuthenticating(false);
@@ -2921,65 +3368,77 @@ const Account: React.FC = () => {
                 </select>
               </div>
 
-              {/* Display area - Nền ngoài #005c56, khung bảng bên trong màu trắng như cũ */}
-              <div className="bg-white text-slate-800 rounded-[32px] md:rounded-[40px] p-5 md:p-8 lg:p-10 shadow-2xl border border-teal-900/10 min-h-[600px] w-full">
-                {adminViewMode === 'fsa' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <FastStandardsAudit />
-                  </div>
-                )}
-
-                {adminViewMode === 'haccp' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
-                      <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">HACCP Checklist & Thẩm Tra An Toàn</h4>
-                        <p className="text-xs text-gray-500 font-medium">Hệ thống thẩm tra 12 bước, 7 nguyên tắc HACCP Codex & TCVN, xác định điểm tới hạn CCP và chương trình tiên quyết PRP.</p>
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+              {/* Display area - Nền ngoài #005c56, khung bảng bên trong màu trắng; giữ các module đã mở để chuyển tab 0ms */}
+              <div
+                id="fast-service-display-panel"
+                className="bg-white text-slate-800 rounded-[32px] md:rounded-[40px] p-5 md:p-8 lg:p-10 shadow-2xl border border-teal-900/10 min-h-[600px] w-full"
+              >
+                <React.Suspense
+                  fallback={
+                    <div className="py-16 text-center space-y-3">
+                      <div className="w-8 h-8 border-3 border-[#007c76] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Đang tải module FAST SERVICE...</p>
                     </div>
-                    <FastHaccpChecklist />
-                  </div>
-                )}
-
-                {adminViewMode === 'iso22k' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
-                      <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">ISO 22000:2018 Full Audit Checklist</h4>
-                        <p className="text-xs text-gray-500 font-medium">Bảng đánh giá toàn diện 43 điều khoản (Điều 4 đến Điều 10), phân loại Major/Minor/Observation, quản trị CRM và xuất báo cáo NCR & CAPA.</p>
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                  }
+                >
+                  {(adminViewMode === 'fsa' || visitedAdminModes.has('fsa')) && (
+                    <div className={adminViewMode === 'fsa' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
+                      <FastStandardsAudit />
                     </div>
-                    <FastIso22kChecklist />
-                  </div>
-                )}
+                  )}
 
-                {adminViewMode === 'attp' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
-                      <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ An Toàn Thực Phẩm</h4>
-                        <p className="text-xs text-gray-500 font-medium">Cập nhật, thẩm định và xử lý quy trình pháp lý, giấy phép ATTP cho cơ sở.</p>
+                  {(adminViewMode === 'haccp' || visitedAdminModes.has('haccp')) && (
+                    <div className={adminViewMode === 'haccp' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
+                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">HACCP Checklist &amp; Thẩm Tra An Toàn</h4>
+                          <p className="text-xs text-gray-500 font-medium">Hệ thống thẩm tra 12 bước, 7 nguyên tắc HACCP Codex &amp; TCVN, xác định điểm tới hạn CCP và chương trình tiên quyết PRP.</p>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                      <FastHaccpChecklist />
                     </div>
-                    <FastFoodSafetyManagement />
-                  </div>
-                )}
+                  )}
 
-                {adminViewMode === 'hsqc' && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
-                      <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ Quảng Cáo</h4>
-                        <p className="text-xs text-gray-500 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                  {(adminViewMode === 'iso22k' || visitedAdminModes.has('iso22k')) && (
+                    <div className={adminViewMode === 'iso22k' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
+                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">ISO 22000:2018 Full Audit Checklist</h4>
+                          <p className="text-xs text-gray-500 font-medium">Bảng đánh giá toàn diện 43 điều khoản (Điều 4 đến Điều 10), phân loại Major/Minor/Observation, quản trị CRM và xuất báo cáo NCR &amp; CAPA.</p>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                      <FastIso22kChecklist />
                     </div>
-                    <AdProfileManagement />
-                  </div>
-                )}
+                  )}
+
+                  {(adminViewMode === 'attp' || visitedAdminModes.has('attp')) && (
+                    <div className={adminViewMode === 'attp' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
+                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ An Toàn Thực Phẩm</h4>
+                          <p className="text-xs text-gray-500 font-medium">Cập nhật, thẩm định và xử lý quy trình pháp lý, giấy phép ATTP cho cơ sở.</p>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                      </div>
+                      <FastFoodSafetyManagement />
+                    </div>
+                  )}
+
+                  {(adminViewMode === 'hsqc' || visitedAdminModes.has('hsqc')) && (
+                    <div className={adminViewMode === 'hsqc' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
+                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">Hồ Sơ Quảng Cáo</h4>
+                          <p className="text-xs text-gray-500 font-medium">Theo dõi kiểm nghiệm chất lượng, sản xuất và tự công bố sản phẩm, phê duyệt quảng cáo.</p>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
+                      </div>
+                      <AdProfileManagement />
+                    </div>
+                  )}
+                </React.Suspense>
               </div>
             </div>
           </main>
@@ -3030,12 +3489,14 @@ const Account: React.FC = () => {
                     { id: 'dashboard', label: 'Bảng điều khiển', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
                     { id: 'buy-courses', label: 'Mua khóa học', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z' },
                     { id: 'purchase-history', label: 'Lịch sử mua hàng', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+                    { id: 'receipt-history', label: 'Quản lý biên lai', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
                     ...(isTeacher || isAdmin ? [
                       { id: 'teacher-dashboard', label: 'Quản lý bài giảng', icon: 'M12 4v16m8-8H4' },
                       { id: 'combo-management', label: 'Quản lý combo', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
                       { id: 'direct-courses', label: 'Quản lý Khóa Đào Tạo', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' }
                     ] : []),
                     ...(isAdmin ? [
+                      { id: 'admin-payment-dashboard', label: 'Dashboard Thanh toán & Kích hoạt', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
                       { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
                       { id: 'featured-courses', label: 'Cấu hình 3 Khóa Nổi Bật Trang Chủ', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z' },
                       { id: 'fast-code-lookup', label: 'Truy vết Giao dịch (Payment Trace)', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
@@ -3120,9 +3581,11 @@ const Account: React.FC = () => {
                   <option value="dashboard">Bảng điều khiển</option>
                   <option value="buy-courses">Mua khóa học</option>
                   <option value="purchase-history">Lịch sử mua hàng</option>
+                  <option value="receipt-history">Quản lý biên lai</option>
                   {(isTeacher || isAdmin) && <option value="teacher-dashboard">Quản lý bài giảng</option>}
                   {(isTeacher || isAdmin) && <option value="combo-management">Quản lý combo</option>}
-                  {isAdmin && <option value="user-management">Học viên & Khóa học</option>}
+                  {isAdmin && <option value="admin-payment-dashboard">Dashboard Thanh toán &amp; Kích hoạt</option>}
+                  {isAdmin && <option value="user-management">Học viên &amp; Khóa học</option>}
                   {isAdmin && <option value="featured-courses">Cấu hình 3 Khóa Nổi Bật Trang Chủ</option>}
                   {(isTeacher || isAdmin) && <option value="direct-courses">Quản lý Khóa Đào Tạo</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
@@ -3179,7 +3642,7 @@ const Account: React.FC = () => {
              </div>
           </header>
 
-          <div className="p-6 md:p-10 space-y-10">
+          <div id="account-tab-workspace" className="p-6 md:p-10 space-y-10">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -3200,6 +3663,8 @@ const Account: React.FC = () => {
                   <FeaturedCoursesDashboard />
                 ) : activeTab === 'direct-courses' && (isAdmin || isTeacher) ? (
                   <TrainingCourseDashboard />
+                ) : activeTab === 'admin-payment-dashboard' && isAdmin ? (
+                  <AdminPaymentDashboard userEmail={user?.email || auth.currentUser?.email || ''} />
                 ) : activeTab === 'fast-code-lookup' && isAdmin ? (
                   <FastCodeLookup />
                 ) : activeTab === 'admin-student-console' && isAdmin ? (
@@ -3233,7 +3698,9 @@ const Account: React.FC = () => {
                     isVip={isVip} 
                   />
                 ) : activeTab === 'purchase-history' ? (
-                  <PurchaseHistory />
+                  <PurchaseHistory userEmail={user?.email} userUid={user?.uid} userName={user?.name} />
+                ) : activeTab === 'receipt-history' ? (
+                  <ReceiptHistoryTable userEmail={user?.email} userUid={user?.uid} userName={user?.name} />
                 ) : activeTab === 'buy-courses' ? (
                   <BuyCoursesView 
                     allCourses={allCourses}
@@ -3369,7 +3836,7 @@ const Account: React.FC = () => {
                               >
                                 <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
                                   <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                                    Liên kết thêm phương thức đăng nhập để dùng chung một tài khoản (UID) và bảo toàn toàn bộ khóa học.
+                                    Liên kết thêm phương thức đăng nhập để dùng chung một tài khoản và bảo toàn toàn bộ khóa học.
                                   </p>
                                   <div className="flex flex-wrap items-center gap-2 shrink-0">
                                     {!isFbLinked && (
@@ -3431,7 +3898,265 @@ const Account: React.FC = () => {
                       </div>
                     </section>
 
+                    {/* THÔNG BÁO CHUẨN BỊ VÀO HỌC & LỊCH TRÌNH CỦA BẠN */}
+                    {learnerScheduleNotifs.length > 0 && (
+                      <section className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200 shadow-xs space-y-6 animate-in slide-in-from-bottom-5 duration-500">
+                        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-stone-200 pb-5">
+                          <div className="flex items-start gap-3.5">
+                            <div className="w-11 h-11 rounded-2xl bg-[#0B1F1E] border border-[#D4B475]/40 flex items-center justify-center text-[#D4B475] shrink-0">
+                              <Bell className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9A7B3E]">
+                                Thư mời học tập &amp; Nhắc lịch check-in
+                              </span>
+                              <h3 className="font-luxury-serif text-xl sm:text-2xl font-bold text-[#0B1F1E] tracking-tight mt-0.5">
+                                Lịch trình tham dự &amp; Chuẩn bị vào học ({learnerScheduleNotifs.length})
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
 
+                        <div className="space-y-5">
+                          {learnerScheduleNotifs.slice(0, 6).map((notif: any) => {
+                            const isTrainingPrep = notif.type === 'training_link';
+                            const prepMeta = isTrainingPrep
+                              ? getPreClassPreparationMeta({
+                                  courseTitle: notif.courseTitle,
+                                  registrationId: notif.registrationId,
+                                  startDate: notif.startDate,
+                                  scheduleDetails: notif.scheduleDetails,
+                                  venueAddress: notif.venueAddress,
+                                  trainingType: notif.trainingType,
+                                  trainingTypeLabel: notif.trainingTypeLabel,
+                                  link: notif.link,
+                                  checkInTime: notif.checkInTime,
+                                  checklist: notif.checklist
+                                })
+                              : null;
+
+                            const isOfflineCard = Boolean(prepMeta?.isOffline);
+                            const actionHref = prepMeta?.actionLink || notif.link;
+                            const isCopiedHere = copiedScheduleNotifId === notif.id;
+
+                            return (
+                              <div
+                                key={notif.id}
+                                onClick={() => {
+                                  if (!notif.isRead && user?.email) {
+                                    markNotificationAsRead(notif.id);
+                                    fetch('/api/user/notifications/read', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ email: user.email, notifId: notif.id })
+                                    }).catch(() => {});
+                                  }
+                                }}
+                                className={`rounded-2xl overflow-hidden border transition-colors ${
+                                  isOfflineCard
+                                    ? 'bg-white border-stone-200'
+                                    : !notif.isRead
+                                      ? 'bg-teal-50/30 border-teal-200'
+                                      : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                {/* Luxury Obsidian-Emerald Header for Offline Concierge Invitations */}
+                                <div
+                                  className={`px-5 sm:px-6 py-4 sm:py-5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                                    isOfflineCard
+                                      ? 'bg-[#0B1F1E] text-white border-[#D4B475]/30'
+                                      : 'bg-slate-50/80 text-slate-900 border-slate-200'
+                                  }`}
+                                >
+                                  <div className="space-y-1.5 min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-bold uppercase tracking-[0.14em]">
+                                      {!notif.isRead && (
+                                        <span className={isOfflineCard ? 'text-[#D4B475]' : 'text-[#007c76]'}>
+                                          ● Mới
+                                        </span>
+                                      )}
+                                      <span className={isOfflineCard ? 'text-[#D4B475]' : 'text-[#007c76]'}>
+                                        {prepMeta ? prepMeta.badgeLabel : (notif.trainingTypeLabel || 'Lịch học sắp tới')}
+                                      </span>
+                                      {prepMeta ? (
+                                        <span className={`tabular-nums ${isOfflineCard ? 'text-stone-200' : 'text-slate-700'}`}>
+                                          · Ngày: {prepMeta.specificDateLabel}
+                                          {prepMeta.timeWindowLabel ? ` · Giờ: ${prepMeta.timeWindowLabel}` : ''}
+                                        </span>
+                                      ) : notif.startDate ? (
+                                        <span className={`tabular-nums ${isOfflineCard ? 'text-stone-300' : 'text-slate-600'}`}>
+                                          · {notif.startDate}
+                                          {notif.scheduleDetails ? ` (${notif.scheduleDetails})` : ''}
+                                        </span>
+                                      ) : null}
+                                      <span className={`tabular-nums ${isOfflineCard ? 'text-stone-400' : 'text-slate-400'}`}>
+                                        · {formatTimeAgo(notif.createdAt || notif.timestamp || new Date().toISOString())}
+                                      </span>
+                                    </div>
+
+                                    <h4
+                                      className={`text-base sm:text-xl leading-snug break-words [overflow-wrap:break-word] ${
+                                        isOfflineCard
+                                          ? 'font-luxury-serif font-semibold text-white'
+                                          : 'font-bold text-slate-900'
+                                      }`}
+                                    >
+                                      {notif.title || notif.courseTitle}
+                                    </h4>
+
+                                    <p className={`text-xs sm:text-sm leading-relaxed ${isOfflineCard ? 'text-stone-300' : 'text-slate-600'}`}>
+                                      {notif.message}
+                                    </p>
+                                  </div>
+
+                                  {actionHref && (
+                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                      <a
+                                        href={actionHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-colors inline-flex items-center justify-center gap-1.5 ${
+                                          isOfflineCard
+                                            ? 'bg-[#D4B475] text-[#0B1F1E] hover:bg-[#E2C68D]'
+                                            : 'bg-[#007c76] text-white hover:bg-[#005f5b]'
+                                        }`}
+                                      >
+                                        {isOfflineCard ? <MapPin className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                                        <span>
+                                          {prepMeta
+                                            ? prepMeta.actionLabel
+                                            : String(notif.link).includes('maps')
+                                              ? 'Chỉ đường tới Hội trường'
+                                              : 'Vào phòng học Zoom'}
+                                        </span>
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {prepMeta && (
+                                  <div className="p-5 sm:p-6 bg-white space-y-5">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
+                                      <div className="space-y-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-3 border-b border-stone-200/80">
+                                          <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500 block">
+                                              Ngày đào tạo
+                                            </span>
+                                            <p className="text-sm font-bold text-[#0B1F1E] mt-0.5 flex items-center gap-1.5 tabular-nums">
+                                              <Calendar className={`w-3.5 h-3.5 shrink-0 ${isOfflineCard ? 'text-[#9A7B3E]' : 'text-[#007c76]'}`} />
+                                              <span>{prepMeta.specificDateLabel}</span>
+                                            </p>
+                                          </div>
+                                          <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-stone-500 block">
+                                              Giờ học
+                                            </span>
+                                            <p className="text-sm font-bold text-[#0B1F1E] mt-0.5 flex items-center gap-1.5 tabular-nums">
+                                              <Clock className={`w-3.5 h-3.5 shrink-0 ${isOfflineCard ? 'text-[#9A7B3E]' : 'text-[#007c76]'}`} />
+                                              <span>{prepMeta.timeWindowLabel}</span>
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 flex items-center gap-1.5">
+                                          {isOfflineCard ? (
+                                            <MapPin className="w-4 h-4 text-[#9A7B3E] shrink-0" />
+                                          ) : (
+                                            <Video className="w-4 h-4 text-[#007c76] shrink-0" />
+                                          )}
+                                          <span>
+                                            {isOfflineCard
+                                              ? 'Địa điểm Hội trường & Đón tiếp Check-in'
+                                              : 'Phòng học Zoom & Thời gian mở lớp'}
+                                          </span>
+                                        </div>
+
+                                        <p className="text-sm font-bold text-slate-900 leading-relaxed">
+                                          {prepMeta.venueAddress}
+                                        </p>
+
+                                        <p className="text-slate-700 font-semibold flex items-start gap-2 leading-relaxed">
+                                          <Clock className={`w-4 h-4 shrink-0 mt-0.5 ${isOfflineCard ? 'text-[#9A7B3E]' : 'text-[#007c76]'}`} />
+                                          <span>{prepMeta.checkInTime}</span>
+                                        </p>
+
+                                        {isOfflineCard && prepMeta.hospitalityNote && (
+                                          <p className="text-[11px] text-stone-600 leading-relaxed pt-1 border-t border-stone-100">
+                                            {prepMeta.hospitalityNote}
+                                          </p>
+                                        )}
+
+                                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const valueToCopy = isOfflineCard
+                                                ? prepMeta.venueAddress
+                                                : prepMeta.actionLink;
+                                              navigator.clipboard.writeText(valueToCopy);
+                                              setCopiedScheduleNotifId(notif.id);
+                                              toast.showToast(
+                                                isOfflineCard
+                                                  ? 'Đã sao chép địa chỉ hội trường!'
+                                                  : 'Đã sao chép link phòng Zoom!',
+                                                'success'
+                                              );
+                                              setTimeout(() => setCopiedScheduleNotifId(null), 2000);
+                                            }}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                                          >
+                                            {isCopiedHere ? (
+                                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                            ) : (
+                                              <Copy className="w-3.5 h-3.5 text-slate-500" />
+                                            )}
+                                            <span>
+                                              {isCopiedHere
+                                                ? 'Đã sao chép'
+                                                : isOfflineCard
+                                                  ? 'Sao chép địa chỉ'
+                                                  : 'Sao chép link Zoom'}
+                                            </span>
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-3 border-t lg:border-t-0 lg:border-l border-stone-200/80 pt-4 lg:pt-0 lg:pl-6">
+                                        <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-stone-500 flex items-center gap-1.5">
+                                          <CheckCircle2 className={`w-4 h-4 shrink-0 ${isOfflineCard ? 'text-[#9A7B3E]' : 'text-[#007c76]'}`} />
+                                          <span>Hành trang cần chuẩn bị trước giờ khai giảng</span>
+                                        </div>
+                                        <ol className="space-y-2 text-slate-700">
+                                          {prepMeta.checklist.map((item: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2.5 leading-relaxed">
+                                              <span
+                                                className={`font-mono font-bold tabular-nums shrink-0 ${
+                                                  isOfflineCard ? 'text-[#9A7B3E]' : 'text-[#007c76]'
+                                                }`}
+                                              >
+                                                0{idx + 1}
+                                              </span>
+                                              <span>{item}</span>
+                                            </li>
+                                          ))}
+                                        </ol>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* Khóa Đào Tạo Trực Tiếp & Zoom Đã Đăng Ký */}
+                    <MyTrainingRegistrationsView userEmail={user.email} />
 
                 <section className="animate-in slide-in-from-bottom-5 duration-700 delay-150">
                   <div className="flex items-center justify-between mb-8">
@@ -3483,9 +4208,6 @@ const Account: React.FC = () => {
                     </div>
                   )}
                 </section>
-
-                {/* Khóa Đào Tạo Trực Tiếp & Zoom Đã Đăng Ký */}
-                <MyTrainingRegistrationsView userEmail={user.email} />
 
                 {/* Gamification & Milestone Badges in Main Dashboard */}
                 <GamificationBadgeSection 
@@ -3741,28 +4463,68 @@ const Account: React.FC = () => {
                     
                     <div className="text-center mb-8">
                         <h3 className="text-3xl font-black text-gray-800 uppercase tracking-[0.025em] leading-[1.45] mb-2">
-                            {isForgotPassword
-                              ? forgotPasswordStep === 'otp'
-                                ? 'Xác thực mã OTP'
-                                : forgotPasswordStep === 'new-password'
-                                  ? 'Đặt mật khẩu mới'
-                                  : forgotPasswordStep === 'done'
-                                    ? 'Hoàn tất khôi phục'
-                                    : 'Quên mật khẩu'
-                              : (isRegistering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại!')}
+                            {isOtpSetupMode
+                              ? otpSetupStep === 'otp'
+                                ? 'Đăng nhập bằng OTP'
+                                : otpSetupStep === 'password'
+                                  ? 'Thêm mật khẩu đăng nhập'
+                                  : 'Kích hoạt tài khoản OTP'
+                              : isForgotPassword
+                                ? forgotPasswordStep === 'otp'
+                                  ? 'Xác thực mã OTP'
+                                  : forgotPasswordStep === 'new-password'
+                                    ? 'Đặt mật khẩu mới'
+                                    : forgotPasswordStep === 'done'
+                                      ? 'Hoàn tất khôi phục'
+                                      : 'Quên mật khẩu'
+                                : (isRegistering ? 'Tạo tài khoản mới' : 'Chào mừng trở lại!')}
                         </h3>
                         <p className="text-gray-500 text-sm font-medium">
-                            {isForgotPassword
-                              ? forgotPasswordStep === 'otp'
-                                ? 'Nhập mã OTP 6 chữ số vừa được gửi về email để mở khóa bước đổi mật khẩu.'
-                                : forgotPasswordStep === 'new-password'
-                                  ? 'Mã OTP đã được xác thực. Vui lòng tạo mật khẩu mới đủ mạnh.'
-                                  : forgotPasswordStep === 'done'
-                                    ? 'Mật khẩu tài khoản của bạn đã được cập nhật an toàn.'
-                                    : 'Nhập địa chỉ email đã đăng ký để nhận mã xác thực OTP.'
-                              : (isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.')}
+                            {isOtpSetupMode
+                              ? otpSetupStep === 'otp'
+                                ? 'Nhập mã OTP 6 chữ số để đăng nhập vào tài khoản đã tạo sẵn và thêm mật khẩu.'
+                                : otpSetupStep === 'password'
+                                  ? 'Xác thực OTP thành công! Tạo mật khẩu để vào xem ngay thông báo học & lịch trình.'
+                                  : 'Nhập email bạn đã dùng đăng ký khóa học để nhận mã OTP.'
+                              : isForgotPassword
+                                ? forgotPasswordStep === 'otp'
+                                  ? 'Nhập mã OTP 6 chữ số vừa được gửi về email để mở khóa bước đổi mật khẩu.'
+                                  : forgotPasswordStep === 'new-password'
+                                    ? 'Mã OTP đã được xác thực. Vui lòng tạo mật khẩu mới đủ mạnh.'
+                                    : forgotPasswordStep === 'done'
+                                      ? 'Mật khẩu tài khoản của bạn đã được cập nhật an toàn.'
+                                      : 'Nhập địa chỉ email đã đăng ký để nhận mã xác thực OTP.'
+                                : (isRegistering ? 'Điền thông tin bên dưới để bắt đầu hành trình.' : 'Vui lòng đăng nhập để tiếp tục học tập.')}
                         </p>
                     </div>
+
+                    {isOtpSetupMode && (
+                        <div className="mb-6 flex items-center justify-between gap-2 px-3 py-2.5 bg-teal-50/70 rounded-2xl border border-teal-200/80 text-[11px] font-bold">
+                            {[
+                              { id: 'email', label: '1. Email' },
+                              { id: 'otp', label: '2. Xác thực OTP' },
+                              { id: 'password', label: '3. Thêm mật khẩu' }
+                            ].map((step, idx) => {
+                              const order = { email: 0, otp: 1, password: 2 }[otpSetupStep];
+                              const isCurrent = idx === order;
+                              const isCompleted = idx < order;
+                              return (
+                                <div
+                                  key={step.id}
+                                  className={`flex-1 text-center py-1.5 px-2 rounded-xl transition-all ${
+                                    isCurrent
+                                      ? 'bg-[#007c76] text-white shadow-xs'
+                                      : isCompleted
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'text-slate-400'
+                                  }`}
+                                >
+                                  {isCompleted ? `✓ ${step.label}` : step.label}
+                                </div>
+                              );
+                            })}
+                        </div>
+                    )}
 
                     {isForgotPassword && forgotPasswordStep !== 'done' && (
                         <div className="mb-6 flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
@@ -3808,7 +4570,215 @@ const Account: React.FC = () => {
                         </div>
                     )}
 
-                    {isForgotPassword ? (
+                    {isOtpSetupMode ? (
+                      otpSetupStep === 'email' ? (
+                        <form onSubmit={(e) => handleOtpSetupSendOtp(e)} noValidate className="space-y-5 text-left">
+                          <div className="space-y-1">
+                            <label className="block text-xs font-black text-slate-700 ml-1">
+                              Email bạn đã dùng đăng ký khóa học
+                            </label>
+                            <input
+                              type="email"
+                              autoComplete="email"
+                              value={email}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (emailError) setEmailError('');
+                                if (error) setError(null);
+                              }}
+                              placeholder="hocvien@gmail.com"
+                              className="w-full py-4 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-gray-700 outline-none focus:bg-white focus:border-[#007c76] focus:ring-4 focus:ring-[#007c76]/10"
+                            />
+                            {emailError && <p className="text-xs font-bold text-red-600 mt-1 ml-1">{emailError}</p>}
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                          >
+                            {isAuthenticating ? 'Đang gửi OTP...' : 'Nhận mã OTP đăng nhập'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={closeOtpSetupFlow}
+                            className="text-xs text-slate-600 hover:text-[#007c76] font-bold cursor-pointer"
+                          >
+                            ← Quay lại đăng nhập
+                          </button>
+                        </form>
+                      ) : otpSetupStep === 'otp' ? (
+                        <form onSubmit={handleOtpSetupVerifyOtp} noValidate className="space-y-5">
+                          {otpStatusMessage && (
+                            <div className="p-3.5 bg-teal-50 border border-teal-200 text-teal-900 rounded-2xl text-xs font-bold text-left">
+                              {otpStatusMessage}
+                            </div>
+                          )}
+                          {otpFormError && (
+                            <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-bold text-left">
+                              {otpFormError}
+                            </div>
+                          )}
+
+                          <div className="text-left space-y-2">
+                            <label className="block text-xs font-black text-slate-700 ml-1">
+                              Mã OTP 6 chữ số cho <span className="text-[#007c76]">{email}</span>
+                            </label>
+                            <div className="flex justify-center gap-2">
+                              {otpDigits.map((digit, index) => (
+                                <input
+                                  key={index}
+                                  id={`setup-otp-input-${index}`}
+                                  type="text"
+                                  maxLength={1}
+                                  pattern="[0-9]*"
+                                  inputMode="numeric"
+                                  value={digit}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    const newDigits = [...otpDigits];
+                                    newDigits[index] = val ? val[0] : '';
+                                    setOtpDigits(newDigits);
+                                    setOtpFormError(null);
+                                    if (val && index < 5) {
+                                      const nextInput = document.getElementById(`setup-otp-input-${index + 1}`);
+                                      if (nextInput) (nextInput as HTMLInputElement).focus();
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOtpSetupVerifyOtp();
+                                    } else if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+                                      const newDigits = [...otpDigits];
+                                      newDigits[index - 1] = '';
+                                      setOtpDigits(newDigits);
+                                      const prevInput = document.getElementById(`setup-otp-input-${index - 1}`);
+                                      if (prevInput) (prevInput as HTMLInputElement).focus();
+                                    }
+                                  }}
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+                                    if (pasted.length > 0) {
+                                      const newDigits = [...otpDigits];
+                                      for (let i = 0; i < 6; i++) newDigits[i] = pasted[i] || '';
+                                      setOtpDigits(newDigits);
+                                      setOtpFormError(null);
+                                    }
+                                  }}
+                                  className="w-11 h-14 text-center text-xl font-black text-[#007c76] bg-gray-50 border-2 border-gray-200 rounded-2xl focus:bg-white focus:border-[#007c76] outline-none transition-all"
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                          >
+                            {isAuthenticating ? 'Đang xác thực...' : 'Xác nhận OTP & Tiếp tục'}
+                          </button>
+
+                          <div className="flex items-center justify-between text-xs pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setOtpSetupStep('email')}
+                              className="text-slate-600 hover:text-[#007c76] font-bold cursor-pointer"
+                            >
+                              ← Đổi email khác
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOtpSetupSendOtp(undefined, email, fullName)}
+                              disabled={otpCountdown > 0 || isAuthenticating}
+                              className={`font-black uppercase tracking-wider cursor-pointer ${otpCountdown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-[#007c76] hover:underline'}`}
+                            >
+                              Gửi lại mã {otpCountdown > 0 ? `(${otpCountdown}s)` : ''}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <form onSubmit={handleOtpSetupComplete} noValidate className="space-y-4 text-left">
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-800 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                            <span>Xác thực OTP thành công cho <strong className="break-all">{email}</strong></span>
+                          </div>
+
+                          {otpSetupError && (
+                            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs font-bold text-red-700">
+                              {otpSetupError}
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-1.5 ml-1">
+                              Tạo mật khẩu đăng nhập
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showOtpSetupPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                value={otpSetupPassword}
+                                onChange={(e) => {
+                                  setOtpSetupPassword(e.target.value);
+                                  if (otpSetupError) setOtpSetupError('');
+                                }}
+                                placeholder="Nhập mật khẩu mạnh (≥ 8 ký tự)"
+                                className="w-full py-3.5 pl-4 pr-14 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-800 text-sm focus:bg-white focus:border-[#007c76] outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowOtpSetupPassword(!showOtpSetupPassword)}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500 hover:text-[#007c76] cursor-pointer"
+                              >
+                                {showOtpSetupPassword ? 'Ẩn' : 'Hiện'}
+                              </button>
+                            </div>
+                            {otpSetupPassword.length > 0 && (
+                              <div className="mt-3">
+                                <PasswordStrengthMeter password={otpSetupPassword} />
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-1.5 ml-1">
+                              Xác nhận mật khẩu
+                            </label>
+                            <input
+                              type={showOtpSetupPassword ? 'text' : 'password'}
+                              autoComplete="new-password"
+                              value={otpSetupConfirmPassword}
+                              onChange={(e) => {
+                                setOtpSetupConfirmPassword(e.target.value);
+                                if (otpSetupError) setOtpSetupError('');
+                              }}
+                              placeholder="Nhập lại mật khẩu"
+                              className="w-full py-3.5 px-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-800 text-sm focus:bg-white focus:border-[#007c76] outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isAuthenticating}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+                          >
+                            {isAuthenticating ? 'Đang hoàn tất...' : 'Lưu mật khẩu & Vào xem lịch học'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={closeOtpSetupFlow}
+                            className="w-full py-2 text-xs font-bold text-slate-500 hover:text-[#007c76] cursor-pointer text-center"
+                          >
+                            Quay lại đăng nhập
+                          </button>
+                        </form>
+                      )
+                    ) : isForgotPassword ? (
                       forgotPasswordStep === 'email' ? (
                         <form onSubmit={handleForgotSendOtp} noValidate className="space-y-5">
                           <div className="space-y-1 text-left">
@@ -4241,8 +5211,19 @@ const Account: React.FC = () => {
                     </form>
                     )}
                     
-                    {!isForgotPassword && (
+                    {!isForgotPassword && !isOtpSetupMode && (
                         <>
+                            <div className="mt-4">
+                              <button
+                                type="button"
+                                onClick={openOtpSetupFlow}
+                                className="w-full py-3 px-4 rounded-2xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/70 text-[#007c76] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                <KeyRound className="w-4 h-4" />
+                                <span>Đăng nhập OTP</span>
+                              </button>
+                            </div>
+
                             <div className="relative my-8">
                                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
                                 <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-white px-4 text-gray-400 font-bold">Hoặc tiếp tục với</span></div>

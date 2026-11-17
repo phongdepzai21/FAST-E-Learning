@@ -59,12 +59,12 @@ const POLICY_SECTIONS: PolicySection[] = [
     keywords: 'công ty tnhh tư vấn fast mst 0314568146 phạm vi áp dụng fastelearning dpo',
     paragraphs: [
       'Khi bạn sử dụng dịch vụ học trực tuyến, tham gia khóa đào tạo Zoom/hội trường, sử dụng bộ công cụ kiểm toán và danh mục kiểm tra tiêu chuẩn (ISO 22000, HACCP, An toàn thực phẩm) hoặc giao dịch trên nền tảng FAST E-Learning, bạn tin tưởng giao phó thông tin cá nhân của mình cho chúng tôi. Chúng tôi hiểu rằng đây là trách nhiệm pháp lý và đạo đức nghề nghiệp quan trọng nhất.',
-      'Chính sách Quyền riêng tư này giải thích minh bạch cách chúng tôi thu thập, sử dụng, chia sẻ, bảo vệ dữ liệu và các công cụ giúp bạn kiểm soát hoàn toàn thông tin của mình — tương đương chuẩn mực minh bạch của các nền tảng công nghệ toàn cầu (Google, Meta) và tuân thủ nghiêm ngặt Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 (có hiệu lực từ 01/01/2026) cùng Nghị định 13/2023/NĐ-CP của Chính phủ Việt Nam.'
+      'Chính sách Quyền riêng tư này giải thích minh bạch cách chúng tôi thu thập, sử dụng, chia sẻ, bảo vệ dữ liệu và các công cụ giúp bạn kiểm soát hoàn toàn thông tin của mình — tương đương chuẩn mực minh bạch của các nền tảng công nghệ toàn cầu (Google, Meta) và tuân thủ nghiêm ngặt Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 (có hiệu lực từ 01/01/2026), Nghị định 13/2023/NĐ-CP cùng Điều 28 & Mục 1 Chương V Nghị định 52/2013/NĐ-CP (được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP) về bảo vệ thông tin cá nhân trong thương mại điện tử.'
     ],
     bullets: [
       {
-        label: 'Bên kiểm soát dữ liệu (Data Controller)',
-        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED) — Mã số thuế: 0314568146.'
+        label: 'Bên kiểm soát dữ liệu & Chủ sở hữu website',
+        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED) — MST / Số ĐKKD: 0314568146 (Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh).'
       },
       {
         label: 'Trụ sở chính',
@@ -624,7 +624,7 @@ const PrivacyPolicy: React.FC = () => {
         <title>Chính sách bảo vệ thông tin cá nhân | FAST E-Learning</title>
         <meta
           name="description"
-          content="Chính sách bảo vệ thông tin cá nhân của người tiêu dùng tại FAST E-Learning (CÔNG TY TNHH TƯ VẤN FAST - MST 0314568146): quy định rõ thu thập, sử dụng, lưu trữ và bảo vệ thông tin khách hàng."
+          content="Chính sách bảo vệ thông tin cá nhân của người tiêu dùng tại FAST E-Learning (CÔNG TY TNHH TƯ VẤN FAST - MST 0314568146) tuân thủ Luật 91/2025/QH15 và Điều 28 Nghị định 52/2013/NĐ-CP (sửa đổi bởi Nghị định 85/2021/NĐ-CP)."
         />
         <link rel="canonical" href="https://fastelearning.com.vn/privacy-policy" />
       </Helmet>
@@ -641,9 +641,9 @@ const PrivacyPolicy: React.FC = () => {
                 <span aria-hidden="true">·</span>
                 <span className="tabular-nums">Có hiệu lực: 01/01/2026</span>
                 <span aria-hidden="true">·</span>
-                <span className="tabular-nums">Cập nhật: 14/11/2026</span>
+                <span className="tabular-nums">Cập nhật: 16/11/2026</span>
                 <span aria-hidden="true">·</span>
-                <span>Tuân thủ Luật 91/2025/QH15</span>
+                <span>Tuân thủ Luật 91/2025/QH15 &amp; NĐ 52/2013/NĐ-CP (sửa đổi NĐ 85/2021/NĐ-CP)</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[0.02em] text-slate-900 dark:text-white leading-[1.45]">
@@ -651,7 +651,7 @@ const PrivacyPolicy: React.FC = () => {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
-                Quy định rõ cách thức thu thập, mục đích sử dụng, thời hạn lưu trữ và biện pháp bảo vệ thông tin cá nhân của khách hàng tại FAST E-Learning (Chủ sở hữu: CÔNG TY TNHH TƯ VẤN FAST · MST: 0314568146).
+                Quy định rõ cách thức thu thập, mục đích sử dụng, thời hạn lưu trữ và biện pháp bảo vệ thông tin cá nhân của khách hàng tại FAST E-Learning (Chủ sở hữu: CÔNG TY TNHH TƯ VẤN FAST · MST: 0314568146) theo Luật 91/2025/QH15 và Nghị định 52/2013/NĐ-CP (sửa đổi bởi Nghị định 85/2021/NĐ-CP).
               </p>
             </div>
 

@@ -292,6 +292,14 @@ const Header: React.FC = () => {
                       >
                         Bảng điều khiển
                       </button>
+                      {isAdmin && (
+                        <button 
+                          onClick={() => { setIsDropdownOpen(false); navigate('/admin'); }} 
+                          className="w-full px-4 py-2 text-left text-xs font-bold text-[#007c76] hover:bg-teal-50 transition-all flex items-center gap-2"
+                        >
+                          Dashboard Admin
+                        </button>
+                      )}
                       <button 
                         onClick={handleLogout} 
                         className="w-full px-4 py-2 text-left text-xs font-bold text-red-500 hover:bg-red-50 transition-all flex items-center gap-2"

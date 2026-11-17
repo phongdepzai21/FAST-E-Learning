@@ -68,6 +68,8 @@ const PrivacyPolicy = lazyWithRetry(() => import('./pages/PrivacyPolicy'));
 const DataDeletion = lazyWithRetry(() => import('./pages/DataDeletion'));
 const Classroom = lazyWithRetry(() => import('./pages/Classroom'));
 const LiveCourseRegistration = lazyWithRetry(() => import('./components/LiveCourseRegistration'));
+const TrainingPayment = lazyWithRetry(() => import('./pages/TrainingPayment'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
 const NotFound = lazyWithRetry(() => import('./pages/NotFound'));
 
 // Lazy load Components phụ trợ & Footer
@@ -87,6 +89,7 @@ const AppLayout: React.FC = () => {
   const navigate = useNavigate();
   const isAccountPath = location.pathname.startsWith('/account');
   const isClassroomPath = location.pathname.startsWith('/hoc');
+  const isAdminPath = location.pathname.startsWith('/admin');
   const [isDelayedLoaded, setIsDelayedLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -319,7 +322,7 @@ const AppLayout: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const shouldHideBars = (isAccountPath && user) || isClassroomPath;
+  const shouldHideBars = (isAccountPath && user) || isClassroomPath || isAdminPath;
   const hideBarsTemporarily = isAccountPath && !authResolved;
   const showBars = !shouldHideBars && !hideBarsTemporarily;
 
@@ -347,11 +350,14 @@ const AppLayout: React.FC = () => {
             <Route path="/faq" element={<FAQ />} />
             <Route path="/account" element={<Account />} />
             <Route path="/teacher-dashboard" element={<Account />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/account/course/:courseId" element={<Account />} />
             <Route path="/account/settings" element={<AccountSettings />} />
             <Route path="/account/vip-upgrade" element={<VipUpgrade />} />
             <Route path="/dang-ky-truc-tiep" element={<LiveCourseRegistration isStandalonePage={true} />} />
             <Route path="/live-training" element={<LiveCourseRegistration isStandalonePage={true} />} />
+            <Route path="/thanh-toan-dao-tao" element={<TrainingPayment />} />
             <Route path="/dieu-khoan-su-dung" element={<TermsOfService />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/chinh-sach-bao-mat" element={<PrivacyPolicy />} />

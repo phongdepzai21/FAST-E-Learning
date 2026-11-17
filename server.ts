@@ -303,6 +303,10 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, status: "ok", uptime: process.uptime() });
+  });
+
   app.use(express.json({ 
     limit: "10mb",
     verify: (req: any, res, buf) => {
@@ -776,6 +780,247 @@ async function startServer() {
 
   // Register the handler for payment webhook
   app.post("/api/payment/webhook", paymentWebhookHandler);
+  app.post("/api/sepay/webhook", paymentWebhookHandler);
+
+  // Local disk + Firestore Order Store for Node/Preview server parity with Netlify Functions
+  const ORDERS_FILE = path.join(DATA_DIR, "orders.json");
+  function loadOrdersFromDisk(): Record<string, any> {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (fs.existsSync(ORDERS_FILE)) {
+        return JSON.parse(fs.readFileSync(ORDERS_FILE, "utf-8")) || {};
+      }
+    } catch {}
+    return {};
+  }
+  function saveOrdersToDisk(ordersMap: Record<string, any>) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(ordersMap, null, 2), "utf-8");
+    } catch {}
+  }
+  let serverOrdersMap: Record<string, any> = loadOrdersFromDisk();
+
+  function normalizeServerFastCode(codeStr?: string): string {
+    if (!codeStr) return "";
+    let clean = String(codeStr).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    while (clean.startsWith("FASTFAST")) clean = clean.substring(4);
+    if (!clean.startsWith("FAST")) clean = `FAST${clean}`;
+    return clean;
+  }
+
+  function extractFastCodeFromText(text: string): string {
+    const upper = String(text || "").toUpperCase();
+    const match = upper.match(/FAST\s*[-_]?\s*([A-Z0-9]{4,16})/i);
+    if (!match) return "";
+    let suffix = match[1].trim().toUpperCase();
+    while (suffix.startsWith("FAST")) suffix = suffix.substring(4);
+    return suffix ? `FAST${suffix}` : "";
+  }
+
+  app.post("/api/create-order", async (req, res) => {
+    try {
+      const {
+        courseId,
+        courseTitle,
+        amount,
+        email,
+        userId,
+        registrationId,
+        orderType,
+        studentName,
+        phone,
+        requestedPaymentCode
+      } = req.body || {};
+
+      if (!courseId && !registrationId) {
+        return res.status(400).json({ success: false, error: "Missing required fields: courseId or registrationId" });
+      }
+
+      const normalizedEmail = String(email || (phone ? `${String(phone).replace(/[^\d]/g, "")}@fast-training.local` : "")).toLowerCase().trim();
+      const numericAmount = Number(amount) || 0;
+      const orderId = `ORD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      let paymentCode = "";
+      let randomSuffix = "";
+      if (requestedPaymentCode && typeof requestedPaymentCode === "string") {
+        const candidate = normalizeServerFastCode(requestedPaymentCode);
+        if (candidate.length >= 8 && candidate.length <= 16) {
+          paymentCode = candidate;
+          randomSuffix = candidate.replace(/^FAST/, "");
+        }
+      }
+
+      if (!paymentCode) {
+        const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (let i = 0; i < 8; i++) {
+          randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        paymentCode = `FAST${randomSuffix}`;
+      }
+
+      const bankCode = process.env.BANK_CODE || "ACB";
+      const bankAccount = process.env.BANK_ACCOUNT || "0989499568";
+      const bankAccountName = process.env.BANK_ACCOUNT_NAME || "CONG TY TNHH TU VAN FAST";
+
+      const orderData = {
+        orderId,
+        paymentCode,
+        courseId: courseId || registrationId,
+        courseTitle: courseTitle || "Khóa học FAST E-Learning",
+        amount: numericAmount,
+        email: normalizedEmail,
+        userId: userId || "",
+        registrationId: registrationId || "",
+        orderType: orderType || (registrationId ? "direct_training" : "course"),
+        studentName: studentName || "",
+        phone: phone || "",
+        status: "PENDING",
+        createdAt: new Date().toISOString(),
+        bankCode,
+        bankAccount,
+        bankAccountName,
+      };
+
+      serverOrdersMap[orderId] = orderData;
+      saveOrdersToDisk(serverOrdersMap);
+
+      try {
+        const db = getServerFirestore();
+        const pendingData = {
+          code: paymentCode,
+          suffix: randomSuffix,
+          email: normalizedEmail,
+          courseId: orderData.courseId,
+          amount: numericAmount,
+          orderId,
+          registrationId: orderData.registrationId,
+          orderType: orderData.orderType,
+          createdAt: orderData.createdAt,
+        };
+        await Promise.all([
+          db.collection("orders").doc(orderId).set(orderData, { merge: true }),
+          db.collection("pending_payments").doc(randomSuffix).set(pendingData, { merge: true }),
+          db.collection("pending_payments").doc(paymentCode).set(pendingData, { merge: true }),
+        ]);
+      } catch (dbErr: any) {
+        console.warn("[CreateOrder] Firestore note:", dbErr?.message);
+      }
+
+      return res.json({
+        success: true,
+        orderId,
+        paymentCode,
+        amount: numericAmount,
+        bankCode,
+        bankAccount,
+        bankAccountName,
+        message: "Order created successfully",
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Internal server error" });
+    }
+  });
+
+  app.get("/api/check-payment", async (req, res) => {
+    try {
+      const orderId = req.query.orderId ? String(req.query.orderId).trim() : "";
+      const paymentCode = req.query.paymentCode ? String(req.query.paymentCode).trim() : "";
+
+      if (!orderId && !paymentCode) {
+        return res.status(400).json({ success: false, error: "Missing orderId or paymentCode parameter" });
+      }
+
+      const cleanCode = paymentCode ? normalizeServerFastCode(paymentCode) : "";
+      let orderDoc: any = null;
+
+      // 1. Check in-memory/disk orders first
+      if (orderId && serverOrdersMap[orderId]) {
+        orderDoc = serverOrdersMap[orderId];
+      } else if (cleanCode) {
+        orderDoc = Object.values(serverOrdersMap).find((o: any) =>
+          o && (o.paymentCode === cleanCode || o.paymentCode === cleanCode.replace(/^FAST/, ""))
+        ) || null;
+      }
+
+      // 2. Check local direct registrations list if paid via webhook
+      if ((!orderDoc || orderDoc.status !== "PAID") && (orderId || cleanCode)) {
+        const matchedReg = serverDirectRegistrations.find((r: any) => {
+          if (!r) return false;
+          const rCode = normalizeServerFastCode(r.paymentCode || r.paymentMemo || "");
+          return (orderId && r.id === orderId) || (cleanCode && rCode === cleanCode);
+        });
+        if (matchedReg) {
+          const isPaid = matchedReg.paymentStatus === "PAID" || matchedReg.status === "confirmed";
+          if (isPaid || !orderDoc) {
+            orderDoc = {
+              orderId: orderDoc?.orderId || matchedReg.id,
+              registrationId: matchedReg.id,
+              paymentCode: matchedReg.paymentCode || matchedReg.paymentMemo || cleanCode,
+              courseId: matchedReg.courseId,
+              courseTitle: matchedReg.courseTitle,
+              amount: matchedReg.totalNumericPrice || 0,
+              status: isPaid ? "PAID" : "PENDING",
+              email: matchedReg.email || matchedReg.userEmail || "",
+              paidAt: matchedReg.paidAt || null,
+            };
+          }
+        }
+      }
+
+      // 3. Check Firestore orders & live_course_registrations
+      if (!orderDoc || orderDoc.status !== "PAID") {
+        try {
+          const db = getServerFirestore();
+          if (orderId) {
+            const snap = await db.collection("orders").doc(orderId).get();
+            if (snap.exists) orderDoc = snap.data();
+          }
+          if ((!orderDoc || orderDoc.status !== "PAID") && cleanCode) {
+            const qSnap = await db.collection("orders").where("paymentCode", "==", cleanCode).limit(1).get();
+            if (!qSnap.empty) orderDoc = qSnap.docs[0].data();
+          }
+          if ((!orderDoc || orderDoc.status !== "PAID") && cleanCode) {
+            const regSnap = await db.collection("live_course_registrations").where("paymentCode", "==", cleanCode).limit(1).get();
+            if (!regSnap.empty) {
+              const rData = regSnap.docs[0].data();
+              const isPaid = rData.paymentStatus === "PAID" || rData.status === "confirmed";
+              orderDoc = {
+                orderId: regSnap.docs[0].id,
+                registrationId: regSnap.docs[0].id,
+                paymentCode: rData.paymentCode || cleanCode,
+                courseId: rData.courseId,
+                courseTitle: rData.courseTitle,
+                amount: rData.totalNumericPrice || 0,
+                status: isPaid ? "PAID" : "PENDING",
+                email: rData.email || rData.userEmail || "",
+                paidAt: rData.paidAt || null,
+              };
+            }
+          }
+        } catch {}
+      }
+
+      if (!orderDoc) {
+        return res.status(404).json({ success: false, error: "Order not found", status: "NOT_FOUND" });
+      }
+
+      return res.json({
+        success: true,
+        orderId: orderDoc.orderId,
+        registrationId: orderDoc.registrationId || null,
+        paymentCode: orderDoc.paymentCode,
+        courseId: orderDoc.courseId,
+        courseTitle: orderDoc.courseTitle,
+        amount: orderDoc.amount,
+        status: orderDoc.status,
+        email: orderDoc.email,
+        paidAt: orderDoc.paidAt || null,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Internal server error" });
+    }
+  });
 
   // 2. Real-time Server-Sent Events (SSE) Stream for cross-account / cross-tab synchronization
   app.get("/api/courses/stream", (req, res) => {
@@ -1336,6 +1581,181 @@ async function startServer() {
 
   let serverDirectRegistrations: any[] = loadDirectRegistrationsFromDisk();
 
+  function buildServerPreClassNotification(reg: any, nowIso: string, idOverride?: string) {
+    const regId = String(reg?.id || reg?.registrationId || `reg-${Date.now()}`).trim();
+    const shortCode = regId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase();
+    const rawType = String(reg?.trainingType || '').toLowerCase().trim();
+    const rawLabel = String(reg?.trainingTypeLabel || '').toLowerCase();
+    const rawLink = String(reg?.meetingLink || reg?.zoomLink || '').trim();
+    const isOffline =
+      rawType === 'direct' ||
+      rawType === 'offline' ||
+      rawType === 'inhouse' ||
+      rawLabel.includes('trực tiếp') ||
+      rawLabel.includes('hội trường') ||
+      rawLabel.includes('offline') ||
+      rawLabel.includes('in-house') ||
+      rawLink.toLowerCase().includes('maps.google');
+
+    const defaultMapLink = 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi';
+    const defaultZoomLink = 'https://zoom.us/j/84927002668';
+    const resolvedLink = isOffline
+      ? (rawLink && !rawLink.toLowerCase().includes('zoom.us') ? rawLink : defaultMapLink)
+      : (rawLink || defaultZoomLink);
+
+    const rawVenue = String(reg?.venueAddress || '').replace(/\s*\/\s*Zoom\s*HD/gi, '').trim();
+    const venueAddress = isOffline
+      ? (rawVenue || 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội (Hội trường đào tạo FAST)')
+      : '';
+    const trainingTypeLabel = reg?.trainingTypeLabel || (isOffline ? 'Trực tiếp tại Hội trường' : 'Online qua Zoom HD');
+    const startDate = reg?.startDate || 'Chưa ấn định ngày cụ thể (vui lòng xem lịch cập nhật)';
+    const scheduleDetails = reg?.scheduleDetails || (isOffline ? '08:30 - 16:30' : '19:30 - 21:30');
+    const courseTitle = reg?.courseTitle || 'Khóa đào tạo ATTP';
+    const scheduleStr = scheduleDetails ? ` · Giờ học: ${scheduleDetails}` : '';
+
+    const checkInTime = isOffline
+      ? 'Có mặt trước giờ khai giảng 15–30 phút để check-in điểm danh & nhận tài liệu'
+      : 'Mở link Zoom trước giờ khai giảng 15 phút để kiểm tra âm thanh & điểm danh';
+    const checklist = isOffline
+      ? [
+          'Có mặt tại hội trường trước 15–30 phút để làm thủ tục điểm danh vào lớp',
+          'Mang theo CCCD/CMND (bản gốc hoặc ảnh VNeID) để đối chiếu cấp chứng nhận',
+          shortCode
+            ? `Cung cấp mã hồ sơ #${shortCode} hoặc email đăng ký tại quầy đón tiếp`
+            : 'Cung cấp email/SĐT đăng ký tại quầy đón tiếp học viên',
+          'Chuẩn bị sổ tay ghi chép và hồ sơ mẫu cơ sở (nếu cần giảng viên góp ý)'
+        ]
+      : [
+          'Tham gia phòng Zoom trước 15 phút để kiểm tra loa, micro và đường truyền',
+          'Đổi tên hiển thị Zoom theo cú pháp: Họ và tên - Số điện thoại',
+          'Chuẩn bị sổ tay ghi chép và tài liệu thực hành trong quá trình học'
+        ];
+
+    return {
+      id: idOverride || `training_${regId}`,
+      title: isOffline
+        ? `Chuẩn bị vào học Offline: ${courseTitle}`
+        : `Chuẩn bị vào học Zoom: ${courseTitle}`,
+      message: isOffline
+        ? `Lịch học trực tiếp tại hội trường đã ấn định: Ngày ${startDate}${scheduleStr}. Địa điểm: ${venueAddress}. Vui lòng có mặt trước 15–30 phút, mang theo CCCD/CMND${shortCode ? ` và mã hồ sơ #${shortCode}` : ''} để điểm danh.`
+        : `Phòng học Zoom HD cho khóa "${courseTitle}" đã sẵn sàng — Ngày ${startDate}${scheduleStr}. Vui lòng vào lớp trước 15 phút và đổi tên theo Họ tên - SĐT để điểm danh.`,
+      type: 'training_link',
+      courseId: reg?.courseId || '',
+      courseTitle,
+      courseImage: reg?.courseImage || '',
+      registrationId: regId,
+      link: resolvedLink,
+      startDate,
+      scheduleDetails,
+      venueAddress,
+      trainingType: reg?.trainingType || (isOffline ? 'direct' : 'zoom'),
+      trainingTypeLabel,
+      checkInTime,
+      checklist,
+      isRead: false,
+      createdAt: reg?.registeredAt || nowIso
+    };
+  }
+
+  async function ensureAutoAccountForDirectRegistration(params: {
+    email?: string;
+    displayName?: string;
+    phone?: string;
+    registration?: any;
+    notification?: any;
+  }): Promise<{ email: string; autoCreated: boolean; alreadyExists: boolean; notification: any | null }> {
+    const emailKey = String(params.email || '').toLowerCase().trim();
+    if (!emailKey || !emailKey.includes('@') || emailKey.endsWith('@fast-training.local')) {
+      return { email: '', autoCreated: false, alreadyExists: false, notification: null };
+    }
+
+    const cleanName = String(params.displayName || params.registration?.studentName || emailKey.split('@')[0]).trim();
+    const cleanPhone = String(params.phone || params.registration?.phone || '').trim();
+    const nowIso = new Date().toISOString();
+
+    let alreadyExists = false;
+    try {
+      const checkRes = await checkUserExistsSafe(emailKey);
+      alreadyExists = checkRes === true;
+    } catch {
+      alreadyExists = false;
+    }
+
+    let autoCreated = false;
+    const uid = `user_${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+    if (!alreadyExists) {
+      autoCreated = true;
+      const internalTempPassword = `Fast@${randomBytes(8).toString('hex')}1A`;
+
+      try {
+        await getAuth().createUser({
+          email: emailKey,
+          password: internalTempPassword,
+          displayName: cleanName,
+          emailVerified: true
+        });
+      } catch (authErr: any) {
+        // Ignore if already exists or Identity Toolkit API restricted
+      }
+
+      const newProfile = {
+        uid,
+        email: emailKey,
+        displayName: cleanName,
+        phone: cleanPhone,
+        isAdmin: false,
+        isTeacher: false,
+        isOwner: false,
+        isVip: false,
+        isLocked: false,
+        autoCreated: true,
+        needsPasswordSetup: true,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+
+      saveUserToDisk(emailKey, newProfile);
+      try {
+        await getServerFirestore().collection("users").doc(emailKey).set(newProfile, { merge: true });
+      } catch {}
+    }
+
+    let savedNotif: any = null;
+    if (params.notification || params.registration) {
+      const reg = params.registration || {};
+      const notifPayload = params.notification || buildServerPreClassNotification(reg, nowIso);
+      await persistUserNotification(emailKey, notifPayload);
+      savedNotif = notifPayload;
+    }
+
+    return {
+      email: emailKey,
+      autoCreated,
+      alreadyExists,
+      notification: savedNotif
+    };
+  }
+
+  app.post("/api/auth/auto-provision-account", async (req, res) => {
+    try {
+      const { email, fullName, phone, registration, notification } = req.body || {};
+      if (!email) {
+        return res.status(400).json({ success: false, error: "Thiếu địa chỉ email để khởi tạo tài khoản." });
+      }
+      const result = await ensureAutoAccountForDirectRegistration({
+        email,
+        displayName: fullName,
+        phone,
+        registration,
+        notification
+      });
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi khởi tạo tài khoản tự động." });
+    }
+  });
+
   app.get("/api/direct-registrations", (req, res) => {
     try {
       res.json({ success: true, records: serverDirectRegistrations });
@@ -1346,7 +1766,7 @@ async function startServer() {
 
   app.post("/api/direct-registrations", async (req, res) => {
     try {
-      const { notification: incomingNotif, ...regData } = req.body || {};
+      const { notification: incomingNotif, deferAccountUntilPaid, ...regData } = req.body || {};
       if (!regData || !regData.studentName) {
         return res.status(400).json({ success: false, error: "Thiếu thông tin đăng ký" });
       }
@@ -1384,25 +1804,19 @@ async function startServer() {
         }, { merge: true });
       } catch (e) {}
 
-      if (targetEmail) {
-        const notifPayload = incomingNotif || {
-          id: `training_${id}`,
-          title: `Link tham gia: ${record.courseTitle}`,
-          message: `Đăng ký #${id} thành công. Link tham gia lớp học: ${resolvedLink}`,
-          type: 'training_link',
-          courseId: record.courseId || '',
-          courseTitle: record.courseTitle,
-          registrationId: id,
-          link: resolvedLink,
-          startDate: record.startDate || '',
-          trainingTypeLabel: record.trainingTypeLabel || '',
-          isRead: false,
-          createdAt: record.registeredAt
-        };
-        await persistUserNotification(targetEmail, notifPayload);
+      let accountProvisioned: { email: string; autoCreated: boolean; alreadyExists: boolean; notification: any | null } | null = null;
+      const isAlreadyPaid = record.paymentStatus === 'PAID' || record.status === 'confirmed';
+      if (targetEmail && (!deferAccountUntilPaid || isAlreadyPaid)) {
+        accountProvisioned = await ensureAutoAccountForDirectRegistration({
+          email: targetEmail,
+          displayName: record.studentName,
+          phone: record.phone,
+          registration: record,
+          notification: incomingNotif
+        });
       }
 
-      res.json({ success: true, record });
+      res.json({ success: true, record, accountProvisioned });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1511,6 +1925,103 @@ async function startServer() {
       res.json({ success: true, records: serverDirectRegistrations });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/direct-registrations/update-schedule", async (req, res) => {
+    try {
+      const {
+        registrationId,
+        startDate,
+        scheduleDetails,
+        venueAddress,
+        meetingLink,
+        trainingType,
+        trainingTypeLabel,
+        customTitle,
+        customMessage,
+        sendNotification = true,
+      } = req.body || {};
+
+      const cleanRegId = String(registrationId || "").trim();
+      if (!cleanRegId) {
+        return res.status(400).json({ success: false, error: "Thiếu mã hồ sơ đăng ký." });
+      }
+
+      const db = getServerFirestore();
+      let existingRecord: any = serverDirectRegistrations.find((r: any) => r.id === cleanRegId) || null;
+
+      if (!existingRecord) {
+        try {
+          const [liveSnap, directSnap] = await Promise.all([
+            db.collection("live_course_registrations").doc(cleanRegId).get(),
+            db.collection("direct_course_registrations").doc(cleanRegId).get(),
+          ]);
+          if (liveSnap.exists) existingRecord = { id: cleanRegId, ...(liveSnap.data() || {}) };
+          else if (directSnap.exists) existingRecord = { id: cleanRegId, ...(directSnap.data() || {}) };
+        } catch (e) {}
+      }
+
+      const nowIso = new Date().toISOString();
+      const updatedFields: Record<string, any> = {
+        id: cleanRegId,
+        updatedAt: nowIso,
+      };
+      if (typeof startDate === "string" && startDate.trim()) updatedFields.startDate = startDate.trim();
+      if (typeof scheduleDetails === "string") updatedFields.scheduleDetails = scheduleDetails.trim();
+      if (typeof venueAddress === "string") updatedFields.venueAddress = venueAddress.trim();
+      if (typeof meetingLink === "string" && meetingLink.trim()) {
+        updatedFields.meetingLink = meetingLink.trim();
+        if ((trainingType || existingRecord?.trainingType) !== "direct") {
+          updatedFields.zoomLink = meetingLink.trim();
+        }
+      }
+      if (typeof trainingType === "string" && trainingType.trim()) updatedFields.trainingType = trainingType.trim();
+      if (typeof trainingTypeLabel === "string" && trainingTypeLabel.trim()) updatedFields.trainingTypeLabel = trainingTypeLabel.trim();
+
+      const mergedRecord = {
+        ...(existingRecord || {}),
+        ...updatedFields,
+      };
+
+      const idx = serverDirectRegistrations.findIndex((r: any) => r.id === cleanRegId);
+      if (idx >= 0) {
+        serverDirectRegistrations[idx] = mergedRecord;
+      } else {
+        serverDirectRegistrations.unshift(mergedRecord);
+      }
+      saveDirectRegistrationsToDisk(serverDirectRegistrations);
+
+      await Promise.all([
+        db.collection("live_course_registrations").doc(cleanRegId).set(updatedFields, { merge: true }).catch(() => {}),
+        db.collection("direct_course_registrations").doc(cleanRegId).set(updatedFields, { merge: true }).catch(() => {}),
+        db.collection("course_registrations").doc(cleanRegId).set(updatedFields, { merge: true }).catch(() => {}),
+      ]);
+
+      const targetEmail = String(mergedRecord.userEmail || mergedRecord.email || mergedRecord.studentEmail || "").toLowerCase().trim();
+      let syncedNotification: any = null;
+
+      if (sendNotification !== false && targetEmail && targetEmail.includes("@")) {
+        const builtNotif = buildTrainingPreparationNotification(mergedRecord, `training_${cleanRegId}`);
+        syncedNotification = {
+          ...builtNotif,
+          title: typeof customTitle === "string" && customTitle.trim() ? customTitle.trim() : builtNotif.title,
+          message: typeof customMessage === "string" && customMessage.trim() ? customMessage.trim() : builtNotif.message,
+          userEmail: targetEmail,
+          isRead: false,
+          createdAt: nowIso,
+        };
+        await persistUserNotification(targetEmail, syncedNotification);
+      }
+
+      return res.json({
+        success: true,
+        record: mergedRecord,
+        notification: syncedNotification,
+      });
+    } catch (err: any) {
+      console.error("[/api/direct-registrations/update-schedule] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi cập nhật ngày giờ đào tạo." });
     }
   });
 
@@ -1628,7 +2139,7 @@ async function startServer() {
     }
   });
 
-  // --- API WEBHOOK KHÁCH HÀNG CHUYỂN KHOẢN TỰ ĐỘNG (Casso / VietQR Webhook) ---
+  // --- API WEBHOOK KHÁCH HÀNG CHUYỂN KHOẢN TỰ ĐỘNG (SePay / VietQR Webhook) ---
   app.post("/api/webhook/payment", async (req, res) => {
     try {
       const payload = req.body || {};
@@ -1641,50 +2152,120 @@ async function startServer() {
         payload
       };
 
-      // Extract details
-      const textContent = JSON.stringify(payload).toUpperCase();
+      const rawText = [
+        payload.code,
+        payload.content,
+        payload.description,
+        payload.memo,
+        JSON.stringify(payload)
+      ].filter(Boolean).join(" ").toUpperCase();
+      const fastCode = extractFastCodeFromText(rawText);
+      const nowIso = new Date().toISOString();
+      const rawWebhookDate = payload.transactionDate || payload.when || payload.paidAt || "";
+      const parsedWebhookDate = rawWebhookDate
+        ? new Date(String(rawWebhookDate).includes("T") ? rawWebhookDate : `${String(rawWebhookDate).replace(" ", "T")}+07:00`)
+        : null;
+      const webhookPaidIso =
+        parsedWebhookDate && !Number.isNaN(parsedWebhookDate.getTime())
+          ? parsedWebhookDate.toISOString()
+          : nowIso;
+      const txnId = String(payload.referenceId || payload.referenceCode || payload.id || `TXN_${Date.now()}`);
       let matchedRegId: string | null = null;
+      let matchedOrderId: string | null = null;
 
-      // Find matching registration by memo / phone / ID
+      // 1. Match orders in memory/disk by FAST code
+      if (fastCode) {
+        for (const o of Object.values(serverOrdersMap)) {
+          if (!o) continue;
+          const oCode = normalizeServerFastCode(o.paymentCode || "");
+          if (oCode === fastCode || (o.paymentCode && rawText.includes(String(o.paymentCode).toUpperCase()))) {
+            matchedOrderId = o.orderId;
+            o.status = "PAID";
+            o.paidAt = webhookPaidIso;
+            o.webhookReceivedAt = nowIso;
+            o.transactionId = txnId;
+            if (o.registrationId) matchedRegId = o.registrationId;
+            break;
+          }
+        }
+        if (matchedOrderId) saveOrdersToDisk(serverOrdersMap);
+      }
+
+      // 2. Match direct training registration by FAST paymentCode/paymentMemo, ID, phone, or name
       for (const reg of serverDirectRegistrations) {
         if (!reg) continue;
+        const regFastCode = normalizeServerFastCode(reg.paymentCode || reg.paymentMemo || "");
         const phone = reg.phone ? reg.phone.replace(/[^\d]/g, '') : '';
         const regId = reg.id ? reg.id.toUpperCase() : '';
         const name = reg.studentName ? reg.studentName.toUpperCase() : '';
 
-        if ((phone && textContent.includes(phone)) || (regId && textContent.includes(regId)) || (name && textContent.includes(name))) {
+        if (
+          (fastCode && regFastCode && regFastCode === fastCode) ||
+          (matchedRegId && reg.id === matchedRegId) ||
+          (regId && rawText.includes(regId)) ||
+          (phone && phone.length >= 6 && rawText.includes(phone)) ||
+          (name && name.length >= 4 && rawText.includes(name))
+        ) {
           matchedRegId = reg.id;
           reg.status = 'confirmed';
-          reg.paidAt = new Date().toISOString();
-          reg.paymentMethod = 'webhook_bank';
+          reg.paymentStatus = 'PAID';
+          reg.paidAt = webhookPaidIso;
+          reg.webhookReceivedAt = nowIso;
+          reg.transactionId = txnId;
+          reg.paymentMethod = 'sepay_acb_vietqr';
           break;
         }
       }
 
       if (matchedRegId) {
         saveDirectRegistrationsToDisk(serverDirectRegistrations);
+        const matchedRegObj = serverDirectRegistrations.find((r: any) => r && r.id === matchedRegId);
+        if (matchedRegObj) {
+          await finalizePaidTrainingAccountAndOtp(matchedRegObj, { sendOtpIfNotSent: true }).catch(() => {});
+        }
         try {
           const db = getServerFirestore();
-          await db.collection("live_course_registrations").doc(matchedRegId).set({
+          const regUpdate = {
             status: 'confirmed',
-            paidAt: new Date().toISOString(),
-            paymentMethod: 'webhook_bank'
-          }, { merge: true });
-          await db.collection("direct_course_registrations").doc(matchedRegId).set({
-            status: 'confirmed',
-            paidAt: new Date().toISOString(),
-            paymentMethod: 'webhook_bank'
-          }, { merge: true });
-        } catch (e) {}
+            paymentStatus: 'PAID',
+            paidAt: webhookPaidIso,
+            webhookReceivedAt: nowIso,
+            transactionId: txnId,
+            paymentMethod: 'sepay_acb_vietqr'
+          };
+          await Promise.all([
+            db.collection("live_course_registrations").doc(matchedRegId).set(regUpdate, { merge: true }),
+            db.collection("direct_course_registrations").doc(matchedRegId).set(regUpdate, { merge: true })
+          ]);
+        } catch {}
       }
 
-      // Save webhook log
+      if (matchedOrderId) {
+        try {
+          const db = getServerFirestore();
+          await db.collection("orders").doc(matchedOrderId).set({
+            status: "PAID",
+            paidAt: webhookPaidIso,
+            webhookReceivedAt: nowIso,
+            transactionId: txnId,
+            accountNumber: "0989499568"
+          }, { merge: true });
+        } catch {}
+      }
+
+      // Also forward FAST code transactions through unified processWebhookTransaction when applicable
+      if (fastCode) {
+        try {
+          await processWebhookTransaction(payload);
+        } catch {}
+      }
+
       try {
         const db = getServerFirestore();
         await db.collection("payment_webhooks").doc(logId).set(webhookRecord, { merge: true });
-      } catch (e) {}
+      } catch {}
 
-      res.json({ error: 0, message: "Ok", success: true, matchedRegId });
+      res.json({ error: 0, message: "Ok", success: true, matchedRegId, matchedOrderId, fastCode: fastCode || null });
     } catch (err: any) {
       res.status(500).json({ error: 0, message: err.message });
     }
@@ -1727,10 +2308,35 @@ async function startServer() {
   const ISO22K_SESSION_FILE = path.join(DATA_DIR, "fast_iso22k_session.json");
   const ISO22K_CRM_FILE = path.join(DATA_DIR, "fast_iso22k_crm.json");
 
+  function isMeaningfulIsoSession(data: any): boolean {
+    if (!data || typeof data !== "object") return false;
+    if (data._isExplicitReset) return true;
+    const textKeys = [
+      "clientName",
+      "contactName",
+      "contactPhone",
+      "leadAuditor",
+      "auditType",
+      "auditAddress",
+      "fsmsScope",
+      "auditDate",
+      "reportNo",
+    ];
+    if (textKeys.some((k) => typeof data[k] === "string" && data[k].trim() !== "")) {
+      return true;
+    }
+    return Object.keys(data).some(
+      (k) =>
+        (k.startsWith("comp_") || k.startsWith("sev_") || k.startsWith("cmt_") || k.startsWith("capa_")) &&
+        Boolean(data[k])
+    );
+  }
+
   function loadIso22kSessionFromDisk(): any {
     try {
       if (fs.existsSync(ISO22K_SESSION_FILE)) {
-        return JSON.parse(fs.readFileSync(ISO22K_SESSION_FILE, "utf-8"));
+        const parsed = JSON.parse(fs.readFileSync(ISO22K_SESSION_FILE, "utf-8"));
+        return isMeaningfulIsoSession(parsed) ? parsed : null;
       }
     } catch (e) {}
     return null;
@@ -1743,39 +2349,107 @@ async function startServer() {
     } catch (e) {}
   }
 
-  function loadIso22kCrmFromDisk(): any {
+  function loadIso22kCrmFromDisk(): { records: Record<string, any>; _lastUpdated: number } {
     try {
       if (fs.existsSync(ISO22K_CRM_FILE)) {
-        return JSON.parse(fs.readFileSync(ISO22K_CRM_FILE, "utf-8"));
+        const parsed = JSON.parse(fs.readFileSync(ISO22K_CRM_FILE, "utf-8"));
+        if (parsed && typeof parsed === "object") {
+          if (parsed.records && typeof parsed.records === "object") {
+            return {
+              records: parsed.records,
+              _lastUpdated: Number(parsed._lastUpdated || 0),
+            };
+          }
+          return {
+            records: parsed,
+            _lastUpdated: 0,
+          };
+        }
       }
     } catch (e) {}
-    return {};
+    return { records: {}, _lastUpdated: 0 };
   }
 
-  function saveIso22kCrmToDisk(crmData: any) {
+  function saveIso22kCrmToDisk(crmData: Record<string, any>, lastUpdated: number) {
     try {
       if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(ISO22K_CRM_FILE, JSON.stringify(crmData, null, 2), "utf-8");
+      fs.writeFileSync(
+        ISO22K_CRM_FILE,
+        JSON.stringify({ records: crmData, _lastUpdated: lastUpdated }, null, 2),
+        "utf-8"
+      );
     } catch (e) {}
   }
 
   let serverIso22kSession = loadIso22kSessionFromDisk();
-  let serverIso22kCrm = loadIso22kCrmFromDisk();
+  const initialDiskCrm = loadIso22kCrmFromDisk();
+  let serverIso22kCrm: Record<string, any> = initialDiskCrm.records;
+  let serverIso22kCrmUpdatedAt: number = initialDiskCrm._lastUpdated;
+  let iso22kBootstrapped = false;
 
-  app.get("/api/fast-iso22k/session", (req, res) => {
+  async function ensureIso22kHydratedFromFirestore() {
+    if (iso22kBootstrapped) return;
+    iso22kBootstrapped = true;
+    try {
+      const db = getServerFirestore();
+      const [sessSnap, crmSnap] = await Promise.all([
+        db.collection("fast_iso22k_crm").doc("current_session").get(),
+        db.collection("fast_iso22k_crm").doc("database").get(),
+      ]);
+
+      if (sessSnap.exists) {
+        const remoteSess = sessSnap.data();
+        const remoteTs = Number(remoteSess?._lastUpdated || 0);
+        const localTs = Number(serverIso22kSession?._lastUpdated || 0);
+        if (isMeaningfulIsoSession(remoteSess) && (!serverIso22kSession || remoteTs >= localTs)) {
+          serverIso22kSession = remoteSess;
+          saveIso22kSessionToDisk(serverIso22kSession);
+        }
+      }
+
+      if (crmSnap.exists) {
+        const remoteCrm = crmSnap.data();
+        const remoteTs = Number(remoteCrm?._lastUpdated || 0);
+        if (
+          remoteCrm?.records &&
+          typeof remoteCrm.records === "object" &&
+          (Object.keys(serverIso22kCrm).length === 0 || remoteTs >= serverIso22kCrmUpdatedAt)
+        ) {
+          serverIso22kCrm = remoteCrm.records;
+          serverIso22kCrmUpdatedAt = remoteTs;
+          saveIso22kCrmToDisk(serverIso22kCrm, serverIso22kCrmUpdatedAt);
+        }
+      }
+    } catch (e) {
+      console.warn("[FastIso22k] Server hydration note:", e);
+    }
+  }
+
+  app.get("/api/fast-iso22k/session", async (req, res) => {
+    await ensureIso22kHydratedFromFirestore();
     res.json({ success: true, session: serverIso22kSession });
   });
 
   app.post("/api/fast-iso22k/session", async (req, res) => {
     try {
+      await ensureIso22kHydratedFromFirestore();
       const sessionData = req.body;
-      if (sessionData) {
-        serverIso22kSession = sessionData;
-        saveIso22kSessionToDisk(serverIso22kSession);
-        try {
-          const db = getServerFirestore();
-          await db.collection("fast_iso22k_crm").doc("current_session").set(sessionData, { merge: true });
-        } catch (e) {}
+      if (sessionData && typeof sessionData === "object") {
+        const incomingTs = Number(sessionData._lastUpdated || Date.now());
+        const currentTs = Number(serverIso22kSession?._lastUpdated || 0);
+
+        if (!isMeaningfulIsoSession(sessionData) && isMeaningfulIsoSession(serverIso22kSession)) {
+          return res.json({ success: true, session: serverIso22kSession, skippedEmptyOverwrite: true });
+        }
+
+        if (!serverIso22kSession || incomingTs >= currentTs) {
+          serverIso22kSession = { ...sessionData, _lastUpdated: incomingTs };
+          saveIso22kSessionToDisk(serverIso22kSession);
+          try {
+            const db = getServerFirestore();
+            await db.collection("fast_iso22k_crm").doc("current_session").set(serverIso22kSession);
+          } catch (e) {}
+        }
       }
       res.json({ success: true, session: serverIso22kSession });
     } catch (err: any) {
@@ -1783,25 +2457,40 @@ async function startServer() {
     }
   });
 
-  app.get("/api/fast-iso22k/crm", (req, res) => {
-    res.json({ success: true, records: serverIso22kCrm });
+  app.get("/api/fast-iso22k/crm", async (req, res) => {
+    await ensureIso22kHydratedFromFirestore();
+    res.json({
+      success: true,
+      records: serverIso22kCrm,
+      _lastUpdated: serverIso22kCrmUpdatedAt,
+    });
   });
 
   app.post("/api/fast-iso22k/crm", async (req, res) => {
     try {
-      const { records } = req.body;
-      if (records) {
-        serverIso22kCrm = records;
-        saveIso22kCrmToDisk(serverIso22kCrm);
-        try {
-          const db = getServerFirestore();
-          await db.collection("fast_iso22k_crm").doc("database").set({
-            records: serverIso22kCrm,
-            _lastUpdated: Date.now()
-          }, { merge: true });
-        } catch (e) {}
+      await ensureIso22kHydratedFromFirestore();
+      const { records, _lastUpdated, _writerId } = req.body || {};
+      if (records && typeof records === "object") {
+        const incomingTs = Number(_lastUpdated || Date.now());
+        if (incomingTs >= serverIso22kCrmUpdatedAt || Object.keys(serverIso22kCrm).length === 0) {
+          serverIso22kCrm = records;
+          serverIso22kCrmUpdatedAt = incomingTs;
+          saveIso22kCrmToDisk(serverIso22kCrm, serverIso22kCrmUpdatedAt);
+          try {
+            const db = getServerFirestore();
+            await db.collection("fast_iso22k_crm").doc("database").set({
+              records: serverIso22kCrm,
+              _lastUpdated: serverIso22kCrmUpdatedAt,
+              ...(_writerId ? { _writerId } : {}),
+            });
+          } catch (e) {}
+        }
       }
-      res.json({ success: true, records: serverIso22kCrm });
+      res.json({
+        success: true,
+        records: serverIso22kCrm,
+        _lastUpdated: serverIso22kCrmUpdatedAt,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1849,136 +2538,375 @@ async function startServer() {
   const otpSendCooldowns = new Map<string, number>();
   const passwordResetTokens = new Map<string, { token: string; expiresAt: number; attempts: number }>();
 
-  // OTP Send Endpoint
-  app.post("/api/otp/send", async (req, res) => {
-    try {
-      const { email, name, flow = 'register', customOtp } = req.body || {};
-      if (!email) return res.status(400).json({ error: "Email là bắt buộc." });
+  async function issueAndSendOtpEmail(params: {
+    email: string;
+    name?: string;
+    flow?: string;
+    customOtp?: string;
+    courseLabel?: string;
+    bypassCooldown?: boolean;
+  }): Promise<{
+    success: boolean;
+    otp: string;
+    emailSent: boolean;
+    fallback?: boolean;
+    message: string;
+    error?: string;
+    statusCode?: number;
+  }> {
+    const emailKey = String(params.email || "").toLowerCase().trim();
+    const flow = params.flow || "register";
+    const flowKey = `${emailKey}_${flow}`;
+    const name = (params.name || "Học viên").trim();
+    const now = Date.now();
 
-      const emailKey = String(email).toLowerCase().trim();
-      const flowKey = `${emailKey}_${flow}`;
-
-      // Check if user account already exists in Firebase Auth or Firestore
-      let userExists: boolean | null = null;
-      if (flow === 'reset' || flow === 'login' || flow === 'register') {
-        userExists = await checkUserExistsSafe(emailKey);
-      }
-
-      // Distinguish flows: Only block reset/login if user explicitly does NOT exist
-      if ((flow === 'reset' || flow === 'login') && userExists === false) {
-        return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
-      }
-
-      const now = Date.now();
-      
-      // Check cooldown (10s)
+    if (!params.bypassCooldown) {
       const cooldownEnd = otpSendCooldowns.get(flowKey) || otpSendCooldowns.get(emailKey) || 0;
       if (now < cooldownEnd) {
         const waitSecs = Math.ceil((cooldownEnd - now) / 1000);
-        return res.status(429).json({ error: `Vui lòng đợi ${waitSecs}s trước khi yêu cầu gửi lại mã.` });
+        return {
+          success: false,
+          otp: "",
+          emailSent: false,
+          statusCode: 429,
+          message: `Vui lòng đợi ${waitSecs}s trước khi yêu cầu gửi lại mã.`,
+          error: `Vui lòng đợi ${waitSecs}s trước khi yêu cầu gửi lại mã.`,
+        };
       }
+    }
 
-      const otp = (customOtp && String(customOtp).trim().length === 6)
-        ? String(customOtp).trim()
+    const otp =
+      params.customOtp && String(params.customOtp).trim().length === 6
+        ? String(params.customOtp).trim()
         : Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes (600s)
+    const expiresAt = Date.now() + 10 * 60 * 1000;
 
-      // Verified working EmailJS configuration with primary working service first
-      const credentialPairs = [
-        {
-          serviceId: process.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap",
-          templateId: process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j",
-          publicKey: process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-"
-        },
-        {
-          serviceId: "service_q86r4ap",
-          templateId: "template_1nq488j",
-          publicKey: "P5IG0fzzQJSm5e4P-"
-        },
-        {
-          serviceId: "default_service",
-          templateId: "template_1nq488j",
-          publicKey: "P5IG0fzzQJSm5e4P-"
+    const credentialPairs = [
+      {
+        serviceId: process.env.VITE_EMAILJS_SERVICE_ID || "service_q86r4ap",
+        templateId: process.env.VITE_EMAILJS_TEMPLATE_ID || "template_1nq488j",
+        publicKey: process.env.VITE_EMAILJS_PUBLIC_KEY || "P5IG0fzzQJSm5e4P-",
+      },
+      {
+        serviceId: "service_q86r4ap",
+        templateId: "template_1nq488j",
+        publicKey: "P5IG0fzzQJSm5e4P-",
+      },
+      {
+        serviceId: "default_service",
+        templateId: "template_1nq488j",
+        publicKey: "P5IG0fzzQJSm5e4P-",
+      },
+    ];
+
+    let emailSent = false;
+    let emailErrorDetails = "";
+
+    for (const cred of credentialPairs) {
+      try {
+        const payload = {
+          service_id: cred.serviceId,
+          template_id: cred.templateId,
+          user_id: cred.publicKey,
+          template_params: {
+            to_name: name,
+            to_email: emailKey,
+            otp_code: otp,
+            course_name: params.courseLabel || "FAST E-Learning",
+          },
+        };
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+
+        const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://dashboard.emailjs.com",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeout));
+
+        if (response.ok) {
+          emailSent = true;
+          console.log(`[OTP] Email sent successfully to ${emailKey} via ${cred.serviceId}`);
+          break;
+        } else {
+          emailErrorDetails = await response.text();
+          console.warn(`[OTP] EmailJS ${cred.serviceId} response:`, response.status, emailErrorDetails);
         }
-      ];
-
-      let emailSent = false;
-      let emailErrorDetails = "";
-
-      for (const cred of credentialPairs) {
-        try {
-          const payload = {
-            service_id: cred.serviceId,
-            template_id: cred.templateId,
-            user_id: cred.publicKey,
-            template_params: {
-              to_name: name || "Học viên",
-              to_email: emailKey,
-              otp_code: otp,
-              course_name: "FAST E-Learning"
-            }
-          };
-
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 6000);
-
-          const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Origin": "https://dashboard.emailjs.com",
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-          }).finally(() => clearTimeout(timeout));
-
-          if (response.ok) {
-            emailSent = true;
-            console.log(`[OTP] Email sent successfully to ${emailKey} via ${cred.serviceId}`);
-            break;
-          } else {
-            emailErrorDetails = await response.text();
-            console.warn(`[OTP] EmailJS ${cred.serviceId} response:`, response.status, emailErrorDetails);
-          }
-        } catch (mailErr: any) {
-          emailErrorDetails = mailErr?.message || String(mailErr);
-          console.warn(`[OTP] EmailJS error with ${cred.serviceId}:`, emailErrorDetails);
-        }
+      } catch (mailErr: any) {
+        emailErrorDetails = mailErr?.message || String(mailErr);
+        console.warn(`[OTP] EmailJS error with ${cred.serviceId}:`, emailErrorDetails);
       }
+    }
 
-      // Store OTP both with flowKey and emailKey for flow-isolation and backward-compatibility
-      const record = { otp, expiresAt, attempts: 0, flow };
-      otpStore.set(flowKey, record);
-      otpStore.set(emailKey, record);
+    const record = { otp, expiresAt, attempts: 0, flow };
+    otpStore.set(flowKey, record);
+    otpStore.set(emailKey, record);
+    saveOtpToDisk(otpStore);
+    otpSendCooldowns.set(flowKey, now + 10000);
+    otpSendCooldowns.set(emailKey, now + 10000);
+
+    if (emailSent) {
+      return {
+        success: true,
+        otp,
+        emailSent: true,
+        message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`,
+      };
+    }
+
+    console.warn(`[OTP] EmailJS dispatch failed for ${emailKey} (flow: ${flow}). Details:`, emailErrorDetails);
+    if (flow === "reset") {
+      otpStore.delete(flowKey);
+      otpStore.delete(emailKey);
       saveOtpToDisk(otpStore);
-      otpSendCooldowns.set(flowKey, now + 10000); // 10s cooldown
-      otpSendCooldowns.set(emailKey, now + 10000);
+      return {
+        success: false,
+        otp: "",
+        emailSent: false,
+        statusCode: 503,
+        message: "Không thể gửi mã OTP xác thực đến email lúc này. Vui lòng thử lại sau.",
+        error: "Không thể gửi mã OTP xác thực đến email lúc này. Vui lòng thử lại sau.",
+      };
+    }
 
-      if (emailSent) {
-        console.log(`[OTP] Successfully dispatched to ${emailKey} (flow: ${flow})`);
-        return res.json({ 
-          success: true, 
-          message: `Mã OTP đã được gửi đến email ${emailKey}. Vui lòng kiểm tra hộp thư đến (và thư rác/spam) để lấy mã xác thực.`
-        });
-      } else {
-        console.warn(`[OTP] EmailJS dispatch failed for ${emailKey} (flow: ${flow}). Details:`, emailErrorDetails);
-        if (flow === 'reset') {
-          otpStore.delete(flowKey);
-          otpStore.delete(emailKey);
-          saveOtpToDisk(otpStore);
-          return res.status(503).json({
-            success: false,
-            error: "Không thể gửi mã OTP xác thực đến email lúc này. Vui lòng thử lại sau."
-          });
-        }
-        return res.json({ 
-          success: true, 
-          fallback: true,
-          otp: otp,
-          message: `Mã OTP đã được khởi tạo thành công (Chế độ dự phòng tự động - Auto Fallback). Mã xác thực của bạn là: ${otp} (đã được tự động ghi nhận).`
+    return {
+      success: true,
+      otp,
+      emailSent: false,
+      fallback: true,
+      message: `Mã OTP đã được khởi tạo thành công (Chế độ dự phòng tự động). Mã xác thực của bạn là: ${otp}.`,
+    };
+  }
+
+  const completedPostPaymentCache = new Map<string, any>();
+
+  async function finalizePaidTrainingAccountAndOtp(regRecord: any, options?: { sendOtpIfNotSent?: boolean }) {
+    const regId = String(regRecord?.id || regRecord?.registrationId || "").trim();
+    const cleanPhoneDigits = String(regRecord?.phone || "").replace(/[^\d]/g, "");
+    let accountEmail = String(regRecord?.userEmail || regRecord?.email || "").toLowerCase().trim();
+    if (!accountEmail || !accountEmail.includes("@") || accountEmail.endsWith("@fast-training.local")) {
+      const suffix = cleanPhoneDigits || regId.replace(/[^a-zA-Z0-9]/g, "").slice(-8) || Date.now().toString().slice(-8);
+      accountEmail = `hv.${suffix}@fastelearning.com.vn`;
+    }
+
+    const updatedReg = {
+      ...regRecord,
+      id: regId || regRecord?.id || `reg-${Date.now()}`,
+      email: accountEmail,
+      userEmail: accountEmail,
+      status: "confirmed",
+      paymentStatus: "PAID",
+      paidAt: regRecord?.paidAt || new Date().toISOString(),
+    };
+
+    const existingIdx = serverDirectRegistrations.findIndex((r: any) => r && r.id === updatedReg.id);
+    if (existingIdx >= 0) {
+      serverDirectRegistrations[existingIdx] = { ...serverDirectRegistrations[existingIdx], ...updatedReg };
+    } else if (updatedReg.id) {
+      serverDirectRegistrations.unshift(updatedReg);
+    }
+    saveDirectRegistrationsToDisk(serverDirectRegistrations);
+
+    const provisioned = await ensureAutoAccountForDirectRegistration({
+      email: accountEmail,
+      displayName: updatedReg.studentName,
+      phone: updatedReg.phone,
+      registration: updatedReg,
+    });
+
+    const cached = regId ? completedPostPaymentCache.get(regId) : null;
+    if (cached && cached.accountEmail === accountEmail) {
+      return cached;
+    }
+
+    let otpResult: Awaited<ReturnType<typeof issueAndSendOtpEmail>> | null = null;
+    if (options?.sendOtpIfNotSent !== false) {
+      otpResult = await issueAndSendOtpEmail({
+        email: accountEmail,
+        name: updatedReg.studentName || "Học viên FAST",
+        flow: "account_setup",
+        courseLabel: `Tài khoản học viên & Lịch học: ${updatedReg.courseTitle || "Khóa đào tạo Online - Offline"}`,
+        bypassCooldown: true,
+      });
+
+      const accountOtpNotifId = `otp_account_${updatedReg.id}`;
+      const prepBase = buildServerPreClassNotification(updatedReg, new Date().toISOString(), accountOtpNotifId);
+      await persistUserNotification(accountEmail, {
+        ...prepBase,
+        id: accountOtpNotifId,
+        title: `Tài khoản & OTP đã kích hoạt: ${updatedReg.courseTitle || "Khóa đào tạo"}`,
+        message: `Thanh toán thành công! Tài khoản ${accountEmail} đã được kích hoạt sẵn với mã OTP. ${prepBase.venueAddress ? `Địa điểm học Offline: ${prepBase.venueAddress}. ` : ''}Vui lòng xem mục Chuẩn bị vào học để kiểm tra lịch trình & thủ tục check-in.`,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    const summary = {
+      accountEmail,
+      accountProvisioned: provisioned,
+      otpDispatched: Boolean(otpResult?.success),
+      otpEmailSent: Boolean(otpResult?.emailSent),
+      otpFallback: Boolean(otpResult?.fallback),
+      otp: otpResult?.fallback ? otpResult.otp : undefined,
+      otpMessage: otpResult?.message || "",
+      registration: updatedReg,
+      notification: provisioned.notification,
+    };
+
+    if (regId) {
+      completedPostPaymentCache.set(regId, summary);
+    }
+    return summary;
+  }
+
+  app.post("/api/training/complete-post-payment", async (req, res) => {
+    try {
+      const { registrationId, orderId, paymentCode, fallbackRecord } = req.body || {};
+      const cleanOrderId = String(orderId || "").trim();
+      const cleanRegId = String(registrationId || "").trim();
+      const cleanCode = paymentCode ? normalizeServerFastCode(String(paymentCode)) : "";
+
+      let matchedOrder: any = cleanOrderId && serverOrdersMap[cleanOrderId] ? serverOrdersMap[cleanOrderId] : null;
+      if (!matchedOrder && cleanCode) {
+        matchedOrder =
+          Object.values(serverOrdersMap).find(
+            (o: any) => o && (o.paymentCode === cleanCode || o.paymentCode === cleanCode.replace(/^FAST/, ""))
+          ) || null;
+      }
+
+      let matchedReg: any = serverDirectRegistrations.find((r: any) => {
+        if (!r) return false;
+        const rCode = normalizeServerFastCode(r.paymentCode || r.paymentMemo || "");
+        return (
+          (cleanRegId && r.id === cleanRegId) ||
+          (cleanOrderId && r.orderId === cleanOrderId) ||
+          (cleanCode && rCode === cleanCode)
+        );
+      });
+
+      if (!matchedReg || (matchedReg.paymentStatus !== "PAID" && matchedReg.status !== "confirmed")) {
+        try {
+          const db = getServerFirestore();
+          if (cleanRegId) {
+            const snap = await db.collection("live_course_registrations").doc(cleanRegId).get();
+            if (snap.exists) matchedReg = { id: snap.id, ...snap.data() };
+          }
+          if ((!matchedReg || matchedReg.paymentStatus !== "PAID") && cleanCode) {
+            const qSnap = await db.collection("live_course_registrations").where("paymentCode", "==", cleanCode).limit(1).get();
+            if (!qSnap.empty) matchedReg = { id: qSnap.docs[0].id, ...qSnap.docs[0].data() };
+          }
+          if (!matchedOrder && cleanOrderId) {
+            const ordSnap = await db.collection("orders").doc(cleanOrderId).get();
+            if (ordSnap.exists) matchedOrder = ordSnap.data();
+          }
+          if (!matchedOrder && cleanCode) {
+            const ordQ = await db.collection("orders").where("paymentCode", "==", cleanCode).limit(1).get();
+            if (!ordQ.empty) matchedOrder = ordQ.docs[0].data();
+          }
+        } catch {}
+      }
+
+      const isPaidOrder = matchedOrder?.status === "PAID" || matchedOrder?.status === "completed";
+      const isPaidReg = matchedReg?.paymentStatus === "PAID" || matchedReg?.status === "confirmed";
+
+      if (!isPaidOrder && !isPaidReg) {
+        return res.status(402).json({
+          success: false,
+          error: "Giao dịch chưa được xác nhận thanh toán.",
         });
       }
+
+      const recordToFinalize = {
+        ...(fallbackRecord || {}),
+        ...(matchedReg || {}),
+        id: matchedReg?.id || cleanRegId || matchedOrder?.registrationId || `reg-${Date.now()}`,
+        orderId: matchedReg?.orderId || cleanOrderId || matchedOrder?.orderId || "",
+        paymentCode: matchedReg?.paymentCode || matchedOrder?.paymentCode || cleanCode,
+        email: matchedReg?.email || matchedReg?.userEmail || matchedOrder?.email || fallbackRecord?.email || "",
+        userEmail: matchedReg?.userEmail || matchedReg?.email || matchedOrder?.email || fallbackRecord?.userEmail || fallbackRecord?.email || "",
+        studentName: matchedReg?.studentName || matchedOrder?.studentName || fallbackRecord?.studentName || "Học viên FAST",
+        phone: matchedReg?.phone || matchedOrder?.phone || fallbackRecord?.phone || "",
+        courseId: matchedReg?.courseId || matchedOrder?.courseId || fallbackRecord?.courseId || "",
+        courseTitle: matchedReg?.courseTitle || matchedOrder?.courseTitle || fallbackRecord?.courseTitle || "Khóa đào tạo Online - Offline",
+      };
+
+      const result = await finalizePaidTrainingAccountAndOtp(recordToFinalize, { sendOtpIfNotSent: true });
+      return res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error("[/api/training/complete-post-payment] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi hoàn tất sau thanh toán." });
+    }
+  });
+
+  // OTP Send Endpoint
+  app.post("/api/otp/send", async (req, res) => {
+    try {
+      const { email, name, flow = 'register', customOtp, courseLabel } = req.body || {};
+      if (!email) return res.status(400).json({ error: "Email là bắt buộc." });
+
+      const emailKey = String(email).toLowerCase().trim();
+
+      // Check if user account already exists in Firebase Auth or Firestore
+      let userExists: boolean | null = null;
+      if (flow === 'reset' || flow === 'login' || flow === 'register' || flow === 'account_setup') {
+        userExists = await checkUserExistsSafe(emailKey);
+      }
+
+      // If account_setup flow has a matching paid direct registration without provisioned user yet, provision now
+      if (flow === 'account_setup' && userExists === false) {
+        const regMatch = serverDirectRegistrations.find((r: any) =>
+          r && (String(r.email || '').toLowerCase().trim() === emailKey || String(r.userEmail || '').toLowerCase().trim() === emailKey)
+        );
+        if (regMatch) {
+          await ensureAutoAccountForDirectRegistration({
+            email: emailKey,
+            displayName: regMatch.studentName || name,
+            phone: regMatch.phone,
+            registration: regMatch
+          });
+          userExists = true;
+        }
+      }
+
+      // Distinguish flows: Only block reset/login/account_setup if user explicitly does NOT exist
+      if ((flow === 'reset' || flow === 'login' || flow === 'account_setup') && userExists === false) {
+        return res.status(404).json({ error: "Không tìm thấy tài khoản người dùng với email này. Vui lòng kiểm tra lại hoặc Đăng ký tài khoản mới." });
+      }
+
+      const result = await issueAndSendOtpEmail({
+        email: emailKey,
+        name: name || "Học viên",
+        flow,
+        customOtp,
+        courseLabel,
+      });
+
+      if (!result.success) {
+        return res.status(result.statusCode || 503).json({
+          success: false,
+          error: result.error || result.message,
+        });
+      }
+
+      if (result.emailSent) {
+        return res.json({
+          success: true,
+          message: result.message,
+        });
+      }
+
+      return res.json({
+        success: true,
+        fallback: true,
+        otp: result.otp,
+        message: result.message,
+      });
     } catch (error: any) {
       console.error("Server OTP Send Error:", error);
       res.status(500).json({ 
@@ -2028,18 +2956,20 @@ async function startServer() {
       otpStore.delete(emailKey);
       saveOtpToDisk(otpStore);
 
-      // For password reset flow: do NOT change password yet; issue a short-lived single-use resetToken
-      if (flow === 'reset') {
+      // For password reset & pre-created account_setup flows: issue a short-lived single-use resetToken
+      if (flow === 'reset' || flow === 'account_setup') {
         const resetToken = randomBytes(32).toString('hex');
         passwordResetTokens.set(emailKey, {
           token: resetToken,
-          expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes to finish setting new password
+          expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes to finish setting password
           attempts: 0
         });
         return res.json({
           success: true,
           resetToken,
-          message: "Xác thực OTP thành công! Bạn có thể nhập mật khẩu mới ngay bây giờ."
+          message: flow === 'account_setup'
+            ? "Xác thực OTP thành công! Vui lòng thêm mật khẩu mới để hoàn tất đăng nhập."
+            : "Xác thực OTP thành công! Bạn có thể nhập mật khẩu mới ngay bây giờ."
         });
       }
 
@@ -2216,6 +3146,143 @@ async function startServer() {
       return res.status(500).json({
         success: false,
         error: "Lỗi hệ thống khi đặt lại mật khẩu. Vui lòng thử lại sau."
+      });
+    }
+  });
+
+  // Complete OTP login + Add password for auto-provisioned learner accounts
+  app.post("/api/auth/otp-complete-setup", async (req, res) => {
+    try {
+      const { email, resetToken, newPassword, fullName } = req.body || {};
+      if (!email || !resetToken || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: "Thiếu thông tin xác thực OTP hoặc mật khẩu mới."
+        });
+      }
+
+      const emailKey = String(email).toLowerCase().trim();
+      const tokenStr = String(resetToken).trim();
+      const pw = String(newPassword);
+
+      if (
+        pw.length < 8 ||
+        !/[A-Z]/.test(pw) ||
+        !/[a-z]/.test(pw) ||
+        !/[0-9]/.test(pw) ||
+        !/[^A-Za-z0-9]/.test(pw)
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: "Mật khẩu mới phải dài tối thiểu 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt."
+        });
+      }
+
+      const tokenRecord = passwordResetTokens.get(emailKey);
+      if (!tokenRecord || Date.now() > tokenRecord.expiresAt) {
+        passwordResetTokens.delete(emailKey);
+        return res.status(403).json({
+          success: false,
+          error: "Phiên xác thực OTP không tồn tại hoặc đã hết hạn. Vui lòng yêu cầu gửi lại mã OTP."
+        });
+      }
+
+      let isTokenMatch = false;
+      try {
+        const expectedBuf = Buffer.from(tokenRecord.token, "utf8");
+        const providedBuf = Buffer.from(tokenStr, "utf8");
+        isTokenMatch =
+          expectedBuf.length === providedBuf.length &&
+          timingSafeEqual(expectedBuf, providedBuf);
+      } catch {
+        isTokenMatch = false;
+      }
+
+      if (!isTokenMatch) {
+        tokenRecord.attempts = (tokenRecord.attempts || 0) + 1;
+        if (tokenRecord.attempts >= 5) passwordResetTokens.delete(emailKey);
+        return res.status(403).json({
+          success: false,
+          error: "Mã phiên OTP không hợp lệ. Vui lòng xác thực lại."
+        });
+      }
+
+      passwordResetTokens.delete(emailKey);
+
+      const diskUsers = loadUsersFromDisk();
+      const existing = diskUsers[emailKey] || {};
+      const resolvedName = String(fullName || existing.displayName || emailKey.split('@')[0]).trim();
+
+      try {
+        const adminAuth = getAuth();
+        try {
+          const authUser = await adminAuth.getUserByEmail(emailKey);
+          await adminAuth.updateUser(authUser.uid, {
+            password: pw,
+            displayName: resolvedName,
+            emailVerified: true
+          });
+        } catch (authErr: any) {
+          if (authErr?.code === 'auth/user-not-found') {
+            await adminAuth.createUser({
+              email: emailKey,
+              password: pw,
+              displayName: resolvedName,
+              emailVerified: true
+            });
+          }
+        }
+      } catch (adminErr: any) {
+        console.warn("[otp-complete-setup] Firebase Admin Auth fallback to disk session:", adminErr?.message);
+      }
+
+      const isOwner = emailKey === 'h1h4phong@gmail.com' || emailKey === 'trdung153@gmail.com';
+      const isAdmin = isOwner || SYSTEM_ADMIN_EMAILS.includes(emailKey) || !!existing.isAdmin;
+      const isTeacher = isAdmin || !!existing.isTeacher;
+
+      const updatedUser = {
+        uid: existing.uid || `user_${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        email: emailKey,
+        displayName: resolvedName,
+        isAdmin,
+        isTeacher,
+        isOwner,
+        isVip: isOwner || !!existing.isVip,
+        isLocked: false,
+        autoCreated: !!existing.autoCreated,
+        needsPasswordSetup: false,
+        password: pw
+      };
+      saveUserToDisk(emailKey, updatedUser);
+
+      try {
+        await getServerFirestore().collection("users").doc(emailKey).set({
+          email: emailKey,
+          displayName: resolvedName,
+          needsPasswordSetup: false,
+          passwordUpdatedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch {}
+
+      return res.json({
+        success: true,
+        message: "Thiết lập mật khẩu và đăng nhập thành công!",
+        user: {
+          uid: updatedUser.uid,
+          email: updatedUser.email,
+          displayName: updatedUser.displayName,
+          isAdmin: updatedUser.isAdmin,
+          isTeacher: updatedUser.isTeacher,
+          isOwner: updatedUser.isOwner,
+          isVip: updatedUser.isVip
+        }
+      });
+    } catch (error: any) {
+      console.error("[/api/auth/otp-complete-setup] Error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Lỗi hệ thống khi hoàn tất thiết lập mật khẩu."
       });
     }
   });
@@ -2791,6 +3858,1043 @@ async function startServer() {
     }
   });
 
+  // --- UNIFIED ADMIN PAYMENT & COURSE ACTIVATION DASHBOARD ENDPOINTS ---
+  async function isAuthorizedAdminEmail(email: string): Promise<boolean> {
+    const emailKey = String(email || "").toLowerCase().trim();
+    if (!emailKey) return false;
+    if (SYSTEM_ADMIN_EMAILS.includes(emailKey)) return true;
+
+    const diskUsers = loadUsersFromDisk();
+    if (diskUsers[emailKey]?.isAdmin === true || diskUsers[emailKey]?.isOwner === true) {
+      return true;
+    }
+
+    try {
+      const adminDoc = await getServerFirestore().collection("users").doc(emailKey).get();
+      if (adminDoc.exists) {
+        const data = adminDoc.data();
+        if (data?.isAdmin === true || data?.isOwner === true) return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  function parseNumericVndAmount(raw: any): number {
+    if (typeof raw === "number" && !Number.isNaN(raw)) return raw;
+    if (!raw) return 0;
+    const str = String(raw).trim();
+    if (str.toLowerCase().includes("miễn phí")) return 0;
+    const digits = str.replace(/[^\d]/g, "");
+    return digits ? Number(digits) : 0;
+  }
+
+  app.get("/api/admin/payments-overview", async (req, res) => {
+    try {
+      const adminEmail = String(req.query.adminEmail || "").toLowerCase().trim();
+      const authorized = await isAuthorizedAdminEmail(adminEmail);
+      if (!authorized) {
+        return res.status(403).json({ success: false, error: "Bạn không có quyền truy cập Admin Dashboard." });
+      }
+
+      const db = getServerFirestore();
+
+      // 1. Collect all Users & Purchased Courses
+      const diskUsers = loadUsersFromDisk();
+      const usersMap = new Map<string, any>();
+
+      Object.entries(diskUsers).forEach(([emailKey, u]) => {
+        if (emailKey) {
+          usersMap.set(emailKey.toLowerCase().trim(), {
+            id: emailKey.toLowerCase().trim(),
+            email: emailKey.toLowerCase().trim(),
+            ...u,
+          });
+        }
+      });
+
+      const activations: any[] = [];
+      const activeCourseKeys = new Set<string>(); // `${email}::${courseId}`
+      const courseStatusLookup = new Map<string, { status: string; unlockedAt?: string; claimedVia?: string; progress?: number }>();
+
+      try {
+        const usersSnap = await db.collection("users").get();
+        const subcollectionJobs = usersSnap.docs.map(async (userDoc) => {
+          const emailKey = userDoc.id.toLowerCase().trim();
+          const uData = userDoc.data() || {};
+          const mergedUser = {
+            ...(usersMap.get(emailKey) || {}),
+            ...uData,
+            id: emailKey,
+            email: uData.email || emailKey,
+          };
+          usersMap.set(emailKey, mergedUser);
+
+          try {
+            const pcSnap = await db.collection("users").doc(userDoc.id).collection("purchased_courses").get();
+            pcSnap.forEach((pcDoc) => {
+              const pc = pcDoc.data() || {};
+              const cid = pc.courseId || pcDoc.id;
+              const statusRaw = String(pc.status || "active").toLowerCase().trim();
+              const normalizedStatus = statusRaw === "inactive" || statusRaw === "revoked" || statusRaw === "suspended"
+                ? "inactive"
+                : statusRaw === "pending"
+                  ? "pending"
+                  : "active";
+              const key = `${emailKey}::${cid}`;
+              courseStatusLookup.set(key, {
+                status: normalizedStatus,
+                unlockedAt: pc.unlockedAt || pc.purchasedAt || pc.updatedAt || "",
+                claimedVia: pc.claimedVia || "SEPAY_AUTO",
+                progress: Number(pc.progress || 0),
+              });
+              if (normalizedStatus === "active") {
+                activeCourseKeys.add(key);
+              }
+              activations.push({
+                id: `pc_${emailKey}_${cid}`,
+                studentEmail: emailKey,
+                studentName: mergedUser.displayName || mergedUser.fullName || emailKey.split("@")[0],
+                phone: mergedUser.phone || "",
+                courseId: cid,
+                courseTitle: pc.courseTitle || pc.title || cid,
+                price: pc.price || "",
+                numericPrice: parseNumericVndAmount(pc.price),
+                status: normalizedStatus,
+                progress: Number(pc.progress || 0),
+                completedLessonsCount: Array.isArray(pc.completedLessons) ? pc.completedLessons.length : 0,
+                purchasedAt: pc.purchasedAt || "",
+                unlockedAt: pc.unlockedAt || pc.purchasedAt || "",
+                claimedVia: pc.claimedVia || "PAYMENT_SYSTEM",
+                sourceType: "purchased_course",
+                isVip: Boolean(mergedUser.isVip),
+                isLocked: Boolean(mergedUser.isLocked),
+              });
+            });
+          } catch {}
+        });
+        await Promise.all(subcollectionJobs);
+      } catch (err: any) {
+        console.warn("[AdminOverview] Firestore users read note:", err?.message || err);
+      }
+
+      // 2. Collect Orders + Pending Payments + Direct/Live Registrations
+      const paymentMap = new Map<string, any>();
+
+      const upsertPayment = (rawKey: string, entry: any) => {
+        const cleanCode = entry.paymentCode ? normalizeServerFastCode(entry.paymentCode) : "";
+        let existingKey = "";
+        if (rawKey && paymentMap.has(rawKey)) {
+          existingKey = rawKey;
+        } else {
+          for (const [k, existing] of paymentMap.entries()) {
+            if (
+              (entry.orderId && existing.orderId && existing.orderId === entry.orderId) ||
+              (entry.registrationId && existing.registrationId && existing.registrationId === entry.registrationId) ||
+              (cleanCode && existing.paymentCode && normalizeServerFastCode(existing.paymentCode) === cleanCode)
+            ) {
+              existingKey = k;
+              break;
+            }
+          }
+        }
+
+        const key = existingKey || rawKey || `pay_${Date.now()}_${paymentMap.size}`;
+        const prev = paymentMap.get(key) || {};
+        const prevStatus = String(prev.status || "").toUpperCase();
+        const nextStatus = String(entry.status || "").toUpperCase();
+        const mergedStatus =
+          prevStatus === "PAID" || nextStatus === "PAID"
+            ? "PAID"
+            : prevStatus === "CANCELLED" || nextStatus === "CANCELLED"
+              ? "CANCELLED"
+              : nextStatus || prevStatus || "PENDING";
+
+        paymentMap.set(key, {
+          ...prev,
+          ...entry,
+          id: prev.id || entry.id || key,
+          orderId: entry.orderId || prev.orderId || "",
+          registrationId: entry.registrationId || prev.registrationId || "",
+          paymentCode: cleanCode || prev.paymentCode || "",
+          status: mergedStatus,
+          email: (entry.email || prev.email || "").toLowerCase().trim(),
+          studentName: entry.studentName || prev.studentName || "",
+          phone: entry.phone || prev.phone || "",
+          courseId: entry.courseId || prev.courseId || "",
+          courseTitle: entry.courseTitle || prev.courseTitle || "",
+          amount: Number(entry.amount || prev.amount || 0),
+          createdAt: prev.createdAt || entry.createdAt || new Date().toISOString(),
+          paidAt: entry.paidAt || prev.paidAt || null,
+          transactionId: entry.transactionId || prev.transactionId || "",
+        });
+      };
+
+      // 2a. Server disk orders
+      Object.values(serverOrdersMap).forEach((o: any) => {
+        if (!o) return;
+        const st = String(o.status || "PENDING").toUpperCase();
+        const normStatus = st === "PAID" || st === "COMPLETED" || st === "CONFIRMED" ? "PAID" : st === "CANCELLED" ? "CANCELLED" : "PENDING";
+        upsertPayment(o.orderId || o.paymentCode, {
+          id: o.orderId || o.paymentCode,
+          orderId: o.orderId || "",
+          registrationId: o.registrationId || "",
+          paymentCode: o.paymentCode || "",
+          orderType: o.orderType || (o.registrationId ? "direct_training" : (String(o.courseId || "").includes("vip") ? "vip" : "course")),
+          studentName: o.studentName || "",
+          email: o.email || "",
+          phone: o.phone || "",
+          courseId: o.courseId || "",
+          courseTitle: o.courseTitle || "Khóa học FAST E-Learning",
+          amount: parseNumericVndAmount(o.amount),
+          status: normStatus,
+          paymentMethod: o.paymentMethod || "SePay ACB VietQR",
+          transactionId: o.transactionId || "",
+          bankAccount: o.bankAccount || "0989499568",
+          createdAt: o.createdAt || "",
+          paidAt: o.paidAt || null,
+        });
+      });
+
+      // 2b. Firestore orders & pending_payments
+      try {
+        const [ordersSnap, pendingSnap] = await Promise.all([
+          db.collection("orders").get(),
+          db.collection("pending_payments").get(),
+        ]);
+        ordersSnap.forEach((docSnap) => {
+          const o = docSnap.data() || {};
+          const st = String(o.status || "PENDING").toUpperCase();
+          const normStatus = st === "PAID" || st === "COMPLETED" || st === "CONFIRMED" ? "PAID" : st === "CANCELLED" ? "CANCELLED" : "PENDING";
+          upsertPayment(docSnap.id, {
+            id: docSnap.id,
+            orderId: o.orderId || docSnap.id,
+            registrationId: o.registrationId || "",
+            paymentCode: o.paymentCode || "",
+            orderType: o.orderType || (o.registrationId ? "direct_training" : (String(o.courseId || "").includes("vip") ? "vip" : "course")),
+            studentName: o.studentName || "",
+            email: o.email || "",
+            phone: o.phone || "",
+            courseId: o.courseId || "",
+            courseTitle: o.courseTitle || "Khóa học FAST E-Learning",
+            amount: parseNumericVndAmount(o.transferAmount || o.amount),
+            status: normStatus,
+            paymentMethod: o.paymentMethod || "SePay ACB VietQR",
+            transactionId: o.transactionId || "",
+            bankAccount: o.accountNumber || o.bankAccount || "0989499568",
+            createdAt: o.createdAt || "",
+            paidAt: o.paidAt || null,
+          });
+        });
+
+        pendingSnap.forEach((docSnap) => {
+          const p = docSnap.data() || {};
+          upsertPayment(p.orderId || p.code || docSnap.id, {
+            id: p.orderId || docSnap.id,
+            orderId: p.orderId || "",
+            registrationId: p.registrationId || "",
+            paymentCode: p.code || p.paymentCode || docSnap.id,
+            orderType: p.orderType || (p.registrationId ? "direct_training" : "course"),
+            studentName: p.studentName || "",
+            email: p.email || "",
+            phone: p.phone || "",
+            courseId: p.courseId || "",
+            courseTitle: p.courseTitle || serverCourses[p.courseId]?.title || p.courseId || "Khóa học FAST E-Learning",
+            amount: parseNumericVndAmount(p.amount),
+            status: "PENDING",
+            paymentMethod: "SePay ACB VietQR",
+            bankAccount: "0989499568",
+            createdAt: p.createdAt || "",
+          });
+        });
+      } catch (err: any) {
+        console.warn("[AdminOverview] Firestore orders read note:", err?.message || err);
+      }
+
+      // 2c. Direct / Live Course Registrations (Disk + Firestore)
+      const directRegList: any[] = [...serverDirectRegistrations];
+      const seenRegIds = new Set(directRegList.map((r) => r?.id).filter(Boolean));
+      try {
+        const [liveSnap, dirSnap] = await Promise.all([
+          db.collection("live_course_registrations").get(),
+          db.collection("direct_course_registrations").get(),
+        ]);
+        [liveSnap, dirSnap].forEach((snap) => {
+          snap.forEach((docSnap) => {
+            if (!seenRegIds.has(docSnap.id)) {
+              seenRegIds.add(docSnap.id);
+              directRegList.push({ id: docSnap.id, ...docSnap.data() });
+            } else {
+              const idx = directRegList.findIndex((r) => r?.id === docSnap.id);
+              if (idx >= 0) {
+                directRegList[idx] = { ...directRegList[idx], ...docSnap.data(), id: docSnap.id };
+              }
+            }
+          });
+        });
+      } catch (err: any) {
+        console.warn("[AdminOverview] Firestore registrations read note:", err?.message || err);
+      }
+
+      directRegList.forEach((reg) => {
+        if (!reg) return;
+        const regStatus = String(reg.status || "").toLowerCase();
+        const payStatus = String(reg.paymentStatus || "").toUpperCase();
+        const isPaid = payStatus === "PAID" || regStatus === "confirmed" || regStatus === "completed";
+        const isCancelled = regStatus === "cancelled" || payStatus === "CANCELLED";
+        const normStatus = isPaid ? "PAID" : isCancelled ? "CANCELLED" : "PENDING";
+        const regEmail = String(reg.userEmail || reg.email || "").toLowerCase().trim();
+        const regCourseId = reg.courseId || reg.id;
+
+        upsertPayment(reg.orderId || reg.id, {
+          id: reg.orderId || reg.id,
+          orderId: reg.orderId || "",
+          registrationId: reg.id,
+          paymentCode: reg.paymentCode || reg.paymentMemo || "",
+          orderType: "direct_training",
+          studentName: reg.studentName || "",
+          email: regEmail,
+          phone: reg.phone || "",
+          courseId: regCourseId,
+          courseTitle: reg.courseTitle || "Khóa đào tạo Online - Offline",
+          amount: parseNumericVndAmount(reg.totalNumericPrice || reg.totalPrice || reg.price),
+          status: normStatus,
+          paymentMethod: reg.paymentMethod || "SePay ACB VietQR",
+          transactionId: reg.transactionId || "",
+          bankAccount: "0989499568",
+          trainingTypeLabel: reg.trainingTypeLabel || reg.trainingType || "Đào tạo Online - Offline",
+          createdAt: reg.registeredAt || reg.createdAt || "",
+          paidAt: reg.paidAt || null,
+        });
+
+        // Also reflect direct training registrations in activations if confirmed/cancelled and not already in purchased_courses
+        if (regEmail && regCourseId && !courseStatusLookup.has(`${regEmail}::${regCourseId}`)) {
+          const actStatus = isPaid ? "active" : isCancelled ? "inactive" : "pending";
+          if (actStatus !== "pending") {
+            const uMeta = usersMap.get(regEmail) || {};
+            activations.push({
+              id: `reg_${reg.id}`,
+              registrationId: reg.id,
+              studentEmail: regEmail,
+              studentName: reg.studentName || uMeta.displayName || regEmail.split("@")[0],
+              phone: reg.phone || uMeta.phone || "",
+              courseId: regCourseId,
+              courseTitle: reg.courseTitle || "Khóa đào tạo Online - Offline",
+              price: reg.totalPrice || reg.price || "",
+              numericPrice: parseNumericVndAmount(reg.totalNumericPrice || reg.totalPrice || reg.price),
+              status: actStatus,
+              progress: isPaid ? 0 : 0,
+              completedLessonsCount: 0,
+              purchasedAt: reg.paidAt || reg.registeredAt || "",
+              unlockedAt: reg.paidAt || reg.registeredAt || "",
+              claimedVia: reg.trainingTypeLabel || "Đào tạo Online - Offline",
+              sourceType: "direct_training",
+              isVip: Boolean(uMeta.isVip),
+              isLocked: Boolean(uMeta.isLocked),
+            });
+            if (actStatus === "active") {
+              activeCourseKeys.add(`${regEmail}::${regCourseId}`);
+            }
+          }
+        }
+      });
+
+      // Enrich payment rows with activation state
+      const payments = Array.from(paymentMap.values())
+        .map((p) => {
+          const emailKey = (p.email || "").toLowerCase().trim();
+          const uMeta = usersMap.get(emailKey);
+          const key = `${emailKey}::${p.courseId}`;
+          const pcMeta = courseStatusLookup.get(key);
+          const isVipActive = p.orderType === "vip" && Boolean(uMeta?.isVip);
+          const courseActivated = Boolean(
+            isVipActive ||
+            activeCourseKeys.has(key) ||
+            (p.orderType === "direct_training" && p.status === "PAID" && pcMeta?.status !== "inactive")
+          );
+          const activationStatus = isVipActive
+            ? "active"
+            : pcMeta?.status || (p.orderType === "direct_training" && p.status === "PAID" ? "active" : "not_activated");
+
+          return {
+            ...p,
+            studentName: p.studentName || uMeta?.displayName || uMeta?.fullName || (emailKey ? emailKey.split("@")[0] : "Khách vãng lai"),
+            courseTitle: p.courseTitle || serverCourses[p.courseId]?.title || p.courseId || "Khóa học FAST",
+            courseActivated,
+            activationStatus,
+          };
+        })
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      activations.sort((a, b) => new Date(b.unlockedAt || b.purchasedAt || 0).getTime() - new Date(a.unlockedAt || a.purchasedAt || 0).getTime());
+
+      // Build student summary list
+      const activationsByEmail = new Map<string, any[]>();
+      activations.forEach((act) => {
+        const list = activationsByEmail.get(act.studentEmail) || [];
+        list.push(act);
+        activationsByEmail.set(act.studentEmail, list);
+      });
+
+      const studentsSummary = Array.from(usersMap.values())
+        .map((u) => {
+          const emailKey = String(u.email || u.id || "").toLowerCase().trim();
+          const userActs = activationsByEmail.get(emailKey) || [];
+          return {
+            email: emailKey,
+            displayName: u.displayName || u.fullName || emailKey.split("@")[0],
+            phone: u.phone || "",
+            isVip: Boolean(u.isVip),
+            isAdmin: Boolean(u.isAdmin),
+            isTeacher: Boolean(u.isTeacher),
+            isLocked: Boolean(u.isLocked),
+            activeCoursesCount: userActs.filter((a) => a.status === "active").length,
+            totalCoursesCount: userActs.length,
+            createdAt: u.createdAt || "",
+            lastLoginAt: u.lastLoginAt || "",
+          };
+        })
+        .sort((a, b) => b.activeCoursesCount - a.activeCoursesCount);
+
+      const paidPayments = payments.filter((p) => p.status === "PAID");
+      const totalConfirmedRevenue = paidPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+      return res.json({
+        success: true,
+        summary: {
+          totalConfirmedRevenue,
+          totalOrders: payments.length,
+          paidOrdersCount: paidPayments.length,
+          pendingOrdersCount: payments.filter((p) => p.status === "PENDING").length,
+          cancelledOrdersCount: payments.filter((p) => p.status === "CANCELLED").length,
+          activeEnrollmentsCount: activations.filter((a) => a.status === "active").length,
+          inactiveEnrollmentsCount: activations.filter((a) => a.status === "inactive").length,
+          totalStudentsCount: studentsSummary.length,
+          vipStudentsCount: studentsSummary.filter((s) => s.isVip).length,
+        },
+        payments,
+        activations,
+        studentsSummary,
+        fetchedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error("[/api/admin/payments-overview] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Không thể tải dữ liệu Admin Dashboard." });
+    }
+  });
+
+  app.post("/api/admin/payments/update-status", async (req, res) => {
+    try {
+      const {
+        adminEmail,
+        orderId,
+        registrationId,
+        paymentCode,
+        newStatus,
+        autoActivateCourse = true,
+        note = "",
+      } = req.body || {};
+
+      if (!(await isAuthorizedAdminEmail(adminEmail))) {
+        return res.status(403).json({ success: false, error: "Bạn không có quyền quản trị viên." });
+      }
+
+      const normalizedStatus = String(newStatus || "").toUpperCase();
+      if (!["PAID", "PENDING", "CANCELLED"].includes(normalizedStatus)) {
+        return res.status(400).json({ success: false, error: "Trạng thái thanh toán không hợp lệ." });
+      }
+
+      const db = getServerFirestore();
+      const nowIso = new Date().toISOString();
+      const cleanOrderId = String(orderId || "").trim();
+      const cleanRegId = String(registrationId || "").trim();
+      const cleanCode = paymentCode ? normalizeServerFastCode(String(paymentCode)) : "";
+
+      let targetEmail = "";
+      let targetCourseId = "";
+      let targetCourseTitle = "";
+      let targetAmount = 0;
+      let targetOrderType = "";
+      let matchedRegRecord: any = null;
+
+      // 1. Update matching order in serverOrdersMap + orders.json + Firestore orders
+      let orderKey = cleanOrderId && serverOrdersMap[cleanOrderId] ? cleanOrderId : "";
+      if (!orderKey && cleanCode) {
+        orderKey = Object.keys(serverOrdersMap).find((k) => {
+          const o = serverOrdersMap[k];
+          return o && normalizeServerFastCode(o.paymentCode || "") === cleanCode;
+        }) || "";
+      }
+
+      if (orderKey && serverOrdersMap[orderKey]) {
+        const ord = serverOrdersMap[orderKey];
+        ord.status = normalizedStatus;
+        ord.updatedAt = nowIso;
+        ord.updatedBy = adminEmail;
+        if (note) ord.adminNote = note;
+        if (normalizedStatus === "PAID") {
+          ord.paidAt = ord.paidAt || nowIso;
+          ord.transactionId = ord.transactionId || `ADMIN_${Date.now()}`;
+        }
+        saveOrdersToDisk(serverOrdersMap);
+        targetEmail = ord.email || targetEmail;
+        targetCourseId = ord.courseId || targetCourseId;
+        targetCourseTitle = ord.courseTitle || targetCourseTitle;
+        targetAmount = parseNumericVndAmount(ord.amount) || targetAmount;
+        targetOrderType = ord.orderType || targetOrderType;
+      }
+
+      try {
+        const orderIdsToUpdate = new Set<string>();
+        if (cleanOrderId) orderIdsToUpdate.add(cleanOrderId);
+        if (orderKey) orderIdsToUpdate.add(orderKey);
+        if (cleanCode) {
+          const qSnap = await db.collection("orders").where("paymentCode", "==", cleanCode).get();
+          qSnap.forEach((d) => {
+            orderIdsToUpdate.add(d.id);
+            const data = d.data() || {};
+            targetEmail = targetEmail || data.email || "";
+            targetCourseId = targetCourseId || data.courseId || "";
+            targetCourseTitle = targetCourseTitle || data.courseTitle || "";
+            targetAmount = targetAmount || parseNumericVndAmount(data.amount);
+            targetOrderType = targetOrderType || data.orderType || "";
+          });
+        }
+        for (const oid of orderIdsToUpdate) {
+          const ordDoc = await db.collection("orders").doc(oid).get();
+          if (ordDoc.exists) {
+            const data = ordDoc.data() || {};
+            targetEmail = targetEmail || data.email || "";
+            targetCourseId = targetCourseId || data.courseId || "";
+            targetCourseTitle = targetCourseTitle || data.courseTitle || "";
+            targetAmount = targetAmount || parseNumericVndAmount(data.amount);
+            targetOrderType = targetOrderType || data.orderType || "";
+            await db.collection("orders").doc(oid).set({
+              status: normalizedStatus,
+              updatedAt: nowIso,
+              updatedBy: adminEmail,
+              ...(note ? { adminNote: note } : {}),
+              ...(normalizedStatus === "PAID" ? { paidAt: data.paidAt || nowIso } : {}),
+            }, { merge: true });
+          }
+        }
+      } catch (err: any) {
+        console.warn("[AdminPaymentUpdate] Firestore orders update note:", err?.message || err);
+      }
+
+      // 2. Update matching registration (direct_registrations.json + Firestore live/direct_course_registrations)
+      const regIdx = serverDirectRegistrations.findIndex((r: any) => {
+        if (!r) return false;
+        const rCode = normalizeServerFastCode(r.paymentCode || r.paymentMemo || "");
+        return (
+          (cleanRegId && r.id === cleanRegId) ||
+          (cleanOrderId && (r.orderId === cleanOrderId || r.id === cleanOrderId)) ||
+          (cleanCode && rCode === cleanCode)
+        );
+      });
+
+      const resolvedRegStatus = normalizedStatus === "PAID" ? "confirmed" : normalizedStatus === "CANCELLED" ? "cancelled" : "pending_payment";
+      if (regIdx >= 0) {
+        const reg = serverDirectRegistrations[regIdx];
+        reg.paymentStatus = normalizedStatus;
+        reg.status = resolvedRegStatus;
+        reg.updatedAt = nowIso;
+        if (normalizedStatus === "PAID") {
+          reg.paidAt = reg.paidAt || nowIso;
+          reg.transactionId = reg.transactionId || `ADMIN_${Date.now()}`;
+        }
+        saveDirectRegistrationsToDisk(serverDirectRegistrations);
+        matchedRegRecord = reg;
+        targetEmail = targetEmail || reg.userEmail || reg.email || "";
+        targetCourseId = targetCourseId || reg.courseId || reg.id;
+        targetCourseTitle = targetCourseTitle || reg.courseTitle || "";
+        targetAmount = targetAmount || parseNumericVndAmount(reg.totalNumericPrice || reg.totalPrice);
+        targetOrderType = targetOrderType || "direct_training";
+      }
+
+      const finalRegId = cleanRegId || matchedRegRecord?.id || "";
+      if (finalRegId) {
+        try {
+          const regUpdate: Record<string, any> = {
+            paymentStatus: normalizedStatus,
+            status: resolvedRegStatus,
+            updatedAt: nowIso,
+            updatedBy: adminEmail,
+            ...(normalizedStatus === "PAID" ? { paidAt: matchedRegRecord?.paidAt || nowIso } : {}),
+          };
+          await Promise.all([
+            db.collection("live_course_registrations").doc(finalRegId).set(regUpdate, { merge: true }).catch(() => {}),
+            db.collection("direct_course_registrations").doc(finalRegId).set(regUpdate, { merge: true }).catch(() => {}),
+          ]);
+        } catch {}
+      }
+
+      // 3. Remove pending_payments entries if marked PAID or CANCELLED
+      if (normalizedStatus === "PAID" || normalizedStatus === "CANCELLED") {
+        const suffix = cleanCode.replace(/^FAST/, "");
+        try {
+          if (cleanCode) await db.collection("pending_payments").doc(cleanCode).delete().catch(() => {});
+          if (suffix) await db.collection("pending_payments").doc(suffix).delete().catch(() => {});
+        } catch {}
+      }
+
+      // 4. Auto-activate course / training account if marked PAID
+      let activationApplied = false;
+      if (normalizedStatus === "PAID" && autoActivateCourse) {
+        if (matchedRegRecord || targetOrderType === "direct_training") {
+          try {
+            const regSnap = (!matchedRegRecord && finalRegId)
+              ? await db.collection("live_course_registrations").doc(finalRegId).get()
+              : null;
+            const regData = matchedRegRecord || (regSnap?.exists ? { id: regSnap.id, ...regSnap.data() } : null);
+            if (regData) {
+              await finalizePaidTrainingAccountAndOtp(regData, { sendOtpIfNotSent: true });
+              activationApplied = true;
+            }
+          } catch (actErr: any) {
+            console.warn("[AdminPaymentUpdate] Training finalization note:", actErr?.message || actErr);
+          }
+        }
+
+        const cleanEmail = String(targetEmail || "").toLowerCase().trim();
+        if (cleanEmail && cleanEmail.includes("@") && !cleanEmail.endsWith("@fast-training.local") && targetCourseId) {
+          const isVipOrder = targetOrderType === "vip" || String(targetCourseId).includes("vip");
+          if (isVipOrder) {
+            await db.collection("users").doc(cleanEmail).set({
+              email: cleanEmail,
+              isVip: true,
+              vipActivatedAt: nowIso,
+              updatedAt: nowIso,
+            }, { merge: true });
+            saveUserToDisk(cleanEmail, { isVip: true, vipActivatedAt: nowIso });
+          } else {
+            const courseTitle = targetCourseTitle || serverCourses[targetCourseId]?.title || targetCourseId;
+            await db.collection("users").doc(cleanEmail).set({
+              email: cleanEmail,
+              updatedAt: nowIso,
+            }, { merge: true });
+            await db.collection("users").doc(cleanEmail).collection("purchased_courses").doc(targetCourseId).set({
+              courseId: targetCourseId,
+              courseTitle,
+              title: courseTitle,
+              price: targetAmount ? `${targetAmount.toLocaleString("vi-VN")}đ` : "Đã thanh toán",
+              progress: 0,
+              status: "active",
+              claimedVia: "ADMIN_PAYMENT_CONFIRM",
+              orderId: cleanOrderId || orderKey || "",
+              paymentCode: cleanCode || "",
+              purchasedAt: nowIso,
+              unlockedAt: nowIso,
+              updatedAt: nowIso,
+            }, { merge: true });
+
+            await db.collection("manual_unlocks").doc(`${cleanEmail.replace(/[^a-z0-9]/g, "_")}_${targetCourseId}_${Date.now()}`).set({
+              studentEmail: cleanEmail,
+              courseId: targetCourseId,
+              courseTitle,
+              unlockedBy: adminEmail,
+              unlockedAt: nowIso,
+              type: "ADMIN_PAYMENT_CONFIRM",
+              bankAmount: targetAmount ? `${targetAmount.toLocaleString("vi-VN")}đ` : "",
+              bankMemo: cleanCode || "",
+            }).catch(() => {});
+
+            await persistUserNotification(cleanEmail, {
+              id: `course_unlock_${targetCourseId}_${Date.now()}`,
+              title: `Khóa học đã được kích hoạt: ${courseTitle}`,
+              message: `Thanh toán mã ${cleanCode || cleanOrderId} đã được xác nhận. Khóa học "${courseTitle}" đã mở khóa toàn bộ bài giảng trong tài khoản của bạn.`,
+              type: "course_unlock",
+              courseId: targetCourseId,
+              courseTitle,
+              link: `/hoc/${targetCourseId}`,
+              isRead: false,
+              createdAt: nowIso,
+            });
+          }
+          activationApplied = true;
+        }
+      }
+
+      return res.json({
+        success: true,
+        status: normalizedStatus,
+        activationApplied,
+        message: normalizedStatus === "PAID"
+          ? (activationApplied ? "Đã xác nhận thanh toán & kích hoạt khóa học thành công." : "Đã cập nhật trạng thái đã thanh toán.")
+          : `Đã cập nhật trạng thái đơn sang ${normalizedStatus}.`,
+      });
+    } catch (err: any) {
+      console.error("[/api/admin/payments/update-status] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi cập nhật trạng thái thanh toán." });
+    }
+  });
+
+  app.post("/api/admin/activations/toggle", async (req, res) => {
+    try {
+      const {
+        adminEmail,
+        studentEmail,
+        courseId,
+        courseTitle,
+        price,
+        action,
+        sourceType = "purchased_course",
+        registrationId,
+        note = "",
+      } = req.body || {};
+
+      if (!(await isAuthorizedAdminEmail(adminEmail))) {
+        return res.status(403).json({ success: false, error: "Bạn không có quyền quản trị viên." });
+      }
+
+      const cleanEmail = String(studentEmail || "").toLowerCase().trim();
+      if (!cleanEmail || !cleanEmail.includes("@")) {
+        return res.status(400).json({ success: false, error: "Email học viên không hợp lệ." });
+      }
+
+      const db = getServerFirestore();
+      const nowIso = new Date().toISOString();
+
+      if (action === "grant_vip" || action === "revoke_vip") {
+        const nextVip = action === "grant_vip";
+        await db.collection("users").doc(cleanEmail).set({
+          email: cleanEmail,
+          isVip: nextVip,
+          updatedAt: nowIso,
+        }, { merge: true });
+        saveUserToDisk(cleanEmail, { isVip: nextVip });
+        await db.collection("manual_unlocks").doc(`vip_${cleanEmail.replace(/[^a-z0-9]/g, "_")}_${Date.now()}`).set({
+          studentEmail: cleanEmail,
+          courseId: "vip-lifetime-access",
+          courseTitle: nextVip ? "VIP Trọn đời" : "Thu hồi VIP Trọn đời",
+          unlockedBy: adminEmail,
+          unlockedAt: nowIso,
+          type: nextVip ? "ADMIN_GRANT_VIP" : "ADMIN_REVOKE_VIP",
+        }).catch(() => {});
+        return res.json({
+          success: true,
+          message: nextVip ? `Đã cấp quyền VIP Trọn đời cho ${cleanEmail}.` : `Đã thu hồi quyền VIP của ${cleanEmail}.`,
+        });
+      }
+
+      const cleanCourseId = String(courseId || "").trim();
+      if (!cleanCourseId) {
+        return res.status(400).json({ success: false, error: "Thiếu mã khóa học cần cập nhật." });
+      }
+
+      const isActivate = action === "activate";
+      const nextStatus = isActivate ? "active" : "inactive";
+      const resolvedTitle = courseTitle || serverCourses[cleanCourseId]?.title || cleanCourseId;
+
+      // Ensure user profile exists
+      const userRef = db.collection("users").doc(cleanEmail);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        const baseUser = {
+          email: cleanEmail,
+          displayName: cleanEmail.split("@")[0],
+          isAdmin: false,
+          isTeacher: false,
+          isOwner: false,
+          isVip: false,
+          isLocked: false,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        await userRef.set(baseUser, { merge: true });
+        saveUserToDisk(cleanEmail, baseUser);
+      }
+
+      if (sourceType === "direct_training" && registrationId) {
+        const nextRegStatus = isActivate ? "confirmed" : "cancelled";
+        const nextPayStatus = isActivate ? "PAID" : "PENDING";
+        const idx = serverDirectRegistrations.findIndex((r: any) => r && r.id === registrationId);
+        if (idx >= 0) {
+          serverDirectRegistrations[idx].status = nextRegStatus;
+          serverDirectRegistrations[idx].paymentStatus = nextPayStatus;
+          serverDirectRegistrations[idx].updatedAt = nowIso;
+          saveDirectRegistrationsToDisk(serverDirectRegistrations);
+        }
+        await Promise.all([
+          db.collection("live_course_registrations").doc(registrationId).set({
+            status: nextRegStatus,
+            paymentStatus: nextPayStatus,
+            updatedAt: nowIso,
+            updatedBy: adminEmail,
+          }, { merge: true }).catch(() => {}),
+          db.collection("direct_course_registrations").doc(registrationId).set({
+            status: nextRegStatus,
+            paymentStatus: nextPayStatus,
+            updatedAt: nowIso,
+            updatedBy: adminEmail,
+          }, { merge: true }).catch(() => {}),
+        ]);
+      }
+
+      // Always sync purchased_courses doc so Admin Dashboard & Classroom check work consistently
+      const pcRef = userRef.collection("purchased_courses").doc(cleanCourseId);
+      const existingPc = await pcRef.get();
+      const existingData = existingPc.exists ? existingPc.data() : null;
+
+      if (existingPc.exists || isActivate) {
+        await pcRef.set({
+          courseId: cleanCourseId,
+          courseTitle: resolvedTitle,
+          title: resolvedTitle,
+          price: price || existingData?.price || serverCourses[cleanCourseId]?.price || "Admin cấp quyền",
+          progress: typeof existingData?.progress === "number" ? existingData.progress : 0,
+          completedLessons: Array.isArray(existingData?.completedLessons) ? existingData.completedLessons : [],
+          purchasedAt: existingData?.purchasedAt || nowIso,
+          unlockedAt: isActivate ? nowIso : (existingData?.unlockedAt || nowIso),
+          status: nextStatus,
+          claimedVia: existingData?.claimedVia || "ADMIN_DASHBOARD",
+          ...(note ? { adminNote: note } : {}),
+          updatedAt: nowIso,
+          updatedBy: adminEmail,
+        }, { merge: true });
+      }
+
+      await db.collection("manual_unlocks").doc(`${cleanEmail.replace(/[^a-z0-9]/g, "_")}_${cleanCourseId}_${Date.now()}`).set({
+        studentEmail: cleanEmail,
+        courseId: cleanCourseId,
+        courseTitle: resolvedTitle,
+        unlockedBy: adminEmail,
+        unlockedAt: nowIso,
+        type: isActivate ? "ADMIN_ACTIVATE" : "ADMIN_REVOKE",
+        bankMemo: note || "",
+      }).catch(() => {});
+
+      if (isActivate) {
+        await persistUserNotification(cleanEmail, {
+          id: `course_unlock_${cleanCourseId}_${Date.now()}`,
+          title: `Khóa học đã kích hoạt: ${resolvedTitle}`,
+          message: `Quản trị viên đã kích hoạt khóa học "${resolvedTitle}" cho tài khoản của bạn. Bạn có thể bắt đầu học ngay bây giờ.`,
+          type: "course_unlock",
+          courseId: cleanCourseId,
+          courseTitle: resolvedTitle,
+          link: `/hoc/${cleanCourseId}`,
+          isRead: false,
+          createdAt: nowIso,
+        });
+      }
+
+      return res.json({
+        success: true,
+        status: nextStatus,
+        message: isActivate
+          ? `Đã kích hoạt khóa học "${resolvedTitle}" cho ${cleanEmail}.`
+          : `Đã tạm khóa quyền truy cập "${resolvedTitle}" của ${cleanEmail}.`,
+      });
+    } catch (err: any) {
+      console.error("[/api/admin/activations/toggle] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Lỗi cập nhật trạng thái kích hoạt." });
+    }
+  });
+
+  // Student Purchase History Endpoint (combines purchased_courses, orders, and direct training registrations)
+  app.get("/api/user/purchase-history", async (req, res) => {
+    try {
+      const emailParam = String(req.query.email || "").toLowerCase().trim();
+      const uidParam = String(req.query.uid || "").trim();
+
+      if (!emailParam && !uidParam) {
+        return res.status(400).json({ success: false, error: "Thiếu thông tin tài khoản." });
+      }
+
+      const db = getServerFirestore();
+      const docKeys = Array.from(new Set([emailParam, uidParam].filter(Boolean)));
+      const recordsMap = new Map<string, any>();
+
+      const upsertRecord = (key: string, rec: any) => {
+        const existing = recordsMap.get(key) || {};
+        recordsMap.set(key, {
+          ...existing,
+          ...rec,
+          id: existing.id || rec.id || key,
+          courseId: rec.courseId || existing.courseId || "",
+          courseTitle: rec.courseTitle || existing.courseTitle || rec.courseId || "Khóa học FAST",
+          buyerEmail: rec.buyerEmail || existing.buyerEmail || emailParam || "",
+          studentName: rec.studentName || existing.studentName || "",
+          phone: rec.phone || existing.phone || "",
+          companyName: rec.companyName || existing.companyName || "",
+          purchasedAt: rec.webhookReceivedAt || rec.paidAt || rec.purchasedAt || existing.webhookReceivedAt || existing.paidAt || existing.purchasedAt || new Date().toISOString(),
+          paidAt: rec.paidAt || existing.paidAt || "",
+          webhookReceivedAt: rec.webhookReceivedAt || existing.webhookReceivedAt || "",
+          price: rec.price || existing.price || "Đã thanh toán",
+          status: rec.status || existing.status || "active",
+          paymentCode: rec.paymentCode || existing.paymentCode || "",
+          transactionId: rec.transactionId || existing.transactionId || "",
+          paymentMethod: rec.paymentMethod || existing.paymentMethod || "",
+          trainingType: rec.trainingType || existing.trainingType || "",
+          trainingTypeLabel: rec.trainingTypeLabel || existing.trainingTypeLabel || "",
+          participantCount: Number(rec.participantCount || existing.participantCount || 1),
+          venueAddress: rec.venueAddress || existing.venueAddress || "",
+          startDate: rec.startDate || existing.startDate || "",
+          scheduleDetails: rec.scheduleDetails || existing.scheduleDetails || "",
+        });
+      };
+
+      // 1. Read user's purchased_courses subcollection across possible docKeys (email & uid)
+      for (const key of docKeys) {
+        try {
+          const pcSnap = await db.collection("users").doc(key).collection("purchased_courses").get();
+          pcSnap.forEach((docSnap) => {
+            const data = docSnap.data() || {};
+            const cid = data.courseId || docSnap.id;
+            const amountStr = data.price || (data.paymentAmount ? `${Number(data.paymentAmount).toLocaleString("vi-VN")}đ` : "Đã thanh toán");
+            const paidTs = data.webhookReceivedAt || data.paidAt || data.purchasedAt || data.unlockedAt || data.activatedAt || data.updatedAt || new Date().toISOString();
+            upsertRecord(`course:${cid}`, {
+              id: data.orderId || docSnap.id,
+              courseId: cid,
+              courseTitle: data.courseTitle || data.title || serverCourses[cid]?.title || cid,
+              buyerEmail: data.buyerEmail || data.email || emailParam || key,
+              studentName: data.studentName || "",
+              phone: data.phone || "",
+              purchasedAt: paidTs,
+              paidAt: data.paidAt || data.activatedAt || "",
+              webhookReceivedAt: data.webhookReceivedAt || data.paidAt || "",
+              price: amountStr,
+              status: data.status || "active",
+              paymentCode: data.paymentCode || "",
+              transactionId: data.transactionId || data.paymentRef || "",
+              paymentMethod: data.paymentMethod || "",
+              trainingType: data.trainingType || "",
+              trainingTypeLabel: data.trainingTypeLabel || "",
+            });
+          });
+        } catch (err: any) {
+          console.warn("[PurchaseHistory] purchased_courses read note:", err?.message || err);
+        }
+      }
+
+      // 2. Read orders matching email or uid (disk + Firestore)
+      const orderMatch = (o: any) => {
+        if (!o) return false;
+        const oEmail = String(o.email || "").toLowerCase().trim();
+        const oUid = String(o.userId || "").trim();
+        return (emailParam && oEmail === emailParam) || (uidParam && oUid === uidParam);
+      };
+
+      Object.values(serverOrdersMap).forEach((o: any) => {
+        if (!orderMatch(o)) return;
+        const cid = o.courseId || o.orderId;
+        const key = o.status === "PAID" && cid ? `course:${cid}` : `order:${o.orderId || cid}`;
+        const numericAmt = parseNumericVndAmount(o.amount);
+        upsertRecord(key, {
+          id: o.orderId || o.paymentCode || cid,
+          courseId: cid,
+          courseTitle: o.courseTitle || serverCourses[cid]?.title || cid || "Khóa học FAST",
+          buyerEmail: String(o.email || emailParam || "").toLowerCase().trim(),
+          studentName: o.studentName || "",
+          phone: o.phone || "",
+          purchasedAt: o.webhookReceivedAt || o.paidAt || o.createdAt || new Date().toISOString(),
+          paidAt: o.paidAt || "",
+          webhookReceivedAt: o.webhookReceivedAt || o.paidAt || "",
+          price: numericAmt > 0 ? `${numericAmt.toLocaleString("vi-VN")}đ` : "Đã thanh toán",
+          status: o.status === "PAID" ? "completed" : o.status === "CANCELLED" ? "failed" : "pending",
+          paymentCode: o.paymentCode || "",
+          transactionId: o.transactionId || "",
+          trainingType: o.trainingType || (o.orderType === "direct_training" ? "direct" : "online"),
+          trainingTypeLabel: o.trainingTypeLabel || "",
+        });
+      });
+
+      try {
+        if (emailParam) {
+          const ordersSnap = await db.collection("orders").where("email", "==", emailParam).get();
+          ordersSnap.forEach((docSnap) => {
+            const o = docSnap.data() || {};
+            const cid = o.courseId || docSnap.id;
+            const key = o.status === "PAID" && cid ? `course:${cid}` : `order:${docSnap.id}`;
+            const numericAmt = parseNumericVndAmount(o.transferAmount || o.amount);
+            upsertRecord(key, {
+              id: o.orderId || docSnap.id,
+              courseId: cid,
+              courseTitle: o.courseTitle || serverCourses[cid]?.title || cid || "Khóa học FAST",
+              buyerEmail: String(o.email || emailParam || "").toLowerCase().trim(),
+              studentName: o.studentName || "",
+              phone: o.phone || "",
+              purchasedAt: o.webhookReceivedAt || o.paidAt || o.createdAt || new Date().toISOString(),
+              paidAt: o.paidAt || "",
+              webhookReceivedAt: o.webhookReceivedAt || o.paidAt || "",
+              price: numericAmt > 0 ? `${numericAmt.toLocaleString("vi-VN")}đ` : "Đã thanh toán",
+              status: o.status === "PAID" ? "completed" : o.status === "CANCELLED" ? "failed" : "pending",
+              paymentCode: o.paymentCode || "",
+              transactionId: o.transactionId || "",
+              trainingType: o.trainingType || (o.orderType === "direct_training" ? "direct" : "online"),
+              trainingTypeLabel: o.trainingTypeLabel || "",
+            });
+          });
+        }
+      } catch (err: any) {
+        console.warn("[PurchaseHistory] orders read note:", err?.message || err);
+      }
+
+      // 3. Read direct/live training registrations matching email
+      const ingestReg = (regId: string, reg: any) => {
+        if (!reg) return;
+        const isPaid = reg.paymentStatus === "PAID" || reg.status === "confirmed" || reg.status === "completed";
+        const isCancelled = reg.status === "cancelled" || reg.paymentStatus === "CANCELLED";
+        const cid = reg.courseId || regId;
+        const numericAmt = parseNumericVndAmount(reg.totalNumericPrice || reg.totalPrice || reg.price);
+        upsertRecord(`reg:${regId}`, {
+          id: reg.orderId || regId,
+          courseId: cid,
+          courseTitle: reg.courseTitle || "Khóa đào tạo Online - Offline",
+          buyerEmail: String(reg.userEmail || reg.email || emailParam).toLowerCase().trim(),
+          studentName: reg.studentName || "",
+          phone: reg.phone || "",
+          companyName: reg.companyName || "",
+          purchasedAt: reg.webhookReceivedAt || reg.paidAt || reg.registeredAt || new Date().toISOString(),
+          paidAt: reg.paidAt || "",
+          webhookReceivedAt: reg.webhookReceivedAt || reg.paidAt || "",
+          price: numericAmt > 0 ? `${numericAmt.toLocaleString("vi-VN")}đ` : (reg.totalPrice || "Đã đăng ký"),
+          status: isPaid ? "completed" : isCancelled ? "failed" : "pending",
+          paymentCode: reg.paymentCode || reg.paymentMemo || "",
+          transactionId: reg.transactionId || "",
+          paymentMethod: reg.paymentMethod || "",
+          trainingType: reg.trainingType || "direct",
+          trainingTypeLabel: reg.trainingTypeLabel || (reg.trainingType === "zoom" ? "Trực tuyến Zoom" : "Trực tiếp Hội trường"),
+          participantCount: Number(reg.participantCount) || 1,
+          venueAddress: reg.venueAddress || "",
+          startDate: reg.startDate || "",
+          scheduleDetails: reg.scheduleDetails || "",
+        });
+      };
+
+      if (emailParam) {
+        serverDirectRegistrations.forEach((reg: any) => {
+          if (!reg) return;
+          const rEmail = String(reg.userEmail || reg.email || "").toLowerCase().trim();
+          if (rEmail !== emailParam) return;
+          ingestReg(reg.id, reg);
+        });
+
+        try {
+          const [liveByUserEmail, liveByEmail, directByUserEmail, directByEmail] = await Promise.all([
+            db.collection("live_course_registrations").where("userEmail", "==", emailParam).get(),
+            db.collection("live_course_registrations").where("email", "==", emailParam).get(),
+            db.collection("direct_course_registrations").where("userEmail", "==", emailParam).get(),
+            db.collection("direct_course_registrations").where("email", "==", emailParam).get(),
+          ]);
+          [liveByUserEmail, liveByEmail, directByUserEmail, directByEmail].forEach((snap) => {
+            snap.forEach((docSnap) => ingestReg(docSnap.id, docSnap.data() || {}));
+          });
+        } catch (err: any) {
+          console.warn("[PurchaseHistory] registration collections read note:", err?.message || err);
+        }
+      }
+
+      const records = Array.from(recordsMap.values()).sort(
+        (a, b) => new Date(b.purchasedAt || 0).getTime() - new Date(a.purchasedAt || 0).getTime()
+      );
+
+      return res.json({ success: true, records });
+    } catch (err: any) {
+      console.error("[/api/user/purchase-history] Error:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Không thể tải lịch sử mua hàng." });
+    }
+  });
+
   // Admin endpoint to permanently purge receipts and records matching course-1792154795450 across all systems
   app.post("/api/admin/purge-target", async (req, res) => {
     try {
@@ -3036,13 +5140,34 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
+  // Vite middleware for development (non-blocking port bind so health probes connect immediately)
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
+    let resolvedVite: any = null;
+    const viteInitPromise = createViteServer({
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: "spa",
+    })
+      .then((vite) => {
+        resolvedVite = vite;
+        console.log("[Vite] Middleware initialized.");
+        return vite;
+      })
+      .catch((viteErr) => {
+        console.error("[Vite] Failed to initialize middleware:", viteErr);
+        throw viteErr;
+      });
+
+    app.use(async (req, res, next) => {
+      try {
+        const vite = resolvedVite || (await viteInitPromise);
+        return vite.middlewares(req, res, next);
+      } catch (err) {
+        return next(err);
+      }
     });
-    app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -3051,8 +5176,11 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const httpServer = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+  httpServer.on("error", (err: any) => {
+    console.error(`[Server] Failed to listen on port ${PORT}:`, err);
   });
 
   // Sync courses from Firestore periodically

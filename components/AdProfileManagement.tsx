@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { db, auth } from '../firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { auth } from '../firebase';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { getFastSessionUser } from '../utils/sessionAuth';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
   value: string;
@@ -252,32 +253,19 @@ export const AdProfileManagement: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('guest');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
+    const raw = auth.currentUser?.email || getFastSessionUser()?.email || '';
+    return raw ? raw.toLowerCase().trim().replace(/[^a-z0-9]/g, '_') : 'guest';
+  });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user && user.email) {
-        setCurrentUserEmail(user.email.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
-      } else {
-        setCurrentUserEmail('guest');
+      const raw = user?.email || getFastSessionUser()?.email || '';
+      if (raw) {
+        setCurrentUserEmail(raw.toLowerCase().trim().replace(/[^a-z0-9]/g, '_'));
       }
     });
     return () => unsubscribe();
-  }, []);
-
-  // Listen for global sync updates via meta-document
-  useEffect(() => {
-    const unsubSync = onSnapshot(doc(db, "sync_control", "global"), () => {
-      fetch('/api/ad-profiles')
-        .then(res => res.json())
-        .then(data => {
-          if (data?.success && Array.isArray(data.records)) {
-            setDatabase(data.records);
-          }
-        })
-        .catch(() => {});
-    });
-    return unsubSync;
   }, []);
 
   // Use unified synchronization hook for active draft session (isolated per administrator)
@@ -571,9 +559,9 @@ export const AdProfileManagement: React.FC = () => {
     const freshId = 'cust_' + Date.now();
     setCurrentId(freshId);
     showSuccessToast("Đã khởi tạo biểu mẫu mới.");
+    scrollToAdSection('ad-customer-form');
     const formEl = document.getElementById('ad-customer-form');
     if (formEl) {
-      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const firstInput = formEl.querySelector('input') as HTMLInputElement;
       if (firstInput) setTimeout(() => firstInput.focus(), 300);
     }
@@ -594,8 +582,7 @@ export const AdProfileManagement: React.FC = () => {
     setCustReceipt(c.receipt || '');
     setChecklist(c.checklist || {});
     saveActiveDraft();
-    const formEl = document.getElementById('ad-customer-form');
-    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToAdSection('ad-customer-form');
   };
 
   // Delete customer
@@ -719,16 +706,16 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
 - FAST CONSULTING • Food All Standard & Trust`;
 
     navigator.clipboard.writeText(msg).then(() => {
-      alert('Đã sao chép thành công tin nhắn danh mục hồ sơ! Bạn có thể dán (Paste) vào Zalo / Email để gửi ngay cho khách hàng.');
+      showSuccessToast('Đã sao chép thành công tin nhắn danh mục hồ sơ! Bạn có thể dán vào Zalo / Email gửi ngay cho khách hàng.');
     }).catch(() => {
-      alert('Không thể sao chép tự động. Vui lòng cho phép quyền truy cập Clipboard.');
+      showErrorToast('Không thể sao chép tự động. Vui lòng cho phép quyền truy cập Clipboard.');
     });
   };
 
   // Export Excel CSV
   const exportToExcel = () => {
     if (database.length === 0) {
-      alert('Chưa có dữ liệu khách hàng nào để xuất file Excel.');
+      showWarningToast('Chưa có dữ liệu khách hàng nào để xuất file Excel.');
       return;
     }
 
@@ -764,11 +751,20 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
     URL.revokeObjectURL(url);
   };
 
+  const { scrollTo: scrollToAdSection } = useSmoothScrollTo({
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+
   const toggleSection = (key: string) => {
+    const willOpen = !openSections[key];
     setOpenSections(prev => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: willOpen
     }));
+    if (willOpen) {
+      scrollToAdSection(`ad-sec-${key}`);
+    }
   };
 
   const toggleAllSections = () => {
@@ -1272,7 +1268,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Accordion 1: Danh Mục Hồ Sơ Khách Hàng Cần Cung Cấp */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div id="ad-sec-secChecklist" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('secChecklist')}
           className="w-full p-4 bg-teal-50/50 hover:bg-teal-50 flex items-center justify-between text-left transition-all border-b border-gray-200"
@@ -1389,7 +1385,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Accordion 2: Trình Tự Thực Hiện */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div id="ad-sec-secProcess" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('secProcess')}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
@@ -1439,7 +1435,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Accordion 3: 3 Cách Thức Tiếp Nhận Hồ Sơ */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div id="ad-sec-secMethods" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('secMethods')}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
@@ -1496,7 +1492,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Accordion 4: Quy Định Kỹ Thuật */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div id="ad-sec-secTechnical" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('secTechnical')}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"
@@ -1525,7 +1521,7 @@ THÔNG TIN LIÊN HỆ & TIẾP NHẬN 24/7:${staffLine}
       </div>
 
       {/* Accordion 5: Căn Cứ Pháp Lý */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div id="ad-sec-secLegal" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button
           onClick={() => toggleSection('secLegal')}
           className="w-full p-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left transition-all border-b border-gray-200"

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
 import { useCloudSync } from '../utils/cloudSyncUtility';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 interface LocalSyncInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onCommit'> {
   value: string;
@@ -146,6 +147,20 @@ export const FastStandardsAudit: React.FC = () => {
   } | null>(null);
 
   const [activeSubTab, setActiveSubTab] = useState<string>('library');
+  const { scrollTo: scrollToFsaPanel } = useSmoothScrollTo({
+    targetId: 'fsa-subtab-panel',
+    triggerKey: activeSubTab,
+    scrollOnMount: false,
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+  const handleSelectSubTab = (tabId: string) => {
+    if (tabId === activeSubTab) {
+      scrollToFsaPanel('fsa-subtab-panel');
+    } else {
+      setActiveSubTab(tabId);
+    }
+  };
   const [currentAuditId, setCurrentAuditId] = useState<string>('');
   
   // Synchronized database/history of saved audits
@@ -495,8 +510,7 @@ export const FastStandardsAudit: React.FC = () => {
     setAuditorName(record.auditorName || '');
     setAuditDate(record.auditDate || '');
     setAuditState(record.auditState || {});
-    setActiveSubTab('checklist');
-    window.scrollTo({ top: 300, behavior: 'smooth' });
+    handleSelectSubTab('library');
   };
 
   const deleteAudit = (id: string, client: string) => {
@@ -792,7 +806,7 @@ export const FastStandardsAudit: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveSubTab(tab.id)}
+              onClick={() => handleSelectSubTab(tab.id)}
               className={`px-3.5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap shrink-0 transition-all flex items-center gap-1.5 cursor-pointer ${
                 tab.id === 'database' ? 'min-w-[180px] justify-center px-6 border-2 border-teal-800' : ''
               } ${
@@ -815,6 +829,7 @@ export const FastStandardsAudit: React.FC = () => {
         })}
       </div>
 
+      <div id="fsa-subtab-panel" className="space-y-6">
       {/* TAB 1: THƯ VIỆN TỔNG QUAN */}
       {activeSubTab === 'library' && (
         <div className="space-y-6">
@@ -955,7 +970,7 @@ export const FastStandardsAudit: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => setActiveSubTab(p.id)}
+                    onClick={() => handleSelectSubTab(p.id)}
                     className={`w-full py-2.5 px-3 bg-gray-100 ${p.btnHover} hover:text-white text-gray-800 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs`}
                   >
                     <span>Vào đánh giá</span>
@@ -1599,6 +1614,7 @@ export const FastStandardsAudit: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
 
       {/* Custom Confirmation Modal to bypass native browser popups */}
       {confirmDialog && confirmDialog.isOpen && (

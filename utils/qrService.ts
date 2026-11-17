@@ -26,9 +26,29 @@ export const POPULAR_BANKS = [
 export const DEFAULT_PAYMENT_CONFIG: PaymentAccountConfig = {
   bankId: 'ACB',
   bankName: 'ACB (Á Châu)',
-  accountNo: '989499568',
+  accountNo: '0989499568',
   accountName: 'CONG TY TNHH TU VAN FAST',
 };
+
+const LEGACY_ACCOUNT_NUMBERS = new Set(['989499568', '0927002668', '22888868']);
+
+function normalizePaymentConfig(raw?: Partial<PaymentAccountConfig> | null): PaymentAccountConfig {
+  const merged = { ...DEFAULT_PAYMENT_CONFIG, ...(raw || {}) };
+  const cleanAcc = String(merged.accountNo || '').replace(/\s+/g, '');
+  if (!cleanAcc || LEGACY_ACCOUNT_NUMBERS.has(cleanAcc)) {
+    merged.accountNo = DEFAULT_PAYMENT_CONFIG.accountNo;
+    merged.bankId = 'ACB';
+    merged.bankName = 'ACB (Á Châu)';
+  }
+  if (merged.bankId === 'MB' && merged.accountNo === DEFAULT_PAYMENT_CONFIG.accountNo) {
+    merged.bankId = 'ACB';
+    merged.bankName = 'ACB (Á Châu)';
+  }
+  if (!merged.accountName || merged.accountName === 'CONG TY TNHH DAO TAO FAST') {
+    merged.accountName = DEFAULT_PAYMENT_CONFIG.accountName;
+  }
+  return merged;
+}
 
 /**
  * Get configured payment accounts with fallback to defaults
@@ -39,7 +59,7 @@ export function getPaymentConfig(): PaymentAccountConfig {
     const saved = localStorage.getItem('fast_payment_account_config');
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_PAYMENT_CONFIG, ...parsed };
+      return normalizePaymentConfig(parsed);
     }
   } catch (e) {
     console.warn('Could not read payment config:', e);
@@ -54,7 +74,7 @@ export async function savePaymentConfig(config: Partial<PaymentAccountConfig>) {
   if (typeof window === 'undefined') return;
   try {
     const current = getPaymentConfig();
-    const updated = { ...current, ...config };
+    const updated = normalizePaymentConfig({ ...current, ...config });
     localStorage.setItem('fast_payment_account_config', JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent('payment_config_updated', { detail: updated }));
 
@@ -77,7 +97,7 @@ export function subscribeToPaymentConfig(onUpdate?: (config: PaymentAccountConfi
     const docRef = doc(db, 'payment_config', 'default');
     return onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
-        const data = snapshot.data() as PaymentAccountConfig;
+        const data = normalizePaymentConfig(snapshot.data() as PaymentAccountConfig);
         localStorage.setItem('fast_payment_account_config', JSON.stringify(data));
         window.dispatchEvent(new CustomEvent('payment_config_updated', { detail: data }));
         if (onUpdate) onUpdate(data);
@@ -173,24 +193,26 @@ export function getVietQrUrl(params: {
   template?: 'compact2' | 'compact' | 'qr_only';
 }): string {
   const cfg = getPaymentConfig();
-  const bankId = params.bankId || cfg.bankId || 'MB';
-  const accountNo = (params.accountNo || cfg.accountNo || '0927002668').replace(/\s+/g, '');
-  const accountName = params.accountName || cfg.accountName || 'CONG TY TNHH DAO TAO FAST';
+  const bankId = params.bankId || cfg.bankId || 'ACB';
+  const accountNo = (params.accountNo || cfg.accountNo || '0989499568').replace(/\s+/g, '');
+  const accountName = params.accountName || cfg.accountName || 'CONG TY TNHH TU VAN FAST';
   const template = params.template || 'compact2';
   const amount = Math.max(0, Math.round(params.amount));
-  const memo = params.memo || 'FAST DANG KY KHOA HOC';
+  const memo = params.memo || 'FASTKHOAHOC';
 
   return `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accountName)}`;
 }
 
 
 /**
- * Create a clean payment transfer memo from course id or title
+ * Create a clean payment transfer memo starting with FAST for SePay auto-matching
  */
-export function generatePaymentMemo(courseId: string, courseTitle?: string): string {
-  const cleanId = (courseId || 'KHOAHOC')
+export function generatePaymentMemo(courseId: string, _courseTitle?: string): string {
+  let cleanId = (courseId || 'KHOAHOC')
     .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 10)
     .toUpperCase();
-  return cleanId.startsWith('FAST') ? cleanId : `FAST${cleanId}`;
+  while (cleanId.startsWith('FAST')) {
+    cleanId = cleanId.slice(4);
+  }
+  return `FAST${(cleanId || 'KHOAHOC').slice(0, 10)}`;
 }

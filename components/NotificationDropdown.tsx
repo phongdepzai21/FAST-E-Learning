@@ -9,7 +9,8 @@ import {
   Clock, 
   X,
   Shield,
-  Video
+  Video,
+  MapPin
 } from 'lucide-react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
@@ -23,7 +24,8 @@ import {
   CourseNotification,
   markCourseAsSeen,
   dismissCourseNotification,
-  deleteNotification
+  deleteNotification,
+  getPreClassPreparationMeta
 } from '../utils/courseNotificationService';
 
 interface NotificationDropdownProps {
@@ -49,7 +51,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       courseId: data.courseId || '',
       courseTitle: data.title || data.courseTitle || 'Thông báo hệ thống',
       title: data.title,
-      courseCategory: data.type === 'training_link' ? 'Link khóa đào tạo' : data.type === 'approval' ? 'Phê duyệt' : data.courseCategory,
+      courseCategory:
+        data.type === 'training_link'
+          ? 'Chuẩn bị vào học'
+          : data.type === 'approval'
+            ? 'Phê duyệt'
+            : data.courseCategory,
       courseImage: data.courseImage || '',
       type: data.type || 'training_link',
       message: data.message || '',
@@ -60,7 +67,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       link: data.link,
       registrationId: data.registrationId,
       startDate: data.startDate,
-      trainingTypeLabel: data.trainingTypeLabel
+      scheduleDetails: data.scheduleDetails,
+      venueAddress: data.venueAddress,
+      trainingType: data.trainingType,
+      trainingTypeLabel: data.trainingTypeLabel,
+      checkInTime: data.checkInTime,
+      checklist: Array.isArray(data.checklist) ? data.checklist : undefined
     };
   }, []);
 
@@ -264,10 +276,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
         {unreadCount > 0 && (
           <span 
             id="notification-badge-count"
-            className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1 items-center justify-center text-[10px] font-black text-white bg-rose-500 rounded-full ring-2 ring-white shadow-xs animate-in zoom-in-50 duration-200"
+            className="absolute -top-1 -right-1 flex h-5 min-w-[20px] px-1 items-center justify-center text-[10px] font-black text-white bg-rose-600 rounded-full ring-2 ring-white shadow-xs tabular-nums"
           >
             {unreadCount > 9 ? '9+' : unreadCount}
-            <span className="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-60 pointer-events-none" />
           </span>
         )}
       </button>
@@ -329,22 +340,48 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 <p className="text-[11px] text-gray-400 mt-0.5">Thông báo đăng ký khóa đào tạo, link học và bài giảng mới sẽ hiển thị tại đây.</p>
               </div>
             ) : (
-              notifications.map((notif) => (
+              notifications.map((notif) => {
+                const prepMeta = notif.type === 'training_link'
+                  ? getPreClassPreparationMeta({
+                      courseTitle: notif.courseTitle,
+                      registrationId: notif.registrationId,
+                      startDate: notif.startDate,
+                      scheduleDetails: notif.scheduleDetails,
+                      venueAddress: notif.venueAddress,
+                      trainingType: notif.trainingType,
+                      trainingTypeLabel: notif.trainingTypeLabel,
+                      link: notif.link,
+                      checkInTime: notif.checkInTime,
+                      checklist: notif.checklist
+                    })
+                  : null;
+
+                return (
                 <div
                   key={notif.id}
                   onClick={() => handleSelectNotification(notif)}
                   className={`p-3.5 transition-colors cursor-pointer flex gap-3 items-start group ${
-                    notif.isRead 
-                      ? 'bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800/60' 
-                      : 'bg-teal-50/40 dark:bg-teal-950/20 hover:bg-teal-50/70'
+                    prepMeta?.isOffline
+                      ? notif.isRead
+                        ? 'bg-white dark:bg-slate-900 hover:bg-stone-50'
+                        : 'bg-stone-50/90 dark:bg-slate-900 hover:bg-stone-100/70'
+                      : notif.isRead 
+                        ? 'bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800/60' 
+                        : 'bg-teal-50/40 dark:bg-teal-950/20 hover:bg-teal-50/70'
                   }`}
                 >
                   {/* Thumbnail / Icon */}
                   <div className="relative shrink-0 mt-0.5">
                     {notif.type === 'training_link' ? (
-                      <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-[#007c76] dark:text-emerald-400 shadow-xs">
-                        <Video className="w-5 h-5" />
-                      </div>
+                      prepMeta?.isOffline ? (
+                        <div className="w-11 h-11 rounded-xl bg-[#0B1F1E] border border-[#D4B475]/50 flex items-center justify-center text-[#D4B475] shadow-xs">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                      ) : (
+                        <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-[#007c76] dark:text-emerald-400 shadow-xs">
+                          <Video className="w-5 h-5" />
+                        </div>
+                      )
                     ) : notif.type === 'approval' ? (
                       <div className="w-11 h-11 rounded-xl bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
                         <Shield className="w-5 h-5" />
@@ -362,30 +399,40 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                       </div>
                     )}
                     {!notif.isRead && (
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white" />
+                      <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+                        prepMeta?.isOffline ? 'bg-[#D4B475]' : 'bg-rose-500'
+                      }`} />
                     )}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                      <span className={`text-[10px] font-extrabold uppercase tracking-wider ${
                         notif.type === 'training_link'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          ? prepMeta?.isOffline
+                            ? 'text-[#9A7B3E]'
+                            : 'text-[#007c76]'
                           : notif.type === 'new' 
-                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' 
+                            ? 'text-rose-700 dark:text-rose-300' 
                             : notif.type === 'approval'
-                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                              : 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
+                              ? 'text-indigo-700 dark:text-indigo-300'
+                              : 'text-teal-800 dark:text-teal-300'
                       }`}>
-                        {notif.type === 'training_link' ? 'Link lớp học' : notif.type === 'new' ? 'Mới' : notif.type === 'approval' ? 'Phê duyệt' : 'Cập nhật'}
+                        {notif.type === 'training_link'
+                          ? (prepMeta?.badgeLabel || 'Chuẩn bị vào học')
+                          : notif.type === 'new'
+                            ? 'Mới'
+                            : notif.type === 'approval'
+                              ? 'Phê duyệt'
+                              : 'Cập nhật'}
                       </span>
                       {notif.courseCategory && notif.type !== 'training_link' && (
                         <span className="text-[10px] font-semibold text-gray-500">
-                          {notif.courseCategory}
+                          · {notif.courseCategory}
                         </span>
                       )}
-                      <span className="text-[10px] text-gray-400 ml-auto flex items-center gap-1 shrink-0">
+                      <span className="text-[10px] text-gray-400 ml-auto flex items-center gap-1 shrink-0 tabular-nums">
                         <Clock className="w-2.5 h-2.5" />
                         {formatTimeAgo(notif.timestamp)}
                       </span>
@@ -408,32 +455,53 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                       )}
                     </div>
 
-                    <h5 className="text-xs font-bold text-gray-900 dark:text-white leading-snug group-hover:text-[#007c76] transition-colors line-clamp-2">
-                      {notif.courseTitle}
+                    <h5 className={`text-xs font-bold leading-snug transition-colors line-clamp-2 ${
+                      prepMeta?.isOffline
+                        ? 'text-[#0B1F1E] dark:text-white group-hover:text-[#9A7B3E]'
+                        : 'text-gray-900 dark:text-white group-hover:text-[#007c76]'
+                    }`}>
+                      {notif.title || notif.courseTitle}
                     </h5>
 
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                    {prepMeta && (
+                      <p className="text-[11px] font-bold text-[#0B1F1E] dark:text-stone-200 mt-1 tabular-nums">
+                        Ngày: {prepMeta.specificDateLabel}
+                        {prepMeta.timeWindowLabel ? ` · Giờ: ${prepMeta.timeWindowLabel}` : ''}
+                      </p>
+                    )}
+
+                    {prepMeta?.isOffline && (
+                      <p className="text-[11px] font-semibold text-stone-700 dark:text-stone-300 mt-0.5 line-clamp-1">
+                        Hội trường: {prepMeta.venueAddress}
+                      </p>
+                    )}
+
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
                       {notif.message}
                     </p>
 
-                    {notif.link && (
-                      <div className="mt-2 flex items-center justify-between gap-2">
+                    {(prepMeta?.actionLink || notif.link) && (
+                      <div className="mt-2.5 flex items-center justify-between gap-2">
                         <a
-                          href={notif.link}
+                          href={prepMeta?.actionLink || notif.link}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => {
                             e.stopPropagation();
                             markReadEverywhere(notif.id);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#007c76] text-white text-[10px] font-black uppercase tracking-wider hover:bg-[#005c56] transition"
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide transition ${
+                            prepMeta?.isOffline
+                              ? 'bg-[#0B1F1E] text-[#D4B475] hover:bg-[#133533]'
+                              : 'bg-[#007c76] text-white hover:bg-[#005c56]'
+                          }`}
                         >
-                          <span>Mở link học</span>
+                          <span>{prepMeta?.isOffline ? 'Chỉ đường tới Hội trường' : 'Vào phòng Zoom'}</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                         {notif.registrationId && (
-                          <span className="text-[10px] font-mono font-bold text-gray-400">
-                            #{notif.registrationId}
+                          <span className="text-[10px] font-mono font-bold text-gray-400 tabular-nums">
+                            #{notif.registrationId.slice(-8).toUpperCase()}
                           </span>
                         )}
                       </div>
@@ -441,7 +509,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
                     {notif.price && !notif.link && (
                       <div className="mt-1 flex items-center justify-between">
-                        <span className="text-[11px] font-extrabold text-[#007c76]">
+                        <span className="text-[11px] font-extrabold text-[#007c76] tabular-nums">
                           {notif.price}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400 group-hover:text-[#007c76] flex items-center gap-0.5">
@@ -451,7 +519,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     )}
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

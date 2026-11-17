@@ -12,6 +12,13 @@ import {
 import { ReceiptModal } from './ReceiptModal';
 import { TeacherAddCourseModal } from './TeacherAddCourseModal';
 import {
+  extractIsoDateFromText,
+  extractTimeWindow,
+  formatIsoDateToVietnamese,
+  DEFAULT_OFFLINE_VENUE,
+  DEFAULT_OFFLINE_MAP_LINK,
+} from '../utils/courseNotificationService';
+import {
   Star,
   CheckCircle2,
   AlertCircle,
@@ -24,6 +31,9 @@ import {
   Video,
   MapPin,
   Calendar,
+  Clock,
+  Edit3,
+  X,
   Phone,
   Mail,
   User,
@@ -64,10 +74,22 @@ export const FeaturedCoursesDashboard: React.FC = () => {
   const [receiptInitialData, setReceiptInitialData] = useState<any>(null);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
 
+  // Schedule customization modal state
+  const [scheduleModalReg, setScheduleModalReg] = useState<any | null>(null);
+  const [customDatePicker, setCustomDatePicker] = useState('');
+  const [customDateText, setCustomDateText] = useState('');
+  const [customStartTime, setCustomStartTime] = useState('08:30');
+  const [customEndTime, setCustomEndTime] = useState('16:30');
+  const [customScheduleDetails, setCustomScheduleDetails] = useState('');
+  const [customVenueInput, setCustomVenueInput] = useState('');
+  const [customLinkInput, setCustomLinkInput] = useState('');
+  const [sendScheduleNotif, setSendScheduleNotif] = useState(true);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+
   // Webhook Test simulation state
   const [webhookPhone, setWebhookPhone] = useState('');
   const [webhookAmount, setWebhookAmount] = useState('299000');
-  const [webhookContent, setWebhookContent] = useState('DAOTAO 0987654321 CHUYEN KHOAN HOAN TAT');
+  const [webhookContent, setWebhookContent] = useState('FAST12345678 CHUYEN KHOAN HOAN TAT');
   const [isSimulatingWebhook, setIsSimulatingWebhook] = useState(false);
 
   // Sync toàn bộ khóa học
@@ -272,6 +294,90 @@ export const FeaturedCoursesDashboard: React.FC = () => {
     }
   };
 
+  const openScheduleModal = (reg: any) => {
+    const isOffline = reg.trainingType !== 'zoom';
+    const rawDate = reg.startDate || '';
+    const rawSchedule = reg.scheduleDetails || (isOffline ? '08:30 - 16:30' : '19:30 - 21:30');
+    const parsedTime = extractTimeWindow(rawSchedule || rawDate);
+    setScheduleModalReg(reg);
+    setCustomDatePicker(extractIsoDateFromText(rawDate) || '2026-11-22');
+    setCustomDateText(rawDate || 'Chủ Nhật, 22/11/2026');
+    setCustomStartTime(parsedTime.start || (isOffline ? '08:30' : '19:30'));
+    setCustomEndTime(parsedTime.end || (isOffline ? '16:30' : '21:30'));
+    setCustomScheduleDetails(rawSchedule);
+    setCustomVenueInput(isOffline ? (reg.venueAddress || DEFAULT_OFFLINE_VENUE) : '');
+    setCustomLinkInput(
+      isOffline
+        ? (reg.meetingLink || DEFAULT_OFFLINE_MAP_LINK)
+        : (reg.meetingLink || reg.zoomLink || 'https://zoom.us/j/84927002668')
+    );
+    setSendScheduleNotif(true);
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduleModalReg) return;
+    const cleanDate = customDateText.trim() || (customDatePicker ? formatIsoDateToVietnamese(customDatePicker) : '');
+    if (!cleanDate) {
+      toast.showToast('Vui lòng chọn hoặc nhập ngày đào tạo cụ thể!', 'error');
+      return;
+    }
+    const cleanSchedule =
+      customScheduleDetails.trim() ||
+      (customStartTime && customEndTime ? `${customStartTime} - ${customEndTime}` : '');
+    const isOffline = scheduleModalReg.trainingType !== 'zoom';
+    const cleanVenue = isOffline ? customVenueInput.trim() || DEFAULT_OFFLINE_VENUE : '';
+    const cleanLink =
+      customLinkInput.trim() ||
+      (isOffline ? DEFAULT_OFFLINE_MAP_LINK : 'https://zoom.us/j/84927002668');
+
+    setIsSavingSchedule(true);
+    try {
+      const res = await fetch('/api/direct-registrations/update-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registrationId: scheduleModalReg.id,
+          startDate: cleanDate,
+          scheduleDetails: cleanSchedule,
+          venueAddress: cleanVenue,
+          meetingLink: cleanLink,
+          trainingType: scheduleModalReg.trainingType,
+          trainingTypeLabel: isOffline ? 'Trực tiếp tại Hội trường' : 'Online qua Zoom HD',
+          sendNotification: sendScheduleNotif,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error || 'Không thể lưu lịch đào tạo');
+      }
+
+      const nowIso = new Date().toISOString();
+      const patch = {
+        startDate: cleanDate,
+        scheduleDetails: cleanSchedule,
+        venueAddress: cleanVenue,
+        meetingLink: cleanLink,
+        zoomLink: isOffline ? (scheduleModalReg.zoomLink || '') : cleanLink,
+        updatedAt: nowIso,
+      };
+      await Promise.all([
+        setDoc(doc(db, 'live_course_registrations', scheduleModalReg.id), patch, { merge: true }).catch(() => {}),
+        setDoc(doc(db, 'direct_course_registrations', scheduleModalReg.id), patch, { merge: true }).catch(() => {}),
+      ]);
+
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === scheduleModalReg.id ? { ...r, ...patch } : r))
+      );
+      toast.showToast(`Đã cập nhật ngày giờ đào tạo (${cleanDate})!`, 'success');
+      setScheduleModalReg(null);
+    } catch (err: any) {
+      toast.showToast(err?.message || 'Lỗi cập nhật ngày giờ đào tạo!', 'error');
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
+
   // Mở Biên lai cho 1 học viên
   const handleOpenReceiptForReg = (reg: any) => {
     setReceiptInitialData({
@@ -304,8 +410,8 @@ export const FeaturedCoursesDashboard: React.FC = () => {
           transactionId: `FT${Date.now()}`,
           amount: parseInt(webhookAmount) || 199000,
           content: webhookContent,
-          accountNo: '0927002668',
-          gateway: 'MBBank'
+          accountNo: '0989499568',
+          gateway: 'ACB'
         })
       });
 
@@ -829,9 +935,15 @@ export const FeaturedCoursesDashboard: React.FC = () => {
 
                         <td className="py-3 px-4">
                           <div className="space-y-1">
-                            <span className="font-bold text-slate-700 block text-[11px]">
+                            <span className="font-bold text-slate-800 block text-[11px]">
                               {reg.startDate}
                             </span>
+                            {reg.scheduleDetails && (
+                              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                                <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                                {reg.scheduleDetails}
+                              </span>
+                            )}
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                               reg.trainingType === 'zoom' ? 'bg-teal-50 text-[#007c76]' : 'bg-emerald-50 text-emerald-800'
                             }`}>
@@ -863,7 +975,16 @@ export const FeaturedCoursesDashboard: React.FC = () => {
                           </select>
                         </td>
 
-                        <td className="py-3 px-4 text-right space-x-2">
+                        <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => openScheduleModal(reg)}
+                            className="px-2.5 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs transition inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Chỉnh ngày giờ</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => handleOpenReceiptForReg(reg)}
@@ -959,7 +1080,7 @@ export const FeaturedCoursesDashboard: React.FC = () => {
               </div>
               <h3 className="text-lg font-black text-slate-900">Webhook Tự Động Duyệt Chuyển Khoản</h3>
               <p className="text-xs text-slate-500">
-                Đăng ký URL Webhook dưới đây vào hệ thống Casso hoặc VietQR để tự động xác nhận chuyển tiền.
+                Đăng ký URL Webhook dưới đây vào hệ thống SePay (ACB · 0989499568) để tự động xác nhận chuyển tiền.
               </p>
             </div>
 
@@ -977,12 +1098,12 @@ export const FeaturedCoursesDashboard: React.FC = () => {
               </h4>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Cú pháp tin nhắn chuyển khoản (Memo/NDCK):</label>
+                <label className="block font-bold text-slate-700 mb-1">Cú pháp tin nhắn chuyển khoản (Memo/NDCK bắt đầu bằng FAST):</label>
                 <input
                   type="text"
                   value={webhookContent}
                   onChange={(e) => setWebhookContent(e.target.value)}
-                  placeholder="DAOTAO 0987654321 CHUYEN KHOAN HOAN TAT"
+                  placeholder="FAST12345678 CHUYEN KHOAN HOAN TAT"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-slate-900"
                 />
               </div>
@@ -1059,6 +1180,153 @@ export const FeaturedCoursesDashboard: React.FC = () => {
         onClose={() => setIsTeacherModalOpen(false)}
         onCourseAdded={() => refreshCourses()}
       />
+
+      {/* MODAL TÙY CHỈNH NGÀY GIỜ ĐÀO TẠO */}
+      {scheduleModalReg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs overflow-y-auto">
+          <form
+            onSubmit={handleSaveSchedule}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl space-y-4 my-6"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="font-black text-base text-slate-900">
+                  Tùy chỉnh Ngày &amp; Giờ Đào Tạo
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Học viên: <strong>{scheduleModalReg.studentName}</strong> ({scheduleModalReg.email || scheduleModalReg.userEmail || scheduleModalReg.phone})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalReg(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Chọn ngày trên lịch *</label>
+                  <input
+                    type="date"
+                    value={customDatePicker}
+                    onChange={(e) => {
+                      const iso = e.target.value;
+                      setCustomDatePicker(iso);
+                      if (iso) setCustomDateText(formatIsoDateToVietnamese(iso));
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#007c76] outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Giờ bắt đầu</label>
+                  <input
+                    type="time"
+                    value={customStartTime}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomStartTime(val);
+                      if (val && customEndTime) setCustomScheduleDetails(`${val} - ${customEndTime}`);
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#007c76] outline-none tabular-nums"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Giờ kết thúc</label>
+                  <input
+                    type="time"
+                    value={customEndTime}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomEndTime(val);
+                      if (customStartTime && val) setCustomScheduleDetails(`${customStartTime} - ${val}`);
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#007c76] outline-none tabular-nums"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Hiển thị ngày đào tạo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={customDateText}
+                    onChange={(e) => setCustomDateText(e.target.value)}
+                    placeholder="VD: Chủ Nhật, 22/11/2026"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#007c76] outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600 block">Khung giờ / Ca học</label>
+                  <input
+                    type="text"
+                    value={customScheduleDetails}
+                    onChange={(e) => setCustomScheduleDetails(e.target.value)}
+                    placeholder="VD: 08:30 - 16:30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:border-[#007c76] outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {scheduleModalReg.trainingType !== 'zoom' && (
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-700 block">Địa điểm hội trường Offline</label>
+                <input
+                  type="text"
+                  value={customVenueInput}
+                  onChange={(e) => setCustomVenueInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-[#007c76] outline-none"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-700 block">
+                {scheduleModalReg.trainingType !== 'zoom' ? 'Link Google Maps chỉ đường' : 'Link phòng Zoom / Meet'}
+              </label>
+              <input
+                type="url"
+                value={customLinkInput}
+                onChange={(e) => setCustomLinkInput(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-[#007c76] focus:bg-white focus:border-[#007c76] outline-none"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={sendScheduleNotif}
+                onChange={(e) => setSendScheduleNotif(e.target.checked)}
+                className="w-4 h-4 rounded accent-[#007c76]"
+              />
+              <span>Đồng bộ gửi thông báo ngày giờ đào tạo mới tới tài khoản học viên</span>
+            </label>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setScheduleModalReg(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingSchedule}
+                className="px-5 py-2 rounded-xl bg-[#007c76] hover:bg-[#005c56] text-white text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-50"
+              >
+                {isSavingSchedule ? 'Đang lưu...' : 'Lưu Ngày & Giờ Học'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

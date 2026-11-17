@@ -222,7 +222,7 @@ const Contact: React.FC = () => {
                   <p className="text-base sm:text-lg font-black text-slate-900 tabular-nums mt-0.5">
                     0314568146
                   </p>
-                  <span className="text-xs text-slate-500 font-medium">Cấp phép hoạt động đào tạo &amp; tư vấn</span>
+                  <span className="text-xs text-slate-500 font-medium block">Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh · Công bố theo Điều 28 NĐ 52/2013/NĐ-CP &amp; NĐ 85/2021/NĐ-CP</span>
                 </div>
               </div>
 

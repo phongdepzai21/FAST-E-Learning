@@ -4,6 +4,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toTenDigitId } from '../utils/idGenerator';
 import { CheckCircle2, Search, Sparkles, User, Phone, Mail, Calendar, Video, MapPin, Copy, ShieldCheck } from 'lucide-react';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 interface LookupResult {
   success: boolean;
@@ -24,6 +25,13 @@ export const FastCodeLookup: React.FC = () => {
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<LookupResult | null>(null);
+  useSmoothScrollTo({
+    targetId: 'fast-lookup-result-panel',
+    triggerKey: result,
+    enabled: Boolean(result),
+    offset: 18,
+    detectDynamicReveal: true,
+  });
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +168,7 @@ export const FastCodeLookup: React.FC = () => {
                   type="text"
                   value={inputCode}
                   onChange={(e) => setInputCode(e.target.value)}
-                  placeholder="VD: DAOTAO 091234 5678, SĐT hoặc Mã hồ sơ"
+                  placeholder="VD: FAST12345678, SĐT hoặc Mã hồ sơ"
                   className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-[#007c76] text-slate-800"
                 />
                 <button
@@ -176,7 +184,7 @@ export const FastCodeLookup: React.FC = () => {
                 </button>
               </div>
               <p className="text-[10px] text-gray-400 font-semibold leading-normal">
-                Hệ thống tự động lọc sạch các tiền tố (DAOTAO, FAST, #, khoảng trắng) để tìm chính xác hồ sơ.
+                Hệ thống tự động lọc sạch các tiền tố (FAST, DAOTAO, #, khoảng trắng) để tìm chính xác hồ sơ.
               </p>
             </div>
           </form>
@@ -187,10 +195,10 @@ export const FastCodeLookup: React.FC = () => {
             <div className="flex flex-wrap gap-2 text-[10px] font-bold">
               <button
                 type="button"
-                onClick={() => setInputCode("DAOTAO")}
+                onClick={() => setInputCode("FAST")}
                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer transition-colors"
               >
-                DAOTAO
+                FAST
               </button>
               <button
                 type="button"
@@ -204,7 +212,7 @@ export const FastCodeLookup: React.FC = () => {
         </div>
 
         {/* Right Side: Analysis Results */}
-        <div className="lg:col-span-7 bg-white p-6 md:p-8 rounded-3xl border border-gray-150 shadow-sm min-h-[300px] flex flex-col justify-between">
+        <div id="fast-lookup-result-panel" className="lg:col-span-7 bg-white p-6 md:p-8 rounded-3xl border border-gray-150 shadow-sm min-h-[300px] flex flex-col justify-between">
           {result ? (
             <div className="space-y-6">
               <div className="flex justify-between items-start pb-4 border-b border-gray-100 flex-wrap gap-3">

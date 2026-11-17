@@ -964,13 +964,10 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
             className="overflow-hidden"
           >
             <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-slate-200/80 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+              <div className="pb-1">
                 <p className="text-xs text-slate-500 font-medium">
-                  Tất cả phương thức đã liên kết dùng chung một mã tài khoản (UID) và bảo toàn toàn bộ khóa học của bạn.
+                  Tất cả phương thức đã liên kết dùng chung một tài khoản và bảo toàn toàn bộ khóa học của bạn.
                 </p>
-                <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto shrink-0">
-                  UID: {user.uid}
-                </span>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
@@ -1146,7 +1143,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 </div>
                 <p className="text-xs text-teal-100 font-mono mt-1 flex items-center justify-center sm:justify-start gap-1.5 opacity-90">
                   <Mail className="w-3.5 h-3.5 text-teal-300" />
-                  <span>{user.email || `Tài khoản Facebook (ID: ${user.uid.slice(0, 8)})`}</span>
+                  <span>{user.email || 'Tài khoản Facebook'}</span>
                 </p>
               </div>
 
@@ -1380,7 +1377,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 <input
                   type="text"
                   disabled
-                  value={email || `Tài khoản Facebook chưa cấp email (UID: ${user.uid})`}
+                  value={email || 'Tài khoản Facebook chưa cấp email'}
                   className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-500 text-sm cursor-not-allowed"
                 />
               </div>
@@ -1413,7 +1410,7 @@ const AccountSettings: React.FC<{ embed?: boolean }> = ({ embed = false }) => {
                 <input
                   type="text"
                   disabled
-                  value={email || `Tài khoản Facebook chưa cấp email (UID: ${user.uid})`}
+                  value={email || 'Tài khoản Facebook chưa cấp email'}
                   className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-500 text-sm cursor-not-allowed opacity-70"
                 />
               </div>

@@ -204,7 +204,7 @@ export const LivePriceQrPreview: React.FC<LivePriceQrPreviewProps> = ({
                   setConfig((prev) => ({ ...prev, accountNo: val }));
                   savePaymentConfig({ accountNo: val });
                 }}
-                placeholder="VD: 0927002668"
+                placeholder="VD: 0989499568"
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-800"
               />
             </div>

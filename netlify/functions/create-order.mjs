@@ -23,16 +23,28 @@ export async function handler(event, context) {
 
   try {
     const body = JSON.parse(event.body || "{}");
-    const { courseId, courseTitle, amount, email, userId } = body;
+    const {
+      courseId,
+      courseTitle,
+      amount,
+      email,
+      userId,
+      registrationId,
+      orderType,
+      studentName,
+      phone,
+      requestedPaymentCode
+    } = body;
 
-    if (!courseId || !email) {
+    if (!courseId && !registrationId) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success: false, error: "Missing required fields: courseId or email" }),
+        body: JSON.stringify({ success: false, error: "Missing required fields: courseId or registrationId" }),
       };
     }
 
+    const normalizedEmail = (email || (phone ? `${String(phone).replace(/[^\d]/g, "")}@fast-training.local` : "")).toLowerCase().trim();
     const numericAmount = Number(amount) || 0;
     const orderId = "ORD_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
     
@@ -40,12 +52,27 @@ export async function handler(event, context) {
     const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let paymentCode = "";
     let randomSuffix = "";
+
+    if (requestedPaymentCode && typeof requestedPaymentCode === "string") {
+      let cleanReq = requestedPaymentCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      while (cleanReq.startsWith("FASTFAST")) {
+        cleanReq = cleanReq.substring(4);
+      }
+      if (!cleanReq.startsWith("FAST")) {
+        cleanReq = `FAST${cleanReq}`;
+      }
+      if (cleanReq.length >= 8 && cleanReq.length <= 16) {
+        paymentCode = cleanReq;
+        randomSuffix = cleanReq.replace(/^FAST/, "");
+      }
+    }
+
     let isUnique = false;
     let attempts = 0;
 
-    while (!isUnique && attempts < 5) {
+    while (!paymentCode && !isUnique && attempts < 5) {
       attempts++;
-      const suffixLength = 9;
+      const suffixLength = 8;
       randomSuffix = "";
       for (let i = 0; i < suffixLength; i++) {
         randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -57,21 +84,27 @@ export async function handler(event, context) {
       const existingSnap = await adminDb.collection("orders").where("paymentCode", "==", paymentCode).limit(1).get();
       if (existingSnap.empty) {
         isUnique = true;
+      } else {
+        paymentCode = "";
       }
     }
 
     const bankCode = process.env.BANK_CODE || "ACB";
-    const bankAccount = process.env.BANK_ACCOUNT || "22888868";
-    const bankAccountName = process.env.BANK_ACCOUNT_NAME || "CÔNG TY TNHH TƯ VẤN VÀ ĐÀO TẠO FAST";
+    const bankAccount = process.env.BANK_ACCOUNT || "0989499568";
+    const bankAccountName = process.env.BANK_ACCOUNT_NAME || "CONG TY TNHH TU VAN FAST";
 
     const orderData = {
       orderId,
-      paymentCode, // Exact code stored: FAST3AGSF5K0R
-      courseId,
+      paymentCode,
+      courseId: courseId || registrationId,
       courseTitle: courseTitle || "Khóa học FAST E-Learning",
       amount: numericAmount,
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       userId: userId || "",
+      registrationId: registrationId || "",
+      orderType: orderType || (registrationId ? "direct_training" : "course"),
+      studentName: studentName || "",
+      phone: phone || "",
       status: "PENDING",
       createdAt: new Date().toISOString(),
       bankCode,
@@ -82,10 +115,12 @@ export async function handler(event, context) {
     const pendingData = {
       code: paymentCode,
       suffix: randomSuffix,
-      email: email.toLowerCase().trim(),
-      courseId,
+      email: normalizedEmail,
+      courseId: courseId || registrationId,
       amount: numericAmount,
       orderId,
+      registrationId: registrationId || "",
+      orderType: orderData.orderType,
       createdAt: new Date().toISOString(),
     };
 
@@ -103,7 +138,7 @@ export async function handler(event, context) {
 
     await batch.commit();
 
-    console.log(`[CreateOrder] Created order ${orderId} with paymentCode ${paymentCode} for ${email}`);
+    console.log(`[CreateOrder] Created order ${orderId} with paymentCode ${paymentCode} for ${normalizedEmail}`);
 
     return {
       statusCode: 200,
@@ -111,7 +146,7 @@ export async function handler(event, context) {
       body: JSON.stringify({
         success: true,
         orderId,
-        paymentCode, // Returns exact paymentCode: FAST3AGSF5K0R
+        paymentCode,
         amount: numericAmount,
         bankCode,
         bankAccount,

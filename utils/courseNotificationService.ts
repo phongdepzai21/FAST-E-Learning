@@ -19,7 +19,214 @@ export interface CourseNotification {
   link?: string;
   registrationId?: string;
   startDate?: string;
+  scheduleDetails?: string;
+  venueAddress?: string;
+  trainingType?: string;
   trainingTypeLabel?: string;
+  checkInTime?: string;
+  prepNotes?: string;
+  checklist?: string[];
+}
+
+export const DEFAULT_OFFLINE_VENUE = 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội (Hội trường đào tạo FAST)';
+export const DEFAULT_OFFLINE_MAP_LINK = 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi';
+
+export function isOfflineTrainingNotification(input?: {
+  trainingType?: string;
+  trainingTypeLabel?: string;
+  link?: string;
+  venueAddress?: string;
+  title?: string;
+  message?: string;
+}): boolean {
+  if (!input) return false;
+  const rawType = String(input.trainingType || '').toLowerCase().trim();
+  const label = String(input.trainingTypeLabel || '').toLowerCase();
+  const link = String(input.link || '').toLowerCase();
+  const title = String(input.title || '').toLowerCase();
+
+  if (rawType === 'direct' || rawType === 'offline' || rawType === 'inhouse') return true;
+  if (rawType === 'zoom' && !label.includes('trực tiếp') && !label.includes('hội trường')) return false;
+  if (
+    label.includes('trực tiếp') ||
+    label.includes('hội trường') ||
+    label.includes('offline') ||
+    label.includes('in-house') ||
+    label.includes('tại cơ sở')
+  ) {
+    return true;
+  }
+  if (link.includes('maps.google') || link.includes('goo.gl/maps') || link.includes('maps.app.goo.gl')) {
+    return true;
+  }
+  if (title.includes('offline') || title.includes('hội trường')) {
+    return true;
+  }
+  return false;
+}
+
+export function cleanOfflineVenueAddress(rawVenue?: string): string {
+  const trimmed = String(rawVenue || '').trim();
+  if (!trimmed) return DEFAULT_OFFLINE_VENUE;
+  const stripped = trimmed.replace(/\s*\/\s*Zoom\s*HD/gi, '').trim();
+  return stripped || DEFAULT_OFFLINE_VENUE;
+}
+
+const WEEKDAY_VI = [
+  'Chủ Nhật',
+  'Thứ Hai',
+  'Thứ Ba',
+  'Thứ Tư',
+  'Thứ Năm',
+  'Thứ Sáu',
+  'Thứ Bảy',
+];
+
+export function formatIsoDateToVietnamese(isoDate?: string): string {
+  const raw = String(isoDate || '').trim();
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return raw;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(d.getTime())) return `${m[3]}/${m[2]}/${m[1]}`;
+  return `${WEEKDAY_VI[d.getDay()]}, ${m[3]}/${m[2]}/${m[1]}`;
+}
+
+export function extractIsoDateFromText(text?: string): string {
+  const raw = String(text || '').trim();
+  const isoMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const vnMatch = raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (vnMatch) {
+    return `${vnMatch[3]}-${vnMatch[2].padStart(2, '0')}-${vnMatch[1].padStart(2, '0')}`;
+  }
+  return '';
+}
+
+export function extractTimeWindow(text?: string): { start: string; end: string } {
+  const raw = String(text || '').trim();
+  const rangeMatch = raw.match(/(\d{1,2}:\d{2})\s*[-–~]\s*(\d{1,2}:\d{2})/);
+  if (rangeMatch) {
+    return {
+      start: rangeMatch[1].padStart(5, '0'),
+      end: rangeMatch[2].padStart(5, '0'),
+    };
+  }
+  return { start: '', end: '' };
+}
+
+export function formatTrainingScheduleDisplay(startDate?: string, scheduleDetails?: string): {
+  dateLabel: string;
+  timeLabel: string;
+} {
+  const rawDate = String(startDate || '').trim();
+  const rawDetails = String(scheduleDetails || '').trim();
+
+  let dateLabel = rawDate;
+  const isoOnly = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoOnly) {
+    dateLabel = formatIsoDateToVietnamese(rawDate);
+  } else if (!dateLabel || /theo lịch khóa học|theo lịch khai giảng/i.test(dateLabel)) {
+    dateLabel = 'Đang chờ ấn định ngày cụ thể';
+  }
+
+  let timeLabel = rawDetails;
+  if (!timeLabel) {
+    const inDateTime = extractTimeWindow(rawDate);
+    if (inDateTime.start && inDateTime.end) {
+      timeLabel = `${inDateTime.start} - ${inDateTime.end}`;
+    }
+  }
+  if (!timeLabel) {
+    timeLabel = 'Theo khung giờ ấn định';
+  }
+
+  return { dateLabel, timeLabel };
+}
+
+export function getPreClassPreparationMeta(input: {
+  courseTitle?: string;
+  registrationId?: string;
+  startDate?: string;
+  scheduleDetails?: string;
+  venueAddress?: string;
+  trainingType?: string;
+  trainingTypeLabel?: string;
+  link?: string;
+  checkInTime?: string;
+  checklist?: string[];
+}) {
+  const isOffline = isOfflineTrainingNotification(input);
+  const shortCode = String(input.registrationId || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(-8)
+    .toUpperCase();
+  const cleanVenue = cleanOfflineVenueAddress(input.venueAddress);
+  const { dateLabel: specificDateLabel, timeLabel: timeWindowLabel } = formatTrainingScheduleDisplay(
+    input.startDate,
+    input.scheduleDetails
+  );
+  const scheduleStr = input.scheduleDetails ? ` (${input.scheduleDetails})` : '';
+
+  if (isOffline) {
+    return {
+      isOffline: true,
+      badgeLabel: 'Thư mời Hội trường Offline',
+      formatLabel: input.trainingTypeLabel || 'Đào tạo Trực tiếp tại Hội trường',
+      specificDateLabel,
+      timeWindowLabel,
+      venueAddress: cleanVenue,
+      actionLink:
+        input.link && !String(input.link).includes('zoom.us')
+          ? input.link
+          : DEFAULT_OFFLINE_MAP_LINK,
+      actionLabel: 'Chỉ đường tới Hội trường',
+      checkInTime:
+        input.checkInTime ||
+        'Đón tiếp & Check-in trước giờ khai giảng 20 phút tại quầy Lễ tân Học viện FAST',
+      hospitalityNote:
+        'Trang phục lịch sự / công sở · Đã chuẩn bị sẵn bộ tài liệu in ấn & tea-break tại bàn',
+      conciergeHotline: '0927 002 668',
+      checklist:
+        Array.isArray(input.checklist) && input.checklist.length > 0
+          ? input.checklist
+          : [
+              'Có mặt tại sảnh Hội trường trước 20 phút để đón tiếp, check-in và nhận bộ tài liệu bản in',
+              'Mang theo CCCD/CMND (bản gốc hoặc VNeID) để đối chiếu hồ sơ cấp Chứng nhận hoàn thành',
+              shortCode
+                ? `Xuất trình Mã hồ sơ #${shortCode} hoặc email đăng ký tại quầy Lễ tân học viên`
+                : 'Xuất trình Email hoặc Số điện thoại đăng ký tại quầy Lễ tân học viên',
+              'Mang theo hồ sơ mẫu cơ sở (nếu muốn Chuyên gia góp ý trực tiếp tại phiên thực hành)'
+            ],
+      defaultTitle: `Thư mời Tham dự Khóa học Offline: ${input.courseTitle || 'Khóa đào tạo ATTP'}`,
+      defaultMessage: `Trân trọng kính mời Quý học viên tham dự khóa đào tạo trực tiếp tại Hội trường FAST vào ${specificDateLabel}${scheduleStr}. Địa điểm: ${cleanVenue}. Vui lòng có mặt trước 20 phút để check-in đón tiếp.`
+    };
+  }
+
+  return {
+    isOffline: false,
+    badgeLabel: 'Lịch học Trực tuyến Zoom HD',
+    formatLabel: input.trainingTypeLabel || 'Online qua Zoom HD',
+    specificDateLabel,
+    timeWindowLabel,
+    venueAddress: 'Phòng học trực tuyến Zoom HD',
+    actionLink: input.link || 'https://zoom.us/j/84927002668',
+    actionLabel: 'Vào phòng học Zoom',
+    checkInTime:
+      input.checkInTime ||
+      'Mở liên kết Zoom trước giờ khai giảng 15 phút để kiểm tra âm thanh & điểm danh',
+    hospitalityNote: 'Khuyến nghị kết nối Wi-Fi ổn định và chuẩn bị tai nghe trong giờ thực hành',
+    conciergeHotline: '0927 002 668',
+    checklist:
+      Array.isArray(input.checklist) && input.checklist.length > 0
+        ? input.checklist
+        : [
+            'Tham gia phòng Zoom trước 15 phút để kiểm tra loa, micro và đường truyền',
+            'Đổi tên hiển thị Zoom theo cú pháp: Họ và tên - Số điện thoại',
+            'Chuẩn bị sổ tay ghi chép và tài liệu thực hành trong quá trình học'
+          ],
+    defaultTitle: `Chuẩn bị vào học Zoom: ${input.courseTitle || 'Khóa đào tạo ATTP'}`,
+    defaultMessage: `Phòng học Zoom HD cho khóa "${input.courseTitle || 'Khóa đào tạo'}" diễn ra vào ${specificDateLabel}${scheduleStr}. Vui lòng vào lớp trước 15 phút và đổi tên theo Họ tên - SĐT để điểm danh.`
+  };
 }
 
 const STORAGE_KEY = 'fast_course_notifications';
@@ -183,33 +390,57 @@ export function addTrainingLinkNotification(params: {
   courseId: string;
   courseTitle: string;
   courseImage?: string;
-  link: string;
+  link?: string;
   registrationId: string;
   startDate?: string;
+  scheduleDetails?: string;
+  venueAddress?: string;
+  trainingType?: string;
   trainingTypeLabel?: string;
+  title?: string;
   message?: string;
+  checkInTime?: string;
+  checklist?: string[];
 }): CourseNotification {
   const normalizedEmail = params.userEmail?.toLowerCase().trim() || undefined;
   const notifId = params.id || `training_${params.registrationId || Date.now()}`;
-  const title = `Link tham gia khóa đào tạo: ${params.courseTitle}`;
-  const message = params.message || `Đăng ký #${params.registrationId} thành công (${params.trainingTypeLabel || 'Đào tạo'}). Link lớp học: ${params.link}`;
+  const prepMeta = getPreClassPreparationMeta({
+    courseTitle: params.courseTitle,
+    registrationId: params.registrationId,
+    startDate: params.startDate,
+    scheduleDetails: params.scheduleDetails,
+    venueAddress: params.venueAddress,
+    trainingType: params.trainingType,
+    trainingTypeLabel: params.trainingTypeLabel,
+    link: params.link,
+    checkInTime: params.checkInTime,
+    checklist: params.checklist,
+  });
+
+  const title = params.title || prepMeta.defaultTitle;
+  const message = params.message || prepMeta.defaultMessage;
 
   const newNotif: CourseNotification = {
     id: notifId,
     courseId: params.courseId,
     courseTitle: params.courseTitle,
     title,
-    courseCategory: 'Khóa đào tạo',
+    courseCategory: prepMeta.isOffline ? 'Chuẩn bị vào học Offline' : 'Chuẩn bị vào học Zoom',
     courseImage: params.courseImage,
     type: 'training_link',
     message,
     timestamp: new Date().toISOString(),
     isRead: false,
     userEmail: normalizedEmail,
-    link: params.link,
+    link: prepMeta.actionLink,
     registrationId: params.registrationId,
     startDate: params.startDate,
-    trainingTypeLabel: params.trainingTypeLabel
+    scheduleDetails: params.scheduleDetails,
+    venueAddress: prepMeta.isOffline ? prepMeta.venueAddress : undefined,
+    trainingType: params.trainingType || (prepMeta.isOffline ? 'direct' : 'zoom'),
+    trainingTypeLabel: prepMeta.formatLabel,
+    checkInTime: prepMeta.checkInTime,
+    checklist: prepMeta.checklist,
   };
 
   const current = getStoredNotifications();

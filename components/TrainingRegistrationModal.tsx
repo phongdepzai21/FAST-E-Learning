@@ -1,41 +1,36 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  X, 
-  CheckCircle2, 
-  Calendar, 
-  MapPin, 
-  Video, 
-  Phone, 
-  Mail, 
-  Building2, 
-  User, 
-  Sparkles, 
-  QrCode, 
-  ShieldCheck, 
-  FileText,
-  Copy,
-  Users,
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  X,
+  MapPin,
+  Video,
+  Phone,
+  Mail,
+  Building2,
+  User,
   Minus,
   Plus,
-  Info,
-  ChevronRight,
-  Check,
-  ExternalLink,
-  Bell
+  ArrowRight,
+  Calendar
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { TrainingCourse } from '../types';
-import { generateTenDigitId, toTenDigitId } from '../utils/idGenerator';
+import { generateTenDigitId } from '../utils/idGenerator';
+import { getPaymentConfig, formatVND } from '../utils/qrService';
 import { db, auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { getFastSessionUser } from '../utils/sessionAuth';
-import { addTrainingLinkNotification } from '../utils/courseNotificationService';
 
 interface TrainingRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   course: TrainingCourse | null;
+}
+
+function buildFastCodeFromSeed(seed: string): string {
+  const cleaned = (seed || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const base = cleaned.slice(-8).padStart(8, '8');
+  return `FAST${base}`;
 }
 
 export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps> = ({
@@ -45,6 +40,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
 }) => {
   const toast = useToast();
   const navigate = useNavigate();
+  const isMountedRef = useRef(true);
 
   // Form inputs
   const [studentName, setStudentName] = useState('');
@@ -56,22 +52,22 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
   const [trainingType, setTrainingType] = useState<'zoom' | 'direct' | 'both' | 'inhouse'>('both');
   const [notes, setNotes] = useState('');
 
-  // UI state
-  const [copiedMemo, setCopiedMemo] = useState(false);
-  const [copiedStk, setCopiedStk] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [createdRecord, setCreatedRecord] = useState<any>(null);
+
+  const paymentConfig = useMemo(() => getPaymentConfig(), [isOpen]);
+  const accountNo = paymentConfig.accountNo === '0989499568' ? paymentConfig.accountNo : '0989499568';
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Sync user info and default format on open / course change
   useEffect(() => {
     if (isOpen) {
-      setIsSuccess(false);
-      setCreatedRecord(null);
-      setCopiedMemo(false);
-      setCopiedStk(false);
-      setCopiedLink(false);
       const sessionUser = getFastSessionUser();
       const effectiveUser = auth.currentUser || sessionUser;
       if (effectiveUser) {
@@ -102,28 +98,10 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
   if (!isOpen || !course) return null;
 
   const totalNumericPrice = unitPriceNumeric * Math.max(1, participantCount);
-  const formattedTotalPrice = totalNumericPrice.toLocaleString('vi-VN') + 'đ';
+  const formattedTotalPrice = formatVND(totalNumericPrice);
 
-  const cleanPhone = phone.replace(/[^\d]/g, '').slice(-6) || 'HOCVIEN';
-  const transferMemo = `DAOTAO ${cleanPhone} ${toTenDigitId(course.id).slice(-4)}`;
-  const qrUrl = `https://img.vietqr.io/image/970422-0927002668-compact2.png?amount=${totalNumericPrice}&addInfo=${encodeURIComponent(transferMemo)}&accountName=CONG%20TY%20TNHH%20TU%20VAN%20FAST`;
-
-  const copyToClipboard = (text: string, type: 'memo' | 'stk' | 'link') => {
-    navigator.clipboard.writeText(text);
-    if (type === 'memo') {
-      setCopiedMemo(true);
-      setTimeout(() => setCopiedMemo(false), 2000);
-      toast.showToast('Đã sao chép nội dung chuyển khoản!', 'success');
-    } else if (type === 'link') {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-      toast.showToast('Đã sao chép link tham gia khóa học!', 'success');
-    } else {
-      setCopiedStk(true);
-      setTimeout(() => setCopiedStk(false), 2000);
-      toast.showToast('Đã sao chép số tài khoản!', 'success');
-    }
-  };
+  const sessionUser = getFastSessionUser();
+  const isUserLoggedIn = !!(auth.currentUser || sessionUser);
 
   const getTrainingTypeLabel = (type: string) => {
     switch (type) {
@@ -152,7 +130,20 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       return;
     }
 
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    const currentSessionUser = getFastSessionUser();
+    const accountEmail = (
+      email.trim() ||
+      auth.currentUser?.email ||
+      currentSessionUser?.email ||
+      ''
+    ).toLowerCase().trim();
+
+    if (!accountEmail) {
+      toast.showToast('Vui lòng nhập Email để hệ thống tự động tạo tài khoản và gửi lịch học!', 'error');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail)) {
       toast.showToast('Email không đúng định dạng. Vui lòng kiểm tra lại!', 'error');
       return;
     }
@@ -166,22 +157,51 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       .map(s => s.trim())
       .filter(Boolean);
 
-    const sessionUser = getFastSessionUser();
-    const accountEmail = (
-      auth.currentUser?.email ||
-      sessionUser?.email ||
-      email.trim() ||
-      ''
-    ).toLowerCase().trim();
-
     const resolvedMeetingLink =
       course.meetingLink?.trim() ||
       (trainingType === 'direct'
         ? 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi'
         : 'https://zoom.us/j/84927002668');
 
+    // Create SePay-recognized FAST payment order via /api/create-order (fallback to FAST + 8 digits from regId)
+    const fallbackFastCode = buildFastCodeFromSeed(regId);
+    let resolvedOrderId = '';
+    let resolvedPaymentCode = fallbackFastCode;
+
+    try {
+      const orderRes = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: course.id,
+          courseTitle: course.title,
+          amount: totalNumericPrice,
+          email: accountEmail || `${cleanPhoneDigits}@fast-training.local`,
+          userId: auth.currentUser?.uid || '',
+          registrationId: regId,
+          orderType: 'direct_training',
+          studentName: studentName.trim(),
+          phone: phone.trim(),
+          requestedPaymentCode: fallbackFastCode
+        })
+      });
+      if (orderRes.ok) {
+        const orderJson = await orderRes.json();
+        if (orderJson.success && orderJson.paymentCode) {
+          resolvedPaymentCode = String(orderJson.paymentCode).trim().toUpperCase();
+          if (!resolvedPaymentCode.startsWith('FAST')) {
+            resolvedPaymentCode = `FAST${resolvedPaymentCode}`;
+          }
+          resolvedOrderId = orderJson.orderId || '';
+        }
+      }
+    } catch (err) {
+      console.warn('Create order fallback for training registration:', err);
+    }
+
     const regData = {
       id: regId,
+      orderId: resolvedOrderId,
       userId: auth.currentUser?.uid || null,
       userEmail: accountEmail,
       studentName: studentName.trim(),
@@ -200,316 +220,138 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
       totalNumericPrice,
       startDate: course.startDate || 'Theo lịch khóa học',
       scheduleDetails: course.scheduleDetails || 'Sáng 08:30 - 11:30 | Chiều 13:30 - 16:30',
-      venueAddress: course.venueAddress || 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội / Zoom HD',
+      venueAddress:
+        trainingType === 'direct'
+          ? (course.venueAddress || 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội').replace(/\s*\/\s*Zoom\s*HD/gi, '').trim()
+          : (course.venueAddress || 'Phòng học trực tuyến Zoom HD'),
       meetingLink: resolvedMeetingLink,
       zoomLink: resolvedMeetingLink,
       notes: notes.trim(),
-      paymentMethod: 'vietqr',
-      paymentMemo: transferMemo,
+      paymentMethod: 'sepay_acb_vietqr',
+      paymentCode: resolvedPaymentCode,
+      paymentMemo: resolvedPaymentCode,
+      paymentBank: 'ACB',
+      paymentAccountNo: accountNo,
+      paymentStatus: 'PENDING',
       status: 'pending',
       registeredAt: nowIso,
       updatedAt: nowIso
     };
 
-    const notifId = `training_${regId}`;
-    const notificationPayload = {
-      id: notifId,
-      title: `Link tham gia: ${course.title}`,
-      message: `Đăng ký #${regId} thành công (${regData.trainingTypeLabel}). Link tham gia lớp học: ${resolvedMeetingLink}`,
-      type: 'training_link',
-      courseId: course.id,
-      courseTitle: course.title,
-      courseImage: course.image || '',
-      registrationId: regId,
-      link: resolvedMeetingLink,
-      startDate: regData.startDate,
-      trainingTypeLabel: regData.trainingTypeLabel,
-      userEmail: accountEmail,
-      isRead: false,
-      createdAt: nowIso
-    };
-
     try {
-      // 1. Save to Firestore collection live_course_registrations
       await setDoc(doc(db, 'live_course_registrations', regId), regData).catch((err) => {
         console.warn('Firestore live_course_registrations fallback:', err);
       });
 
-      // 2. Save instant local notification for account bell
-      addTrainingLinkNotification({
-        id: notifId,
-        userEmail: accountEmail || undefined,
-        courseId: course.id,
-        courseTitle: course.title,
-        courseImage: course.image,
-        link: resolvedMeetingLink,
-        registrationId: regId,
-        startDate: regData.startDate,
-        trainingTypeLabel: regData.trainingTypeLabel,
-        message: notificationPayload.message
-      });
-
-      // 3. Persist notification directly to Firestore user notifications subcollection when possible
-      if (accountEmail) {
-        setDoc(doc(db, 'users', accountEmail, 'notifications', notifId), notificationPayload).catch(() => {});
-      }
-
-      // 4. Post to backend server endpoint (creates server backup + admin Firestore notification)
       await fetch('/api/direct-registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...regData, notification: notificationPayload })
+        body: JSON.stringify({ ...regData, deferAccountUntilPaid: true })
       }).catch(() => {});
 
-      setCreatedRecord(regData);
-      setIsSuccess(true);
-      toast.showToast('Đăng ký thành công! Đã gửi thông báo link khóa học về tài khoản của bạn.', 'success');
+      const checkoutPayload = {
+        registration: regData,
+        orderId: resolvedOrderId,
+        paymentCode: resolvedPaymentCode,
+        amount: totalNumericPrice,
+        courseId: course.id,
+        courseTitle: course.title,
+        courseImage: course.image || '',
+        studentName: studentName.trim(),
+        email: accountEmail,
+        phone: phone.trim(),
+        trainingTypeLabel: regData.trainingTypeLabel,
+        startDate: regData.startDate,
+        scheduleDetails: regData.scheduleDetails,
+        venueAddress: regData.venueAddress,
+        meetingLink: resolvedMeetingLink
+      };
+
+      try {
+        sessionStorage.setItem('fast_pending_training_checkout', JSON.stringify(checkoutPayload));
+      } catch {}
+
+      onClose();
+      const q = new URLSearchParams({
+        regId,
+        code: resolvedPaymentCode
+      });
+      if (resolvedOrderId) q.set('orderId', resolvedOrderId);
+      navigate(`/thanh-toan-dao-tao?${q.toString()}`, { state: { checkoutPayload } });
     } catch (err: any) {
       console.error('Lỗi lưu đăng ký khóa học:', err);
-      toast.showToast('Không thể gửi đăng ký. Vui lòng kiểm tra lại kết nối mạng!', 'error');
+      toast.showToast('Không thể khởi tạo đơn thanh toán. Vui lòng kiểm tra lại kết nối mạng!', 'error');
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) setIsSubmitting(false);
     }
   };
 
-  const handleReset = () => {
-    setIsSuccess(false);
-    setCreatedRecord(null);
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto print:hidden">
-      <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden my-6 animate-fade-in relative text-slate-800">
-        
-        {/* Header Header Bar */}
-        <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-[#007c76] p-5 sm:p-6 text-white flex items-center justify-between border-b border-teal-500/30">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0 shadow-inner">
-              <Sparkles className="w-5 h-5 text-teal-300" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm overflow-y-auto print:hidden">
+      <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden my-4 relative text-slate-900 transition-all">
+        {/* Clean Top Modal Header */}
+        <div className="px-6 py-4 sm:px-8 sm:py-5 bg-slate-900 text-white flex items-center justify-between gap-4 border-b border-slate-800">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-teal-300 font-medium">
+              <span>Đào tạo trực tiếp &amp; Zoom</span>
+              <span aria-hidden="true">·</span>
+              <span>Bước 1/2: Thông tin đăng ký</span>
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-widest text-teal-300 block">
-                Đăng Ký Khóa Đào Tạo Trực Tiếp &amp; Zoom
-              </span>
-              <h3 className="font-black text-base text-white truncate">
-                {course.title}
-              </h3>
-            </div>
+            <h3 className="font-bold text-base sm:text-lg text-white leading-snug mt-0.5 break-words [overflow-wrap:break-word]">
+              {course.title}
+            </h3>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-2"
+            aria-label="Đóng cửa sổ"
+            className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Screen 2: Registration Success & Payment Details */}
-        {isSuccess && createdRecord ? (
-          <div className="p-6 sm:p-8 space-y-6 max-h-[85vh] overflow-y-auto">
-            {/* Success Banner */}
-            <div className="text-center space-y-3">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner animate-bounce">
-                <CheckCircle2 className="w-9 h-9" />
-              </div>
-              <div>
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  Mã đăng ký: #{createdRecord.id}
-                </span>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mt-2">
-                  Đăng ký thành công!
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto mt-1">
-                  Cảm ơn <strong className="text-slate-900">{createdRecord.studentName}</strong>. Hệ thống đã lưu giữ chỗ cho bạn. Vui lòng chuyển khoản học phí để xác nhận giữ chỗ chính thức.
-                </p>
-              </div>
-            </div>
-
-            {/* Registration Summary Card */}
-            <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-2.5 text-xs sm:text-sm">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                <span className="text-slate-500 font-bold">Khóa đào tạo:</span>
-                <span className="font-black text-[#007c76] text-right truncate max-w-[240px] sm:max-w-[320px]">{createdRecord.courseTitle}</span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                <span className="text-slate-500 font-bold">Hình thức học:</span>
-                <span className="font-black text-emerald-700 flex items-center gap-1.5">
-                  {createdRecord.trainingType === 'zoom' ? <Video className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-                  {createdRecord.trainingTypeLabel}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                <span className="text-slate-500 font-bold">Số lượng học viên:</span>
-                <span className="font-bold text-slate-800">{createdRecord.participantCount} học viên</span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
-                <span className="text-slate-500 font-bold">Lịch khai giảng:</span>
-                <span className="font-bold text-slate-800">{createdRecord.startDate}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-bold">Tổng học phí:</span>
-                <span className="font-black text-emerald-700 text-base">{createdRecord.totalPrice}</span>
-              </div>
-            </div>
-
-            {/* VietQR Bank Transfer Card */}
-            <div className="p-4 sm:p-5 bg-teal-50/60 rounded-2xl border border-teal-200/80 space-y-4">
-              <div className="flex items-center gap-2 text-[#007c76] font-black uppercase text-xs">
-                <QrCode className="w-4 h-4" />
-                <span>Thanh Toán Chuyển Khoản Qua VietQR</span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="bg-white p-2 rounded-xl border border-teal-200 shadow-sm shrink-0">
-                  <img
-                    src={qrUrl}
-                    alt="VietQR Chuyển khoản"
-                    className="w-36 h-36 object-contain"
-                  />
-                </div>
-
-                <div className="space-y-2.5 text-xs flex-1 w-full">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Ngân hàng &amp; STK</span>
-                      <strong className="font-mono text-slate-900 font-black text-sm">MB Bank: 0927 002 668</strong>
-                      <span className="text-[10px] text-slate-600 block font-black uppercase">CÔNG TY TNHH TƯ VẤN FAST</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard('0927002668', 'stk')}
-                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedStk ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedStk ? 'Đã chép' : 'Sao chép'}</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex justify-between items-center">
-                    <div>
-                      <span className="text-[10px] text-amber-700 font-black uppercase block">Nội dung chuyển khoản (bắt buộc)</span>
-                      <strong className="font-mono text-amber-950 font-black text-sm bg-yellow-200/70 px-1.5 py-0.5 rounded">
-                        {transferMemo}
-                      </strong>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(transferMemo, 'memo')}
-                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer shadow-xs"
-                    >
-                      {copiedMemo ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedMemo ? 'Đã chép' : 'Sao chép nội dung'}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-[11px] text-slate-500 bg-white/80 p-3 rounded-xl border border-teal-100 flex items-start gap-2">
-                <Info className="w-4 h-4 text-[#007c76] shrink-0 mt-0.5" />
-                <span>
-                  Sau khi hoàn tất thanh toán, bộ phận học vụ FAST E-Learning sẽ kiểm tra và gửi xác nhận qua Zalo SĐT <strong className="text-slate-800 font-mono">{createdRecord.phone}</strong> kèm đường dẫn phòng Zoom và giáo trình chi tiết.
-                </span>
-              </div>
-            </div>
-
-            {/* Account Notification & Class Link Banner */}
-            <div className="p-4 sm:p-5 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-emerald-800 font-black uppercase text-xs">
-                  <Bell className="w-4 h-4 text-emerald-600" />
-                  <span>Thông Báo Link Lớp Học Đã Gửi Qua Tài Khoản</span>
-                </div>
-                {createdRecord.userEmail && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-full border border-emerald-200 truncate max-w-[180px]">
-                    {createdRecord.userEmail}
-                  </span>
-                )}
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Link tham gia / thông tin lớp học</span>
-                  <a
-                    href={createdRecord.meetingLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-black text-[#007c76] hover:underline break-all inline-flex items-center gap-1"
-                  >
-                    <span>{createdRecord.meetingLink}</span>
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                  </a>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(createdRecord.meetingLink, 'link')}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] transition flex items-center gap-1 cursor-pointer shrink-0 self-start sm:self-center"
-                >
-                  {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Đã chép link' : 'Sao chép link'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="pt-2 flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  handleReset();
-                  navigate('/account');
-                }}
-                className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Bell className="w-4 h-4 text-teal-300" />
-                <span>Xem Thông Báo Trong Tài Khoản</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="flex-1 py-3.5 bg-[#007c76] hover:bg-[#005c56] text-white font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer shadow-lg shadow-[#007c76]/20 flex items-center justify-center gap-2"
-              >
-                <span>Hoàn Tất &amp; Đóng</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Form Đăng Ký Khóa Học */
-          <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-5 max-h-[80vh] overflow-y-auto">
-            {/* Tóm tắt khóa học & ảnh bìa */}
-            <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-teal-50/60 border border-teal-200/80">
+        {/* Form Đăng Ký Khóa Học */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-5 max-h-[82vh] overflow-y-auto">
+            {/* Course summary header */}
+            <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
               <img
                 src={course.image}
                 alt={course.title}
-                className="w-24 h-16 object-cover rounded-xl border border-slate-200 shadow-xs shrink-0"
+                referrerPolicy="no-referrer"
+                className="w-24 h-16 object-cover rounded-xl border border-slate-200 shrink-0"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=800';
+                  (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
-              <div className="flex-1 min-w-0 space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase text-[#007c76]">{course.category || 'Đào tạo ATTP'}</span>
-                  <span className="text-[10px] bg-white text-slate-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">
-                    Lịch: {course.startDate || 'Chủ Nhật hàng tuần'}
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="font-semibold text-[#007c76]">{course.category || 'Đào tạo ATTP'}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    {course.startDate || 'Chủ Nhật hàng tuần'}
                   </span>
+                  <span aria-hidden="true">·</span>
+                  <span>{course.duration || '1 ngày'}</span>
                 </div>
-                <h4 className="w-full text-sm font-black text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">{course.title}</h4>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-emerald-700">{course.price}</span>
+                <h4 className="w-full text-sm sm:text-base font-bold text-slate-900 leading-[1.45] break-words [overflow-wrap:break-word]">
+                  {course.title}
+                </h4>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-bold text-[#007c76] tabular-nums">{course.price}</span>
                   {course.originalPrice && course.originalPrice !== course.price && (
-                    <span className="text-xs text-slate-400 line-through font-bold">{course.originalPrice}</span>
+                    <span className="text-xs text-slate-400 line-through tabular-nums">{course.originalPrice}</span>
                   )}
-                  <span className="text-[10px] text-slate-500 font-medium">({course.duration || '1 ngày'})</span>
                 </div>
               </div>
             </div>
 
-            {/* Select Hình thức tham gia (Zoom / Offline Direct) */}
+            {/* Hình thức học */}
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
-                Hình thức học tập mong muốn:
+              <label className="text-xs font-bold text-slate-700 block">
+                Hình thức học tập mong muốn
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -517,20 +359,20 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                   type="button"
                   disabled={course.trainingFormat === 'direct'}
                   onClick={() => setTrainingType('zoom')}
-                  className={`p-3.5 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
+                  className={`p-3.5 rounded-xl border text-left transition-colors flex items-center gap-3 cursor-pointer ${
                     trainingType === 'zoom'
-                      ? 'border-[#007c76] bg-teal-50/80 shadow-xs text-[#007c76] ring-2 ring-[#007c76]/20'
-                      : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                      ? 'border-[#007c76] bg-teal-50/70 text-[#007c76]'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700'
                   } ${course.trainingFormat === 'direct' ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                     trainingType === 'zoom' ? 'bg-[#007c76] text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
-                    <Video className="w-5 h-5" />
+                    <Video className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-black text-xs block">Online qua Zoom HD</span>
-                    <span className="text-[10px] opacity-80 block">Học tại nhà, tương tác 1-1</span>
+                    <span className="font-bold text-xs block">Online qua Zoom HD</span>
+                    <span className="text-[11px] text-slate-500 block">Học trực tuyến, tương tác 1-1</span>
                   </div>
                 </button>
 
@@ -538,67 +380,65 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                   type="button"
                   disabled={course.trainingFormat === 'zoom'}
                   onClick={() => setTrainingType('direct')}
-                  className={`p-3.5 rounded-2xl border text-left transition flex items-center gap-3 cursor-pointer ${
+                  className={`p-3.5 rounded-xl border text-left transition-colors flex items-center gap-3 cursor-pointer ${
                     trainingType === 'direct'
-                      ? 'border-[#007c76] bg-teal-50/80 shadow-xs text-[#007c76] ring-2 ring-[#007c76]/20'
-                      : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                      ? 'border-[#007c76] bg-teal-50/70 text-[#007c76]'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700'
                   } ${course.trainingFormat === 'zoom' ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`}
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                     trainingType === 'direct' ? 'bg-[#007c76] text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
-                    <MapPin className="w-5 h-5" />
+                    <MapPin className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-black text-xs block">Trực tiếp tại Hội trường</span>
-                    <span className="text-[10px] opacity-80 block">Thực hành hiện trường &amp; mẫu</span>
+                    <span className="font-bold text-xs block">Trực tiếp tại Hội trường</span>
+                    <span className="text-[11px] text-slate-500 block">Thực hành hiện trường &amp; mẫu</span>
                   </div>
                 </button>
               </div>
             </div>
 
-            {/* Controls Số lượng học viên */}
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="space-y-0.5 text-center sm:text-left">
-                <span className="text-xs font-black uppercase text-slate-800 block">Số lượng học viên đăng ký</span>
-                <span className="text-[11px] text-slate-500 font-medium block">
+            {/* Số lượng học viên */}
+            <div className="bg-slate-50 px-4 py-3.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">Số lượng học viên đăng ký</span>
+                <span className="text-xs text-slate-500 tabular-nums">
                   Đơn giá: <strong className="text-slate-800">{course.price}</strong> / học viên
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setParticipantCount(prev => Math.max(1, prev - 1))}
-                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer font-bold"
+                  className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-8 text-center font-black text-sm text-slate-900 font-mono">
+                <span className="w-8 text-center font-bold text-sm text-slate-900 font-mono tabular-nums">
                   {participantCount}
                 </span>
                 <button
                   type="button"
                   onClick={() => setParticipantCount(prev => Math.min(50, prev + 1))}
-                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition cursor-pointer font-bold"
+                  className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Form Thông tin học viên */}
+            {/* Thông tin học viên */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
-                  Thông tin học viên đăng ký:
-                </label>
-                <span className="text-[10px] text-slate-400 font-bold">* Bắt buộc điền</span>
+                <label className="text-xs font-bold text-slate-700">Thông tin học viên</label>
+                <span className="text-xs text-slate-400">* Bắt buộc</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-600">Họ và tên học viên chính *</span>
+                  <span className="text-xs font-medium text-slate-600">Họ và tên học viên chính *</span>
                   <div className="relative">
                     <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -607,13 +447,13 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                       value={studentName}
                       onChange={e => setStudentName(e.target.value)}
                       placeholder="Nguyễn Văn A"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-600">Số điện thoại / Zalo *</span>
+                  <span className="text-xs font-medium text-slate-600">Số điện thoại / Zalo *</span>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -622,27 +462,35 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
                       placeholder="0912 345 678"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none font-mono"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-600">Email nhận link Zoom &amp; tài liệu</span>
+                  <span className="text-xs font-medium text-slate-600">
+                    Email nhận lịch học &amp; tài khoản *
+                  </span>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="email"
+                      required
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       placeholder="hocvien@email.com"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
                     />
                   </div>
+                  {!isUserLoggedIn && (
+                    <span className="text-[11px] text-[#007c76] block">
+                      Tài khoản sẽ tự động tạo sẵn theo email này để nhận OTP &amp; lịch học.
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-slate-600">Tên Doanh nghiệp / Cơ sở</span>
+                  <span className="text-xs font-medium text-slate-600">Tên Doanh nghiệp / Cơ sở</span>
                   <div className="relative">
                     <Building2 className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -650,17 +498,16 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
                       value={companyName}
                       onChange={e => setCompanyName(e.target.value)}
                       placeholder="Công ty F&amp;B / Cơ sở kinh doanh"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-[#007c76] outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Thêm ô danh sách học viên bổ sung nếu đăng ký > 1 người */}
               {participantCount > 1 && (
-                <div className="space-y-1 pt-1 animate-fade-in">
-                  <span className="text-[11px] font-bold text-slate-600">
-                    Họ tên {participantCount - 1} học viên bổ sung (Mỗi học viên 1 dòng):
+                <div className="space-y-1 pt-1">
+                  <span className="text-xs font-medium text-slate-600">
+                    Họ tên {participantCount - 1} học viên bổ sung (Mỗi học viên 1 dòng)
                   </span>
                   <textarea
                     rows={2}
@@ -673,7 +520,7 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
               )}
 
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-600">Ghi chú / Yêu cầu đặc biệt (nếu có)</span>
+                <span className="text-xs font-medium text-slate-600">Ghi chú / Yêu cầu đặc biệt (tùy chọn)</span>
                 <input
                   type="text"
                   value={notes}
@@ -684,26 +531,31 @@ export const TrainingRegistrationModal: React.FC<TrainingRegistrationModalProps>
               </div>
             </div>
 
-            {/* Total Fee & Submit Button */}
-            <div className="pt-2 border-t border-slate-200 space-y-3">
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="font-bold text-slate-600 uppercase">Tổng học phí thanh toán:</span>
-                <span className="font-black text-emerald-700 text-lg sm:text-xl font-mono">
-                  {formattedTotalPrice}
-                </span>
+            {/* Footer Summary & Submit */}
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+                <div className="text-slate-500">
+                  <span>Thanh toán tự động ACB · SePay </span>
+                  <span className="font-mono font-semibold text-slate-700">({accountNo})</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs text-slate-500">Tổng học phí:</span>
+                  <span className="font-bold text-[#007c76] text-lg sm:text-xl font-mono tabular-nums">
+                    {formattedTotalPrice}
+                  </span>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-4 bg-[#007c76] hover:bg-[#005c56] text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-lg shadow-[#007c76]/20 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-6 bg-[#007c76] hover:bg-[#00625d] text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="w-4.5 h-4.5 text-teal-200" />
-                <span>{isSubmitting ? 'Đang khởi tạo hồ sơ...' : `Xác Nhận Đăng Ký (${formattedTotalPrice})`}</span>
+                <span>{isSubmitting ? 'Đang chuyển sang trang thanh toán...' : `Tiếp tục thanh toán (${formattedTotalPrice})`}</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </form>
-        )}
       </div>
     </div>
   );

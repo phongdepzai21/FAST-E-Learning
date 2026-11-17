@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { Course } from '../types';
 import { getMergedCourses } from '../constants';
 import { getCachedFeaturedCourseIds, subscribeToFeaturedCourseIds, filterFeaturedCourses } from '../utils/featuredCoursesService';
-import { getPaymentConfig, getVietQrUrl } from '../utils/qrService';
+import { getPaymentConfig, formatVND } from '../utils/qrService';
 import { generateTenDigitId } from '../utils/idGenerator';
+import { getFastSessionUser } from '../utils/sessionAuth';
 import {
   X,
   Video,
@@ -16,15 +18,6 @@ import {
   Phone,
   Mail,
   Building,
-  CheckCircle2,
-  QrCode,
-  ShieldCheck,
-  Sparkles,
-  Copy,
-  Clock,
-  Award,
-  ChevronRight,
-  BookOpen,
   ArrowRight,
   Flame,
   Check
@@ -40,19 +33,19 @@ export interface LiveCourseRegistrationProps {
 export const PRESET_TRAINING_SCHEDULES = [
   {
     id: 'zoom-sun-evening',
-    label: 'Tối Chủ Nhật (19:30 - 21:30) • Trực tuyến qua Zoom',
+    label: 'Chủ Nhật, 22/11/2026 (19:30 - 21:30) • Trực tuyến qua Zoom',
     type: 'zoom' as const,
     note: 'Tương tác trực tiếp cùng chuyên gia, giải đáp câu hỏi thực tế'
   },
   {
     id: 'direct-sun-morning',
-    label: 'Sáng Chủ Nhật (08:30 - 11:30) • Trực tiếp Hội trường',
+    label: 'Chủ Nhật, 22/11/2026 (08:30 - 11:30) • Trực tiếp Hội trường',
     type: 'direct' as const,
     note: 'Tập huấn trực tiếp tại Hội trường trung tâm FAST (Cấp giấy tại lớp)'
   },
   {
     id: 'zoom-sat-evening',
-    label: 'Tối Thứ Bảy (19:30 - 21:30) • Trực tuyến qua Zoom',
+    label: 'Thứ Bảy, 28/11/2026 (19:30 - 21:30) • Trực tuyến qua Zoom',
     type: 'zoom' as const,
     note: 'Thực hành phân tích mối nguy & tình huống kiểm tra ATTP'
   },
@@ -60,7 +53,7 @@ export const PRESET_TRAINING_SCHEDULES = [
     id: 'custom-schedule',
     label: 'Lịch riêng theo yêu cầu của cơ sở / doanh nghiệp',
     type: 'direct' as const,
-    note: 'FAST cử chuyên gia tập huấn tận nơi cho đoàn từ 3 người'
+    note: 'FAST cử chuyên gia tập huấn tận nơi theo ngày giờ thỏa thuận cho đoàn từ 3 người'
   }
 ];
 
@@ -71,6 +64,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
   isStandalonePage = false
 }) => {
   const toast = useToast();
+  const navigate = useNavigate();
 
   // State danh sách toàn bộ khóa học và 5 khóa nổi bật
   const [allCourses, setAllCourses] = useState<Course[]>(() => getMergedCourses([]));
@@ -86,10 +80,16 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
   const [email, setEmail] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [createdRecord, setCreatedRecord] = useState<any | null>(null);
+  const [sessionRegId] = useState<string>(() => generateTenDigitId());
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Sync toàn bộ khóa học từ API nếu có
   useEffect(() => {
@@ -139,34 +139,20 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
     }
   }, [studentName, email]);
 
-  // Cấu hình ngân hàng VietQR
+  // Cấu hình ngân hàng VietQR (ACB · 0989499568)
   const paymentConfig = useMemo(() => getPaymentConfig(), []);
+  const accountNo = paymentConfig.accountNo === '0989499568' ? paymentConfig.accountNo : '0989499568';
   const tuitionAmount = 199000;
-  const tuitionFormatted = '199.000đ';
+  const tuitionFormatted = formatVND(tuitionAmount);
 
-  const cleanPhoneMemo = useMemo(() => {
-    const digits = phone.replace(/[^\d]/g, '');
-    const courseCode = selectedCourse?.id?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'LIVE';
-    return `LIVE199K ${digits || 'SDT'} ${courseCode}`;
-  }, [phone, selectedCourse?.id]);
+  // Mã nội dung chuyển khoản luôn bắt đầu bằng FAST (1 từ liền mạch 12 ký tự để SePay nhận diện 100%)
+  const fastPaymentCode = useMemo(() => {
+    const suffix = sessionRegId.replace(/[^A-Z0-9]/gi, '').slice(-8).toUpperCase().padStart(8, '8');
+    return `FAST${suffix}`;
+  }, [sessionRegId]);
 
-  const vietQrUrl = useMemo(() => {
-    return getVietQrUrl({
-      bankId: paymentConfig.bankId || 'MB',
-      accountNo: paymentConfig.accountNo || '0927002668',
-      accountName: paymentConfig.accountName || 'CONG TY TNHH TU VAN FAST',
-      amount: tuitionAmount,
-      memo: cleanPhoneMemo,
-      template: 'compact2'
-    });
-  }, [paymentConfig, cleanPhoneMemo, tuitionAmount]);
-
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    toast.showToast(`Đã sao chép ${field}!`, 'success');
-    setTimeout(() => setCopiedField(null), 2000);
-  };
+  const currentSessionUser = getFastSessionUser();
+  const isUserLoggedIn = !!(auth.currentUser || currentSessionUser);
 
   const handleSubmitRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,38 +167,118 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
       return;
     }
 
+    const sessionUser = getFastSessionUser();
+    const normalizedEmail = (email.trim() || auth.currentUser?.email || sessionUser?.email || '').toLowerCase().trim();
+    if (!normalizedEmail) {
+      toast.showToast('Vui lòng nhập email để hệ thống tự động tạo tài khoản và gửi lịch học', 'error');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      toast.showToast('Email không đúng định dạng. Vui lòng kiểm tra lại!', 'error');
+      return;
+    }
+
     if (!selectedCourse) {
       toast.showToast('Vui lòng chọn 1 trong 5 khóa học nổi bật', 'error');
       return;
     }
 
     setIsSubmitting(true);
-    const regId = generateTenDigitId();
+    const regId = sessionRegId;
     const chosenSchedule = customDate ? `Ngày riêng: ${customDate} (${trainingType === 'zoom' ? 'Zoom' : 'Trực tiếp'})` : scheduleChoice;
+    const cleanPhoneDigits = phone.replace(/[^\d]/g, '');
+
+    let resolvedOrderId = '';
+    let resolvedPaymentCode = fastPaymentCode;
+
+    try {
+      const orderRes = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: selectedCourse.id,
+          courseTitle: selectedCourse.title,
+          amount: tuitionAmount,
+          email: normalizedEmail || `${cleanPhoneDigits}@fast-training.local`,
+          userId: auth.currentUser?.uid || '',
+          registrationId: regId,
+          orderType: 'direct_training',
+          studentName: studentName.trim(),
+          phone: phone.trim(),
+          requestedPaymentCode: fastPaymentCode
+        })
+      });
+      if (orderRes.ok) {
+        const orderJson = await orderRes.json();
+        if (orderJson.success && orderJson.paymentCode) {
+          resolvedPaymentCode = String(orderJson.paymentCode).trim().toUpperCase();
+          if (!resolvedPaymentCode.startsWith('FAST')) resolvedPaymentCode = `FAST${resolvedPaymentCode}`;
+          resolvedOrderId = orderJson.orderId || '';
+        }
+      }
+    } catch (err) {
+      console.warn('Create order fallback:', err);
+    }
+
+    const resolvedMeetingLink =
+      trainingType === 'direct'
+        ? 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi'
+        : 'https://zoom.us/j/84927002668';
+    const trainingTypeLabel = trainingType === 'zoom' ? 'Online qua Zoom HD' : 'Trực tiếp tại Hội trường';
+    const nowIso = new Date().toISOString();
 
     const registrationData = {
       id: regId,
+      orderId: resolvedOrderId,
       studentName: studentName.trim(),
       phone: phone.trim(),
-      email: email.trim() || (auth.currentUser?.email || ''),
+      email: normalizedEmail,
+      userEmail: normalizedEmail,
       companyName: companyName.trim() || 'Cá nhân / Tự do',
       courseId: selectedCourse.id,
       courseTitle: selectedCourse.title,
       price: tuitionFormatted,
+      totalPrice: tuitionFormatted,
+      totalNumericPrice: tuitionAmount,
       trainingType,
+      trainingTypeLabel,
       startDate: chosenSchedule,
       notes: notes.trim(),
-      registeredAt: new Date().toISOString(),
+      registeredAt: nowIso,
       status: 'pending',
-      paymentCode: cleanPhoneMemo,
-      paymentMethod: 'vietqr',
+      paymentStatus: 'PENDING',
+      paymentCode: resolvedPaymentCode,
+      paymentMemo: resolvedPaymentCode,
+      paymentBank: 'ACB',
+      paymentAccountNo: accountNo,
+      paymentMethod: 'sepay_acb_vietqr',
+      meetingLink: resolvedMeetingLink,
+      zoomLink: resolvedMeetingLink,
       zoomMeetingId: '849 2700 2668',
       zoomPasscode: 'FAST199K',
       venueAddress: 'Tòa nhà FAST E-Learning, Số 18 Phố Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội'
     };
 
+    const notifId = `training_${regId}`;
+    const notificationPayload = {
+      id: notifId,
+      title: `Thông báo lịch học: ${selectedCourse.title}`,
+      message: `Đăng ký #${regId} thành công (${trainingTypeLabel}). Lịch trình: ${chosenSchedule}. Mã thanh toán: ${resolvedPaymentCode}. Link/Địa điểm: ${resolvedMeetingLink}`,
+      type: 'training_link',
+      courseId: selectedCourse.id,
+      courseTitle: selectedCourse.title,
+      courseImage: selectedCourse.image || '',
+      registrationId: regId,
+      link: resolvedMeetingLink,
+      startDate: chosenSchedule,
+      venueAddress: registrationData.venueAddress,
+      trainingTypeLabel,
+      userEmail: normalizedEmail,
+      isRead: false,
+      createdAt: nowIso
+    };
+
     try {
-      // 1. Lưu Firestore live_course_registrations & direct_course_registrations
       try {
         await setDoc(doc(db, 'live_course_registrations', regId), registrationData);
         await setDoc(doc(db, 'direct_course_registrations', regId), registrationData);
@@ -220,109 +286,52 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
         console.warn('Lỗi ghi Firestore (tiếp tục lưu qua server):', err);
       }
 
-      // 2. Gửi API lưu vào backend server & backup đĩa cứng
-      try {
-        await fetch('/api/direct-registrations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(registrationData)
-        });
-      } catch (err) {
+      await fetch('/api/direct-registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...registrationData, deferAccountUntilPaid: true })
+      }).catch((err) => {
         console.warn('Lỗi API server:', err);
-      }
+      });
 
-      setCreatedRecord(registrationData);
-      setIsSuccess(true);
-      toast.showToast('Đăng ký khóa đào tạo trực tiếp thành công!', 'success');
+      const checkoutPayload = {
+        registration: registrationData,
+        orderId: resolvedOrderId,
+        paymentCode: resolvedPaymentCode,
+        amount: tuitionAmount,
+        courseId: selectedCourse.id,
+        courseTitle: selectedCourse.title,
+        courseImage: selectedCourse.image || '',
+        studentName: studentName.trim(),
+        email: normalizedEmail,
+        phone: phone.trim(),
+        trainingTypeLabel,
+        startDate: chosenSchedule,
+        scheduleDetails: 'Sáng 08:30 - 11:30 | Tối 19:30 - 21:30',
+        venueAddress: registrationData.venueAddress,
+        meetingLink: resolvedMeetingLink
+      };
+
+      try {
+        sessionStorage.setItem('fast_pending_training_checkout', JSON.stringify(checkoutPayload));
+      } catch {}
+
+      if (onClose) onClose();
+      const q = new URLSearchParams({
+        regId,
+        code: resolvedPaymentCode
+      });
+      if (resolvedOrderId) q.set('orderId', resolvedOrderId);
+      navigate(`/thanh-toan-dao-tao?${q.toString()}`, { state: { checkoutPayload } });
     } catch (error: any) {
       console.error('Lỗi khi gửi đăng ký:', error);
-      toast.showToast('Có lỗi xảy ra khi lưu đăng ký. Vui lòng thử lại!', 'error');
+      toast.showToast('Có lỗi xảy ra khi khởi tạo thanh toán. Vui lòng thử lại!', 'error');
     } finally {
-      setIsSubmitting(false);
+      if (isMountedRef.current) setIsSubmitting(false);
     }
   };
 
-  const handleResetForm = () => {
-    setIsSuccess(false);
-    setCreatedRecord(null);
-    setNotes('');
-  };
-
   if (!isOpen && !isStandalonePage) return null;
-
-  // Render Màn hình Thành công (Confirmation Screen)
-  if (isSuccess && createdRecord) {
-    return (
-      <div className={isStandalonePage ? 'max-w-4xl mx-auto p-4 md:p-8 animate-fade-in' : 'p-6 md:p-8 text-center animate-fade-in'}>
-        <div className="bg-white rounded-3xl border border-emerald-100 shadow-2xl p-6 sm:p-10 text-center max-w-2xl mx-auto space-y-6">
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              Đăng ký thành công • Học phí: {tuitionFormatted}
-            </span>
-            <h3 className="text-2xl sm:text-3xl font-black text-gray-900 leading-tight">
-              Chào mừng {createdRecord.studentName}!
-            </h3>
-            <p className="text-sm text-gray-600 max-w-md mx-auto">
-              Hệ thống FAST E-Learning đã ghi nhận hồ sơ đăng ký khóa đào tạo trực tiếp của bạn.
-            </p>
-          </div>
-
-          {/* Chi tiết phiếu đăng ký */}
-          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-left space-y-3.5 text-xs sm:text-sm">
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-slate-500 font-bold">Khóa học đăng ký:</span>
-              <span className="font-black text-[#007c76] text-right truncate max-w-[240px]">{createdRecord.courseTitle}</span>
-            </div>
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-slate-500 font-bold">Lịch đào tạo:</span>
-              <span className="font-black text-slate-800 text-right">{createdRecord.startDate}</span>
-            </div>
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-slate-500 font-bold">Hình thức:</span>
-              <span className="font-black text-emerald-700 flex items-center gap-1">
-                {createdRecord.trainingType === 'zoom' ? <Video className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-                {createdRecord.trainingType === 'zoom' ? 'Trực tuyến Zoom' : 'Trực tiếp Hội trường'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-slate-500 font-bold">Số điện thoại / Zalo:</span>
-              <span className="font-black text-slate-900">{createdRecord.phone}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-500 font-bold">Mã số hồ sơ:</span>
-              <span className="font-mono font-black text-xs text-slate-800 bg-white px-2.5 py-1 rounded border border-slate-200">
-                #{createdRecord.id}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleResetForm}
-              className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-bold text-xs uppercase tracking-wider hover:bg-gray-50 transition"
-            >
-              Đăng ký thêm khóa khác
-            </button>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-3 px-4 rounded-xl bg-[#007c76] hover:bg-[#00605b] text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-[#007c76]/20 transition"
-              >
-                Đóng thông báo
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Render form đăng ký chính
   const content = (
@@ -566,18 +575,24 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Email nhận chứng nhận
+                Email nhận lịch học &amp; tài khoản <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
+                  required
                   placeholder="hocvien@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#007c76]"
                 />
               </div>
+              {!isUserLoggedIn && (
+                <p className="text-[11px] text-[#007c76] mt-1 font-medium">
+                  Hệ thống tự động tạo tài khoản theo email này để nhận OTP &amp; xem lịch học.
+                </p>
+              )}
             </div>
 
             <div>
@@ -611,83 +626,7 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
           </div>
         </div>
 
-        {/* BƯỚC 4: THANH TOÁN VIETQR 199.000Đ */}
-        <div className="p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Học phí đào tạo trực tiếp</span>
-              <span className="text-2xl font-black text-[#007c76]">{tuitionFormatted}</span>
-            </div>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 w-fit">
-              ✓ Đã bao gồm giáo trình, bài test & cấp chứng nhận
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-            {/* Ảnh mã VietQR */}
-            <div className="md:col-span-5 flex flex-col items-center">
-              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-md">
-                <img
-                  src={vietQrUrl}
-                  alt="VietQR 199k"
-                  className="w-48 h-48 object-contain rounded-lg"
-                />
-              </div>
-              <span className="text-[10px] font-bold text-slate-400 mt-1.5 flex items-center gap-1">
-                <QrCode className="w-3 h-3 text-[#007c76]" /> Quét mã thanh toán tức thì
-              </span>
-            </div>
-
-            {/* Chi tiết chuyển khoản */}
-            <div className="md:col-span-7 space-y-2.5 text-xs">
-              <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold block">Ngân hàng thụ hưởng</span>
-                  <span className="font-bold text-slate-800">{paymentConfig.bankName || 'MB Bank'}</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold block">Số tài khoản</span>
-                  <span className="font-mono font-black text-slate-900 text-sm">{paymentConfig.accountNo || '0927002668'}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(paymentConfig.accountNo || '0927002668', 'số tài khoản')}
-                  className="px-2.5 py-1 text-[11px] rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center gap-1 cursor-pointer"
-                >
-                  <Copy className="w-3 h-3" />
-                  <span>{copiedField === 'số tài khoản' ? 'Đã chép' : 'Sao chép'}</span>
-                </button>
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 font-bold block">Chủ tài khoản</span>
-                  <span className="font-black text-slate-800 uppercase text-xs">{paymentConfig.accountName || 'CÔNG TY TNHH TƯ VẤN FAST'}</span>
-                </div>
-              </div>
-
-              <div className="bg-teal-50/70 p-3 rounded-xl border border-teal-200 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-teal-800 font-bold block">Nội dung chuyển khoản (Memo)</span>
-                  <span className="font-mono font-black text-[#007c76] text-xs sm:text-sm">{cleanPhoneMemo}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(cleanPhoneMemo, 'nội dung chuyển khoản')}
-                  className="px-2.5 py-1 text-[11px] rounded bg-[#007c76] text-white hover:bg-[#00605b] font-bold flex items-center gap-1 cursor-pointer shadow-xs"
-                >
-                  <Copy className="w-3 h-3" />
-                  <span>{copiedField === 'nội dung chuyển khoản' ? 'Đã chép' : 'Sao chép'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nút gửi đăng ký */}
+        {/* Nút chuyển sang trang thanh toán */}
         <div className="pt-2">
           <button
             type="submit"
@@ -697,17 +636,17 @@ export const LiveCourseRegistration: React.FC<LiveCourseRegistrationProps> = ({
             {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Đang ghi nhận hồ sơ...</span>
+                <span>Đang chuyển sang trang thanh toán...</span>
               </>
             ) : (
               <>
-                <span>Xác Nhận Đăng Ký Khóa Đào Tạo (199.000đ)</span>
+                <span>Tiếp tục thanh toán ({tuitionFormatted})</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
           <p className="text-center text-[11px] text-slate-400 font-medium mt-2.5">
-            Bảo mật thông tin học viên 100% • Hỗ trợ xuất hóa đơn VAT theo yêu cầu của cơ sở doanh nghiệp.
+            Thanh toán tự động ACB / SePay • Sau khi hoàn tất, hệ thống tự động tạo tài khoản &amp; gửi mã OTP.
           </p>
         </div>
       </form>

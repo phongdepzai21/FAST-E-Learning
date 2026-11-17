@@ -26,30 +26,35 @@ const TERM_SECTIONS: TermSection[] = [
   {
     id: 'chu-so-huu-va-nguyen-tac-chung',
     number: '00',
-    title: 'Thông tin Chủ sở hữu website & Nguyên tắc chung về hoạt động',
+    title: 'Thông tin Chủ sở hữu website & Nguyên tắc chung (Điều 28 & 29 NĐ 52/2013/NĐ-CP, sửa đổi bởi NĐ 85/2021/NĐ-CP)',
     summary:
-      'Công khai thông tin pháp lý chủ sở hữu website FAST E-Learning và phạm vi điều chỉnh của chính sách hoạt động.',
-    keywords: 'chủ sở hữu công ty tnhh tư vấn fast mst 0314568146 địa chỉ số điện thoại email nguyên tắc chung',
+      'Công khai đầy đủ thông tin chủ sở hữu website thương mại điện tử bán hàng FAST E-Learning theo đúng quy định tại Điều 28 và Điều 29 Nghị định 52/2013/NĐ-CP, được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP.',
+    keywords: 'chủ sở hữu công ty tnhh tư vấn fast mst 0314568146 nghị định 52/2013/nđ-cp nghị định 85/2021/nđ-cp điều 28 điều 29 sở kế hoạch đầu tư địa chỉ số điện thoại email',
     paragraphs: [
-      'Website fastelearning.com.vn là nền tảng đào tạo trực tuyến và cung cấp học liệu, công cụ quản lý an toàn thực phẩm & tiêu chuẩn quốc tế (ISO, HACCP) thuộc quyền sở hữu và quản lý trực tiếp của CÔNG TY TNHH TƯ VẤN FAST.',
+      'Website fastelearning.com.vn là website thương mại điện tử bán hàng cung ứng dịch vụ đào tạo trực tuyến, khóa đào tạo trực tiếp/Zoom và bộ công cụ quản lý an toàn thực phẩm & tiêu chuẩn quốc tế (ISO, HACCP) thuộc quyền sở hữu và quản lý trực tiếp của CÔNG TY TNHH TƯ VẤN FAST.',
+      'Website công bố minh bạch toàn bộ thông tin chủ sở hữu, thông tin dịch vụ, giá cả, điều kiện giao dịch chung, giao nhận/cung ứng dịch vụ số và phương thức thanh toán theo Điều 28 Nghị định 52/2013/NĐ-CP về thương mại điện tử, được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP.',
       'Bằng việc truy cập, đăng ký tài khoản hoặc giao dịch trên website, bạn xác nhận đã đọc, hiểu và đồng ý tuân thủ toàn bộ Chính sách chung về hoạt động (Điều khoản sử dụng) này.'
     ],
     bullets: [
       {
         label: 'Tên chủ sở hữu website',
-        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED)'
+        text: 'CÔNG TY TNHH TƯ VẤN FAST (Tên giao dịch quốc tế: FAST CONSULTING COMPANY LIMITED)'
       },
       {
-        label: 'Mã số thuế / Số đăng ký kinh doanh',
-        text: '0314568146'
+        label: 'Tên website TMĐT & Loại hình hoạt động',
+        text: 'FAST E-Learning (https://fastelearning.com.vn) — Website TMĐT bán hàng cung ứng khóa học trực tuyến & dịch vụ đào tạo tiêu chuẩn chất lượng, an toàn thực phẩm.'
       },
       {
-        label: 'Địa chỉ trụ sở',
+        label: 'Mã số thuế / Số Giấy chứng nhận ĐKKD & Cơ quan cấp',
+        text: '0314568146 — Cấp bởi Sở Kế hoạch và Đầu tư Thành phố Hồ Chí Minh (Phòng Đăng ký kinh doanh).'
+      },
+      {
+        label: 'Địa chỉ trụ sở chính',
         text: 'Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, Thành phố Hồ Chí Minh, Việt Nam'
       },
       {
-        label: 'Số điện thoại & Email liên hệ chính thức',
-        text: 'Hotline / Zalo: 0927 002 668 · Email hỗ trợ: support@fastelearning.com.vn · Email doanh nghiệp: hkc.qms@gmail.com'
+        label: 'Số điện thoại & Địa chỉ thư điện tử (Email) chính thức',
+        text: 'Hotline / Zalo: 0927 002 668 · Email hỗ trợ học viên: support@fastelearning.com.vn · Email doanh nghiệp: hkc.qms@gmail.com'
       }
     ]
   },
@@ -107,43 +112,73 @@ const TERM_SECTIONS: TermSection[] = [
   {
     id: 'mua-khoa-hoc',
     number: '02',
-    title: 'Quy định về Mua khóa học & Điều kiện giao dịch',
+    title: 'Thông tin Dịch vụ, Giá cả & Điều kiện giao dịch chung (Điều 30–32 NĐ 52/2013/NĐ-CP & NĐ 85/2021/NĐ-CP)',
     summary:
-      'Bản chất dịch vụ học liệu số, thông tin học phí niêm yết và quy trình mua khóa học — kích hoạt quyền truy cập trên hệ thống.',
-    keywords: 'mua khóa học điều kiện giao dịch quyền truy cập học phí vnđ chứng nhận 599k kích hoạt',
+      'Công bố rõ đặc tính dịch vụ đào tạo số, giá niêm yết VNĐ, quyền hủy/hoàn tiền và điều kiện giao dịch chung theo Điều 30, 31, 32 Nghị định 52/2013/NĐ-CP (sửa đổi bởi Nghị định 85/2021/NĐ-CP).',
+    keywords: 'mua khóa học điều kiện giao dịch chung thông tin hàng hóa dịch vụ giá cả điều 30 31 32 nghị định 52/2013 85/2021 vnđ kích hoạt',
     paragraphs: [
-      'FAST E-Learning cung cấp quyền truy cập trực tuyến (theo thời hạn khóa học hoặc trọn đời theo gói công bố) vào hệ thống bài giảng video, học liệu, biểu mẫu kiểm toán ISO/HACCP/ATTP và bài kiểm tra trắc nghiệm tương ứng.',
-      'Quy trình mua khóa học chuẩn gồm 4 bước: (1) Chọn khóa học hoặc gói đào tạo phù hợp -> (2) Xác nhận thông tin học viên (Họ tên, Email, Số điện thoại) -> (3) Thực hiện thanh toán qua mã VietQR ngân hàng -> (4) Hệ thống đối soát tự động trong 1–3 giây và mở khóa bài giảng ngay trên tài khoản.'
+      'Theo Điều 30 Nghị định 52/2013/NĐ-CP, mọi khóa học trên FAST E-Learning đều hiển thị công khai nội dung chương trình, số lượng bài giảng, thời lượng, hình thức học (Video trực tuyến, Zoom HD tương tác hoặc trực tiếp tại hội trường), đối tượng áp dụng và điều kiện hoàn thành.',
+      'Quy trình giao dịch chuẩn gồm 4 bước: (1) Chọn khóa học hoặc gói đào tạo phù hợp -> (2) Nhập/xác nhận thông tin học viên (Họ tên, Email, Số điện thoại) -> (3) Thực hiện thanh toán qua mã VietQR ngân hàng ACB -> (4) Hệ thống đối soát tự động (hoặc kích hoạt tài khoản qua OTP) và mở quyền truy cập bài giảng / gửi lịch trình lớp học ngay trên tài khoản.'
     ],
     bullets: [
       {
-        label: 'Minh bạch học phí & hóa đơn',
-        text: 'Mọi mức giá niêm yết bằng Đồng Việt Nam (VNĐ) là giá trọn gói, đã bao gồm chi phí lưu trữ bài giảng, chấm bài trắc nghiệm tự động và cấp Giấy chứng nhận hoàn thành bản mềm (Digital Certificate).'
+        label: 'Minh bạch giá cả & Chi phí (Điều 31 NĐ 52/2013/NĐ-CP)',
+        text: 'Mọi mức giá niêm yết bằng Đồng Việt Nam (VNĐ) trên từng trang khóa học là giá trọn gói rõ ràng, không phát sinh phụ phí ẩn; đã bao gồm chi phí lưu trữ bài giảng, chấm bài trắc nghiệm tự động và cấp Giấy chứng nhận hoàn thành bản mềm (Digital Certificate). Đối với doanh nghiệp yêu cầu xuất hóa đơn GTGT, vui lòng cung cấp thông tin MST trước hoặc ngay khi đăng ký.'
       },
       {
-        label: 'Không mua bán sẵn Giấy chứng nhận',
-        text: 'Học phí mua khóa học dùng để tiếp cận chương trình đào tạo và hệ thống đánh giá kiến thức, KHÔNG phải là giao dịch mua bán chứng nhận. Học viên cần học tối thiểu 80% thời lượng bài giảng và đạt từ 80% điểm kiểm tra trắc nghiệm trở lên mới đủ điều kiện nhận Giấy chứng nhận.'
+        label: 'Điều kiện giao dịch chung & Giới hạn sử dụng (Điều 32 NĐ 52/2013/NĐ-CP & NĐ 85/2021/NĐ-CP)',
+        text: 'Học phí mua khóa học dùng để tiếp cận chương trình đào tạo và hệ thống đánh giá kiến thức, KHÔNG phải giao dịch mua bán chứng nhận. Học viên cần hoàn thành tối thiểu 80% thời lượng bài giảng và đạt từ 80% điểm kiểm tra trắc nghiệm trở lên mới đủ điều kiện nhận Giấy chứng nhận hoàn thành.'
+      }
+    ]
+  },
+  {
+    id: 'giao-nhan-va-cung-ung-dich-vu',
+    number: '02B',
+    title: 'Chính sách Vận chuyển, Giao nhận & Cung ứng dịch vụ số (Điều 33 NĐ 52/2013/NĐ-CP)',
+    summary:
+      'Thông tin phương thức bàn giao quyền truy cập khóa học trực tuyến, lịch học Zoom/hội trường, thời hạn kích hoạt và phạm vi cung ứng dịch vụ theo Điều 33 Nghị định 52/2013/NĐ-CP.',
+    keywords: 'vận chuyển giao nhận cung ứng dịch vụ số kích hoạt tức thì link zoom chứng nhận bản cứng điều 33 nghị định 52/2013',
+    paragraphs: [
+      'Do đặc thù sản phẩm của FAST E-Learning là dịch vụ đào tạo và học liệu điện tử (không phải hàng hóa vật lý thông thường), việc giao nhận được thực hiện trực tuyến theo cơ chế kích hoạt điện tử và thông báo lịch trình tự động:'
+    ],
+    bullets: [
+      {
+        label: '1. Thời hạn kích hoạt & bàn giao dịch vụ',
+        text: 'Đối với khóa học video E-Learning: quyền học được kích hoạt tự động trong vòng 1–3 giây ngay sau khi giao dịch thanh toán VietQR được đối soát thành công (hoặc trong 5–15 phút nếu hỗ trợ thủ công). Đối với khóa đào tạo trực tiếp/Zoom: lịch trình học, mã hồ sơ và đường link phòng học được tạo sẵn và hiển thị trong mục Thông báo & Bảng điều khiển tài khoản ngay sau khi đăng ký.'
+      },
+      {
+        label: '2. Chi phí vận chuyển & Chứng nhận bản cứng (nếu có)',
+        text: 'Không thu phí vận chuyển đối với khóa học trực tuyến, tài liệu PDF và Giấy chứng nhận hoàn thành bản mềm (tải trực tiếp trên hệ thống). Trường hợp học viên hoặc doanh nghiệp có nhu cầu in và gửi chuyển phát nhanh Giấy chứng nhận bản cứng qua bưu điện, chi phí phát sinh sẽ được thông báo trước và xác nhận riêng.'
+      },
+      {
+        label: '3. Phạm vi địa lý cung ứng dịch vụ',
+        text: 'Các khóa học trực tuyến và lớp Zoom HD phục vụ học viên trên toàn lãnh thổ Việt Nam và học viên Việt kiều/quốc tế có kết nối Internet. Các lớp đào tạo trực tiếp tại hội trường tổ chức theo địa điểm công bố cụ thể trong từng lịch khai giảng.'
+      },
+      {
+        label: '4. Trách nhiệm khi giao nhận chậm trễ hoặc sự cố kỹ thuật',
+        text: 'Nếu sau 15 phút kể từ khi chuyển khoản thành công mà tài khoản chưa được mở khóa hoặc chưa nhận được thông báo lịch học, học viên liên hệ ngay Hotline/Zalo 0927 002 668 để được kiểm tra và kích hoạt ngay; trường hợp quá 48 giờ không thể sử dụng dịch vụ do lỗi hệ thống sẽ được áp dụng hoàn tiền 100%.'
       }
     ]
   },
   {
     id: 'thanh-toan',
     number: '03',
-    title: 'Chính sách Thanh toán & Xử lý sự cố chuyển khoản',
+    title: 'Phương thức Thanh toán & Xử lý sự cố giao dịch (Điều 34 NĐ 52/2013/NĐ-CP & NĐ 85/2021/NĐ-CP)',
     summary:
-      'Phương thức thanh toán qua VietQR / Ngân hàng TMCP Á Châu (ACB) và cơ chế xử lý các trường hợp chuyển sai nội dung, thiếu hoặc thừa tiền.',
-    keywords: 'thanh toán vietqr acb chuyển khoản sai nội dung thiếu thừa trùng lặp đối soát',
+      'Phương thức thanh toán minh bạch qua VietQR / Ngân hàng TMCP Á Châu (ACB - STK 0989499568) và cơ chế đảm bảo an toàn giao dịch, xử lý sai sót theo Điều 34 Nghị định 52/2013/NĐ-CP.',
+    keywords: 'thanh toán phương thức vietqr acb 0989499568 chuyển khoản sai nội dung thiếu thừa trùng lặp đối soát điều 34',
     paragraphs: [
-      'Nền tảng tích hợp cổng chuyển khoản ngân hàng tự động VietQR kết nối trực tiếp với tài khoản thụ hưởng của Công ty TNHH Tư Vấn FAST tại Ngân hàng TMCP Á Châu (ACB). Nội dung chuyển khoản chứa mã đơn hàng 10 chữ số để kích hoạt khóa học hoàn toàn tự động.'
+      'Tuân thủ Điều 34 Nghị định 52/2013/NĐ-CP (sửa đổi bởi Nghị định 85/2021/NĐ-CP), nền tảng công bố đầy đủ các phương thức thanh toán trước khi người dùng xác nhận đặt đăng ký. Hiện tại website áp dụng thanh toán chuyển khoản ngân hàng tự động qua mã VietQR kết nối trực tiếp tới tài khoản doanh nghiệp của CÔNG TY TNHH TƯ VẤN FAST tại Ngân hàng TMCP Á Châu (ACB) — Số tài khoản: 0989499568 (Chủ tài khoản: CONG TY TNHH TU VAN FAST).',
+      'Website không thu thập hay lưu giữ số thẻ tín dụng, mã CVV hoặc mật khẩu ngân hàng điện tử của khách hàng; mọi giao dịch thực hiện trực tiếp trên ứng dụng ngân hàng của người mua.'
     ],
     bullets: [
       {
-        label: 'Chuyển khoản sai hoặc thiếu nội dung định danh',
-        text: 'Hệ thống ghi nhận giao dịch vào nhật ký chờ đối soát. Học viên vui lòng chụp biên lai chuyển khoản và liên hệ Hotline/Zalo 0927 002 668 hoặc email support@fastelearning.com.vn để đội ngũ kỹ thuật kiểm tra và kích hoạt thủ công trong vòng 5–15 phút.'
+        label: 'Chuyển khoản sai hoặc thiếu nội dung định danh (tiền tố FAST)',
+        text: 'Hệ thống ghi nhận giao dịch vào nhật ký chờ đối soát. Học viên vui lòng giữ lại biên lai chuyển khoản và liên hệ Hotline/Zalo 0927 002 668 hoặc email support@fastelearning.com.vn để đội ngũ kỹ thuật kiểm tra và kích hoạt thủ công trong vòng 5–15 phút.'
       },
       {
         label: 'Chuyển khoản thiếu số tiền học phí',
-        text: 'Đơn hàng chưa thể kích hoạt tự động. Học viên cần chuyển bổ sung phần tiền còn thiếu kèm đúng mã đơn hoặc yêu cầu hoàn trả lại phần giao dịch chưa hoàn tất.'
+        text: 'Đơn hàng chưa thể kích hoạt tự động. Học viên cần chuyển bổ sung phần tiền còn thiếu kèm đúng nội dung chuyển khoản hoặc yêu cầu hoàn trả lại phần giao dịch chưa hoàn tất.'
       },
       {
         label: 'Chuyển khoản thừa tiền hoặc thanh toán trùng lặp',
@@ -218,16 +253,16 @@ const TERM_SECTIONS: TermSection[] = [
     number: '06',
     title: 'Chứng nhận hoàn thành, Bảo mật dữ liệu & Giải quyết khiếu nại',
     summary:
-      'Giá trị pháp lý của Giấy chứng nhận hoàn thành, cam kết bảo vệ dữ liệu theo Luật 91/2025/QH15 và kênh tiếp nhận khiếu nại chính thức.',
-    keywords: 'chứng nhận 80% khiếu nại bảo mật dữ liệu 91/2025/qh15 doanh nghiệp mst 0314568146',
+      'Giá trị pháp lý của Giấy chứng nhận hoàn thành, cam kết bảo vệ dữ liệu theo Luật 91/2025/QH15 & Nghị định 52/2013/NĐ-CP (sửa đổi bởi Nghị định 85/2021/NĐ-CP) và cơ chế giải quyết khiếu nại.',
+    keywords: 'chứng nhận 80% khiếu nại bảo mật dữ liệu 91/2025/qh15 nghị định 52/2013 85/2021 doanh nghiệp mst 0314568146',
     paragraphs: [
       'Giấy chứng nhận được cấp sau khi hoàn thành >= 80% thời lượng bài giảng và đạt >= 80% điểm kiểm tra trắc nghiệm là "Giấy chứng nhận hoàn thành khóa học" (Certificate of Completion) do FAST E-Learning cấp kèm mã tra cứu 10 chữ số, không phải văn bằng giáo dục nghề nghiệp hay chứng chỉ hành nghề do cơ quan Nhà nước trực tiếp cấp.',
-      'Việc thu thập và bảo vệ tên, email, thông tin xác thực Facebook/Google, dữ liệu học tập và dữ liệu giao dịch được quy định chi tiết tại Chính sách & Quyền riêng tư (/privacy-policy) tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15.'
+      'Việc thu thập, lưu trữ và bảo vệ tên, email, thông tin xác thực Facebook/Google, dữ liệu học tập và dữ liệu giao dịch được quy định chi tiết tại Chính sách bảo vệ thông tin cá nhân (/privacy-policy), tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Mục 1 Chương V Nghị định 52/2013/NĐ-CP (được sửa đổi, bổ sung bởi Nghị định 85/2021/NĐ-CP).'
     ],
     bullets: [
       {
         label: 'Đơn vị chủ quản vận hành',
-        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED) — MST: 0314568146 · Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, TP. Hồ Chí Minh.'
+        text: 'CÔNG TY TNHH TƯ VẤN FAST (FAST CONSULTING COMPANY LIMITED) — MST / Số ĐKKD: 0314568146 (Cấp bởi Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh) · Tòa nhà Mộc Gia, Tầng 6, Số 238-240-242 đường Nguyễn Oanh, Phường Gò Vấp, TP. Hồ Chí Minh.'
       },
       {
         label: 'Kênh tiếp nhận khiếu nại & hỗ trợ (rà soát trong 12 giờ)',
@@ -322,12 +357,12 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection }) => {
             <div className="max-w-3xl space-y-3">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 <span className="text-[#007c76] dark:text-teal-400 font-semibold">
-                  Pháp lý & Thỏa thuận người dùng
+                  Pháp lý &amp; Điều 28 NĐ 52/2013/NĐ-CP (sửa đổi bởi NĐ 85/2021/NĐ-CP)
                 </span>
                 <span aria-hidden="true">·</span>
                 <span className="tabular-nums">Có hiệu lực: 01/01/2026</span>
                 <span aria-hidden="true">·</span>
-                <span className="tabular-nums">Cập nhật: 14/11/2026</span>
+                <span className="tabular-nums">Cập nhật: 16/11/2026</span>
                 <span aria-hidden="true">·</span>
                 <span>CÔNG TY TNHH TƯ VẤN FAST</span>
               </div>
@@ -337,7 +372,7 @@ export const LegalTerms: React.FC<LegalTermsProps> = ({ defaultSection }) => {
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-3xl">
-                Điều khoản sử dụng website FAST E-Learning, thông tin chủ sở hữu (CÔNG TY TNHH TƯ VẤN FAST · MST: 0314568146), quyền và nghĩa vụ của các bên liên quan, chính sách thanh toán VietQR và hoàn tiền.
+                Công bố đầy đủ thông tin chủ sở hữu website (CÔNG TY TNHH TƯ VẤN FAST · MST/ĐKKD: 0314568146) và các nội dung theo Điều 28 Nghị định 52/2013/NĐ-CP, được sửa đổi bởi Nghị định 85/2021/NĐ-CP: điều kiện giao dịch chung, giao nhận dịch vụ số, thanh toán VietQR/ACB và hoàn tiền.
               </p>
             </div>
 

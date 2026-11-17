@@ -9,6 +9,10 @@ export interface PaymentWebhookBody {
   transferAmount?: number | string;
   amount?: number | string;
   referenceId?: string;
+  referenceCode?: string;
+  transactionDate?: string;
+  when?: string;
+  paidAt?: string;
   id?: string;
 }
 
@@ -47,7 +51,15 @@ export async function processWebhookTransaction(
     const matchedTxnCode = (body.code || "").toString().trim().toUpperCase();
     const content = (body.content || body.description || body.memo || "").toString().trim().toUpperCase();
     const amount = Number(body.transferAmount || body.amount || 0);
-    const referenceId = (body.referenceId || body.id || `TXN_${Date.now()}`).toString();
+    const referenceId = (body.referenceId || body.referenceCode || body.id || `TXN_${Date.now()}`).toString();
+    const rawWebhookDate = body.transactionDate || body.when || body.paidAt || "";
+    const parsedWebhookDate = rawWebhookDate
+      ? new Date(String(rawWebhookDate).includes("T") ? rawWebhookDate : `${String(rawWebhookDate).replace(" ", "T")}+07:00`)
+      : null;
+    const resolvedWebhookIso =
+      parsedWebhookDate && !Number.isNaN(parsedWebhookDate.getTime())
+        ? parsedWebhookDate.toISOString()
+        : new Date().toISOString();
 
     console.log(`[PaymentService] Incoming Webhook: Code: "${matchedTxnCode}" | Content: "${content}" | Amount: ${amount}`);
 
@@ -73,17 +85,25 @@ export async function processWebhookTransaction(
     let targetCode = "";
     let suffix = "";
 
-    // Step 1: Parse suffix from content sentence using robust regex
-    const fastRegex = /FAST\s*[-_]?\s*(\d+)/i;
+    // Step 1: Parse FAST code (alphanumeric or numeric) from content or code field
+    const fastRegex = /FAST\s*[-_]?\s*([A-Z0-9]{4,16})/i;
+    const normalizeFastMatch = (rawSuffix: string) => {
+      let cleanSuffix = rawSuffix.trim().toUpperCase();
+      while (cleanSuffix.startsWith("FAST")) {
+        cleanSuffix = cleanSuffix.substring(4);
+      }
+      return cleanSuffix;
+    };
+
     const match = content.match(fastRegex);
     if (match) {
-      suffix = match[1].trim();
-      targetCode = `FAST${suffix}`;
+      suffix = normalizeFastMatch(match[1]);
+      if (suffix) targetCode = `FAST${suffix}`;
     } else if (matchedTxnCode) {
       const codeMatch = matchedTxnCode.match(fastRegex);
       if (codeMatch) {
-        suffix = codeMatch[1].trim();
-        targetCode = `FAST${suffix}`;
+        suffix = normalizeFastMatch(codeMatch[1]);
+        if (suffix) targetCode = `FAST${suffix}`;
       }
     }
 
@@ -94,10 +114,12 @@ export async function processWebhookTransaction(
       return { success: false, message: "Ignored: Not a FAST transaction" };
     }
 
-    console.log(`[PaymentService] Identified transaction suffix: "${suffix}". Performing lookup...`);
+    console.log(`[PaymentService] Identified FAST code "${targetCode}" (suffix "${suffix}"). Performing lookup...`);
 
     let matchedEmail: string | null = null;
     let courseId: string | null = null;
+    let orderId: string | null = null;
+    let registrationId: string | null = null;
 
     const db = getFirestore();
 
@@ -107,22 +129,78 @@ export async function processWebhookTransaction(
         setTimeout(() => reject(new Error("Firebase database request timed out after 5 seconds.")), ms)
       );
 
-    // Step 3: Match from pending_payments
+    // Step 3: Match from pending_payments (check both FAST... code and suffix)
     try {
-      const pendingDocRef = db.collection("pending_payments").doc(suffix);
-      const pendingSnap = await Promise.race([
-        pendingDocRef.get(),
+      let pendingSnap = await Promise.race([
+        db.collection("pending_payments").doc(targetCode).get(),
         timeoutPromise(5000)
       ]) as any;
 
+      if (!pendingSnap || !pendingSnap.exists) {
+        pendingSnap = await Promise.race([
+          db.collection("pending_payments").doc(suffix).get(),
+          timeoutPromise(5000)
+        ]) as any;
+      }
+
       if (pendingSnap && pendingSnap.exists) {
         const pData = pendingSnap.data()!;
-        matchedEmail = pData.email;
-        courseId = pData.courseId;
-        console.log(`[PaymentService] Matched via Pending Payment doc: Email: ${matchedEmail}, Course: ${courseId}`);
+        matchedEmail = pData.email || null;
+        courseId = pData.courseId || null;
+        orderId = pData.orderId || null;
+        registrationId = pData.registrationId || null;
+        console.log(`[PaymentService] Matched via Pending Payment doc: Email: ${matchedEmail}, Course: ${courseId}, RegId: ${registrationId}`);
       }
     } catch (dbErr: any) {
       console.error("[PaymentService:Database] Pending Payment database query error/timeout:", dbErr.message);
+    }
+
+    // Step 3b: Match from orders collection if not found in pending_payments
+    if (!orderId && (!matchedEmail || !courseId)) {
+      try {
+        let ordersSnap = await Promise.race([
+          db.collection("orders").where("paymentCode", "==", targetCode).limit(1).get(),
+          timeoutPromise(5000)
+        ]) as any;
+        if (ordersSnap && ordersSnap.empty) {
+          ordersSnap = await Promise.race([
+            db.collection("orders").where("paymentCode", "==", suffix).limit(1).get(),
+            timeoutPromise(5000)
+          ]) as any;
+        }
+        if (ordersSnap && !ordersSnap.empty) {
+          const oDoc = ordersSnap.docs[0];
+          const oData = oDoc.data();
+          orderId = oDoc.id;
+          matchedEmail = matchedEmail || oData.email || null;
+          courseId = courseId || oData.courseId || null;
+          registrationId = registrationId || oData.registrationId || null;
+          console.log(`[PaymentService] Matched via Orders collection: Order ${orderId}`);
+        }
+      } catch (dbErr: any) {
+        console.warn("[PaymentService:Database] Orders lookup note:", dbErr.message);
+      }
+    }
+
+    // Step 3c: Match direct training registration collections by paymentCode / paymentMemo
+    if (!registrationId) {
+      try {
+        const liveSnap = await Promise.race([
+          db.collection("live_course_registrations").get(),
+          timeoutPromise(5000)
+        ]) as any;
+        liveSnap?.forEach((docSnap: any) => {
+          const rData = docSnap.data();
+          const rCode = String(rData.paymentCode || rData.paymentMemo || "").toUpperCase().replace(/\s+/g, "");
+          if (rCode && (rCode === targetCode || rCode.includes(targetCode))) {
+            registrationId = docSnap.id;
+            matchedEmail = matchedEmail || rData.userEmail || rData.email || null;
+            courseId = courseId || rData.courseId || null;
+          }
+        });
+      } catch (dbErr: any) {
+        console.warn("[PaymentService:Database] Live registrations lookup note:", dbErr.message);
+      }
     }
 
     // Step 4: Fallback to searching users collection directly using positional values
@@ -156,9 +234,9 @@ export async function processWebhookTransaction(
     }
 
     // Handle mock simulations or unmatched transactions gracefully
-    if (!matchedEmail || !courseId) {
-      const warnMsg = `Webhook received successfully. No active pending order found for code suffix "${suffix}". (Normal for simulation/test payments)`;
-      console.warn(`[PaymentService] Match warning: No pending order found for memo "${targetCode}". This is normal for mock simulation tests.`);
+    if (!registrationId && (!matchedEmail || !courseId)) {
+      const warnMsg = `Webhook received successfully. No active pending order found for code "${targetCode}". (Normal for simulation/test payments)`;
+      console.warn(`[PaymentService] Match warning: No pending order found for memo "${targetCode}".`);
       await logFailedWebhookAttempt(body, warnMsg, "ignored");
       return {
         success: true,
@@ -167,79 +245,207 @@ export async function processWebhookTransaction(
       };
     }
 
-    console.log(`[PaymentService] Match Succeeded! User: "${matchedEmail}" | Course: "${courseId}"`);
+    console.log(`[PaymentService] Match Succeeded! User: "${matchedEmail}" | Course: "${courseId}" | Reg: "${registrationId}"`);
 
-    // Step 5: Provision course inside user's purchased_courses subcollection
-    const courseDocRef = db
-      .collection("users")
-      .doc(matchedEmail)
-      .collection("purchased_courses")
-      .doc(courseId);
+    const nowIso = new Date().toISOString();
 
-    await Promise.race([
-      courseDocRef.set({
-        courseId,
-        status: "active",
-        activatedAt: new Date().toISOString(),
-        paymentRef: referenceId,
-        paymentAmount: amount,
-        paymentMethod: "vietqr_auto_banking",
-        updatedAt: new Date().toISOString()
-      }, { merge: true }),
-      timeoutPromise(5000)
-    ]);
-
-    // If VIP combo, grant VIP status globally
-    if (courseId === 'khoa-vip' || courseId === 'combo-vip') {
+    // Update order status if matched
+    if (orderId) {
       try {
-        await db.collection("users").doc(matchedEmail).set({
-          isVip: true,
-          vipSince: new Date().toISOString()
+        await db.collection("orders").doc(orderId).set({
+          status: "PAID",
+          paidAt: resolvedWebhookIso,
+          webhookReceivedAt: nowIso,
+          webhookTransactionDate: rawWebhookDate || nowIso,
+          transactionId: referenceId,
+          transferAmount: amount,
+          accountNumber: "0989499568",
+          ...(matchedEmail ? { email: matchedEmail } : {}),
         }, { merge: true });
-      } catch (vipErr: any) {
-        console.warn("[PaymentService] Could not set isVip flag:", vipErr.message);
+      } catch (ordErr: any) {
+        console.warn("[PaymentService] Failed to update order status:", ordErr.message);
       }
     }
 
-    // If Combo, automatically unlock all sub-courses
-    if (courseId.startsWith("combo-")) {
+    // Update direct training registration status if matched
+    if (registrationId) {
+      const regUpdate = {
+        status: "confirmed",
+        paymentStatus: "PAID",
+        paidAt: resolvedWebhookIso,
+        webhookReceivedAt: nowIso,
+        webhookTransactionDate: rawWebhookDate || nowIso,
+        transactionId: referenceId,
+        paymentMethod: "sepay_acb_vietqr",
+        updatedAt: nowIso,
+      };
       try {
-        let linkedCourseIds: string[] = [];
-        const comboDoc = await db.collection("combos").doc(courseId).get();
-        if (comboDoc.exists && Array.isArray(comboDoc.data()?.courseIds)) {
-          linkedCourseIds = comboDoc.data()?.courseIds || [];
-        } else if (courseId === 'combo-basic') {
-          linkedCourseIds = ['basic-principles', 'truy-xuat-nguon-goc'];
-        } else if (courseId === 'combo-pro') {
-          linkedCourseIds = ['iso-9001', 'iso-14001', 'iso-22000'];
-        } else if (courseId === 'combo-vip') {
-          linkedCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
-        }
+        await Promise.all([
+          db.collection("live_course_registrations").doc(registrationId).set(regUpdate, { merge: true }),
+          db.collection("direct_course_registrations").doc(registrationId).set(regUpdate, { merge: true }),
+        ]);
 
-        for (const subId of linkedCourseIds) {
-          await db
-            .collection("users")
-            .doc(matchedEmail)
-            .collection("purchased_courses")
-            .doc(subId)
-            .set({
-              courseId: subId,
-              status: "active",
-              activatedAt: new Date().toISOString(),
-              paymentRef: referenceId,
-              price: "Mở khóa qua Gói Combo",
-              paymentMethod: "vietqr_auto_banking",
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
+        if (matchedEmail && !matchedEmail.endsWith("@fast-training.local")) {
+          const liveDoc = await db.collection("live_course_registrations").doc(registrationId).get();
+          const rData = liveDoc.exists ? liveDoc.data() || {} : {};
+          const rawType = String(rData.trainingType || "").toLowerCase().trim();
+          const rawLabel = String(rData.trainingTypeLabel || "").toLowerCase();
+          const rawLink = String(rData.meetingLink || rData.zoomLink || "").trim();
+          const isOffline =
+            rawType === "direct" ||
+            rawType === "offline" ||
+            rawType === "inhouse" ||
+            rawLabel.includes("trực tiếp") ||
+            rawLabel.includes("hội trường") ||
+            rawLabel.includes("offline") ||
+            rawLink.toLowerCase().includes("maps.google");
+
+          const resolvedLink = isOffline
+            ? (rawLink && !rawLink.toLowerCase().includes("zoom.us")
+                ? rawLink
+                : "https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi")
+            : (rawLink || "https://zoom.us/j/84927002668");
+
+          const trainingTypeLabel =
+            rData.trainingTypeLabel || (isOffline ? "Trực tiếp tại Hội trường" : "Online qua Zoom HD");
+          const startDate = rData.startDate || "Theo lịch khóa học";
+          const scheduleDetails = rData.scheduleDetails || "";
+          const scheduleStr = scheduleDetails ? ` (${scheduleDetails})` : "";
+          const rawVenue = String(rData.venueAddress || "").replace(/\s*\/\s*Zoom\s*HD/gi, "").trim();
+          const venueAddress = isOffline
+            ? (rawVenue || "Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội (Hội trường đào tạo FAST)")
+            : "";
+          const shortCode = String(registrationId).replace(/[^a-zA-Z0-9]/g, "").slice(-8).toUpperCase();
+          const courseTitle = rData.courseTitle || "Khóa đào tạo ATTP";
+          const checkInTime = isOffline
+            ? "Có mặt trước giờ khai giảng 15–30 phút để check-in điểm danh & nhận tài liệu"
+            : "Mở link Zoom trước giờ khai giảng 15 phút để kiểm tra âm thanh & điểm danh";
+          const checklist = isOffline
+            ? [
+                "Có mặt tại hội trường trước 15–30 phút để làm thủ tục điểm danh vào lớp",
+                "Mang theo CCCD/CMND (bản gốc hoặc ảnh VNeID) để đối chiếu cấp chứng nhận",
+                `Cung cấp mã hồ sơ #${shortCode} hoặc email đăng ký tại quầy đón tiếp`,
+                "Chuẩn bị sổ tay ghi chép và hồ sơ mẫu cơ sở (nếu cần giảng viên góp ý)"
+              ]
+            : [
+                "Tham gia phòng Zoom trước 15 phút để kiểm tra loa, micro và đường truyền",
+                "Đổi tên hiển thị Zoom theo cú pháp: Họ và tên - Số điện thoại",
+                "Chuẩn bị sổ tay ghi chép và tài liệu thực hành trong quá trình học"
+              ];
+
+          await db.collection("users").doc(matchedEmail).collection("notifications").doc(`training_${registrationId}`).set({
+            id: `training_${registrationId}`,
+            title: isOffline
+              ? `Chuẩn bị vào học Offline: ${courseTitle}`
+              : `Chuẩn bị vào học Zoom: ${courseTitle}`,
+            message: isOffline
+              ? `Khóa học trực tiếp tại hội trường đã sẵn sàng (${startDate}${scheduleStr}). Địa điểm: ${venueAddress}. Vui lòng có mặt trước 15–30 phút, mang theo CCCD/CMND và mã hồ sơ #${shortCode} để điểm danh.`
+              : `Phòng học Zoom HD cho khóa "${courseTitle}" đã sẵn sàng (${startDate}${scheduleStr}). Vui lòng vào lớp trước 15 phút và đổi tên theo Họ tên - SĐT để điểm danh.`,
+            type: "training_link",
+            courseId: rData.courseId || courseId || "",
+            courseTitle,
+            registrationId,
+            link: resolvedLink,
+            startDate,
+            scheduleDetails,
+            venueAddress,
+            trainingType: rData.trainingType || (isOffline ? "direct" : "zoom"),
+            trainingTypeLabel,
+            checkInTime,
+            checklist,
+            userEmail: matchedEmail,
+            isRead: false,
+            createdAt: nowIso,
+          }, { merge: true });
         }
-      } catch (comboErr: any) {
-        console.warn("[PaymentService] Error provisioning subcourses for combo:", comboErr.message);
+      } catch (regErr: any) {
+        console.warn("[PaymentService] Failed to update direct registration status:", regErr.message);
+      }
+    }
+
+    // Step 5: Provision course inside user's purchased_courses subcollection (when email & courseId exist and not an ephemeral phone email)
+    if (matchedEmail && courseId && !matchedEmail.endsWith("@fast-training.local")) {
+      const courseDocRef = db
+        .collection("users")
+        .doc(matchedEmail)
+        .collection("purchased_courses")
+        .doc(courseId);
+
+      await Promise.race([
+        courseDocRef.set({
+          courseId,
+          status: "active",
+          buyerEmail: matchedEmail,
+          activatedAt: nowIso,
+          purchasedAt: resolvedWebhookIso,
+          paidAt: resolvedWebhookIso,
+          webhookReceivedAt: nowIso,
+          paymentCode: targetCode,
+          orderId: orderId || "",
+          paymentRef: referenceId,
+          transactionId: referenceId,
+          paymentAmount: amount,
+          paymentMethod: "vietqr_auto_banking",
+          updatedAt: nowIso
+        }, { merge: true }),
+        timeoutPromise(5000)
+      ]);
+
+      // If VIP combo, grant VIP status globally
+      if (courseId === 'khoa-vip' || courseId === 'combo-vip') {
+        try {
+          await db.collection("users").doc(matchedEmail).set({
+            isVip: true,
+            vipSince: nowIso
+          }, { merge: true });
+        } catch (vipErr: any) {
+          console.warn("[PaymentService] Could not set isVip flag:", vipErr.message);
+        }
+      }
+
+      // If Combo, automatically unlock all sub-courses
+      if (courseId.startsWith("combo-")) {
+        try {
+          let linkedCourseIds: string[] = [];
+          const comboDoc = await db.collection("combos").doc(courseId).get();
+          if (comboDoc.exists && Array.isArray(comboDoc.data()?.courseIds)) {
+            linkedCourseIds = comboDoc.data()?.courseIds || [];
+          } else if (courseId === 'combo-basic') {
+            linkedCourseIds = ['basic-principles', 'truy-xuat-nguon-goc'];
+          } else if (courseId === 'combo-pro') {
+            linkedCourseIds = ['iso-9001', 'iso-14001', 'iso-22000'];
+          } else if (courseId === 'combo-vip') {
+            linkedCourseIds = ['haccp-tcvn', 'iso-22000', 'iso-9001', 'iso-14001', 'vietgap'];
+          }
+
+          for (const subId of linkedCourseIds) {
+            await db
+              .collection("users")
+              .doc(matchedEmail)
+              .collection("purchased_courses")
+              .doc(subId)
+              .set({
+                courseId: subId,
+                status: "active",
+                activatedAt: nowIso,
+                paymentRef: referenceId,
+                price: "Mở khóa qua Gói Combo",
+                paymentMethod: "vietqr_auto_banking",
+                updatedAt: nowIso
+              }, { merge: true });
+          }
+        } catch (comboErr: any) {
+          console.warn("[PaymentService] Error provisioning subcourses for combo:", comboErr.message);
+        }
       }
     }
 
     // Step 6: Mark pending_payment as processed
     try {
-      await db.collection("pending_payments").doc(suffix).delete();
+      await Promise.all([
+        db.collection("pending_payments").doc(suffix).delete(),
+        db.collection("pending_payments").doc(targetCode).delete(),
+      ]);
     } catch (cleanupErr: any) {
       console.warn("[PaymentService] Failed to clean up pending_payments doc:", cleanupErr.message);
     }
@@ -248,7 +454,7 @@ export async function processWebhookTransaction(
     try {
       await logFailedWebhookAttempt(
         body,
-        `Successfully provisioned course "${courseId}" for user "${matchedEmail}". Ref: ${referenceId}`,
+        `Successfully processed "${targetCode}" (Course: "${courseId}", Reg: "${registrationId}") for "${matchedEmail}". Ref: ${referenceId}`,
         "success" as any
       );
     } catch (logSuccessErr: any) {
@@ -257,7 +463,7 @@ export async function processWebhookTransaction(
 
     return {
       success: true,
-      message: `Successfully provisioned course "${courseId}" for user "${matchedEmail}". Transaction reference: ${referenceId}`
+      message: `Successfully processed ${targetCode}. Transaction reference: ${referenceId}`
     };
   } catch (err: any) {
     console.error("[PaymentService] Webhook processing exception:", err);

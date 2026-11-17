@@ -5,7 +5,7 @@ import emailjs from '@emailjs/browser';
 export interface SendOtpOptions {
   email: string;
   name?: string;
-  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock' | 'dev_access';
+  flow?: 'register' | 'login' | 'reset' | 'account_setup' | 'purchase' | 'lock' | 'dev_access';
   customOtp?: string;
 }
 
@@ -20,7 +20,7 @@ export interface SendOtpResponse {
 export interface VerifyOtpOptions {
   email: string;
   otp: string;
-  flow?: 'register' | 'login' | 'reset' | 'purchase' | 'lock' | 'dev_access';
+  flow?: 'register' | 'login' | 'reset' | 'account_setup' | 'purchase' | 'lock' | 'dev_access';
   password?: string;
   fullName?: string;
 }

@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { db, auth } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '../contexts/ToastContext';
 import { DirectRegistration } from '../types';
+import { getVietQrUrl } from '../utils/qrService';
+import { getFastSessionUser } from '../utils/sessionAuth';
+import { addTrainingLinkNotification } from '../utils/courseNotificationService';
 import {
   X,
   Video,
@@ -16,8 +20,10 @@ import {
   QrCode,
   ShieldCheck,
   Sparkles,
-  Copy,
-  Clock
+  Landmark,
+  KeyRound,
+  LogIn,
+  Bell
 } from 'lucide-react';
 
 interface DirectRegistrationModalProps {
@@ -44,6 +50,7 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
   defaultStartDate = UPCOMING_START_DATES[0]
 }) => {
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [studentName, setStudentName] = useState('');
   const [phone, setPhone] = useState('');
@@ -56,8 +63,15 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdReg, setCreatedReg] = useState<DirectRegistration | null>(null);
+  const [accountProvisioned, setAccountProvisioned] = useState<{
+    email: string;
+    autoCreated: boolean;
+    alreadyExists: boolean;
+  } | null>(null);
 
   if (!isOpen) return null;
+
+  const isUserLoggedIn = !!(auth.currentUser || getFastSessionUser());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,50 +94,190 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
     const finalStartDate = startDate === 'Lịch theo yêu cầu riêng của cơ sở / doanh nghiệp' && customStartDate.trim()
       ? customStartDate.trim()
       : startDate;
+    const cleanPhoneForOrder = phone.replace(/[^\d]/g, '').slice(-6) || '199000';
+    const fastMemoCode = `FAST199K${cleanPhoneForOrder}`;
 
-    const regPayload: DirectRegistration = {
+    const cleanEmail = email.toLowerCase().trim();
+    const resolvedLink = trainingType === 'zoom'
+      ? 'https://zoom.us/j/84920268888'
+      : 'https://maps.google.com/?q=18+Nguyen+Co+Thach+Nam+Tu+Liem+Ha+Noi';
+    const trainingTypeLabel = trainingType === 'zoom' ? 'Online qua Zoom HD' : 'Trực tiếp tại Hội trường';
+    const nowIso = new Date().toISOString();
+
+    const regPayload: DirectRegistration & Record<string, any> = {
       id: regId,
       studentName: studentName.trim(),
-      studentEmail: email.toLowerCase().trim(),
+      studentEmail: cleanEmail,
+      email: cleanEmail,
+      userEmail: cleanEmail,
       phone: phone.trim(),
       companyName: companyName.trim() || undefined,
       courseId: 'attp-truc-tiep',
       courseTitle,
       price,
+      totalPrice: price,
       trainingType,
+      trainingTypeLabel,
       startDate: finalStartDate,
+      meetingLink: resolvedLink,
       zoomLink: trainingType === 'zoom' ? 'https://zoom.us/j/84920268888' : undefined,
       zoomMeetingId: trainingType === 'zoom' ? '849 2026 8888' : undefined,
       zoomPasscode: trainingType === 'zoom' ? '2FAST2026' : undefined,
-      registeredAt: new Date().toISOString(),
+      registeredAt: nowIso,
       status: 'pending',
+      paymentStatus: 'PENDING',
+      paymentCode: fastMemoCode,
+      paymentMemo: fastMemoCode,
+      paymentBank: 'ACB',
+      paymentAccountNo: '0989499568',
       notes: notes.trim() || undefined
     };
 
+    const venueAddress = trainingType === 'direct'
+      ? 'Số 18 Nguyễn Cơ Thạch, Nam Từ Liêm, Hà Nội (Hội trường đào tạo FAST)'
+      : 'Phòng học trực tuyến Zoom HD';
+    const shortRegCode = regId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase();
+    const isOfflineMode = trainingType === 'direct';
+    const checkInTime = isOfflineMode
+      ? 'Có mặt trước giờ khai giảng 15–30 phút để check-in điểm danh & nhận tài liệu'
+      : 'Mở link Zoom trước giờ khai giảng 15 phút để kiểm tra âm thanh & điểm danh';
+    const checklist = isOfflineMode
+      ? [
+          'Có mặt tại hội trường trước 15–30 phút để làm thủ tục điểm danh vào lớp',
+          'Mang theo CCCD/CMND (bản gốc hoặc ảnh VNeID) để đối chiếu cấp chứng nhận',
+          `Cung cấp mã hồ sơ #${shortRegCode} hoặc email đăng ký tại quầy đón tiếp`,
+          'Chuẩn bị sổ tay ghi chép và hồ sơ mẫu cơ sở (nếu cần giảng viên góp ý)'
+        ]
+      : [
+          'Tham gia phòng Zoom trước 15 phút để kiểm tra loa, micro và đường truyền',
+          'Đổi tên hiển thị Zoom theo cú pháp: Họ và tên - Số điện thoại',
+          'Chuẩn bị sổ tay ghi chép và tài liệu thực hành trong quá trình học'
+        ];
+
+    const notifId = `training_${regId}`;
+    const notificationPayload = {
+      id: notifId,
+      title: isOfflineMode
+        ? `Chuẩn bị vào học Offline: ${courseTitle}`
+        : `Chuẩn bị vào học Zoom: ${courseTitle}`,
+      message: isOfflineMode
+        ? `Khóa học trực tiếp tại hội trường đã sẵn sàng (${finalStartDate}). Địa điểm: ${venueAddress}. Vui lòng có mặt trước 15–30 phút, mang theo CCCD/CMND và mã hồ sơ #${shortRegCode} để điểm danh.`
+        : `Phòng học Zoom HD cho khóa "${courseTitle}" đã sẵn sàng (${finalStartDate}). Vui lòng vào lớp trước 15 phút và đổi tên theo Họ tên - SĐT để điểm danh.`,
+      type: 'training_link',
+      courseId: 'attp-truc-tiep',
+      courseTitle,
+      registrationId: regId,
+      link: resolvedLink,
+      startDate: finalStartDate,
+      venueAddress: isOfflineMode ? venueAddress : '',
+      trainingType,
+      trainingTypeLabel,
+      checkInTime,
+      checklist,
+      userEmail: cleanEmail,
+      isRead: false,
+      createdAt: nowIso
+    };
+
     try {
-      // 1. Save to Firestore direct_course_registrations & course_registrations
+      // 0. Create SePay FAST order for automatic reconciliation
+      await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: 'attp-truc-tiep',
+          courseTitle,
+          amount: 199000,
+          email: cleanEmail,
+          registrationId: regId,
+          orderType: 'direct_training',
+          studentName: studentName.trim(),
+          phone: phone.trim(),
+          requestedPaymentCode: fastMemoCode
+        })
+      }).catch(() => {});
+
+      // 1. Save to Firestore direct_course_registrations & course_registrations & user notifications
       await Promise.all([
         setDoc(doc(db, 'direct_course_registrations', regId), regPayload, { merge: true }),
         setDoc(doc(db, 'course_registrations', regId), {
           ...regPayload,
           type: 'DIRECT_TRAINING_199K'
-        }, { merge: true })
-      ]);
+        }, { merge: true }),
+        setDoc(doc(db, 'users', cleanEmail, 'notifications', notifId), notificationPayload, { merge: true })
+      ]).catch(() => {});
 
-      // 2. Push to server endpoint
+      addTrainingLinkNotification({
+        id: notifId,
+        userEmail: cleanEmail,
+        courseId: 'attp-truc-tiep',
+        courseTitle,
+        link: resolvedLink,
+        registrationId: regId,
+        startDate: finalStartDate,
+        venueAddress: isOfflineMode ? venueAddress : undefined,
+        trainingType,
+        trainingTypeLabel,
+        title: notificationPayload.title,
+        message: notificationPayload.message,
+        checkInTime,
+        checklist
+      });
+
+      // 2. Push to server endpoint & auto-provision account
+      let provisionedInfo: { email: string; autoCreated: boolean; alreadyExists: boolean } | null = null;
       try {
-        await fetch('/api/direct-registrations', {
+        const regRes = await fetch('/api/direct-registrations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(regPayload)
+          body: JSON.stringify({ ...regPayload, notification: notificationPayload })
         });
+        if (regRes.ok) {
+          const regJson = await regRes.json().catch(() => null);
+          if (regJson?.accountProvisioned?.email) {
+            provisionedInfo = regJson.accountProvisioned;
+          }
+        }
       } catch (err) {
         console.warn('Server sync note:', err);
       }
 
+      if (!provisionedInfo && cleanEmail) {
+        try {
+          const provRes = await fetch('/api/auth/auto-provision-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: cleanEmail,
+              fullName: studentName.trim(),
+              phone: phone.trim(),
+              registration: regPayload,
+              notification: notificationPayload
+            })
+          });
+          if (provRes.ok) {
+            const provJson = await provRes.json().catch(() => null);
+            if (provJson?.email) {
+              provisionedInfo = {
+                email: provJson.email,
+                autoCreated: !!provJson.autoCreated,
+                alreadyExists: !!provJson.alreadyExists
+              };
+            }
+          }
+        } catch {}
+      }
+
+      setAccountProvisioned(
+        provisionedInfo || {
+          email: cleanEmail,
+          autoCreated: !isUserLoggedIn,
+          alreadyExists: isUserLoggedIn
+        }
+      );
       setCreatedReg(regPayload);
       setIsSuccess(true);
-      toast.success('Đăng ký khóa học thành công! Cán bộ phụ trách sẽ liên hệ ngay.');
+      toast.success('Đăng ký thành công! Tài khoản và lịch trình học đã sẵn sàng.');
     } catch (err: any) {
       console.error('Lỗi đăng ký:', err);
       toast.error(`Lỗi khi gửi đăng ký: ${err.message || 'Vui lòng thử lại'}`);
@@ -132,9 +286,18 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
     }
   };
 
-  const cleanPhoneForTransfer = phone.replace(/[^\d]/g, '').slice(-6) || '199K';
-  const qrTransferContent = `ATTP199K ${cleanPhoneForTransfer}`;
-  const qrUrl = `https://img.vietqr.io/image/970422-0927002668-compact2.png?amount=199000&addInfo=${encodeURIComponent(qrTransferContent)}&accountName=CONG%20TY%20TNHH%20TIEU%20CHUAN%20CHAT%20LUONG%202FAST`;
+  const cleanPhoneForTransfer = phone.replace(/[^\d]/g, '').slice(-6) || '199000';
+  const qrTransferContent = `FAST199K${cleanPhoneForTransfer}`;
+  const bankAccountNo = '0989499568';
+  const bankAccountName = 'CONG TY TNHH TU VAN FAST';
+  const qrUrl = getVietQrUrl({
+    bankId: 'ACB',
+    accountNo: bankAccountNo,
+    accountName: bankAccountName,
+    amount: 199000,
+    memo: qrTransferContent,
+    template: 'compact2'
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
@@ -166,20 +329,62 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
         {/* Modal Content */}
         <div className="p-6 sm:p-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
           {isSuccess && createdReg ? (
-            <div className="space-y-6 text-center py-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <CheckCircle2 className="w-10 h-10" />
+            <div className="space-y-6 text-center py-2">
+              <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
               <div>
                 <h3 className="text-xl font-black text-gray-800">
                   Đăng Ký Khóa Học Thành Công!
                 </h3>
-                <p className="text-xs sm:text-sm text-gray-500 mt-1 max-w-md mx-auto">
-                  Chào mừng <strong>{createdReg.studentName}</strong>! FAST đã ghi nhận thông tin đăng ký của bạn cho lớp <strong>{createdReg.startDate}</strong>.
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 max-w-md mx-auto">
+                  Chào mừng <strong>{createdReg.studentName}</strong>! Hệ thống đã ghi nhận lịch trình <strong>{createdReg.startDate}</strong> cho bạn.
                 </p>
               </div>
 
-              {/* Info Box */}
+              {/* Auto-provisioned Account & OTP CTA */}
+              {(() => {
+                const provisionedEmail = accountProvisioned?.email || (createdReg as any).studentEmail || email.toLowerCase().trim();
+                const otpSetupUrl = `/account?otpSetup=1&email=${encodeURIComponent(provisionedEmail)}&name=${encodeURIComponent(createdReg.studentName)}&regId=${encodeURIComponent(createdReg.id)}`;
+                if (isUserLoggedIn) return null;
+                return (
+                  <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1 text-xs text-slate-700">
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <KeyRound className="w-4 h-4 text-[#007c76] shrink-0" />
+                        <span>
+                          {accountProvisioned?.autoCreated === false
+                            ? 'Thông báo lịch học đã gửi vào tài khoản của bạn'
+                            : 'Tài khoản học viên đã được tạo sẵn & gửi về email'}
+                        </span>
+                      </p>
+                      <p className="text-slate-600">
+                        Email: <strong className="text-[#007c76]">{provisionedEmail}</strong>. Bấm đăng nhập OTP và thêm mật khẩu để xem sẵn thông báo lịch trình học.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        navigate(otpSetupUrl, {
+                          state: {
+                            otpAccountSetup: true,
+                            email: provisionedEmail,
+                            name: createdReg.studentName,
+                            registrationId: createdReg.id
+                          }
+                        });
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-[#007c76] hover:bg-[#00625d] text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Đăng nhập OTP &amp; Thêm mật khẩu</span>
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* Info Box (no copy buttons) */}
               <div className="bg-teal-50/60 p-5 rounded-2xl border border-teal-200 text-left space-y-3">
                 <div className="flex items-center justify-between text-xs pb-2 border-b border-teal-200/60">
                   <span className="text-gray-500 font-bold uppercase tracking-wider">Mã đăng ký:</span>
@@ -199,58 +404,111 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
                     )}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-teal-200/60">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500 font-bold uppercase tracking-wider">Lịch khai giảng:</span>
-                  <span className="font-bold text-gray-800">{createdReg.startDate}</span>
+                  <span className="font-bold text-gray-800 text-right">{createdReg.startDate}</span>
+                </div>
+              </div>
+
+              {/* Read-Only VietQR ACB Payment Block (no copy, no download QR, no check tx) */}
+              <div
+                className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden text-left select-none"
+                onCopy={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                <div className="px-4 py-3 bg-white border-b border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Landmark className="w-4 h-4 text-[#007c76]" />
+                    <span>Thông tin thanh toán ACB (chỉ xem)</span>
+                  </span>
+                  <span className="font-bold text-[#007c76] tabular-nums">{price}</span>
                 </div>
 
-                {createdReg.trainingType === 'zoom' && (
-                  <div className="p-3 bg-white rounded-xl border border-teal-200 space-y-1.5">
-                    <p className="text-[11px] font-black text-teal-800 uppercase tracking-wide flex items-center gap-1">
-                      <Video className="w-3.5 h-3.5 text-[#007c76]" /> Thông tin phòng học Zoom:
-                    </p>
-                    <p className="text-xs text-gray-700">
-                      ID Cuộc họp: <strong className="font-mono text-[#007c76]">{createdReg.zoomMeetingId}</strong>
-                    </p>
-                    <p className="text-xs text-gray-700">
-                      Mật mã (Passcode): <strong className="font-mono text-[#007c76]">{createdReg.zoomPasscode}</strong>
-                    </p>
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`Zoom ID: ${createdReg.zoomMeetingId} | Passcode: ${createdReg.zoomPasscode} | Link: ${createdReg.zoomLink}`);
-                          toast.success('Đã sao chép thông tin phòng Zoom!');
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                  <div className="sm:col-span-5 flex flex-col items-center">
+                    <div className="w-40 h-40 bg-white p-2 rounded-xl border border-slate-200 flex items-center justify-center">
+                      <img
+                        src={qrUrl}
+                        alt="VietQR ACB 0989499568"
+                        referrerPolicy="no-referrer"
+                        draggable={false}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
                         }}
-                        className="text-[11px] text-[#007c76] hover:underline font-bold inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3 h-3" /> Sao chép thông tin phòng Zoom
-                      </button>
+                        className="w-full h-full object-contain pointer-events-none"
+                      />
+                    </div>
+                    <span className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                      <QrCode className="w-3.5 h-3.5 text-[#007c76]" />
+                      Quét QR bằng App ngân hàng
+                    </span>
+                  </div>
+
+                  <div className="sm:col-span-7 bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 text-xs overflow-hidden">
+                    <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Ngân hàng</span>
+                      <span className="font-semibold text-slate-900">ACB (Á Châu)</span>
+                    </div>
+                    <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Chủ TK</span>
+                      <span className="font-semibold text-slate-900">{bankAccountName}</span>
+                    </div>
+                    <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Số tài khoản ACB</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm tabular-nums">{bankAccountNo}</span>
+                    </div>
+                    <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                      <span className="text-slate-500">Số tiền</span>
+                      <span className="font-bold text-[#007c76] text-sm tabular-nums">{price}</span>
+                    </div>
+                    <div className="px-3.5 py-3 bg-teal-50/70 flex items-center justify-between gap-2">
+                      <span className="text-[#007c76] font-semibold">Nội dung</span>
+                      <span className="font-mono font-bold text-slate-900 text-sm">{qrTransferContent}</span>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* VietQR Quick Payment */}
-              <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 text-center space-y-3">
-                <p className="text-xs font-black uppercase tracking-wider text-gray-700 flex items-center justify-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-[#007c76]" /> Quét mã VietQR chuyển khoản học phí ({price})
-                </p>
-                <div className="w-44 h-44 mx-auto bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex items-center justify-center">
-                  <img src={qrUrl} alt="VietQR" className="w-full h-full object-contain" />
                 </div>
-                <p className="text-[11px] text-gray-500">
-                  Nội dung chuyển khoản: <span className="font-mono font-bold text-gray-800 bg-gray-200 px-2 py-0.5 rounded">{qrTransferContent}</span>
-                </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const provisionedEmail = accountProvisioned?.email || (createdReg as any).studentEmail || email.toLowerCase().trim();
+                    const otpSetupUrl = `/account?otpSetup=1&email=${encodeURIComponent(provisionedEmail)}&name=${encodeURIComponent(createdReg.studentName)}&regId=${encodeURIComponent(createdReg.id)}`;
+                    onClose();
+                    if (isUserLoggedIn) {
+                      navigate('/account');
+                    } else {
+                      navigate(otpSetupUrl, {
+                        state: {
+                          otpAccountSetup: true,
+                          email: provisionedEmail,
+                          name: createdReg.studentName,
+                          registrationId: createdReg.id
+                        }
+                      });
+                    }
+                  }}
+                  className="flex-1 py-3 px-4 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isUserLoggedIn ? (
+                    <>
+                      <Bell className="w-4 h-4" />
+                      <span>Xem thông báo &amp; lịch học</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      <span>Đăng nhập OTP &amp; Thêm mật khẩu</span>
+                    </>
+                  )}
+                </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-3 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                  className="py-3 px-5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
-                  Hoàn tất & Đóng
+                  Đóng
                 </button>
               </div>
             </div>

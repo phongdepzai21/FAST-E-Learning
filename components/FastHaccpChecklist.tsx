@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import { useToast } from '../contexts/ToastContext';
+import { useSmoothScrollTo } from '../hooks/useSmoothScrollTo';
 
 // Checklist Data Structure from user's exact specification
 export const CHECKLIST_DATA = [
@@ -67,6 +69,18 @@ export const CHECKLIST_DATA = [
 ];
 
 export const FastHaccpChecklist: React.FC = () => {
+  const { success: showSuccessToast, warning: showWarningToast } = useToast();
+  const { scrollTo: scrollToHaccpSection } = useSmoothScrollTo({
+    offset: 16,
+    detectDynamicReveal: true,
+  });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
   // Client Form State
   const [clientName, setClientName] = useState<string>('');
   const [auditType, setAuditType] = useState<string>('');
@@ -288,42 +302,50 @@ export const FastHaccpChecklist: React.FC = () => {
 
   // New Client Action
   const newClient = () => {
-    if (window.confirm("Tạo mới sẽ xóa form hiện tại (hãy chắc chắn bạn đã nhấn 'Lưu CRM'). Tiếp tục?")) {
-      localStorage.removeItem('fast_haccp_current');
-      localStorage.removeItem('fast_haccp_current_ts');
-      setClientName('');
-      setAuditType('');
-      setAuditAddress('');
-      setFsmsScope('');
-      setContactPhone('');
-      setAuditDate('');
-      setReportNo('');
-      setCompliance({});
-      setSeverities({});
-      setComments({});
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Tạo hồ sơ HACCP mới',
+      message: "Tạo mới sẽ xóa form hiện tại (hãy chắc chắn bạn đã nhấn 'Lưu CRM'). Tiếp tục?",
+      onConfirm: () => {
+        localStorage.removeItem('fast_haccp_current');
+        localStorage.removeItem('fast_haccp_current_ts');
+        setClientName('');
+        setAuditType('');
+        setAuditAddress('');
+        setFsmsScope('');
+        setContactPhone('');
+        setAuditDate('');
+        setReportNo('');
+        setCompliance({});
+        setSeverities({});
+        setComments({});
 
-      // Reset Cloud Session
-      try {
-        setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
-          clientName: '',
-          auditType: '',
-          auditAddress: '',
-          fsmsScope: '',
-          contactPhone: '',
-          auditDate: '',
-          reportNo: '',
-          _progress: '0%',
-          _lastUpdated: Date.now()
-        });
-      } catch (e) {}
-    }
+        // Reset Cloud Session
+        try {
+          setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
+            clientName: '',
+            auditType: '',
+            auditAddress: '',
+            fsmsScope: '',
+            contactPhone: '',
+            auditDate: '',
+            reportNo: '',
+            _progress: '0%',
+            _lastUpdated: Date.now()
+          });
+        } catch (e) {}
+        showSuccessToast('Đã tạo form hồ sơ HACCP mới.');
+        scrollToHaccpSection('haccp-client-form');
+      }
+    });
   };
 
   // Save to CRM Action
   const saveToCRM = async () => {
     const currentData = getCurrentStateDataObject();
     if (!currentData || !currentData.clientName || !currentData.clientName.trim()) {
-      alert("Vui lòng điền 'Tên Khách Hàng' trước khi lưu CRM!");
+      showWarningToast("Vui lòng điền 'Tên Khách Hàng' trước khi lưu CRM!");
+      scrollToHaccpSection('haccp-client-form');
       return;
     }
 
@@ -348,7 +370,7 @@ export const FastHaccpChecklist: React.FC = () => {
       console.warn('[FastHaccp] CRM Cloud sync error:', e);
     }
 
-    alert("Đã lưu thông tin khách hàng vào CRM thành công!");
+    showSuccessToast('Đã lưu thông tin khách hàng vào CRM thành công!');
   };
 
   // Open CRM Modal
@@ -363,39 +385,52 @@ export const FastHaccpChecklist: React.FC = () => {
 
   // Load Record from CRM
   const loadRecord = (id: string) => {
-    if (window.confirm("Tải dữ liệu này sẽ ghi đè lên form hiện tại. Tiếp tục?")) {
-      const rec = crmRecords[id];
-      if (rec) {
-        applyStateData(rec);
-        localStorage.setItem('fast_haccp_current', JSON.stringify(rec));
-        localStorage.setItem('fast_haccp_current_ts', String(Date.now()));
-        try {
-          setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
-            ...rec,
-            _lastUpdated: Date.now()
-          }, { merge: true });
-        } catch (e) {}
-        closeCRM();
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Tải dữ liệu khách hàng',
+      message: 'Tải dữ liệu này sẽ ghi đè lên form hiện tại. Tiếp tục?',
+      onConfirm: () => {
+        const rec = crmRecords[id];
+        if (rec) {
+          applyStateData(rec);
+          localStorage.setItem('fast_haccp_current', JSON.stringify(rec));
+          localStorage.setItem('fast_haccp_current_ts', String(Date.now()));
+          try {
+            setDoc(doc(db, 'fast_haccp_crm', 'current_session'), {
+              ...rec,
+              _lastUpdated: Date.now()
+            }, { merge: true });
+          } catch (e) {}
+          closeCRM();
+          showSuccessToast(`Đã tải hồ sơ "${rec.clientName || id}" lên form.`);
+          scrollToHaccpSection('haccp-client-form');
+        }
       }
-    }
+    });
   };
 
   // Delete Record from CRM
-  const deleteRecord = async (id: string) => {
-    if (window.confirm("Xóa khách hàng này khỏi CRM?")) {
-      const updated = { ...crmRecords };
-      delete updated[id];
-      setCrmRecords(updated);
-      localStorage.setItem('fast_haccp_crm', JSON.stringify(updated));
+  const deleteRecord = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa hồ sơ CRM',
+      message: 'Xóa khách hàng này khỏi CRM?',
+      onConfirm: async () => {
+        const updated = { ...crmRecords };
+        delete updated[id];
+        setCrmRecords(updated);
+        localStorage.setItem('fast_haccp_crm', JSON.stringify(updated));
 
-      // Sync to Cloud Firestore
-      try {
-        await setDoc(doc(db, 'fast_haccp_crm', 'database'), {
-          records: updated,
-          _lastUpdated: Date.now()
-        });
-      } catch (e) {}
-    }
+        // Sync to Cloud Firestore
+        try {
+          await setDoc(doc(db, 'fast_haccp_crm', 'database'), {
+            records: updated,
+            _lastUpdated: Date.now()
+          });
+        } catch (e) {}
+        showSuccessToast('Đã xóa bản ghi khỏi CRM.');
+      }
+    });
   };
 
   // Toggle All Sections Open / Closed
@@ -1184,7 +1219,7 @@ export const FastHaccpChecklist: React.FC = () => {
         </div>
 
         {/* Client & CRM Info */}
-        <div className="client-section">
+        <div id="haccp-client-form" className="client-section">
           <div className="client-header">
             <h2>Thông Tin Khách Hàng</h2>
             <div className="btn-group">
@@ -1758,6 +1793,36 @@ export const FastHaccpChecklist: React.FC = () => {
                   ...............................................................
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[10000] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full border border-gray-200 shadow-2xl space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-tight text-gray-900">{confirmDialog.title}</h3>
+            <p className="text-xs text-gray-600 font-semibold leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const fn = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  fn();
+                }}
+                className="px-4 py-2 bg-[#007c76] hover:bg-[#005a56] text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Xác nhận
+              </button>
             </div>
           </div>
         </div>

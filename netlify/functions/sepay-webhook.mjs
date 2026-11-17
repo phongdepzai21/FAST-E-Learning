@@ -230,7 +230,7 @@ export async function handler(event, context) {
   const transferAmount = Number(bodyObj.transferAmount || bodyObj.amount || 0);
   const txnId = (bodyObj.id || bodyObj.referenceCode || `TXN_${Date.now()}`).toString();
   const receivedAccount = (bodyObj.subAccount || bodyObj.accountNumber || bodyObj.bankAccount || "").toString().trim();
-  const expectedAccount = (process.env.BANK_ACCOUNT || "22888868").toString().trim();
+  const expectedAccount = (process.env.BANK_ACCOUNT || "0989499568").toString().trim();
 
   // Validate receiving account if specified in payload
   if (receivedAccount && expectedAccount && receivedAccount !== expectedAccount && receivedAccount !== "989499568") {
@@ -258,6 +258,7 @@ export async function handler(event, context) {
     let targetEmail = "";
     let courseId = "";
     let orderId = "";
+    let registrationId = "";
     let expectedAmount = 0;
 
     // 1. Try pending_payments doc by paymentCode (e.g. FAST3AGSF5K0R)
@@ -271,8 +272,9 @@ export async function handler(event, context) {
     if (pendingSnap.exists) {
       const pData = pendingSnap.data();
       targetEmail = (pData.email || "").toLowerCase().trim();
-      courseId = pData.courseId;
-      orderId = pData.orderId;
+      courseId = pData.courseId || "";
+      orderId = pData.orderId || "";
+      registrationId = pData.registrationId || "";
       expectedAmount = Number(pData.amount || 0);
     } else {
       // 3. Query orders collection by paymentCode
@@ -286,13 +288,14 @@ export async function handler(event, context) {
       if (!ordersSnap.empty) {
         const oData = ordersSnap.docs[0].data();
         targetEmail = (oData.email || "").toLowerCase().trim();
-        courseId = oData.courseId;
+        courseId = oData.courseId || "";
         orderId = ordersSnap.docs[0].id;
+        registrationId = oData.registrationId || "";
         expectedAmount = Number(oData.amount || 0);
       }
     }
 
-    if (!targetEmail || !courseId) {
+    if (!registrationId && (!targetEmail || !courseId)) {
       console.warn(`[SePayWebhook] No matching order or pending payment found for code "${paymentCode}"`);
       return {
         statusCode: 200,
@@ -315,13 +318,15 @@ export async function handler(event, context) {
         return { alreadyProcessed: true };
       }
 
+      const nowIso = new Date().toISOString();
+
       // Mark transaction as processed
       transaction.set(txnLogRef, {
         txnId,
         paymentCode,
         transferAmount,
         receivedAccount,
-        processedAt: new Date().toISOString(),
+        processedAt: nowIso,
       });
 
       // Update order status if orderId exists
@@ -331,7 +336,7 @@ export async function handler(event, context) {
           orderRef,
           {
             status: "PAID",
-            paidAt: new Date().toISOString(),
+            paidAt: nowIso,
             transactionId: txnId,
             transferAmount,
             accountNumber: receivedAccount || expectedAccount,
@@ -340,28 +345,44 @@ export async function handler(event, context) {
         );
       }
 
-      // Provision course in user's purchased_courses collection
-      const courseDocRef = adminDb
-        .collection("users")
-        .doc(targetEmail)
-        .collection("purchased_courses")
-        .doc(courseId);
+      // Confirm direct training registration if linked
+      if (registrationId) {
+        const regUpdate = {
+          status: "confirmed",
+          paymentStatus: "PAID",
+          paidAt: nowIso,
+          transactionId: txnId,
+          paymentMethod: "sepay_acb_vietqr",
+          updatedAt: nowIso,
+        };
+        transaction.set(adminDb.collection("live_course_registrations").doc(registrationId), regUpdate, { merge: true });
+        transaction.set(adminDb.collection("direct_course_registrations").doc(registrationId), regUpdate, { merge: true });
+      }
 
-      transaction.set(
-        courseDocRef,
-        {
-          courseId,
-          status: "active",
-          purchasedAt: new Date().toISOString(),
-          paymentRef: txnId,
-          price: `${transferAmount}đ`,
-          claimedVia: "SEPAY_AUTO_BANKING",
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      // Provision course in user's purchased_courses collection when applicable
+      if (targetEmail && courseId && !targetEmail.endsWith("@fast-training.local")) {
+        const courseDocRef = adminDb
+          .collection("users")
+          .doc(targetEmail)
+          .collection("purchased_courses")
+          .doc(courseId);
 
-      return { success: true, targetEmail, courseId };
+        transaction.set(
+          courseDocRef,
+          {
+            courseId,
+            status: "active",
+            purchasedAt: nowIso,
+            paymentRef: txnId,
+            price: `${transferAmount}đ`,
+            claimedVia: "SEPAY_AUTO_BANKING",
+            updatedAt: nowIso,
+          },
+          { merge: true }
+        );
+      }
+
+      return { success: true, targetEmail, courseId, registrationId };
     });
 
     if (result.alreadyProcessed) {

@@ -4,13 +4,9 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CONSULTING_SERVICES } from '../constants';
 import { Link } from "react-router-dom";
 import { Download, FileText, Eye, Lock, ShieldCheck } from 'lucide-react';
-import Iso22000ChecklistModal from '../components/Iso22000ChecklistModal';
 import SecureDocViewerModal from '../components/SecureDocViewerModal';
-import { useToast } from '../contexts/ToastContext';
 
 const Consulting: React.FC = () => {
-  const toast = useToast();
-  const [showIsoChecklistModal, setShowIsoChecklistModal] = useState(false);
   const [showSecureDocModal, setShowSecureDocModal] = useState(false);
   const [selectedDocTitle, setSelectedDocTitle] = useState('Mẫu Hồ Sơ Xin Cấp Giấy Chứng Nhận Cơ Sở Đủ Điều Kiện ATTP');
 
@@ -147,30 +143,19 @@ const Consulting: React.FC = () => {
                                   <p className="text-xs text-slate-500 font-medium">{att.description} ({att.size})</p>
                                 </div>
 
-                                {att.isInteractive ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowIsoChecklistModal(true)}
-                                    className="px-4 py-2 bg-[#007c76] hover:bg-[#005f5b] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
-                                  >
-                                    <span>Mở Checklist</span>
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedDocTitle(att.name);
-                                      setShowSecureDocModal(true);
-                                    }}
-                                    className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                                    title="Chỉ xem trực tuyến - Không hỗ trợ tải về hoặc in ấn"
-                                  >
-                                    <Eye className="w-3.5 h-3.5 text-emerald-700" />
-                                    <span>Xem trực tuyến</span>
-                                    <span className="text-[9px] bg-emerald-200/80 text-emerald-900 px-1 py-0.5 rounded font-black uppercase">Khóa in/tải</span>
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDocTitle(att.name);
+                                    setShowSecureDocModal(true);
+                                  }}
+                                  className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                                  title="Chỉ xem trực tuyến - Không hỗ trợ tải về hoặc in ấn"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>Xem trực tuyến</span>
+                                  <span className="text-[9px] bg-emerald-200/80 text-emerald-900 px-1 py-0.5 rounded font-black uppercase">Khóa in/tải</span>
+                                </button>
                               </div>
                             ))}
                           </div>
@@ -259,17 +244,12 @@ const Consulting: React.FC = () => {
         </div>
       </section>
 
-      {/* ISO 22000 Full Audit Checklist Modal */}
-      <Iso22000ChecklistModal
-        isOpen={showIsoChecklistModal}
-        onClose={() => setShowIsoChecklistModal(false)}
-      />
-
       {/* Secure View-Only Document Previewer Modal */}
       <SecureDocViewerModal
         isOpen={showSecureDocModal}
         onClose={() => setShowSecureDocModal(false)}
         documentTitle={selectedDocTitle}
+        hideChecklistTab={true}
       />
     </main>
   );
