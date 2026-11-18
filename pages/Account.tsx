@@ -21,6 +21,7 @@ const AdProfileManagement = React.lazy(() => import('../components/AdProfileMana
 const FastFoodSafetyManagement = React.lazy(() => import('../components/FastFoodSafetyManagement'));
 const FastHaccpChecklist = React.lazy(() => import('../components/FastHaccpChecklist'));
 const FastIso22kChecklist = React.lazy(() => import('../components/FastIso22kChecklist'));
+const FastSupermarketHygieneAudit = React.lazy(() => import('../components/FastSupermarketHygieneAudit'));
 const AdminDiagnosticConsole = React.lazy(() => import('../components/AdminDiagnosticConsole').then(m => ({ default: m.AdminDiagnosticConsole })));
 const DirectCourseDashboard = React.lazy(() => import('../components/DirectCourseDashboard').then(m => ({ default: m.DirectCourseDashboard })));
 const FeaturedCoursesDashboard = React.lazy(() => import('../components/FeaturedCoursesDashboard').then(m => ({ default: m.FeaturedCoursesDashboard })));
@@ -414,7 +415,7 @@ const Account: React.FC = () => {
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'receipt-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'admin-payment-dashboard' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
-  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'student'>('student');
+  const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'supermarket' | 'student'>('student');
   const [visitedAdminModes, setVisitedAdminModes] = useState<Set<string>>(() => new Set(['fsa']));
   const [masterSearch, setMasterSearch] = useState('');
   const [attpClients, setAttpClients] = useState<any[]>([]);
@@ -422,7 +423,7 @@ const Account: React.FC = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [copiedScheduleNotifId, setCopiedScheduleNotifId] = useState<string | null>(null);
 
-  // Preload all 5 FastService chunks once an admin opens Account so FSA <-> HSQC switches immediately
+  // Preload all FastService chunks once an admin opens Account so switching tabs is instant
   useEffect(() => {
     if (!user?.isAdmin) return;
     import('../components/FastStandardsAudit').catch(() => {});
@@ -430,6 +431,7 @@ const Account: React.FC = () => {
     import('../components/FastFoodSafetyManagement').catch(() => {});
     import('../components/FastHaccpChecklist').catch(() => {});
     import('../components/FastIso22kChecklist').catch(() => {});
+    import('../components/FastSupermarketHygieneAudit').catch(() => {});
   }, [user?.isAdmin]);
 
   // Track visited FastService tabs cleanly
@@ -3278,6 +3280,7 @@ const Account: React.FC = () => {
                   { id: 'fsa', label: 'Food Safety Audit Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
                   { id: 'haccp', label: 'HACCP Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
                   { id: 'iso22k', label: 'ISO 22000:2018 Full Checklist', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+                  { id: 'supermarket', label: 'Food hygiene for supermarket', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z' },
                   { id: 'attp', label: 'Hồ Sơ An Toàn Thực Phẩm', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
                   { id: 'hsqc', label: 'Hồ Sơ Quảng Cáo', icon: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
                   { id: 'student', label: 'Quay lại Học viên', icon: 'M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z', isBackLink: true }
@@ -3362,6 +3365,7 @@ const Account: React.FC = () => {
                   <option value="fsa">Food Safety Audit + Checklist</option>
                   <option value="haccp">HACCP Checklist</option>
                   <option value="iso22k">ISO 22000:2018 Full Checklist</option>
+                  <option value="supermarket">Food hygiene for supermarket</option>
                   <option value="attp">Hồ Sơ An Toàn Thực Phẩm</option>
                   <option value="hsqc">Hồ Sơ Quảng Cáo</option>
                   <option value="student">Quay lại Học viên</option>
@@ -3410,6 +3414,12 @@ const Account: React.FC = () => {
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#005c56] bg-teal-50 px-3 py-1.5 rounded-xl border border-teal-200">System Ready</span>
                       </div>
                       <FastIso22kChecklist />
+                    </div>
+                  )}
+
+                  {(adminViewMode === 'supermarket' || visitedAdminModes.has('supermarket')) && (
+                    <div className={adminViewMode === 'supermarket' ? 'space-y-4 animate-fade-in fast-supermarket-audit-root' : 'hidden print:hidden'}>
+                      <FastSupermarketHygieneAudit />
                     </div>
                   )}
 
@@ -3589,7 +3599,7 @@ const Account: React.FC = () => {
                   {isAdmin && <option value="featured-courses">Cấu hình 3 Khóa Nổi Bật Trang Chủ</option>}
                   {(isTeacher || isAdmin) && <option value="direct-courses">Quản lý Khóa Đào Tạo</option>}
                   {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
-                  {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (Food Safety Audit + Checklist • ATTP • HSQC)</option>}
+                  {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (FSA • HACCP • ISO 22K • Supermarket • ATTP • HSQC)</option>}
                 </select>
              </div>
              

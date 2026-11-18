@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAST CONSULTING - Hệ Thống Đánh Giá QA Audit Control Points & Quản Lý CAPA</title>
+  <style>
+    /* ==========================================================================
+       1. HỆ THỐNG MÀU SẮC THƯƠNG HIỆU CHUẨN FAST CONSULTING
+       ========================================================================== */
+    :root {
+      --primary: #007c76;        /* Xanh Teal chủ đạo */
+      --primary-dark: #005c56;   /* Xanh rừng đậm */
+      --text-main: #374151;      /* Xám than Charcoal */
+      --surface: #ffffff;        /* Trắng tinh khiết */
+
+      --primary-light: #e6f2f1;
+      --primary-bg: #f4f8f8;
+      --border-color: #d2dedd;
+      --border-subtle: #e9efee;
+      --text-muted: #6b7280;
+
+      /* Màu trạng thái đánh giá */
+      --pass-color: #2e7d32;     /* Đạt - Pass */
+      --pass-bg: #e8f5e9;
+      --pass-border: #c8e6c9;
+
+      --nc-color: #d32f2f;       /* Không đạt - NC */
+      --nc-bg: #fde8e8;
+      --nc-border: #ffcdd2;
+
+      --ni-color: #e65100;       /* Cần cải tiến / Xuất gửi khách */
+      --ni-bg: #fff3e0;
+      --ni-border: #ffe0b2;
+
+      --zalo-color: #0277bd;     /* Sao chép Zalo / Tham chiếu */
+      --zalo-bg: #e1f5fe;
+      --zalo-border: #b3e5fc;
+
+      --na-color: #4b5563;
+      --na-bg: #f3f4f6;
+      --na-border: #d1d5db;
+
+      --shadow-sm: 0 1px 3px rgba(0, 124, 118, 0.08);
+      --shadow-md: 0 4px 16px rgba(0, 124, 118, 0.10);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--primary-bg);
+      color: var(--text-main);
+      line-height: 1.55;
+      padding: 14px 10px 70px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+
+    /* ==========================================================================
+       2. HEADER THƯƠNG HIỆU FAST CONSULTING
+       ========================================================================== */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #ffffff;
+      padding: 20px 26px;
+      border-bottom: 4px solid var(--primary-dark);
+    }
+
+    .header-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo-badge {
+      width: 50px;
+      height: 50px;
+      background: #ffffff;
+      color: var(--primary);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 12.5px;
+      color: var(--primary-light);
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hotline-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--nc-color);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 13.5px;
+      text-decoration: none;
+      box-shadow: 0 3px 10px rgba(211, 47, 47, 0.35);
+      transition: var(--transition);
+      min-height: 38px;
+    }
+
+    .hotline-btn:hover {
+      background: #b71c1c;
+      transform: translateY(-1px);
+    }
+
+    .header-badge-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .header-badge {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       3. THÔNG TIN CUỘC ĐÁNH GIÁ (AUDIT METADATA)
+       ========================================================================== */
+    .audit-meta-section {
+      padding: 18px 26px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .section-sub-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .field-label .req {
+      color: var(--nc-color);
+    }
+
+    .field-input, .field-select {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13.5px;
+      font-family: inherit;
+      color: var(--text-main);
+      background-color: var(--primary-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: var(--transition);
+      min-height: 38px;
+    }
+
+    .field-input:focus, .field-select:focus {
+      background-color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 124, 118, 0.15);
+    }
+
+    .print-meta-table {
+      display: none;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+      margin-top: 6px;
+    }
+
+    .print-meta-table td {
+      border: 1px solid #666666;
+      padding: 5px 8px;
+    }
+
+    /* ==========================================================================
+       4. BỘ LỌC NGÀNH HÀNG THÔNG MINH (12 DEPARTMENTS)
+       ========================================================================== */
+    .dept-filter-section {
+      padding: 16px 26px;
+      background: #f8fbfb;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .dept-pills-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .dept-pill {
+      padding: 6px 13px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition);
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 34px;
+    }
+
+    .dept-pill:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+
+    .dept-pill.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary-dark);
+      box-shadow: 0 2px 6px rgba(0, 124, 118, 0.25);
+    }
+
+    .dept-pill.all-pill.active {
+      background: var(--primary-dark);
+    }
+
+    /* ==========================================================================
+       5. BẢNG ĐIỀU KHIỂN KPI DASHBOARD (5 THẺ)
+       ========================================================================== */
+    .kpi-section {
+      padding: 18px 26px;
+      background: #ffffff;
+      border-bottom: 1.5px solid var(--border-color);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--primary);
+    }
+
+    .kpi-card.kpi-pass::before { background: var(--pass-color); }
+    .kpi-card.kpi-nc::before { background: var(--nc-color); }
+    .kpi-card.kpi-score::before { background: var(--zalo-color); }
+    .kpi-card.kpi-rank::before { background: var(--ni-color); }
+
+    .kpi-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .kpi-val-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .kpi-num {
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--primary-dark);
+    }
+
+    .kpi-card.kpi-pass .kpi-num { color: var(--pass-color); }
+    .kpi-card.kpi-nc .kpi-num { color: var(--nc-color); }
+    .kpi-card.kpi-score .kpi-num { color: var(--zalo-color); }
+    .kpi-card.kpi-rank .kpi-num { font-size: 18px; color: var(--ni-color); }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       6. STICKY PROGRESS & ACTION TOOLBAR
+       ========================================================================== */
+    .sticky-bar {
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      background: #ffffff;
+      border-bottom: 1.5px solid var(--border-color);
+      padding: 12px 26px;
+      box-shadow: 0 4px 12px rgba(0, 124, 118, 0.08);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: #e2eceb;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--pass-color) 100%);
+      transition: width 0.35s ease;
+    }
+
+    .toolbar-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 240px;
+      max-width: 380px;
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-size: 13.5px;
+      outline: none;
+      min-height: 38px;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(0, 124, 118, 0.14);
+    }
+
+    .status-filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-chip {
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-main);
+      cursor: pointer;
+      min-height: 36px;
+      transition: var(--transition);
+    }
+
+    .filter-chip:hover {
+      background: var(--primary-light);
+    }
+
+    .filter-chip.active {
+      background: var(--primary-dark);
+      color: #ffffff;
+      border-color: var(--primary-dark);
+    }
+
+    .export-buttons {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      font-size: 12.5px;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition);
+      min-height: 38px;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary-dark);
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      color: #ffffff;
+    }
+
+    .btn-pass {
+      background: var(--pass-color);
+      color: #ffffff;
+      border-color: #1b5e20;
+    }
+    .btn-pass:hover {
+      background: #1b5e20;
+      color: #ffffff;
+    }
+
+    .btn-ni {
+      background: var(--ni-color);
+      color: #ffffff;
+      border-color: #bf360c;
+    }
+    .btn-ni:hover {
+      background: #bf360c;
+      color: #ffffff;
+    }
+
+    .btn-zalo {
+      background: var(--zalo-color);
+      color: #ffffff;
+      border-color: #01579b;
+    }
+    .btn-zalo:hover {
+      background: #01579b;
+      color: #ffffff;
+    }
+
+    /* ==========================================================================
+       7. DANH SÁCH KHU VỰC & ĐIỂM KIỂM SOÁT (8 AREAS ACCORDIONS)
+       ========================================================================== */
+    .audit-body {
+      padding: 20px 26px;
+    }
+
+    .area-card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-bottom: 18px;
+      background: #ffffff;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .area-header {
+      background: #f5f9f9;
+      padding: 13px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+      transition: var(--transition);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .area-card.open .area-header {
+      background: var(--primary-light);
+      border-bottom-color: var(--border-color);
+    }
+
+    .area-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .area-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .area-name {
+      font-size: 15.5px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      text-transform: uppercase;
+    }
+
+    .area-stats-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .mini-stat {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+    }
+
+    .mini-stat.pass { color: var(--pass-color); border-color: var(--pass-border); background: var(--pass-bg); }
+    .mini-stat.nc { color: var(--nc-color); border-color: var(--nc-border); background: var(--nc-bg); }
+
+    .btn-batch-pass {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--pass-border);
+      background: #ffffff;
+      color: var(--pass-color);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .btn-batch-pass:hover {
+      background: var(--pass-color);
+      color: #ffffff;
+    }
+
+    .area-arrow {
+      color: var(--primary-dark);
+      transition: transform 0.25s ease;
+    }
+
+    .area-card.open .area-arrow {
+      transform: rotate(180deg);
+    }
+
+    .area-content {
+      display: none;
+      padding: 0;
+    }
+
+    .area-card.open .area-content {
+      display: block;
+    }
+
+    .criteria-group-header {
+      background: #f9fbfb;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      border-bottom: 1px solid var(--border-subtle);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cp-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: var(--transition);
+    }
+
+    .cp-item:last-child {
+      border-bottom: none;
+    }
+
+    .cp-item.status-pass {
+      background-color: #f6fbf7;
+    }
+
+    .cp-item.status-nc {
+      background-color: #fff8f8;
+      border-left: 4px solid var(--nc-color);
+    }
+
+    .cp-item.status-na {
+      background-color: #fafafa;
+      opacity: 0.78;
+    }
+
+    .cp-main-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .cp-info {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .cp-title-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .cp-code {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .cp-condition {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .cp-detail {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .cp-depts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .dept-tag {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #eef2f3;
+      color: #4b5563;
+      border: 1px solid #dce3e5;
+    }
+
+    .dept-tag.highlighted {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      border-color: #b2d4d2;
+    }
+
+    /* 3 Nút Chấm Điểm Nhanh (Touch-friendly cho iPad/Tablet) */
+    .cp-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .score-btn {
+      padding: 8px 14px;
+      font-size: 12.5px;
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border-color);
+      background: #ffffff;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: var(--transition);
+      min-height: 40px;
+      min-width: 78px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .score-btn.btn-opt-pass:hover {
+      border-color: var(--pass-color);
+      color: var(--pass-color);
+      background: var(--pass-bg);
+    }
+    .score-btn.btn-opt-pass.selected {
+      background: var(--pass-color);
+      color: #ffffff;
+      border-color: #1b5e20;
+      box-shadow: 0 2px 6px rgba(46, 125, 50, 0.3);
+    }
+
+    .score-btn.btn-opt-nc:hover {
+      border-color: var(--nc-color);
+      color: var(--nc-color);
+      background: var(--nc-bg);
+    }
+    .score-btn.btn-opt-nc.selected {
+      background: var(--nc-color);
+      color: #ffffff;
+      border-color: #b71c1c;
+      box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
+    }
+
+    .score-btn.btn-opt-na:hover {
+      border-color: var(--na-color);
+      background: var(--na-bg);
+    }
+    .score-btn.btn-opt-na.selected {
+      background: var(--na-color);
+      color: #ffffff;
+      border-color: #374151;
+    }
+
+    /* Khung Ghi Nhận Bằng Chứng Lỗi (NC) & CAPA */
+    .nc-drawer {
+      display: none;
+      margin-top: 12px;
+      padding: 14px;
+      background: #ffffff;
+      border: 1.5px solid var(--nc-border);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 2px 8px rgba(211, 47, 47, 0.06);
+    }
+
+    .cp-item.status-nc .nc-drawer {
+      display: block;
+    }
+
+    .nc-drawer-header {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--nc-color);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .nc-input, .nc-select {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      border: 1px solid #f5b7b7;
+      border-radius: 5px;
+      background: #fffafa;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    .nc-input:focus, .nc-select:focus {
+      border-color: var(--nc-color);
+      background: #ffffff;
+      box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.15);
+    }
+
+    /* ==========================================================================
+       8. MODAL LỊCH SỬ ĐÁNH GIÁ (MINI CRM DATABASE)
+       ========================================================================== */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.55);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #ffffff;
+      border-radius: var(--radius-md);
+      max-width: 960px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      padding: 16px 20px;
+      background: var(--primary-dark);
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-head h3 {
+      font-size: 16px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+    }
+
+    .crm-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .crm-table th {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      padding: 9px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .crm-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    /* ==========================================================================
+       9. FOOTER
+       ========================================================================== */
+    footer {
+      background: #ffffff;
+      border-top: 1px solid var(--border-color);
+      padding: 20px 26px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-brand {
+      font-weight: 800;
+      color: var(--primary);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    /* ==========================================================================
+       10. CHUẨN IN ẤN BIÊN BẢN ĐÁNH GIÁ A4 (@media print)
+       ========================================================================== */
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+        color: #000000 !important;
+        font-size: 9.5pt !important;
+      }
+
+      .container {
+        border: none !important;
+        box-shadow: none !important;
+        max-width: 100% !important;
+      }
+
+      header {
+        background: none !important;
+        color: #000000 !important;
+        border-bottom: 2px solid #000000 !important;
+        padding: 0 0 8px 0 !important;
+      }
+
+      .brand-logo-badge {
+        border: 1.5px solid #000000 !important;
+        color: #000000 !important;
+      }
+
+      .brand-text h1 { color: #000000 !important; }
+      .brand-text p { color: #333333 !important; }
+
+      .header-actions,
+      .dept-filter-section,
+      .sticky-bar,
+      .btn-batch-pass,
+      .area-arrow,
+      .cp-depts,
+      .modal-backdrop {
+        display: none !important;
+      }
+
+      .meta-grid { display: none !important; }
+      .print-meta-table { display: table !important; }
+
+      .audit-meta-section {
+        padding: 10px 0 !important;
+      }
+
+      .kpi-section {
+        padding: 10px 0 !important;
+        border-bottom: 1px solid #000000 !important;
+      }
+
+      .kpi-card {
+        border: 1px solid #666666 !important;
+        box-shadow: none !important;
+        padding: 8px 10px !important;
+      }
+
+      .area-card {
+        border: 1px solid #666666 !important;
+        box-shadow: none !important;
+        margin-bottom: 12px !important;
+      }
+
+      .area-header {
+        background: #eeeeee !important;
+        padding: 7px 12px !important;
+      }
+
+      .area-content {
+        display: block !important;
+      }
+
+      .cp-item {
+        padding: 8px 12px !important;
+        page-break-inside: avoid;
+      }
+
+      .score-btn:not(.selected) {
+        display: none !important;
+      }
+
+      .score-btn.selected {
+        border: 1px solid #000000 !important;
+        background: transparent !important;
+        color: #000000 !important;
+        padding: 2px 8px !important;
+        min-height: auto !important;
+      }
+
+      .nc-input, .nc-select {
+        border: none !important;
+        border-bottom: 1px solid #666666 !important;
+        background: transparent !important;
+        padding: 2px 0 !important;
+      }
+
+      /* Chế độ chỉ in Phiếu Lỗi NC & CAPA gửi cơ sở */
+      body.print-nc-only .cp-item:not(.status-nc) {
+        display: none !important;
+      }
+      body.print-nc-only .area-card.no-nc-area {
+        display: none !important;
+      }
+      body.print-nc-only .criteria-group-header {
+        display: none !important;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+    }
+
+    @media (max-width: 700px) {
+      header, .audit-meta-section, .dept-filter-section, .kpi-section, .sticky-bar, .audit-body {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+      .cp-actions {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .score-btn {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 1. HEADER THƯƠNG HIỆU FAST CONSULTING -->
+  <header>
+    <div class="header-top">
+      <div class="brand-box">
+        <div class="brand-logo-badge">FC</div>
+        <div class="brand-text">
+          <h1>FAST CONSULTING</h1>
+          <p>Food All Standard &amp; Training &bull; QA Audit Control Points</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn" style="background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.4);" onclick="openHistoryModal()">
+          <svg width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022l-.074.997zm2.004.45a7.003 7.003 0 0 0-.985-.299l.219-.976c.383.086.76.2 1.126.342l-.36.933zm1.37.71a7.01 7.01 0 0 0-.439-.27l.493-.87a8.025 8.025 0 0 1 .979.654l-.615.789a6.996 6.996 0 0 0-.418-.302zm1.834 1.79a6.99 6.99 0 0 0-.653-.796l.724-.69c.27.285.52.59.747.91l-.818.576zm.744 1.352a7.08 7.08 0 0 0-.214-.468l.893-.45a7.976 7.976 0 0 1 .45 1.088l-.95.313a7.023 7.023 0 0 0-.179-.483zm.53 2.507a6.991 6.991 0 0 0-.1-1.025l.985-.17c.067.386.106.778.116 1.17l-1 .025zm-.131 1.538c.033-.17.06-.339.081-.51l.993.123a7.957 7.957 0 0 1-.23 1.155l-.964-.267c.046-.165.086-.332.12-.501zm-.952 2.379c.184-.29.346-.594.486-.908l.914.405c-.16.36-.345.706-.555 1.038l-.845-.535zm-.964 1.205c.122-.122.239-.248.35-.378l.758.653a8.073 8.073 0 0 1-.401.432l-.707-.707z"/><path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0v1z"/><path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5z"/></svg>
+          Lịch Sử Đánh Giá (<span id="savedCountBadge">0</span>)
+        </button>
+        <a href="tel:0927002668" class="hotline-btn">
+          <svg width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a1.745 1.745 0 0 1-1.657-.459L5.482 8.062a1.745 1.745 0 0 1-.46-1.657l.548-2.19a.678.678 0 0 0-.122-.58L3.654 1.328z"/></svg>
+          Hotline QA: 0927 002 668
+        </a>
+      </div>
+    </div>
+    <div class="header-badge-list">
+      <span class="header-badge">Hệ thống Đánh giá QA Thực địa &amp; Bán lẻ</span>
+      <span class="header-badge">08 Nhóm Khu Vực Kiểm Soát</span>
+      <span class="header-badge">12 Ngành Hàng Chuyên Biệt</span>
+      <span class="header-badge">Quản lý Lỗi NC &amp; Kế hoạch CAPA</span>
+    </div>
+  </header>
+
+  <!-- 2. THÔNG TIN CUỘC ĐÁNH GIÁ (AUDIT METADATA) -->
+  <div class="audit-meta-section">
+    <div class="section-sub-title">
+      <span>1. Thông Tin Cuộc Đánh Giá &amp; Cơ Sở Được Kiểm Tra</span>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn" style="padding: 4px 10px; min-height: 30px; font-size: 12px;" onclick="startNewAudit()">+ Tạo Cuộc Đánh Giá Mới</button>
+        <button class="btn btn-primary" style="padding: 4px 12px; min-height: 30px; font-size: 12px;" onclick="saveAuditToCRM()">
+          <svg width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/></svg>
+          Lưu Biên Bản (CRM)
+        </button>
+      </div>
+    </div>
+
+    <!-- Bảng hiển thị khi In A4 -->
+    <table class="print-meta-table">
+      <tr>
+        <td style="width: 18%; font-weight: bold; background: #f0f0f0;">Tên Cơ Sở / Siêu Thị:</td>
+        <td style="width: 32%; font-weight: bold;" id="pFacilityName">-</td>
+        <td style="width: 18%; font-weight: bold; background: #f0f0f0;">Ngày Đánh Giá:</td>
+        <td style="width: 32%;" id="pAuditDate">-</td>
+      </tr>
+      <tr>
+        <td style="font-weight: bold; background: #f0f0f0;">Chuyên Gia Đánh Giá:</td>
+        <td id="pAuditorName">-</td>
+        <td style="font-weight: bold; background: #f0f0f0;">Đại Diện Cơ Sở:</td>
+        <td id="pFacilityRep">-</td>
+      </tr>
+      <tr>
+        <td style="font-weight: bold; background: #f0f0f0;">Địa Chỉ / Khu Vực:</td>
+        <td id="pFacilityAddress">-</td>
+        <td style="font-weight: bold; background: #f0f0f0;">Ngành Hàng Đánh Giá:</td>
+        <td id="pSelectedDepts">Tất cả 12 ngành hàng</td>
+      </tr>
+    </table>
+
+    <div class="meta-grid">
+      <div class="field-group">
+        <label class="field-label">Tên Cơ Sở / Siêu Thị / Cửa Hàng <span class="req">*</span></label>
+        <input type="text" id="facilityName" class="field-input" placeholder="VD: Siêu thị MM Mega Market An Phú..." oninput="saveDraft()">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Chuyên Gia Đánh Giá (Lead Auditor) <span class="req">*</span></label>
+        <input type="text" id="auditorName" class="field-input" placeholder="Họ tên chuyên gia FAST..." oninput="saveDraft()">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Đại Diện Cơ Sở Tiếp Đoàn</label>
+        <input type="text" id="facilityRep" class="field-input" placeholder="Quản lý cửa hàng / QA nội bộ..." oninput="saveDraft()">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Ngày Đánh Giá <span class="req">*</span></label>
+        <input type="date" id="auditDate" class="field-input" oninput="saveDraft()">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Địa Chỉ Cơ Sở</label>
+        <input type="text" id="facilityAddress" class="field-input" placeholder="Số nhà, đường, quận/huyện, tỉnh/TP..." oninput="saveDraft()">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Hình Thức Đánh Giá</label>
+        <select id="auditType" class="field-select" onchange="saveDraft()">
+          <option value="Đánh giá QA định kỳ">Đánh giá QA định kỳ</option>
+          <option value="Đánh giá đột xuất hiện trường">Đánh giá đột xuất hiện trường</option>
+          <option value="Thẩm tra khắc phục (Follow-up CAPA)">Thẩm tra khắc phục (Follow-up CAPA)</option>
+          <option value="Tư vấn tiền thẩm định ATTP / HACCP">Tư vấn tiền thẩm định ATTP / HACCP</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. BỘ LỌC NGÀNH HÀNG THÔNG MINH (12 DEPARTMENTS) -->
+  <div class="dept-filter-section">
+    <div class="section-sub-title" style="margin-bottom: 4px;">
+      <span>2. Chọn Ngành Hàng / Bộ Phận Đánh Giá (12 Departments)</span>
+      <span style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: none;">Bấm chọn 1 hoặc nhiều ngành hàng để lọc tự động các điểm kiểm soát tương ứng</span>
+    </div>
+    <div class="dept-pills-wrap" id="deptPillsContainer">
+      <!-- Render bằng JS -->
+    </div>
+  </div>
+
+  <!-- 4. BẢNG ĐIỀU KHIỂN KPI DASHBOARD (5 THẺ) -->
+  <div class="kpi-section">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Tổng Điểm Kiểm Soát</div>
+        <div class="kpi-val-row">
+          <span class="kpi-num" id="kpiTotal">0</span>
+          <span class="kpi-sub">tiêu chí áp dụng</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-pass">
+        <div class="kpi-label">Số Mục Đạt (Pass)</div>
+        <div class="kpi-val-row">
+          <span class="kpi-num" id="kpiPass">0</span>
+          <span class="kpi-sub">đạt chuẩn</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-nc">
+        <div class="kpi-label">Số Lỗi NC Phát Hiện</div>
+        <div class="kpi-val-row">
+          <span class="kpi-num" id="kpiNC">0</span>
+          <span class="kpi-sub">không phù hợp</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-score">
+        <div class="kpi-label">Điểm Tuân Thủ (%)</div>
+        <div class="kpi-val-row">
+          <span class="kpi-num" id="kpiCompliance">0%</span>
+          <span class="kpi-sub" id="kpiEvaluatedText">(0 đã chấm)</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-rank">
+        <div class="kpi-label">Xếp Loại Đánh Giá</div>
+        <div class="kpi-val-row">
+          <span class="kpi-num" id="kpiRank">CHƯA CHẤM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. STICKY PROGRESS BAR & ACTION TOOLBAR -->
+  <div class="sticky-bar">
+    <div class="progress-header">
+      <span style="color: var(--primary-dark);" id="stickyProgressText">Tiến độ kiểm tra thực địa: 0 / 0 tiêu chí (0%)</span>
+      <span style="color: var(--pass-color);" id="stickyScoreText">Tỷ lệ tuân thủ: 0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="stickyProgressFill"></div>
+    </div>
+
+    <div class="toolbar-controls">
+      <div class="search-box">
+        <svg width="15" height="15" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="Tìm nhanh tiêu chí, điều kiện lỗi, khu vực..." oninput="renderChecklist()">
+      </div>
+
+      <div class="status-filters">
+        <button class="filter-chip active" data-filter="ALL" onclick="setStatusFilter('ALL', this)">Tất cả</button>
+        <button class="filter-chip" data-filter="UNRATED" onclick="setStatusFilter('UNRATED', this)">Chưa chấm</button>
+        <button class="filter-chip" data-filter="PASS" onclick="setStatusFilter('PASS', this)">Đạt (Pass)</button>
+        <button class="filter-chip" data-filter="NC" onclick="setStatusFilter('NC', this)">Lỗi (NC)</button>
+        <button class="filter-chip" data-filter="NA" onclick="setStatusFilter('NA', this)">N/A</button>
+      </div>
+
+      <div class="export-buttons">
+        <button class="btn btn-pass" onclick="exportToExcel()">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/></svg>
+          Xuất Excel (CAPA)
+        </button>
+
+        <button class="btn btn-zalo" onclick="copyNCSummaryZalo()">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
+          Sao Chép Lỗi Gửi Zalo
+        </button>
+
+        <button class="btn btn-ni" onclick="printReport(true)" title="Chỉ xuất phiếu tổng hợp các lỗi NC & yêu cầu khắc phục gửi cơ sở">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/></svg>
+          Xuất PDF Phiếu Lỗi NC
+        </button>
+
+        <button class="btn btn-primary" onclick="printReport(false)" title="In hoặc xuất PDF toàn bộ biên bản đánh giá">
+          In Toàn Bộ (PDF)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. NỘI DUNG CHECKLIST 08 KHU VỰC KIỂM SOÁT -->
+  <div class="audit-body" id="auditAreasContainer">
+    <!-- Render tự động từ JavaScript -->
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-brand">FAST CONSULTING &bull; FOOD ALL STANDARD &amp; TRAINING</div>
+    <p>Hệ thống Quản trị Đánh giá Chất lượng &amp; An toàn Thực phẩm (QA Audit Control Points &amp; CAPA)</p>
+    <p style="margin-top: 4px;">Tổng đài Tư vấn &amp; Hỗ trợ Chuyên gia 24/7: <strong style="color: var(--nc-color);">0927 002 668</strong></p>
+  </footer>
+</div>
+
+<!-- MODAL LỊCH SỬ ĐÁNH GIÁ (MINI CRM) -->
+<div class="modal-backdrop" id="historyModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Lịch Sử Các Cuộc Đánh Giá Đã Lưu (FAST QA CRM)</h3>
+      <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="overflow-x: auto;">
+        <table class="crm-table">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Ngày Đánh Giá</th>
+              <th>Tên Cơ Sở / Siêu Thị</th>
+              <th>Chuyên Gia</th>
+              <th>Đạt / Lỗi NC</th>
+              <th>Tuân Thủ %</th>
+              <th>Xếp Loại</th>
+              <th>Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================================================
+  // 1. DANH SÁCH 12 NGÀNH HÀNG (DEPARTMENTS)
+  // ==========================================================================
+  const DEPARTMENTS = [
+    'Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica',
+    'Delivery', 'Grocery', 'BAT & Confect', 'NFIF', 'GOR', 'Canteen & General'
+  ];
+
+  const ALL_DEPTS = [...DEPARTMENTS];
+  const FRESH_DEPTS = ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'];
+  const FOOD_DEPTS = ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Grocery', 'BAT & Confect', 'GOR', 'Canteen & General'];
+
+  // ==========================================================================
+  // 2. CƠ SỞ DỮ LIỆU ĐẦY ĐỦ 08 NHÓM KHU VỰC & ĐIỂM KIỂM SOÁT (CONTROL POINTS)
+  // ==========================================================================
+  const AUDIT_AREAS = [
+    {
+      id: 1,
+      name: 'Area 1: Cơ sở vật chất hạ tầng',
+      items: [
+        // Trần
+        { code: '1.1.1', criteria: 'Trần', condition: 'Bẩn', detail: 'Trần khu vực chế biến/kinh doanh bám bụi bẩn, dầu mỡ.', depts: ['Produce', 'Seafood', 'Butchery', 'Bakery', 'Delica', 'Grocery', 'Canteen & General'] },
+        { code: '1.1.2', criteria: 'Trần', condition: 'Nấm mốc', detail: 'Trần xuất hiện vết nấm mốc đen/xanh do ẩm thấp.', depts: ALL_DEPTS },
+        { code: '1.1.3', criteria: 'Trần', condition: 'Gỉ sét', detail: 'Kết cấu khung trần, thanh treo, tấm trần kim loại bị gỉ sét.', depts: ALL_DEPTS },
+        { code: '1.1.4', criteria: 'Trần', condition: 'Mạng nhện', detail: 'Có mạng nhện giăng trên trần hoặc góc trần.', depts: ALL_DEPTS },
+        { code: '1.1.5', criteria: 'Trần', condition: 'Hư hỏng', detail: 'Trần bị thấm, dột nước, thủng, bong tróc vật liệu.', depts: ['Produce', 'P&F', 'Butchery', 'Bakery', 'Grocery', 'BAT & Confect', 'NFIF', 'GOR', 'Canteen & General'] },
+        // Tường
+        { code: '1.2.1', criteria: 'Tường', condition: 'Bẩn', detail: 'Tường, vách ngăn bám bẩn, vết thực phẩm bắn lên không vệ sinh.', depts: ['Produce', 'P&F', 'Butchery', 'Canteen & General'] },
+        { code: '1.2.2', criteria: 'Tường', condition: 'Nấm mốc', detail: 'Tường bị ẩm ướt, xuất hiện nấm mốc.', depts: ['Produce', 'Seafood', 'P&F', 'BAT & Confect', 'NFIF', 'GOR', 'Canteen & General'] },
+        { code: '1.2.3', criteria: 'Tường', condition: 'Gỉ sét', detail: 'Vách tôn/inox hoặc nẹp tường bị gỉ sét.', depts: ['Produce', 'P&F', 'NFIF', 'GOR', 'Canteen & General'] },
+        { code: '1.2.4', criteria: 'Tường', condition: 'Mạng nhện', detail: 'Có mạng nhện bám trên bề mặt tường, góc tường.', depts: ['Seafood', 'P&F', 'Canteen & General'] },
+        { code: '1.2.5', criteria: 'Tường', condition: 'Hư hỏng', detail: 'Tường bị bể gạch, nứt nẻ, bung tróc sơn/vữa.', depts: ['Produce', 'P&F', 'Canteen & General'] },
+        // Sàn
+        { code: '1.3.1', criteria: 'Sàn', condition: 'Bẩn', detail: 'Sàn có rác, sản phẩm rơi vãi, vết bẩn dầu mỡ tích tụ.', depts: ['Produce', 'Seafood', 'P&F', 'Delica', 'Grocery', 'BAT & Confect', 'Canteen & General'] },
+        { code: '1.3.2', criteria: 'Sàn', condition: 'Nấm mốc', detail: 'Mặt sàn hoặc ron gạch xuất hiện nấm mốc, rêu.', depts: ['Seafood', 'P&F', 'Butchery', 'Grocery', 'BAT & Confect', 'Canteen & General'] },
+        { code: '1.3.3', criteria: 'Sàn', condition: 'Gỉ sét', detail: 'Bề mặt sàn kim loại/nắp sàn bị gỉ sét.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Grocery', 'BAT & Confect', 'GOR', 'Canteen & General'] },
+        { code: '1.3.4', criteria: 'Sàn', condition: 'Hư hỏng', detail: 'Nứt, bể gạch, đọng nước (lưu ý ngoại lệ sàn ướt đặc thù tại ngành hàng thủy sản).', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Grocery', 'BAT & Confect', 'GOR', 'Canteen & General'] },
+        // Cửa
+        { code: '1.4.1', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Bẩn', detail: 'Áp dụng tất cả các loại cửa tại các khu vực, bao gồm cả màng nhựa PVC.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'GOR', 'Canteen & General'] },
+        { code: '1.4.2', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Nấm mốc', detail: 'Cửa hoặc dải màng nhựa PVC bị nấm mốc.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'GOR', 'Canteen & General'] },
+        { code: '1.4.3', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Gỉ sét', detail: 'Khung cửa, bản lề, thanh treo màng cửa bị gỉ sét.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'GOR', 'Canteen & General'] },
+        { code: '1.4.4', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Mạng nhện', detail: 'Có mạng nhện bám trên cửa hoặc khung cửa.', depts: ['Seafood', 'Delica', 'GOR', 'Canteen & General'] },
+        { code: '1.4.5', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Hư hỏng', detail: 'Cửa nứt, bể kính/nhựa, màng cửa PVC bị rách hoặc thiếu dải.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Delica', 'GOR', 'Canteen & General'] },
+        { code: '1.4.6', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Luôn mở', detail: 'Cửa hoặc màng cửa ra vào khu vực chế biến/kho lạnh không đóng.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'GOR', 'Canteen & General'] },
+        { code: '1.4.7', criteria: 'Cửa (bao gồm màng cửa PVC)', condition: 'Không kín', detail: 'Cửa/màng cửa đóng nhưng không kín do joint cao su bị hư, cửa bị vênh tạo khe hở côn trùng.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'GOR', 'Canteen & General'] },
+        // Cống thoát nước
+        { code: '1.5.1', criteria: 'Cống thoát nước', condition: 'Nghẹt', detail: 'Cống thoát nước bị tắc nghẽn, thoát nước chậm gây ứ đọng.', depts: FRESH_DEPTS },
+        { code: '1.5.2', criteria: 'Cống thoát nước', condition: 'Bẩn', detail: 'Rãnh cống, lưới chắn rác tích tụ cặn bã thực phẩm, bùn bẩn.', depts: FRESH_DEPTS },
+        { code: '1.5.3', criteria: 'Cống thoát nước', condition: 'Có mùi hôi', detail: 'Cống thoát nước bốc mùi hôi thối ngược lên khu vực chế biến/bán hàng.', depts: FRESH_DEPTS },
+        { code: '1.5.4', criteria: 'Cống thoát nước', condition: 'Gỉ sét', detail: 'Nắp cống, song chắn rác kim loại bị gỉ sét nặng.', depts: FRESH_DEPTS },
+        { code: '1.5.5', criteria: 'Cống thoát nước', condition: 'Hư hỏng', detail: 'Nắp cống bị gãy, mất lưới chắn rác/chống chuột cống.', depts: FRESH_DEPTS },
+        // Nguồn sáng
+        { code: '1.6.1', criteria: 'Nguồn sáng', condition: 'Không đủ sáng', detail: 'Ánh sáng yếu, bóng đèn cháy không đủ độ rọi trong khu vực sản xuất/chế biến.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'BAT & Confect', 'NFIF', 'GOR', 'Canteen & General'] },
+        { code: '1.6.2', criteria: 'Nguồn sáng', condition: 'Không có máng che', detail: 'Đèn chiếu sáng trong khu vực sản xuất/chế biến không có máng che bảo vệ chống vỡ thủy tinh.', depts: ALL_DEPTS },
+        // Bồn rửa
+        { code: '1.7.1', criteria: 'Bồn rửa', condition: 'Bẩn', detail: 'Bồn rửa tay, bồn rửa thực phẩm/dụng cụ bám bẩn, ố vàng.', depts: FRESH_DEPTS },
+        { code: '1.7.2', criteria: 'Bồn rửa', condition: 'Nghẹt', detail: 'Đường thoát nước bồn rửa bị nghẹt, ứ đọng nước.', depts: FRESH_DEPTS },
+        { code: '1.7.3', criteria: 'Bồn rửa', condition: 'Hư hỏng', detail: 'Bồn rửa, ống xả, vòi/van nước không hoàn chỉnh hoặc bị rò rỉ nước.', depts: FRESH_DEPTS }
+      ]
+    },
+    {
+      id: 2,
+      name: 'Area 2: Chất lượng sản phẩm',
+      items: [
+        // Bao bì
+        { code: '2.1.1', criteria: 'Bao bì', condition: 'Bẩn', detail: 'Áp dụng cho tất cả sản phẩm trưng bày, nguyên liệu, bán thành phẩm, hóa chất bị bám bẩn.', depts: ALL_DEPTS },
+        { code: '2.1.2', criteria: 'Bao bì', condition: 'Không nguyên vẹn', detail: 'Bao bì bị xì chân không, rách, thủng, hở mí hàn.', depts: ALL_DEPTS },
+        { code: '2.1.3', criteria: 'Bao bì', condition: 'Phồng bao bì', detail: 'Bao bì thực phẩm bị phồng khí bất thường (nghi ngờ hư hỏng vi sinh).', depts: FOOD_DEPTS },
+        { code: '2.1.4', criteria: 'Bao bì', condition: 'Móp méo', detail: 'Đồ hộp, lon, chai lọ bị móp méo, biến dạng.', depts: ALL_DEPTS },
+        { code: '2.1.5', criteria: 'Bao bì', condition: 'Gỉ sét', detail: 'Nắp lon, hộp thiếc bị gỉ sét.', depts: ALL_DEPTS },
+        // Nhãn
+        { code: '2.2.1', criteria: 'Nhãn mác', condition: 'Không nguyên vẹn', detail: 'Nhãn barcode, nhãn chính/phụ, tem rượu, mẫu lưu thịt/bánh/delica, nhãn bình nước/bình hóa chất/thùng ngâm dụng cụ bị rách, mờ.', depts: ALL_DEPTS },
+        { code: '2.2.2', criteria: 'Nhãn mác', condition: 'Không có nhãn', detail: 'Sản phẩm trưng bày, nguyên liệu, bán thành phẩm, bình san chiết hóa chất không có nhãn nhận diện.', depts: ALL_DEPTS },
+        { code: '2.2.3', criteria: 'Nhãn mác', condition: 'Có nhiều nhãn với thông tin mâu thuẫn nhau', detail: 'Trên cùng sản phẩm dán 2 nhãn có NSX/HSD hoặc xuất xứ khác nhau.', depts: FOOD_DEPTS },
+        { code: '2.2.4', criteria: 'Nhãn mác', condition: 'Thông tin trên nhãn không đúng', detail: 'Sai tên hàng, sai xuất xứ, sai thành phần hoặc điều kiện bảo quản.', depts: ALL_DEPTS },
+        { code: '2.2.5', criteria: 'Nhãn mác', condition: 'Thông tin trên nhãn không đủ', detail: 'Thiếu thông tin bắt buộc theo quy định ghi nhãn hàng hóa (NSX, HSD, định lượng, cảnh báo...).', depts: ALL_DEPTS },
+        { code: '2.2.6', criteria: 'Nhãn mác', condition: 'Dán không phù hợp', detail: 'Nhãn phụ dán đè che khuất thông tin bắt buộc trên nhãn gốc hoặc dán sai vị trí.', depts: ALL_DEPTS },
+        // Cảm quan & HSD
+        { code: '2.3.1', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Hư hỏng', detail: 'Sản phẩm/nguyên liệu bị thối rữa, biến chất, hư hỏng.', depts: ALL_DEPTS },
+        { code: '2.3.2', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Không còn sống', detail: 'Thủy hải sản bày bán/trữ dạng sống nhưng đã chết trong hồ/bể.', depts: ['Seafood'] },
+        { code: '2.3.3', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Không còn tươi', detail: 'Rau củ héo úa, thịt/cá giảm độ tươi (mắt đục, mang thâm, mất đàn hồi).', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Delica', 'Canteen & General'] },
+        { code: '2.3.4', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Có lẫn vật lạ', detail: 'Sản phẩm lẫn vật lạ như lông, tóc, côn trùng, mảnh nhựa/kim loại, tạp chất.', depts: ALL_DEPTS },
+        { code: '2.3.5', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Có nấm mốc', detail: 'Bề mặt thực phẩm, bánh, nguyên liệu khô xuất hiện nấm mốc.', depts: FOOD_DEPTS },
+        { code: '2.3.6', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Bị chảy nước, rỉ dịch', detail: 'Sản phẩm đóng gói hoặc khay thịt/cá bị rỉ dịch máu, chảy nước ra ngoài.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Delica', 'Canteen & General'] },
+        { code: '2.3.7', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Tái đông', detail: 'Sản phẩm đã rã đông đem cấp đông lại trái quy định.', depts: ['Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '2.3.8', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Rã đông', detail: 'Sản phẩm đông lạnh bị chảy nước/mềm do bảo quản sai nhiệt độ.', depts: ['Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] },
+        { code: '2.3.9', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Cảm quan không đạt', detail: 'Màu sắc, mùi vị, trạng thái bất thường so với tiêu chuẩn sản phẩm.', depts: ALL_DEPTS },
+        { code: '2.3.10', criteria: 'Cảm quan & Hạn sử dụng', condition: 'Hạn sử dụng không phù hợp', detail: 'Sản phẩm quá hạn sử dụng, bị tẩy xóa/kéo dài HSD hoặc cận hạn không rút khỏi kệ theo SOP.', depts: ALL_DEPTS }
+      ]
+    },
+    {
+      id: 3,
+      name: 'Area 3: Điều kiện bảo quản',
+      items: [
+        // Nhiệt độ bảo quản
+        { code: '3.1.1', criteria: 'Nhiệt độ bảo quản', condition: 'Khu vực nhận hàng không đạt', detail: 'Nhiệt độ khu vực/xe giao nhận hàng không đạt chuẩn theo nhóm hàng.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'GOR'] },
+        { code: '3.1.2', criteria: 'Nhiệt độ bảo quản', condition: 'Kho lưu trữ không đạt', detail: 'Nhiệt độ kho mát, kho đông, kho khô vượt ngưỡng quy định.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Grocery', 'Canteen & General'] },
+        { code: '3.1.3', criteria: 'Nhiệt độ bảo quản', condition: 'Thiết bị không đạt yêu cầu', detail: 'Nhiệt độ các tủ đông/mát tại quầy, tủ trưng bày hàng nướng hoặc đá gel không đạt nhiệt độ quy định.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] },
+        { code: '3.1.4', criteria: 'Nhiệt độ bảo quản', condition: 'Sản phẩm không có đá / thiếu đá', detail: 'Nước đá quá ít không đủ ướp lạnh sản phẩm (áp dụng Seafood, Produce, Delivery).', depts: ['Produce', 'Seafood', 'Delivery'] },
+        { code: '3.1.5', criteria: 'Nhiệt độ bảo quản', condition: 'Sản phẩm không được bảo quản theo đúng điều kiện', detail: 'Sai điều kiện ghi trên nhãn sản phẩm; hàng ướp lạnh/đông lạnh khi giao hàng không bảo quản với đá trong thùng cách nhiệt.', depts: FOOD_DEPTS },
+        { code: '3.1.6', criteria: 'Nhiệt độ bảo quản', condition: 'Sản phẩm trưng bày/lưu kho vượt giới hạn quy định', detail: 'Trong kho không cách sàn, cách tường, cách trần; trong tủ cabinet trưng bày xếp quá đầy che luồng luân chuyển hơi lạnh.', depts: FOOD_DEPTS },
+        // Tình trạng hàng hóa
+        { code: '3.2.1', criteria: 'Tình trạng hàng hóa', condition: 'Sản phẩm bị chèn ép', detail: 'Sản phẩm nặng đặt bên trên sản phẩm nhẹ, nhạy cảm; sắp xếp không ngăn nắp, khoa học.', depts: ['Produce', 'Seafood', 'P&F', 'Bakery', 'Delivery', 'Grocery', 'GOR'] },
+        { code: '3.2.2', criteria: 'Tình trạng hàng hóa', condition: 'Sản phẩm lưu ngoài trời không được che đậy', detail: 'Hàng hóa tập kết ngoài trời bị bẩn hoặc chịu ảnh hưởng trực tiếp bởi nắng, mưa, bụi.', depts: ['Produce', 'Grocery', 'BAT & Confect', 'NFIF', 'GOR'] },
+        { code: '3.2.3', criteria: 'Tình trạng hàng hóa', condition: 'Sản phẩm không được bảo quản đúng hướng dẫn', detail: 'Sai điều kiện NCC; hàng nhạy cảm giao không đóng thùng carton; thủy sản sống giáp xác & 2 mảnh vỏ trữ sai cách; hồ cua sống nước ngoài mức 15-20cm, >3 lớp, nhiệt độ >24°C, độ mặn ngoài 30-32‰.', depts: ['Produce', 'Seafood', 'Delivery'] },
+        { code: '3.2.4', criteria: 'Tình trạng hàng hóa', condition: 'Rã đông không đúng quy trình', detail: 'Thực hiện rã đông không tuân thủ hướng dẫn trong SOP hoặc WI.', depts: ['Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '3.2.5', criteria: 'Tình trạng hàng hóa', condition: 'Thời gian chờ vượt quá quy định tại mỗi chặng', detail: 'Thời gian chờ quá lâu tại quầy thanh toán, quầy chuyển giao hàng, nơi xếp hàng lên xe giao nhận.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Delica', 'Delivery', 'GOR'] },
+        // Kiểm soát tồn kho
+        { code: '3.3.1', criteria: 'Kiểm soát tồn kho', condition: 'Không có stock note', detail: 'Thiếu phiếu nhận diện (stock note) cho sản phẩm khó nhìn thông tin nhãn hoặc sản phẩm không nhãn.', depts: ALL_DEPTS },
+        { code: '3.3.2', criteria: 'Kiểm soát tồn kho', condition: 'Stock note không phù hợp', detail: 'Thông tin stock note sai/thiếu (áp dụng cả nguyên liệu, hóa chất, sản phẩm kém chất lượng chờ hủy/chờ xử lý).', depts: ALL_DEPTS },
+        { code: '3.3.3', criteria: 'Kiểm soát tồn kho', condition: 'Xuất kho không theo nguyên tắc FEFO, FIFO', detail: 'Sản phẩm nhập trước hoặc hết hạn trước nhưng không được ưu tiên xuất sử dụng/bán trước.', depts: ALL_DEPTS },
+        { code: '3.3.4', criteria: 'Kiểm soát tồn kho', condition: 'Trưng bày không theo nguyên tắc FEFO, FIFO', detail: 'Sản phẩm hết hạn trước được trưng bày phía sau hoặc nằm phía dưới sản phẩm có HSD mới hơn.', depts: FOOD_DEPTS }
+      ]
+    },
+    {
+      id: 4,
+      name: 'Area 4: Ô nhiễm (Ô nhiễm chéo & Trang thiết bị)',
+      items: [
+        // Ô nhiễm chéo từ sản phẩm khác
+        { code: '4.1.1', criteria: 'Ô nhiễm chéo từ sản phẩm khác', condition: 'Không tách biệt thực phẩm và phi thực phẩm', detail: 'Để lẫn thực phẩm dùng ngay, thực phẩm chế biến trước khi dùng với phi thực phẩm (bột giặt, nước xả) hoặc nước mắm với sữa dinh dưỡng.', depts: ['Grocery', 'BAT & Confect', 'NFIF', 'Delivery', 'GOR'] },
+        { code: '4.1.2', criteria: 'Ô nhiễm chéo từ sản phẩm khác', condition: 'Thực phẩm tươi sống đặt phía trên sản phẩm dùng ngay', detail: 'Bố trí thịt/cá/rau sống ở kệ trên làm rỉ dịch xuống thực phẩm ăn ngay ở kệ dưới.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Delica', 'Canteen & General'] },
+        { code: '4.1.3', criteria: 'Ô nhiễm chéo từ sản phẩm khác', condition: 'Thịt và thủy sản không có vách ngăn', detail: 'Thực phẩm chế biến từ thịt và thực phẩm chế biến từ thủy sản để chung không có vách ngăn cách biệt.', depts: ['Seafood', 'P&F', 'Butchery', 'Delica', 'Canteen & General'] },
+        { code: '4.1.4', criteria: 'Ô nhiễm chéo từ sản phẩm khác', condition: 'Nướng chung lò xếp nguyên liệu mới lên trên hàng sẵn có', detail: 'Tại một thời điểm nướng nhiều loại sản phẩm trong cùng một lò mà xếp nguyên liệu sống mới vào phía trên sản phẩm đang chín.', depts: ['Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        // Ô nhiễm chéo từ dụng cụ thiết bị
+        { code: '4.2.1', criteria: 'Ô nhiễm chéo từ dụng cụ thiết bị', condition: 'Dùng lẫn dụng cụ ngành hàng khác hoặc của NCC', detail: 'Sử dụng rổ, khay, dao, thớt của ngành hàng khác hoặc dụng cụ của Nhà cung cấp để chứa hàng.', depts: FRESH_DEPTS },
+        { code: '4.2.2', criteria: 'Ô nhiễm chéo từ dụng cụ thiết bị', condition: 'Chứa thực phẩm chưa bao gói vào xe trolley khách hàng', detail: 'Sử dụng xe đẩy mua sắm của khách hàng để chứa thực phẩm trần chưa bao gói (Bakery, Butchery, Seafood, P&F).', depts: ['Seafood', 'P&F', 'Butchery', 'Bakery'] },
+        { code: '4.2.3', criteria: 'Ô nhiễm chéo từ dụng cụ thiết bị', condition: 'Đặt sản phẩm còn nóng trực tiếp lên khay xốp/nhựa/túi nylon', detail: 'Sản phẩm mới nướng/chế biến còn nóng đặt trực tiếp lên vật liệu nhựa/xốp không chịu nhiệt (Bakery, Butchery).', depts: ['Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        // Ô nhiễm từ nguồn nhiễm khác
+        { code: '4.3.1', criteria: 'Ô nhiễm từ nguồn nhiễm khác', condition: 'Thực phẩm hở đặt ngay dưới đèn diệt côn trùng', detail: 'Thực phẩm, nguyên liệu chưa bao gói đặt trực tiếp bên dưới đèn bẫy côn trùng.', depts: FOOD_DEPTS },
+        { code: '4.3.2', criteria: 'Ô nhiễm từ nguồn nhiễm khác', condition: 'Đặt gần hóa chất vệ sinh hoặc nơi có nước ngưng tụ', detail: 'Thực phẩm, nguyên liệu, dụng cụ thiết bị đặt gần hóa chất tẩy rửa hoặc dưới trần/máy lạnh bị nhỏ nước ngưng tụ.', depts: ALL_DEPTS },
+        { code: '4.3.3', criteria: 'Ô nhiễm từ nguồn nhiễm khác', condition: 'Nguyên liệu dùng dở dang không được che đậy', detail: 'Bao bì nguyên liệu đã mở sử dụng dở dang không buộc kín hoặc đậy nắp bảo vệ.', depts: ['Produce', 'Seafood', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '4.3.4', criteria: 'Ô nhiễm từ nguồn nhiễm khác', condition: 'Hàng hủy / hàng thu hồi / thùng rác không cách biệt', detail: 'Hàng chờ hủy, hàng thu hồi hoặc thùng rác đặt chung với hàng hóa/thực phẩm sạch.', depts: ALL_DEPTS },
+        { code: '4.3.5', criteria: 'Ô nhiễm từ nguồn nhiễm khác', condition: 'Nước đá / đá gel không sạch', detail: 'Nước đá ướp hoặc đá gel bị bẩn, lẫn vật lạ, máu, vảy cá (áp dụng Seafood, Delivery).', depts: ['Seafood', 'Delivery', 'Canteen & General'] },
+        // Trang thiết bị
+        { code: '4.4.1', criteria: 'Trang thiết bị', condition: 'Không sắp xếp theo quy tắc 1 chiều', detail: 'Bố trí mặt bằng, dây chuyền thiết bị đi chéo luồng giữa khu bẩn (sơ chế thô) và khu sạch (thành phẩm).', depts: ['Produce', 'Seafood', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '4.4.2', criteria: 'Trang thiết bị', condition: 'Sử dụng pallet gỗ tại khu vực không được phép', detail: 'Dùng pallet gỗ lưu trữ dài ngày (>3 ngày) trong kho lạnh/kho đông hoặc khu chứa sản phẩm mở/chưa bao gói tại ngành hàng thực phẩm.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica'] },
+        { code: '4.4.3', criteria: 'Trang thiết bị', condition: 'Dụng cụ chứa đựng đặt trực tiếp trên sàn', detail: 'Áp dụng tất cả dụng cụ chứa thực phẩm và bình hóa chất trong khu vực lưu trữ hoặc đang sử dụng.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '4.4.4', criteria: 'Trang thiết bị', condition: 'Hàng hóa đặt trực tiếp trên sàn', detail: 'Sản phẩm, nguyên liệu, bán thành phẩm đặt trực tiếp xuống nền sàn không có kệ/pallet kê cao.', depts: ALL_DEPTS },
+        { code: '4.4.5', criteria: 'Trang thiết bị', condition: 'Thiết bị không có dấu hiệu phân biệt', detail: 'Dao, kéo, rổ, thớt, pallet, xe trolley, thùng rác không phân biệt màu sắc/ký hiệu giữa các khu vực sống - chín.', depts: FRESH_DEPTS },
+        { code: '4.4.6', criteria: 'Trang thiết bị', condition: 'Thùng rác không phù hợp', detail: 'Thùng rác dơ, bể, không túi rác, không nắp đậy, quá đầy, mở nắp bằng tay hoặc dùng khay chứa thực phẩm để đựng rác.', depts: ALL_DEPTS }
+      ]
+    },
+    {
+      id: 5,
+      name: 'Area 5: Hồ sơ, tài liệu',
+      items: [
+        // Báo cáo nhập hàng
+        { code: '5.1.1', criteria: 'Báo cáo nhập hàng', condition: 'Không có giấy kiểm dịch', detail: 'Thiếu giấy chứng nhận kiểm dịch đối với sản phẩm thịt và chế biến từ thịt tại ngành hàng P&F, Butchery, Grocery.', depts: ['P&F', 'Butchery', 'Grocery', 'Delica', 'Canteen & General'] },
+        { code: '5.1.2', criteria: 'Báo cáo nhập hàng', condition: 'Thông tin trên giấy kiểm dịch không phù hợp', detail: 'Sử dụng bản photo không hợp lệ, sai địa chỉ nơi đến, sai số lượng so với phiếu giao hàng.', depts: ['P&F', 'Butchery', 'Grocery', 'Delica', 'Canteen & General'] },
+        { code: '5.1.3', criteria: 'Báo cáo nhập hàng', condition: 'Không có báo cáo kiểm tra khi nhận hàng', detail: 'Thiếu phiếu kiểm soát nhiệt độ khi nhận hàng theo SOP, biên bản từ chối nhận hàng.', depts: FOOD_DEPTS },
+        { code: '5.1.4', criteria: 'Báo cáo nhập hàng', condition: 'Thông tin trên báo cáo nhận hàng không phù hợp', detail: 'Ghi chép phiếu nhận hàng thiếu thông tin nhiệt độ, chữ ký hoặc sai lệch thực tế.', depts: FOOD_DEPTS },
+        { code: '5.1.5', criteria: 'Báo cáo nhập hàng', condition: 'Không có / Sai thông tin Hồ sơ nhập khẩu & Truy xuất nguồn gốc', detail: 'Thiếu hồ sơ nhập khẩu (Produce, Seafood, Butchery, BAT) hoặc thiếu/sai hồ sơ truy xuất nguồn gốc NCC địa phương (Produce, Seafood).', depts: ['Produce', 'Seafood', 'Butchery', 'BAT & Confect'] },
+        // Báo cáo hằng ngày
+        { code: '5.2.1', criteria: 'Báo cáo hằng ngày', condition: 'Không có Hồ sơ kiểm tra vệ sinh hằng ngày', detail: 'Thiếu checklist vệ sinh đầu ca/cuối ca tại các khu vực sơ chế, chế biến.', depts: FRESH_DEPTS },
+        { code: '5.2.2', criteria: 'Báo cáo hằng ngày', condition: 'Không có Hồ sơ kiểm soát nguyên liệu', detail: 'Thiếu hồ sơ CBHQ/CBPHQĐATTP bao bì tiếp xúc thực phẩm; thiếu biểu kiểm soát test nhanh hàn the/ure khi nhập thủy sản.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '5.2.3', criteria: 'Báo cáo hằng ngày', condition: 'Không có Hồ sơ kiểm soát quá trình nướng / sơ chế / chế biến', detail: 'Thiếu nhật ký kiểm soát nhiệt độ tâm/thời gian nướng của các lô hàng (Produce, Seafood, Butchery, Bakery, Delica).', depts: ['Produce', 'Seafood', 'Butchery', 'Bakery', 'Delica', 'Canteen & General'] },
+        { code: '5.2.4', criteria: 'Báo cáo hằng ngày', condition: 'Không có Hồ sơ kiểm soát chia nhỏ / châm hàng / cân hàng / gia vị ướp', detail: 'Thiếu hồ sơ chia nhỏ (phô mai, bơ, thịt/thủy sản đông lạnh), châm hàng xá, cân đối chiếu, định lượng gia vị ướp.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Grocery', 'BAT & Confect'] },
+        { code: '5.2.5', criteria: 'Báo cáo hằng ngày', condition: 'Không có đầy đủ hồ sơ kiểm soát nhiệt độ thiết bị / nước / pH / độ mặn', detail: 'Ghi thiếu thông số nhiệt độ tủ, pH, độ mặn hồ thủy sản hoặc nhiệt độ vượt chuẩn 1 ngày nhưng chưa có bằng chứng CAPA.', depts: ALL_DEPTS },
+        { code: '5.2.6', criteria: 'Báo cáo hằng ngày', condition: 'Không có Hồ sơ lưu mẫu thức ăn 3 bước', detail: 'Sổ kiểm thực 3 bước và lưu mẫu thức ăn tại Canteen, Delica không ghi chép đầy đủ theo quy định.', depts: ['Delica', 'Canteen & General'] },
+        { code: '5.2.7', criteria: 'Báo cáo hằng ngày', condition: 'Hồ sơ kiểm soát không phù hợp (Lab test, Lưu mẫu, BBD, Côn trùng)', detail: 'Khối lượng tịnh sai/chưa trừ bì; test lab nước/máy xay thịt/máy ép/đá/RTE không đạt; lưu mẫu thiếu (<100g đặc, <150ml lỏng) hoặc thiếu món; form BBD/HSD sai; thiếu hồ sơ côn trùng.', depts: ALL_DEPTS },
+        // Bảng hướng dẫn
+        { code: '5.3.1', criteria: 'Bảng hướng dẫn & Cảnh báo', condition: 'Không có các bảng hướng dẫn vận hành & vệ sinh', detail: 'Thiếu bảng hướng dẫn sử dụng/san chiết/lưu trữ hóa chất, bảng hướng dẫn rửa tay, hoặc thiếu SOP/WI tại quầy.', depts: ALL_DEPTS },
+        { code: '5.3.2', criteria: 'Bảng hướng dẫn & Cảnh báo', condition: 'Không có các bảng cảnh báo bắt buộc', detail: 'Thiếu bảng "Vui lòng không tái đông" tại quầy rã đông hoặc bảng "Không bán rượu bia cho người dưới 18 tuổi" tại quầy rượu.', depts: ['Seafood', 'P&F', 'Butchery', 'Grocery', 'BAT & Confect'] },
+        { code: '5.3.3', criteria: 'Bảng hướng dẫn & Cảnh báo', condition: 'Không có hoặc sai bảng thông tin sản phẩm / xuất xứ', detail: 'Thiếu bảng thông tin hàng bán xá (thịt, cá, bánh kẹo, gạo, đậu) hoặc sai thông tin xuất xứ hàng nhập khẩu, NCC RAT.', depts: ['Produce', 'Seafood', 'Butchery', 'Grocery', 'BAT & Confect'] }
+      ]
+    },
+    {
+      id: 6,
+      name: 'Area 6: Nhân viên',
+      items: [
+        // Đồng phục / BHLĐ
+        { code: '6.1.1', criteria: 'Đồng phục / Bảo hộ lao động', condition: 'Nhân viên mặc đồng phục / BHLĐ không đúng quy định', detail: 'Thiếu nón che tóc, khẩu trang, áo, tạp dề, giày hoặc thiếu găng tay dùng 1 lần khi tiếp xúc thực phẩm ăn ngay chưa bao gói (kể cả nhân viên giao hàng, vệ sinh nhà thầu).', depts: ALL_DEPTS },
+        { code: '6.1.2', criteria: 'Đồng phục / Bảo hộ lao động', condition: 'Nhân viên mặc đồng phục / BHLĐ không sạch', detail: 'Quần áo bảo hộ, tạp dề dính bẩn, ố màu hoặc đơn vị giặt ủi giao đến không đảm bảo sạch sẽ.', depts: ALL_DEPTS },
+        { code: '6.1.3', criteria: 'Đồng phục / Bảo hộ lao động', condition: 'Nhân viên mặc đồng phục / BHLĐ không nguyên vẹn', detail: 'Đồng phục, nón, tạp dề, ủng bị rách, sứt chỉ, hư hỏng.', depts: ALL_DEPTS },
+        { code: '6.1.4', criteria: 'Đồng phục / Bảo hộ lao động', condition: 'Nhân viên mặc BHLĐ ra khỏi khu vực làm việc / đi ăn cơm', detail: 'Mặc nguyên bảo hộ (nón, khẩu trang, tạp dề, găng tay, ủng) đi ăn cơm hoặc ra khỏi khu vực siêu thị/kho.', depts: FRESH_DEPTS },
+        { code: '6.1.5', criteria: 'Đồng phục / Bảo hộ lao động', condition: 'Nhân viên mặc BHLĐ vào nhà vệ sinh', detail: 'Nhân viên không tháo bỏ áo BHLĐ, tạp dề, găng tay trước khi đi vào nhà vệ sinh.', depts: FRESH_DEPTS },
+        // Vệ sinh cá nhân
+        { code: '6.2.1', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên mắc bệnh truyền nhiễm hoặc có vết thương hở vẫn đi làm', detail: 'Nhân viên mắc bệnh thuộc danh mục cấm tiếp xúc thực phẩm hoặc có vết thương hở không băng bó chống thấm nước.', depts: FRESH_DEPTS },
+        { code: '6.2.2', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên chưa được khám sức khỏe', detail: 'Nhân viên chính thức, thời vụ (Casual) hoặc PG của NCC chưa có giấy khám sức khỏe định kỳ theo quy định.', depts: FOOD_DEPTS },
+        { code: '6.2.3', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên chưa được tập huấn kiến thức ATTP', detail: 'Nhân viên làm việc tại ngành hàng thực phẩm chưa được đào tạo và xác nhận kiến thức ATTP.', depts: FOOD_DEPTS },
+        { code: '6.2.4', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên đeo trang sức', detail: 'Đeo đồng hồ, vòng tay, nhẫn, bông tai, dây chuyền tại khu vực sơ chế/chế biến/bán xá.', depts: FRESH_DEPTS },
+        { code: '6.2.5', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên để móng tay dài / sơn móng tay', detail: 'Móng tay để dài, dính bẩn hoặc sơn móng tay, gắn móng giả.', depts: FRESH_DEPTS },
+        { code: '6.2.6', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên rửa tay không đúng cách', detail: 'Rửa tay qua loa không dùng xà phòng/dung dịch sát khuẩn hoặc không đúng quy trình 6 bước.', depts: FRESH_DEPTS },
+        { code: '6.2.7', criteria: 'Vệ sinh cá nhân', condition: 'Nhân viên sử dụng sai găng tay', detail: 'Dùng găng tay vải/cao su thô để bốc thực phẩm chín hoặc dùng găng tay rách.', depts: FRESH_DEPTS },
+        // Hành vi
+        { code: '6.3.1', criteria: 'Hành vi nhân viên', condition: 'Khi thay đổi công việc, nhân viên không thay găng tay', detail: 'Dùng chung 1 đôi găng tay từ khâu xử lý đồ sống/thu tiền sang chạm vào thực phẩm chín.', depts: FRESH_DEPTS },
+        { code: '6.3.2', criteria: 'Hành vi nhân viên', condition: 'Nhân viên không rửa tay khi chuyển sang công đoạn khác', detail: 'Không rửa tay sát khuẩn sau khi đi vệ sinh, chạm vào rác, điện thoại hoặc chuyển công đoạn.', depts: FRESH_DEPTS },
+        { code: '6.3.3', criteria: 'Hành vi nhân viên', condition: 'Tác phong nhân viên không phù hợp trong thời gian làm việc', detail: 'Ngủ, nằm gục trên bàn/kệ hàng trong giờ làm việc.', depts: ALL_DEPTS },
+        { code: '6.3.4', criteria: 'Hành vi nhân viên', condition: 'Nhân viên hút thuốc trong thời gian làm việc', detail: 'Hút thuốc lá/thuốc lá điện tử trong khu vực kho, bãi nhận hàng hoặc khu chế biến.', depts: ALL_DEPTS },
+        { code: '6.3.5', criteria: 'Hành vi nhân viên', condition: 'Có dấu hiệu ăn uống trong khu vực làm việc', detail: 'Phát hiện thức ăn dở dang, ly nước, tách trà, vỏ bánh kẹo tại khu vực sản xuất/bán hàng.', depts: ALL_DEPTS }
+      ]
+    },
+    {
+      id: 7,
+      name: 'Area 7: Trang thiết bị dụng cụ (Bán hàng | Lưu trữ | Chế biến)',
+      items: [
+        // Khu vực bán hàng
+        { code: '7.1.1', criteria: 'Khu vực bán hàng - Vệ sinh', condition: 'Thiết bị tại khu vực bán hàng không sạch / vệ sinh sai cách', detail: 'Quầy kệ trưng bày, hộp đựng hóa chất rửa tay dơ, thiết bị pha hóa chất thiếu linh kiện hoặc hư hỏng.', depts: FOOD_DEPTS },
+        { code: '7.1.2', criteria: 'Khu vực bán hàng - Vệ sinh', condition: 'Dùng không đúng hóa chất / sai nồng độ / không khử khuẩn', detail: 'Vệ sinh thiết bị quầy bán hàng không dùng hóa chất sát khuẩn hoặc pha sai nồng độ quy định.', depts: FRESH_DEPTS },
+        { code: '7.1.3', criteria: 'Khu vực bán hàng - Chất liệu', condition: 'Chất liệu thiết bị không phù hợp / gỉ sét / dùng gỗ, tre', detail: 'Dụng cụ, khay kệ trưng bày tiếp xúc thực phẩm bị gỉ sét hoặc làm bằng vật liệu gỗ, tre.', depts: FOOD_DEPTS },
+        { code: '7.1.4', criteria: 'Khu vực bán hàng - Tình trạng', condition: 'Thiếu trang bị theo quy định / thiếu tem kiểm định, hiệu chuẩn', detail: 'Thiếu bồn rửa tay, thùng rác, máy sấy tay/khăn giấy; cân hoặc nhiệt kế không có tem kiểm định/hiệu chuẩn còn hạn.', depts: FOOD_DEPTS },
+        { code: '7.1.5', criteria: 'Khu vực bán hàng - Tình trạng', condition: 'Thiết bị hư hỏng, móp méo, mốc, hôi, nhớt, đọng nước, thớt chặt sâu', detail: 'Thiết bị đặt không ngăn nắp, không hoạt động, thớt/mặt bàn có vết chặt sâu, ẩm mốc, mùi hôi, nhớt hoặc đọng nước.', depts: FRESH_DEPTS },
+        // Khu vực lưu trữ hàng
+        { code: '7.2.1', criteria: 'Khu vực lưu trữ hàng - Vệ sinh', condition: 'Thiết bị tại khu vực lưu trữ hàng không sạch / không khử khuẩn', detail: 'Kệ kho, pallet nhựa, xe đẩy, tủ lưu trữ bám bẩn hoặc vệ sinh sai hóa chất/nồng độ.', depts: ALL_DEPTS },
+        { code: '7.2.2', criteria: 'Khu vực lưu trữ hàng - Chất liệu', condition: 'Chất liệu thiết bị lưu trữ gỉ sét / gỗ, tre / hóa chất có màu mùi', detail: 'Giá kệ kho bị gỉ sét, dùng kệ gỗ/tre trong khu vực ẩm ướt, hoặc hóa chất tẩy rửa có mùi lạ.', depts: ALL_DEPTS },
+        { code: '7.2.3', criteria: 'Khu vực lưu trữ hàng - Tình trạng', condition: 'Không ngăn nắp / hóa chất không lưu khu riêng kín / thiết bị hư hỏng', detail: 'Vật tư, hóa chất vệ sinh không khóa lưu trong khu vực riêng kín; thiết bị kho móp méo, hỏng, mốc, đọng nước.', depts: ALL_DEPTS },
+        // Khu vực chế biến
+        { code: '7.3.1', criteria: 'Khu vực chế biến - Vệ sinh', condition: 'Thiết bị tại khu vực chế biến không sạch / không khử khuẩn', detail: 'Bàn sơ chế, máy xay thịt, máy cắt, lò nướng, dao thớt bám cặn thực phẩm hoặc không khử trùng đúng nồng độ.', depts: FRESH_DEPTS },
+        { code: '7.3.2', criteria: 'Khu vực chế biến - Chất liệu', condition: 'Chất liệu thiết bị chế biến gỉ sét / gỗ, tre', detail: 'Sử dụng thớt gỗ, cán dao gỗ, rổ tre hoặc thiết bị inox bị gỉ sét trong khu vực chế biến.', depts: FRESH_DEPTS },
+        { code: '7.3.3', criteria: 'Khu vực chế biến - Tình trạng', condition: 'Thiếu dụng cụ vệ sinh khử trùng & tem hiệu chuẩn', detail: 'Thiếu bình xịt hóa chất, khay ngâm dụng cụ (đặc biệt Butchery, Seafood), hóa chất rửa tay; thiếu tem hiệu chuẩn nhiệt kế/cân.', depts: FRESH_DEPTS },
+        { code: '7.3.4', criteria: 'Khu vực chế biến - Tình trạng', condition: 'Thiết bị chế biến không hoạt động / thớt vết chặt sâu / mốc / nhớt / đọng nước', detail: 'Máy móc hỏng, không đặt đúng nơi quy định, thớt có vết chặt sâu khó vệ sinh, có nấm mốc, mùi hôi, nhớt hoặc đọng nước.', depts: FRESH_DEPTS }
+      ]
+    },
+    {
+      id: 8,
+      name: 'Area 8: Vật gây hại',
+      items: [
+        // Dấu hiệu xâm nhập
+        { code: '8.1.1', criteria: 'Dấu hiệu xâm nhập', condition: 'Có phân của vật gây hại', detail: 'Phát hiện phân chuột, phân gián, phân chim trong khu vực kho, quầy kệ hoặc khu chế biến.', depts: ALL_DEPTS },
+        { code: '8.1.2', criteria: 'Dấu hiệu xâm nhập', condition: 'Sản phẩm bị cắn phá', detail: 'Bao bì thực phẩm, thùng carton hoặc hàng hóa có dấu vết bị chuột, gián cắn phá.', depts: ALL_DEPTS },
+        { code: '8.1.3', criteria: 'Dấu hiệu xâm nhập', condition: 'Có vật gây hại sống', detail: 'Phát hiện chuột, gián, ruồi, kiến sống hoặc chim/tổ chim trong kho, cửa nhập hàng, lối vào.', depts: ALL_DEPTS },
+        { code: '8.1.4', criteria: 'Dấu hiệu xâm nhập', condition: 'Có vật gây hại chết', detail: 'Xác chuột, gián, côn trùng chết tồn đọng trên sàn, góc kho không được thu gom vệ sinh.', depts: ALL_DEPTS },
+        // Kiểm soát mồi bẫy & đèn diệt côn trùng
+        { code: '8.2.1', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Mồi bẫy đặt sai vị trí', detail: 'Hộp bẫy chuột/bẫy dính đặt sai sơ đồ kiểm soát hoặc đặt bên trong khu vực thực phẩm hở.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Grocery', 'BAT & Confect', 'Canteen & General'] },
+        { code: '8.2.2', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Mồi / bẫy bị hư hỏng', detail: 'Hộp bẫy bị vỡ, mất nắp, bẹp méo không còn đảm bảo an toàn.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Grocery', 'BAT & Confect', 'Canteen & General'] },
+        { code: '8.2.3', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Mồi bẫy không còn tác dụng', detail: 'Keo dính khô, bả mồi hết hoặc ẩm mốc không còn hiệu lực bắt côn trùng/chuột.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] },
+        { code: '8.2.4', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Đèn diệt côn trùng không đặt đúng vị trí', detail: 'Thiếu đèn diệt côn trùng tại phía trong cửa nhận hàng, khu sản xuất bánh, ngay phía ngoài cửa cuốn ngăn khu sản xuất và bán bánh.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] },
+        { code: '8.2.5', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Đèn diệt côn trùng bị hư hỏng', detail: 'Đèn bị vỡ bóng, hỏng máng, đứt dây nguồn không hoạt động.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] },
+        { code: '8.2.6', criteria: 'Kiểm soát mồi bẫy & Đèn côn trùng', condition: 'Đèn diệt côn trùng không còn tác dụng', detail: 'Bóng đèn UV hết hạn phát tia thu hút hoặc tấm keo dính bên trong đầy xác côn trùng không thay mới.', depts: ['Produce', 'Seafood', 'P&F', 'Butchery', 'Bakery', 'Delica', 'Delivery', 'Canteen & General'] }
+      ]
+    }
+  ];
+
+  // ==========================================================================
+  // 3. QUẢN LÝ TRẠNG THÁI (STATE MANAGEMENT) & LOCALSTORAGE
+  // ==========================================================================
+  const ACTIVE_AUDIT_KEY = 'FAST_QA_AUDIT_ACTIVE_V1';
+  const SAVED_AUDITS_KEY = 'FAST_QA_AUDIT_HISTORY_V1';
+
+  let state = {
+    id: 'audit_' + Date.now(),
+    facilityName: '',
+    auditorName: '',
+    facilityRep: '',
+    auditDate: new Date().toISOString().split('T')[0],
+    auditType: 'Đánh giá QA định kỳ',
+    selectedDepts: [], // rỗng = Tất cả 12 ngành hàng
+    statusFilter: 'ALL',
+    openAreas: [1, 2, 3, 4, 5, 6, 7, 8],
+    records: {} // { [code]: { status: 'PASS'|'NC'|'NA', evidence: '', capa: '', pic: '', deadline: '', severity: 'Major' } }
+  };
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatDateVN(isoDate) {
+    if (!isoDate) return '-';
+    const parts = isoDate.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : isoDate;
+  }
+
+  // ==========================================================================
+  // 4. BỘ LỌC NGÀNH HÀNG (12 DEPARTMENTS)
+  // ==========================================================================
+  function renderDeptPills() {
+    const container = document.getElementById('deptPillsContainer');
+    const isAll = state.selectedDepts.length === 0;
+
+    let html = `<button class="dept-pill all-pill ${isAll ? 'active' : ''}" onclick="toggleDept('ALL')">
+      ✓ Tất cả (12 ngành hàng)
+    </button>`;
+
+    DEPARTMENTS.forEach(dept => {
+      const isSelected = state.selectedDepts.includes(dept);
+      html += `<button class="dept-pill ${isSelected ? 'active' : ''}" onclick="toggleDept('${dept}')">
+        ${isSelected ? '✓ ' : ''}${dept}
+      </button>`;
+    });
+
+    container.innerHTML = html;
+    updatePrintMeta();
+  }
+
+  function toggleDept(dept) {
+    if (dept === 'ALL') {
+      state.selectedDepts = [];
+    } else {
+      const idx = state.selectedDepts.indexOf(dept);
+      if (idx >= 0) {
+        state.selectedDepts.splice(idx, 1);
+      } else {
+        state.selectedDepts.push(dept);
+      }
+    }
+    saveDraft();
+    renderDeptPills();
+    renderChecklist();
+  }
+
+  function isItemApplicableToSelectedDepts(item) {
+    if (state.selectedDepts.length === 0) return true;
+    return item.depts.some(d => state.selectedDepts.includes(d));
+  }
+
+  // ==========================================================================
+  // 5. RENDER DANH SÁCH KIỂM SOÁT & GHI NHẬN LỖI NC / CAPA
+  // ==========================================================================
+  function renderChecklist() {
+    const container = document.getElementById('auditAreasContainer');
+    const searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+    let html = '';
+
+    AUDIT_AREAS.forEach(area => {
+      // Lọc các item thuộc ngành hàng đang chọn
+      const deptApplicableItems = area.items.filter(isItemApplicableToSelectedDepts);
+      if (deptApplicableItems.length === 0) return;
+
+      // Tính thống kê cho Area header
+      let areaPass = 0, areaNC = 0, areaNA = 0;
+      deptApplicableItems.forEach(it => {
+        const rec = state.records[it.code];
+        if (rec?.status === 'PASS') areaPass++;
+        else if (rec?.status === 'NC') areaNC++;
+        else if (rec?.status === 'NA') areaNA++;
+      });
+
+      // Lọc theo từ khóa tìm kiếm & bộ lọc trạng thái
+      const visibleItems = deptApplicableItems.filter(it => {
+        const rec = state.records[it.code] || {};
+        const st = rec.status || 'UNRATED';
+
+        if (state.statusFilter !== 'ALL' && st !== state.statusFilter) return false;
+
+        if (searchQuery) {
+          const haystack = `${it.code} ${area.name} ${it.criteria} ${it.condition} ${it.detail} ${rec.evidence || ''} ${rec.capa || ''}`.toLowerCase();
+          if (!haystack.includes(searchQuery)) return false;
+        }
+        return true;
+      });
+
+      if (visibleItems.length === 0) return;
+
+      const isOpen = state.openAreas.includes(area.id) || searchQuery !== '' || state.statusFilter !== 'ALL';
+      const noNcClass = areaNC === 0 ? 'no-nc-area' : '';
+
+      html += `
+        <div class="area-card ${isOpen ? 'open' : ''} ${noNcClass}" id="area-card-${area.id}">
+          <div class="area-header" onclick="toggleArea(${area.id})">
+            <div class="area-title-wrap">
+              <span class="area-badge">${area.id}</span>
+              <span class="area-name">${escapeHTML(area.name)}</span>
+            </div>
+            <div class="area-stats-wrap" onclick="event.stopPropagation()">
+              <span class="mini-stat pass">Đạt: ${areaPass}</span>
+              <span class="mini-stat nc">Lỗi NC: ${areaNC}</span>
+              <span class="mini-stat">Tổng: ${deptApplicableItems.length}</span>
+              <button class="btn-batch-pass" onclick="batchPassArea(${area.id})" title="Đánh dấu Đạt cho các mục chưa chấm trong khu vực này">
+                ✓ Đạt phần còn lại
+              </button>
+              <svg class="area-arrow" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" onclick="toggleArea(${area.id})" style="cursor:pointer;">
+                <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </div>
+          </div>
+          <div class="area-content">
+      `;
+
+      let currentCriteria = '';
+      visibleItems.forEach(item => {
+        if (item.criteria !== currentCriteria) {
+          currentCriteria = item.criteria;
+          html += `<div class="criteria-group-header">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M9.5 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
+            Tiêu chí kiểm soát: ${escapeHTML(currentCriteria)}
+          </div>`;
+        }
+
+        const rec = state.records[item.code] || {};
+        const st = rec.status || '';
+        const statusClass = st === 'PASS' ? 'status-pass' : (st === 'NC' ? 'status-nc' : (st === 'NA' ? 'status-na' : ''));
+
+        const deptTagsHtml = item.depts.map(d => {
+          const isHl = state.selectedDepts.includes(d);
+          return `<span class="dept-tag ${isHl ? 'highlighted' : ''}">${escapeHTML(d)}</span>`;
+        }).join('');
+
+        html += `
+          <div class="cp-item ${statusClass}" id="cp-${item.code}">
+            <div class="cp-main-row">
+              <div class="cp-info">
+                <div class="cp-title-line">
+                  <span class="cp-code">${item.code}</span>
+                  <span class="cp-condition">${escapeHTML(item.condition)}</span>
+                </div>
+                <div class="cp-detail">${escapeHTML(item.detail)}</div>
+                <div class="cp-depts">${deptTagsHtml}</div>
+              </div>
+
+              <div class="cp-actions">
+                <button class="score-btn btn-opt-pass ${st === 'PASS' ? 'selected' : ''}" onclick="setItemStatus('${item.code}', 'PASS')">
+                  ✓ Đạt
+                </button>
+                <button class="score-btn btn-opt-nc ${st === 'NC' ? 'selected' : ''}" onclick="setItemStatus('${item.code}', 'NC')">
+                  ✕ Lỗi (NC)
+                </button>
+                <button class="score-btn btn-opt-na ${st === 'NA' ? 'selected' : ''}" onclick="setItemStatus('${item.code}', 'NA')">
+                  — N/A
+                </button>
+              </div>
+            </div>
+
+            <!-- Khung ghi nhận bằng chứng thực tế & Hành động khắc phục (CAPA) -->
+            <div class="nc-drawer">
+              <div class="nc-drawer-header">
+                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                Ghi nhận Lỗi Không Phù Hợp (NC) &amp; Kế Hoạch Khắc Phục (CAPA)
+              </div>
+              <div class="nc-grid">
+                <div class="field-group">
+                  <label class="field-label">Bằng chứng thực tế / Vị trí phát hiện lỗi <span class="req">*</span></label>
+                  <input type="text" class="nc-input" placeholder="VD: Quầy thịt tươi số 2 có 3 khay thịt rỉ dịch, màng cửa rách..." value="${escapeHTML(rec.evidence || '')}" oninput="updateNCField('${item.code}', 'evidence', this.value)">
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Hành động khắc phục yêu cầu (CAPA) <span class="req">*</span></label>
+                  <input type="text" class="nc-input" placeholder="VD: Thu hồi khay rỉ dịch, vệ sinh khử trùng quầy, thay màng PVC..." value="${escapeHTML(rec.capa || '')}" oninput="updateNCField('${item.code}', 'capa', this.value)">
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Mức độ vi phạm</label>
+                  <select class="nc-select" onchange="updateNCField('${item.code}', 'severity', this.value)">
+                    <option value="Minor (Lỗi nhẹ)" ${rec.severity === 'Minor (Lỗi nhẹ)' ? 'selected' : ''}>Minor (Lỗi nhẹ)</option>
+                    <option value="Major (Lỗi nặng)" ${(!rec.severity || rec.severity === 'Major (Lỗi nặng)') ? 'selected' : ''}>Major (Lỗi nặng)</option>
+                    <option value="Critical (Nghiêm trọng)" ${rec.severity === 'Critical (Nghiêm trọng)' ? 'selected' : ''}>Critical (Nghiêm trọng - Xử lý ngay)</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Thời hạn hoàn thành (Deadline)</label>
+                  <input type="date" class="nc-input" value="${escapeHTML(rec.deadline || '')}" oninput="updateNCField('${item.code}', 'deadline', this.value)">
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div></div>`;
+    });
+
+    if (!html) {
+      html = `<div style="text-align:center; padding: 40px 20px; color: var(--text-muted); background: #fff; border-radius: 10px; border: 1px dashed var(--border-color);">
+        Không tìm thấy điểm kiểm soát nào phù hợp với bộ lọc hiện tại.
+      </div>`;
+    }
+
+    container.innerHTML = html;
+    updateKPIs();
+  }
+
+  // ==========================================================================
+  // 6. TƯƠNG TÁC CHẤM ĐIỂM & CẬP NHẬT KPI
+  // ==========================================================================
+  function toggleArea(areaId) {
+    const idx = state.openAreas.indexOf(areaId);
+    if (idx >= 0) state.openAreas.splice(idx, 1);
+    else state.openAreas.push(areaId);
+    saveDraft();
+    const card = document.getElementById(`area-card-${areaId}`);
+    if (card) card.classList.toggle('open');
+  }
+
+  function setItemStatus(code, newStatus) {
+    if (!state.records[code]) {
+      state.records[code] = { severity: 'Major (Lỗi nặng)' };
+    }
+    // Toggle off nếu bấm lại cùng trạng thái
+    if (state.records[code].status === newStatus) {
+      delete state.records[code].status;
+    } else {
+      state.records[code].status = newStatus;
+      if (newStatus === 'NC' && !state.records[code].deadline) {
+        // Mặc định deadline +3 ngày
+        const d = new Date();
+        d.setDate(d.getDate() + 3);
+        state.records[code].deadline = d.toISOString().split('T')[0];
+      }
+    }
+    saveDraft();
+    renderChecklist();
+  }
+
+  function updateNCField(code, field, value) {
+    if (!state.records[code]) state.records[code] = { status: 'NC' };
+    state.records[code][field] = value;
+    saveDraft();
+  }
+
+  function batchPassArea(areaId) {
+    const area = AUDIT_AREAS.find(a => a.id === areaId);
+    if (!area) return;
+    const applicable = area.items.filter(isItemApplicableToSelectedDepts);
+    let count = 0;
+    applicable.forEach(it => {
+      if (!state.records[it.code] || !state.records[it.code].status) {
+        state.records[it.code] = { status: 'PASS' };
+        count++;
+      }
+    });
+    if (count > 0) {
+      saveDraft();
+      renderChecklist();
+    } else {
+      alert('Tất cả tiêu chí trong khu vực này đã được đánh giá!');
+    }
+  }
+
+  function setStatusFilter(filter, btnEl) {
+    state.statusFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+    renderChecklist();
+  }
+
+  function updateKPIs() {
+    let totalApplicable = 0;
+    let passCount = 0;
+    let ncCount = 0;
+    let naCount = 0;
+
+    AUDIT_AREAS.forEach(area => {
+      area.items.forEach(item => {
+        if (!isItemApplicableToSelectedDepts(item)) return;
+        totalApplicable++;
+        const st = state.records[item.code]?.status;
+        if (st === 'PASS') passCount++;
+        else if (st === 'NC') ncCount++;
+        else if (st === 'NA') naCount++;
+      });
+    });
+
+    const evaluatedCount = passCount + ncCount + naCount;
+    const scorableCount = passCount + ncCount;
+    const compliancePct = scorableCount > 0 ? Math.round((passCount / scorableCount) * 100) : 0;
+    const progressPct = totalApplicable > 0 ? Math.round((evaluatedCount / totalApplicable) * 100) : 0;
+
+    document.getElementById('kpiTotal').innerText = totalApplicable;
+    document.getElementById('kpiPass').innerText = passCount;
+    document.getElementById('kpiNC').innerText = ncCount;
+    document.getElementById('kpiCompliance').innerText = compliancePct + '%';
+    document.getElementById('kpiEvaluatedText').innerText = `(${evaluatedCount}/${totalApplicable} đã chấm)`;
+
+    // Xếp loại đánh giá
+    const rankEl = document.getElementById('kpiRank');
+    if (scorableCount === 0) {
+      rankEl.innerText = 'CHƯA CHẤM';
+      rankEl.style.color = 'var(--text-muted)';
+    } else if (compliancePct >= 95) {
+      rankEl.innerText = 'XUẤT SẮC (HẠNG A)';
+      rankEl.style.color = 'var(--pass-color)';
+    } else if (compliancePct >= 85) {
+      rankEl.innerText = 'ĐẠT CHUẨN (HẠNG B)';
+      rankEl.style.color = 'var(--primary)';
+    } else if (compliancePct >= 70) {
+      rankEl.innerText = 'CẦN CẢI TIẾN (C)';
+      rankEl.style.color = 'var(--ni-color)';
+    } else {
+      rankEl.innerText = 'KHÔNG ĐẠT (D)';
+      rankEl.style.color = 'var(--nc-color)';
+    }
+
+    // Sticky bar
+    document.getElementById('stickyProgressText').innerText = `Tiến độ kiểm tra thực địa: ${evaluatedCount} / ${totalApplicable} tiêu chí (${progressPct}%)`;
+    document.getElementById('stickyScoreText').innerText = `Tỷ lệ tuân thủ: ${compliancePct}% (Đạt: ${passCount} | Lỗi NC: ${ncCount})`;
+    document.getElementById('stickyProgressFill').style.width = progressPct + '%';
+  }
+
+  // ==========================================================================
+  // 7. XUẤT EXCEL (UTF-8 BOM), SAO CHÉP ZALO & IN PDF
+  // ==========================================================================
+  function exportToExcel() {
+    const facility = document.getElementById('facilityName').value.trim() || 'CoSo_DanhGia';
+    const auditor = document.getElementById('auditorName').value.trim() || '';
+    const date = document.getElementById('auditDate').value || '';
+
+    let csv = '\uFEFF'; // UTF-8 BOM chống lỗi font tiếng Việt
+    csv += `BIÊN BẢN ĐÁNH GIÁ QA AUDIT CONTROL POINTS & KẾ HOẠCH KHẮC PHỤC (CAPA) - FAST CONSULTING\n`;
+    csv += `Cơ sở:,"${facility.replace(/"/g, '""')}",Chuyên gia:,"${auditor.replace(/"/g, '""')}",Ngày đánh giá:,"${formatDateVN(date)}"\n\n`;
+    csv += 'Mã Điểm KS,Nhóm Khu Vực (Area),Tiêu Chí (Criteria),Điều Kiện Lỗi (Condition),Mô Tả Chi Tiết,Ngành Hàng Áp Dụng,Kết Quả Đánh Giá,Mức Độ Lỗi,Bằng Chứng Thực Tế / Vị Trí Lỗi,Hành Động Khắc Phục (CAPA),Thời Hạn Hoàn Thành\n';
+
+    const esc = (val) => `"${(val || '').toString().replace(/"/g, '""')}"`;
+
+    AUDIT_AREAS.forEach(area => {
+      area.items.forEach(item => {
+        if (!isItemApplicableToSelectedDepts(item)) return;
+        const rec = state.records[item.code] || {};
+        const statusLabel = rec.status === 'PASS' ? 'Đạt (Pass)' : (rec.status === 'NC' ? 'Lỗi (NC)' : (rec.status === 'NA' ? 'Không áp dụng (N/A)' : 'Chưa chấm'));
+        csv += `${esc(item.code)},${esc(area.name)},${esc(item.criteria)},${esc(item.condition)},${esc(item.detail)},${esc(item.depts.join('; '))},${esc(statusLabel)},${esc(rec.status === 'NC' ? rec.severity : '')},${esc(rec.evidence)},${esc(rec.capa)},${esc(rec.deadline ? formatDateVN(rec.deadline) : '')}\n`;
+      });
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = facility.replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_');
+    a.href = url;
+    a.download = `FAST_QA_Audit_CAPA_${safeName}_${date || Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function copyNCSummaryZalo() {
+    const facility = document.getElementById('facilityName').value.trim() || 'CƠ SỞ ĐƯỢC ĐÁNH GIÁ';
+    const auditor = document.getElementById('auditorName').value.trim() || 'Chuyên gia FAST';
+    const date = formatDateVN(document.getElementById('auditDate').value);
+    const compliance = document.getElementById('kpiCompliance').innerText;
+    const rank = document.getElementById('kpiRank').innerText;
+
+    let ncLines = [];
+    let idx = 1;
+
+    AUDIT_AREAS.forEach(area => {
+      area.items.forEach(item => {
+        if (!isItemApplicableToSelectedDepts(item)) return;
+        const rec = state.records[item.code];
+        if (rec && rec.status === 'NC') {
+          ncLines.push(
+            `${idx}. [${item.code}] ${area.name.replace(/^Area \d+:\s*/, '')} - ${item.criteria}: ${item.condition}\n` +
+            `   • Mức độ: ${rec.severity || 'Major'}\n` +
+            `   • Thực tế / Vị trí: ${rec.evidence || 'Chưa ghi chi tiết'}\n` +
+            `   • Khắc phục (CAPA): ${rec.capa || 'Khắc phục ngay theo chuẩn ATTP'}\n` +
+            `   • Hạn hoàn thành: ${rec.deadline ? formatDateVN(rec.deadline) : 'Ngay lập tức'}`
+          );
+          idx++;
+        }
+      });
+    });
+
+    const ncBody = ncLines.length > 0
+      ? ncLines.join('\n\n')
+      : '✅ Tuyệt vời! Không phát hiện điểm không phù hợp (NC) nào trong kỳ đánh giá này.';
+
+    const msg = `BÁO CÁO TÓM TẮT ĐÁNH GIÁ QA / ATTP (FAST CONSULTING)
+- Cơ sở: ${facility.toUpperCase()}
+- Ngày đánh giá: ${date}
+- Chuyên gia đánh giá: ${auditor}
+- Tỷ lệ tuân thủ: ${compliance} | Xếp loại: ${rank}
+--------------------------------------------------
+DANH SÁCH ĐIỂM KHÔNG PHÙ HỢP (NC) & YÊU CẦU KHẮC PHỤC (${ncLines.length} LỖI):
+
+${ncBody}
+--------------------------------------------------
+Đề nghị cơ sở triển khai khắc phục đúng thời hạn và gửi hình ảnh xác nhận sau khắc phục.
+Trân trọng, FAST CONSULTING • Hotline: 0927 002 668`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(msg).then(() => {
+        alert(`Đã sao chép báo cáo (${ncLines.length} lỗi NC)! Bạn có thể dán (Paste) vào Zalo hoặc Email để gửi ngay cho cơ sở.`);
+      }).catch(() => fallbackCopy(msg, ncLines.length));
+    } else {
+      fallbackCopy(msg, ncLines.length);
+    }
+  }
+
+  function fallbackCopy(text, count) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert(`Đã sao chép báo cáo (${count} lỗi NC)! Bạn có thể dán (Paste) vào Zalo hoặc Email để gửi ngay cho cơ sở.`);
+  }
+
+  function printReport(ncOnly = false) {
+    const facility = document.getElementById('facilityName').value.trim() || 'CoSo';
+    const date = document.getElementById('auditDate').value || new Date().toISOString().split('T')[0];
+    const safeName = facility.replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_');
+    const origTitle = document.title;
+
+    updatePrintMeta();
+    document.title = `FAST_QA_Audit_${safeName}_${date}`;
+
+    if (ncOnly) {
+      document.body.classList.add('print-nc-only');
+    }
+
+    window.print();
+
+    setTimeout(() => {
+      document.body.classList.remove('print-nc-only');
+      document.title = origTitle;
+    }, 1000);
+  }
+
+  function updatePrintMeta() {
+    document.getElementById('pFacilityName').innerText = document.getElementById('facilityName').value.trim() || '-';
+    document.getElementById('pAuditorName').innerText = document.getElementById('auditorName').value.trim() || '-';
+    document.getElementById('pFacilityRep').innerText = document.getElementById('facilityRep').value.trim() || '-';
+    document.getElementById('pAuditDate').innerText = formatDateVN(document.getElementById('auditDate').value);
+    document.getElementById('pFacilityAddress').innerText = document.getElementById('facilityAddress').value.trim() || '-';
+    document.getElementById('pSelectedDepts').innerText = state.selectedDepts.length > 0 ? state.selectedDepts.join(', ') : 'Tất cả 12 ngành hàng';
+  }
+
+  // ==========================================================================
+  // 8. LƯU TRỮ TỰ ĐỘNG & MINI CRM LỊCH SỬ ĐÁNH GIÁ (LOCALSTORAGE)
+  // ==========================================================================
+  function saveDraft() {
+    state.facilityName = document.getElementById('facilityName').value;
+    state.auditorName = document.getElementById('auditorName').value;
+    state.facilityRep = document.getElementById('facilityRep').value;
+    state.auditDate = document.getElementById('auditDate').value;
+    state.facilityAddress = document.getElementById('facilityAddress').value;
+    state.auditType = document.getElementById('auditType').value;
+
+    try {
+      localStorage.setItem(ACTIVE_AUDIT_KEY, JSON.stringify(state));
+    } catch (e) {}
+  }
+
+  function getSavedHistory() {
+    try {
+      const raw = localStorage.getItem(SAVED_AUDITS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveAuditToCRM() {
+    saveDraft();
+    if (!state.facilityName.trim()) {
+      alert('Vui lòng nhập Tên Cơ Sở / Siêu Thị trước khi lưu biên bản!');
+      document.getElementById('facilityName').focus();
+      return;
+    }
+
+    const history = getSavedHistory();
+    const snapshot = JSON.parse(JSON.stringify(state));
+    snapshot.summary = {
+      pass: document.getElementById('kpiPass').innerText,
+      nc: document.getElementById('kpiNC').innerText,
+      compliance: document.getElementById('kpiCompliance').innerText,
+      rank: document.getElementById('kpiRank').innerText,
+      savedAt: new Date().toLocaleString('vi-VN')
+    };
+
+    const idx = history.findIndex(h => h.id === snapshot.id);
+    if (idx >= 0) history[idx] = snapshot;
+    else history.unshift(snapshot);
+
+    localStorage.setItem(SAVED_AUDITS_KEY, JSON.stringify(history));
+    updateHistoryBadge();
+    alert(`Đã lưu thành công biên bản đánh giá cơ sở "${state.facilityName}" vào hệ thống CRM!`);
+  }
+
+  function startNewAudit() {
+    if (!confirm('Tạo cuộc đánh giá mới? Dữ liệu hiện tại chưa lưu vào CRM sẽ được làm mới.')) return;
+    state = {
+      id: 'audit_' + Date.now(),
+      facilityName: '',
+      auditorName: state.auditorName, // Giữ lại tên chuyên gia
+      facilityRep: '',
+      auditDate: new Date().toISOString().split('T')[0],
+      auditType: 'Đánh giá QA định kỳ',
+      selectedDepts: [],
+      statusFilter: 'ALL',
+      openAreas: [1, 2, 3, 4, 5, 6, 7, 8],
+      records: {}
+    };
+    applyStateToInputs();
+    saveDraft();
+    renderDeptPills();
+    renderChecklist();
+  }
+
+  function openHistoryModal() {
+    const history = getSavedHistory();
+    const tbody = document.getElementById('historyTableBody');
+
+    if (history.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px; color: var(--text-muted);">Chưa có biên bản đánh giá nào được lưu.</td></tr>`;
+    } else {
+      tbody.innerHTML = history.map((h, i) => `
+        <tr>
+          <td><strong>${i + 1}</strong></td>
+          <td>${formatDateVN(h.auditDate)}</td>
+          <td><strong>${escapeHTML(h.facilityName)}</strong></td>
+          <td>${escapeHTML(h.auditorName || '-')}</td>
+          <td><span style="color:var(--pass-color);font-weight:700;">${h.summary?.pass || 0} Đạt</span> / <span style="color:var(--nc-color);font-weight:700;">${h.summary?.nc || 0} NC</span></td>
+          <td><strong>${h.summary?.compliance || '0%'}</strong></td>
+          <td>${escapeHTML(h.summary?.rank || '-')}</td>
+          <td>
+            <button class="btn-sm btn-sm-primary" onclick="loadAuditFromCRM('${h.id}')">Mở</button>
+            <button class="btn-sm" style="color:var(--nc-color);" onclick="deleteAuditFromCRM('${h.id}')">Xóa</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    document.getElementById('historyModal').classList.add('show');
+  }
+
+  function closeHistoryModal() {
+    document.getElementById('historyModal').classList.remove('show');
+  }
+
+  function loadAuditFromCRM(id) {
+    const history = getSavedHistory();
+    const found = history.find(h => h.id === id);
+    if (!found) return;
+    state = JSON.parse(JSON.stringify(found));
+    applyStateToInputs();
+    saveDraft();
+    renderDeptPills();
+    renderChecklist();
+    closeHistoryModal();
+  }
+
+  function deleteAuditFromCRM(id) {
+    if (!confirm('Xóa biên bản đánh giá này khỏi lịch sử?')) return;
+    const history = getSavedHistory().filter(h => h.id !== id);
+    localStorage.setItem(SAVED_AUDITS_KEY, JSON.stringify(history));
+    updateHistoryBadge();
+    openHistoryModal();
+  }
+
+  function updateHistoryBadge() {
+    document.getElementById('savedCountBadge').innerText = getSavedHistory().length;
+  }
+
+  function applyStateToInputs() {
+    document.getElementById('facilityName').value = state.facilityName || '';
+    document.getElementById('auditorName').value = state.auditorName || '';
+    document.getElementById('facilityRep').value = state.facilityRep || '';
+    document.getElementById('auditDate').value = state.auditDate || new Date().toISOString().split('T')[0];
+    document.getElementById('facilityAddress').value = state.facilityAddress || '';
+    document.getElementById('auditType').value = state.auditType || 'Đánh giá QA định kỳ';
+  }
+
+  // Khởi chạy ứng dụng
+  window.addEventListener('DOMContentLoaded', () => {
+    try {
+      const savedDraft = localStorage.getItem(ACTIVE_AUDIT_KEY);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        state = { ...state, ...parsed };
+      }
+    } catch (e) {}
+
+    applyStateToInputs();
+    updateHistoryBadge();
+    renderDeptPills();
+    renderChecklist();
+  });
+</script>
+</body>
+</html>

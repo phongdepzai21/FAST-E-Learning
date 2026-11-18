@@ -164,6 +164,23 @@ service cloud.firestore {
              (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
     }
 
+    function isValidSupermarketHygieneDoc(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             (!('facilityName' in data) || (data.facilityName is string && data.facilityName.size() <= 512)) &&
+             (!('auditorName' in data) || (data.auditorName is string && data.auditorName.size() <= 256)) &&
+             (!('facilityRep' in data) || (data.facilityRep is string && data.facilityRep.size() <= 256)) &&
+             (!('auditDate' in data) || (data.auditDate is string && data.auditDate.size() <= 64)) &&
+             (!('facilityAddress' in data) || (data.facilityAddress is string && data.facilityAddress.size() <= 1024)) &&
+             (!('auditType' in data) || (data.auditType is string && data.auditType.size() <= 256)) &&
+             (!('selectedDepts' in data) || (data.selectedDepts is list && data.selectedDepts.size() <= 32)) &&
+             (!('openAreas' in data) || (data.openAreas is list && data.openAreas.size() <= 32)) &&
+             (!('records' in data) || data.records is map) &&
+             (!('_lastUpdated' in data) || data._lastUpdated is int) &&
+             (!('_writerId' in data) || (data._writerId is string && data._writerId.size() <= 128)) &&
+             (!('_loadedFromCrmId' in data) || data._loadedFromCrmId == null || (data._loadedFromCrmId is string && data._loadedFromCrmId.size() <= 128)) &&
+             (!('_isExplicitReset' in data) || data._isExplicitReset is bool);
+    }
+
     // --- Collection Rules ---
 
     // 1. Users
@@ -261,6 +278,13 @@ service cloud.firestore {
     // 8. Fast ISO 22000 CRM Records (ISO 22K Checklist)
     match /fast_iso22k_crm/{recordId} {
       allow read, write: if true;
+    }
+
+    // 8.1 Fast Supermarket Hygiene Audit CRM Records
+    match /fast_supermarket_hygiene_crm/{recordId} {
+      allow read: if isValidId(recordId);
+      allow create, update: if isValidId(recordId) && isValidSupermarketHygieneDoc(incoming());
+      allow delete: if isAdmin() || isSystemOwner();
     }
 
     // 9. Manual Unlocks Logs

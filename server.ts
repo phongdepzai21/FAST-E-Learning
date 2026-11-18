@@ -2002,7 +2002,7 @@ async function startServer() {
       let syncedNotification: any = null;
 
       if (sendNotification !== false && targetEmail && targetEmail.includes("@")) {
-        const builtNotif = buildTrainingPreparationNotification(mergedRecord, `training_${cleanRegId}`);
+        const builtNotif = buildServerPreClassNotification(mergedRecord, nowIso, `training_${cleanRegId}`);
         syncedNotification = {
           ...builtNotif,
           title: typeof customTitle === "string" && customTitle.trim() ? customTitle.trim() : builtNotif.title,
@@ -2490,6 +2490,211 @@ async function startServer() {
         success: true,
         records: serverIso22kCrm,
         _lastUpdated: serverIso22kCrmUpdatedAt,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- FAST SERVICE FOOD HYGIENE FOR SUPERMARKET ENDPOINTS ---
+  const SUPERMARKET_SESSION_FILE = path.join(DATA_DIR, "fast_supermarket_hygiene_session.json");
+  const SUPERMARKET_CRM_FILE = path.join(DATA_DIR, "fast_supermarket_hygiene_crm.json");
+
+  function isMeaningfulSupermarketSession(data: any): boolean {
+    if (!data || typeof data !== "object") return false;
+    if (data._isExplicitReset) return true;
+    const textKeys = ["facilityName", "auditorName", "facilityRep", "facilityAddress"];
+    if (textKeys.some((k) => typeof data[k] === "string" && data[k].trim() !== "")) {
+      return true;
+    }
+    if (Array.isArray(data.selectedDepts) && data.selectedDepts.length > 0) {
+      return true;
+    }
+    if (data.records && typeof data.records === "object") {
+      return Object.values(data.records).some(
+        (r: any) => r && (r.status || r.evidence || r.capa)
+      );
+    }
+    return false;
+  }
+
+  function loadSupermarketSessionFromDisk(): any {
+    try {
+      if (fs.existsSync(SUPERMARKET_SESSION_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(SUPERMARKET_SESSION_FILE, "utf-8"));
+        return isMeaningfulSupermarketSession(parsed) ? parsed : null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveSupermarketSessionToDisk(data: any) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(SUPERMARKET_SESSION_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {}
+  }
+
+  function loadSupermarketCrmFromDisk(): { records: Record<string, any>; _lastUpdated: number } {
+    try {
+      if (fs.existsSync(SUPERMARKET_CRM_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(SUPERMARKET_CRM_FILE, "utf-8"));
+        if (parsed && typeof parsed === "object") {
+          if (parsed.records && typeof parsed.records === "object") {
+            return {
+              records: parsed.records,
+              _lastUpdated: Number(parsed._lastUpdated || 0),
+            };
+          }
+          return {
+            records: parsed,
+            _lastUpdated: 0,
+          };
+        }
+      }
+    } catch (e) {}
+    return { records: {}, _lastUpdated: 0 };
+  }
+
+  function saveSupermarketCrmToDisk(crmData: Record<string, any>, lastUpdated: number) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(
+        SUPERMARKET_CRM_FILE,
+        JSON.stringify({ records: crmData, _lastUpdated: lastUpdated }, null, 2),
+        "utf-8"
+      );
+    } catch (e) {}
+  }
+
+  let serverSupermarketSession = loadSupermarketSessionFromDisk();
+  const initialDiskSupermarketCrm = loadSupermarketCrmFromDisk();
+  let serverSupermarketCrm: Record<string, any> = initialDiskSupermarketCrm.records;
+  let serverSupermarketCrmUpdatedAt: number = initialDiskSupermarketCrm._lastUpdated;
+  let supermarketBootstrapped = false;
+
+  async function ensureSupermarketHydratedFromFirestore() {
+    if (supermarketBootstrapped) return;
+    supermarketBootstrapped = true;
+    try {
+      const db = getServerFirestore();
+      const [sessSnap, crmSnap] = await Promise.all([
+        db.collection("fast_supermarket_hygiene_crm").doc("current_session").get(),
+        db.collection("fast_supermarket_hygiene_crm").doc("database").get(),
+      ]);
+
+      if (sessSnap.exists) {
+        const remoteSess = sessSnap.data();
+        const remoteTs = Number(remoteSess?._lastUpdated || 0);
+        const localTs = Number(serverSupermarketSession?._lastUpdated || 0);
+        if (
+          isMeaningfulSupermarketSession(remoteSess) &&
+          (!serverSupermarketSession || remoteTs >= localTs)
+        ) {
+          serverSupermarketSession = remoteSess;
+          saveSupermarketSessionToDisk(serverSupermarketSession);
+        }
+      }
+
+      if (crmSnap.exists) {
+        const remoteCrm = crmSnap.data();
+        const remoteTs = Number(remoteCrm?._lastUpdated || 0);
+        if (
+          remoteCrm?.records &&
+          typeof remoteCrm.records === "object" &&
+          (Object.keys(serverSupermarketCrm).length === 0 || remoteTs >= serverSupermarketCrmUpdatedAt)
+        ) {
+          serverSupermarketCrm = remoteCrm.records;
+          serverSupermarketCrmUpdatedAt = remoteTs;
+          saveSupermarketCrmToDisk(serverSupermarketCrm, serverSupermarketCrmUpdatedAt);
+        }
+      }
+    } catch (e) {
+      console.warn("[FastSupermarketHygiene] Server hydration note:", e);
+    }
+  }
+
+  app.get("/api/fast-supermarket-hygiene/session", async (req, res) => {
+    await ensureSupermarketHydratedFromFirestore();
+    res.json({ success: true, session: serverSupermarketSession });
+  });
+
+  app.post("/api/fast-supermarket-hygiene/session", async (req, res) => {
+    try {
+      await ensureSupermarketHydratedFromFirestore();
+      const sessionData = req.body;
+      if (sessionData && typeof sessionData === "object") {
+        const incomingTs = Number(sessionData._lastUpdated || Date.now());
+        const currentTs = Number(serverSupermarketSession?._lastUpdated || 0);
+
+        if (
+          !isMeaningfulSupermarketSession(sessionData) &&
+          isMeaningfulSupermarketSession(serverSupermarketSession)
+        ) {
+          return res.json({
+            success: true,
+            session: serverSupermarketSession,
+            skippedEmptyOverwrite: true,
+          });
+        }
+
+        if (!serverSupermarketSession || incomingTs >= currentTs) {
+          serverSupermarketSession = { ...sessionData, _lastUpdated: incomingTs };
+          saveSupermarketSessionToDisk(serverSupermarketSession);
+          try {
+            const db = getServerFirestore();
+            await db
+              .collection("fast_supermarket_hygiene_crm")
+              .doc("current_session")
+              .set(serverSupermarketSession);
+          } catch (e) {}
+        }
+      }
+      res.json({ success: true, session: serverSupermarketSession });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/fast-supermarket-hygiene/crm", async (req, res) => {
+    await ensureSupermarketHydratedFromFirestore();
+    res.json({
+      success: true,
+      records: serverSupermarketCrm,
+      _lastUpdated: serverSupermarketCrmUpdatedAt,
+    });
+  });
+
+  app.post("/api/fast-supermarket-hygiene/crm", async (req, res) => {
+    try {
+      await ensureSupermarketHydratedFromFirestore();
+      const { records, _lastUpdated, _writerId } = req.body || {};
+      if (records && typeof records === "object") {
+        const incomingTs = Number(_lastUpdated || Date.now());
+        if (
+          incomingTs >= serverSupermarketCrmUpdatedAt ||
+          Object.keys(serverSupermarketCrm).length === 0
+        ) {
+          serverSupermarketCrm = records;
+          serverSupermarketCrmUpdatedAt = incomingTs;
+          saveSupermarketCrmToDisk(serverSupermarketCrm, serverSupermarketCrmUpdatedAt);
+          try {
+            const db = getServerFirestore();
+            await db
+              .collection("fast_supermarket_hygiene_crm")
+              .doc("database")
+              .set({
+                records: serverSupermarketCrm,
+                _lastUpdated: serverSupermarketCrmUpdatedAt,
+                ...(_writerId ? { _writerId } : {}),
+              });
+          } catch (e) {}
+        }
+      }
+      res.json({
+        success: true,
+        records: serverSupermarketCrm,
+        _lastUpdated: serverSupermarketCrmUpdatedAt,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

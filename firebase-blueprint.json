@@ -133,6 +133,19 @@
         "updatedAt": { "type": "string", "description": "ISO timestamp" }
       }
     },
+    "FastSupermarketHygieneCrm": {
+      "title": "FastSupermarketHygieneCrm",
+      "description": "Food hygiene for supermarket QA audit session and CRM database state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Audit session ID" },
+        "facilityName": { "type": "string", "description": "Supermarket / retail facility name" },
+        "auditorName": { "type": "string", "description": "Lead auditor name" },
+        "auditDate": { "type": "string", "description": "Audit date YYYY-MM-DD" },
+        "records": { "type": "object", "description": "Control point scoring & CAPA records map" },
+        "_lastUpdated": { "type": "integer", "description": "Millisecond timestamp for sync conflict resolution" }
+      }
+    },
     "StudentProgress": {
       "title": "StudentProgress",
       "description": "Student lesson autosave progress data",
@@ -232,6 +245,10 @@
     "fast_iso22k_crm/{recordId}": {
       "schema": "FastIso22kCrm",
       "description": "ISO 22000 audit records and session"
+    },
+    "fast_supermarket_hygiene_crm/{recordId}": {
+      "schema": "FastSupermarketHygieneCrm",
+      "description": "Food hygiene for supermarket audit session and CRM history"
     },
     "student_progress/{userEmail}": {
       "schema": "StudentProgress",

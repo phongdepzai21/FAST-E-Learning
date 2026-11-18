@@ -78,6 +78,12 @@ export interface DirectRegistration {
   registeredAt: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   notes?: string;
+  scheduleDetails?: string;
+  venueAddress?: string;
+  meetingLink?: string;
+  trainingTypeLabel?: string;
+  userEmail?: string;
+  updatedAt?: string;
 }
 
 export interface TeamMember {
