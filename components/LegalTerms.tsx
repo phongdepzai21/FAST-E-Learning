@@ -45,8 +45,8 @@ const TERM_SECTIONS: TermSection[] = [
         text: 'FAST E-Learning (https://fastelearning.com.vn) — Website TMĐT bán hàng cung ứng khóa học trực tuyến & dịch vụ đào tạo tiêu chuẩn chất lượng, an toàn thực phẩm.'
       },
       {
-        label: 'Mã số thuế / Số Giấy chứng nhận ĐKKD & Cơ quan cấp',
-        text: '0314568146 — Cấp bởi Sở Kế hoạch và Đầu tư Thành phố Hồ Chí Minh (Phòng Đăng ký kinh doanh).'
+        label: 'Mã số thuế',
+        text: '0314568146'
       },
       {
         label: 'Địa chỉ trụ sở chính',

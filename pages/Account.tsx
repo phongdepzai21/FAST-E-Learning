@@ -26,7 +26,6 @@ const AdminDiagnosticConsole = React.lazy(() => import('../components/AdminDiagn
 const DirectCourseDashboard = React.lazy(() => import('../components/DirectCourseDashboard').then(m => ({ default: m.DirectCourseDashboard })));
 const FeaturedCoursesDashboard = React.lazy(() => import('../components/FeaturedCoursesDashboard').then(m => ({ default: m.FeaturedCoursesDashboard })));
 const TrainingCourseDashboard = React.lazy(() => import('../components/TrainingCourseDashboard').then(m => ({ default: m.TrainingCourseDashboard })));
-const FastCodeLookup = React.lazy(() => import('../components/FastCodeLookup').then(m => ({ default: m.FastCodeLookup })));
 const AdminPaymentDashboard = React.lazy(() => import('../components/AdminPaymentDashboard').then(m => ({ default: m.AdminPaymentDashboard })));
 const PurchaseHistory = React.lazy(() => import('../components/PurchaseHistory').then(m => ({ default: m.PurchaseHistory })));
 const ReceiptHistoryTable = React.lazy(() => import('../components/ReceiptHistoryTable').then(m => ({ default: m.ReceiptHistoryTable })));
@@ -79,7 +78,7 @@ import {
   formatTimeAgo,
   getPreClassPreparationMeta
 } from '../utils/courseNotificationService';
-import { Bell, Calendar, Check, Clock, Copy, ExternalLink, KeyRound, LogIn, MapPin, Video, CheckCircle2 } from 'lucide-react';
+import { Bell, Calendar, Check, Clock, Copy, ExternalLink, KeyRound, LogIn, MapPin, Video, CheckCircle2, FileText, X } from 'lucide-react';
 
 interface UserProfile {
   uid?: string;
@@ -414,7 +413,7 @@ const Account: React.FC = () => {
   const [nameError, setNameError] = useState<string>('');
   const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'receipt-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'fast-code-lookup' | 'admin-payment-dashboard' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-courses' | 'badges' | 'buy-courses' | 'purchase-history' | 'receipt-history' | 'teacher-dashboard' | 'user-management' | 'combo-management' | 'fast-standards-audit' | 'fast-haccp-checklist' | 'fast-iso22k-checklist' | 'ad-profile-management' | 'fast-food-safety' | 'settings' | 'course-learning' | 'admin-manual-unlock' | 'admin-student-console' | 'admin-payment-dashboard' | 'unified-webhook-center' | 'direct-courses' | 'featured-courses'>('dashboard');
   const [adminViewMode, setAdminViewMode] = useState<'fsa' | 'attp' | 'hsqc' | 'haccp' | 'iso22k' | 'supermarket' | 'student'>('student');
   const [visitedAdminModes, setVisitedAdminModes] = useState<Set<string>>(() => new Set(['fsa']));
   const [masterSearch, setMasterSearch] = useState('');
@@ -683,6 +682,11 @@ const Account: React.FC = () => {
   // Google reCAPTCHA states
   const [captchaToken, setCaptchaToken] = useState('');
   const [captchaError, setCaptchaError] = useState('');
+
+  // Terms of Service acceptance states for registration
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsError, setTermsError] = useState('');
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   // OTP Verification States
   const [isOtpPending, setIsOtpPending] = useState(false);
@@ -2207,6 +2211,16 @@ const Account: React.FC = () => {
       }
       setCaptchaError("");
 
+      if (!acceptedTerms) {
+        const msg = "Bạn phải đồng ý với Điều khoản sử dụng để đăng ký và sử dụng hệ thống.";
+        setTermsError(msg);
+        setError(msg);
+        setIsAuthenticating(false);
+        toast.error("Vui lòng tích chọn đồng ý với Điều khoản sử dụng!");
+        return;
+      }
+      setTermsError("");
+
       // Check existing account before launching OTP registration
       try {
         const res = await fetch('/api/user/exists', {
@@ -2766,6 +2780,14 @@ const Account: React.FC = () => {
   const handleFacebookLogin = async () => {
     if (isAuthenticating || isLinkingFacebook) return;
 
+    if (isRegistering && !acceptedTerms) {
+      const msg = "Bạn phải đồng ý với Điều khoản sử dụng trước khi đăng ký tài khoản.";
+      setTermsError(msg);
+      setError(msg);
+      toast.error("Vui lòng tích chọn đồng ý với Điều khoản sử dụng!");
+      return;
+    }
+
     // TRƯỜNG HỢP A: Người dùng ĐANG ĐĂNG NHẬP -> luôn dùng linkWithPopup, không chuyển tài khoản
     if (auth.currentUser) {
       await handleLinkFacebookInSession();
@@ -2804,6 +2826,13 @@ const Account: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (isRegistering && !acceptedTerms) {
+      const msg = "Bạn phải đồng ý với Điều khoản sử dụng trước khi đăng ký tài khoản.";
+      setTermsError(msg);
+      setError(msg);
+      toast.error("Vui lòng tích chọn đồng ý với Điều khoản sử dụng!");
+      return;
+    }
     setIsAuthenticating(true);
     setError(null);
     try {
@@ -3393,7 +3422,7 @@ const Account: React.FC = () => {
 
                   {(adminViewMode === 'haccp' || visitedAdminModes.has('haccp')) && (
                     <div className={adminViewMode === 'haccp' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
-                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                      <div className="print:hidden haccp-main-checklist p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                         <div>
                           <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">HACCP Checklist &amp; Thẩm Tra An Toàn</h4>
                           <p className="text-xs text-gray-500 font-medium">Hệ thống thẩm tra 12 bước, 7 nguyên tắc HACCP Codex &amp; TCVN, xác định điểm tới hạn CCP và chương trình tiên quyết PRP.</p>
@@ -3406,7 +3435,7 @@ const Account: React.FC = () => {
 
                   {(adminViewMode === 'iso22k' || visitedAdminModes.has('iso22k')) && (
                     <div className={adminViewMode === 'iso22k' ? 'space-y-4 animate-fade-in' : 'hidden print:hidden'}>
-                      <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
+                      <div className="print:hidden iso22k-main-checklist p-4 bg-gray-50/80 rounded-2xl border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shadow-xs text-gray-800">
                         <div>
                           <h4 className="text-sm font-black text-gray-900 uppercase tracking-wide">ISO 22000:2018 Full Audit Checklist</h4>
                           <p className="text-xs text-gray-500 font-medium">Bảng đánh giá toàn diện 43 điều khoản (Điều 4 đến Điều 10), phân loại Major/Minor/Observation, quản trị CRM và xuất báo cáo NCR &amp; CAPA.</p>
@@ -3509,7 +3538,6 @@ const Account: React.FC = () => {
                       { id: 'admin-payment-dashboard', label: 'Dashboard Thanh toán & Kích hoạt', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
                       { id: 'user-management', label: 'Học viên & Khóa học', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
                       { id: 'featured-courses', label: 'Cấu hình 3 Khóa Nổi Bật Trang Chủ', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z' },
-                      { id: 'fast-code-lookup', label: 'Truy vết Giao dịch (Payment Trace)', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
                       { id: 'admin-audit-center', label: 'FAST SERVICE', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', isAuditViewLink: true }
                     ] : [])
                   ].map((item) => {
@@ -3598,7 +3626,6 @@ const Account: React.FC = () => {
                   {isAdmin && <option value="user-management">Học viên &amp; Khóa học</option>}
                   {isAdmin && <option value="featured-courses">Cấu hình 3 Khóa Nổi Bật Trang Chủ</option>}
                   {(isTeacher || isAdmin) && <option value="direct-courses">Quản lý Khóa Đào Tạo</option>}
-                  {isAdmin && <option value="fast-code-lookup">Truy vết Giao dịch (Payment Trace)</option>}
                   {isAdmin && <option value="admin-audit-center">➜ FAST SERVICE (FSA • HACCP • ISO 22K • Supermarket • ATTP • HSQC)</option>}
                 </select>
              </div>
@@ -3675,8 +3702,6 @@ const Account: React.FC = () => {
                   <TrainingCourseDashboard />
                 ) : activeTab === 'admin-payment-dashboard' && isAdmin ? (
                   <AdminPaymentDashboard userEmail={user?.email || auth.currentUser?.email || ''} />
-                ) : activeTab === 'fast-code-lookup' && isAdmin ? (
-                  <FastCodeLookup />
                 ) : activeTab === 'admin-student-console' && isAdmin ? (
                   <AdminStudentConsole />
                 ) : activeTab === 'admin-manual-unlock' && isAdmin ? (
@@ -5191,7 +5216,7 @@ const Account: React.FC = () => {
                         </div>
 
                         {isRegistering && (
-                            <div className="pt-2 pb-1">
+                            <div className="pt-2 pb-1 space-y-3">
                                 <ReCaptcha
                                     onVerify={(token) => {
                                         setCaptchaToken(token);
@@ -5201,13 +5226,63 @@ const Account: React.FC = () => {
                                     hasError={!!captchaError}
                                     errorMessage={captchaError}
                                 />
+
+                                <div
+                                  className={`p-3.5 rounded-2xl border text-left transition-colors ${
+                                    termsError
+                                      ? 'bg-red-50/70 border-red-300'
+                                      : acceptedTerms
+                                      ? 'bg-teal-50/60 border-teal-200'
+                                      : 'bg-gray-50 border-gray-200'
+                                  }`}
+                                >
+                                  <label className="flex items-start gap-3 cursor-pointer select-none">
+                                    <input
+                                      id="register-accept-terms"
+                                      type="checkbox"
+                                      checked={acceptedTerms}
+                                      onChange={(e) => {
+                                        setAcceptedTerms(e.target.checked);
+                                        if (e.target.checked) {
+                                          setTermsError('');
+                                          setError(null);
+                                        }
+                                      }}
+                                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#007c76] focus:ring-[#007c76] shrink-0 cursor-pointer accent-[#007c76]"
+                                    />
+                                    <span className="text-xs font-semibold text-gray-700 leading-relaxed">
+                                      Tôi đã đọc, hiểu và đồng ý với{' '}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setIsTermsModalOpen(true);
+                                        }}
+                                        className="text-[#007c76] font-extrabold underline hover:text-[#005c56] cursor-pointer"
+                                      >
+                                        Điều khoản sử dụng
+                                      </button>{' '}
+                                      và{' '}
+                                      <Link
+                                        to="/privacy-policy"
+                                        className="text-[#007c76] font-extrabold underline hover:text-[#005c56]"
+                                      >
+                                        Chính sách bảo mật
+                                      </Link>{' '}
+                                      của FAST E-Learning mới được đăng ký sử dụng hệ thống.
+                                    </span>
+                                  </label>
+                                  {termsError && (
+                                    <p className="text-xs font-bold text-red-600 mt-1.5 ml-7">{termsError}</p>
+                                  )}
+                                </div>
                             </div>
                         )}
 
                         <button 
                             type="submit"
-                            disabled={isAuthenticating}
-                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                            disabled={isAuthenticating || (isRegistering && !acceptedTerms)}
+                            className="w-full bg-[#007c76] text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00605b] hover:shadow-lg hover:shadow-teal-700/30 transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                         >
                             {isAuthenticating ? (
                                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -5299,6 +5374,8 @@ const Account: React.FC = () => {
                                         setError(null);
                                         setCaptchaToken('');
                                         setCaptchaError('');
+                                        setAcceptedTerms(false);
+                                        setTermsError('');
                                         setEmailError('');
                                         setPasswordError('');
                                         setNameError('');
@@ -5318,6 +5395,80 @@ const Account: React.FC = () => {
         <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
             <p className="text-[10px] text-gray-400 font-medium">© FAST E-Learning. All rights reserved.</p>
         </div>
+
+        {/* In-page Terms of Service Quick-View Modal */}
+        {isTermsModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden text-left">
+              <div className="px-6 py-4 bg-[#007c76] text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-5 h-5 text-teal-100" />
+                  <h4 className="text-sm sm:text-base font-black uppercase tracking-wide">
+                    Điều Khoản Sử Dụng — FAST E-Learning
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTermsModalOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-white/15 text-white cursor-pointer"
+                  aria-label="Đóng"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                <p className="font-semibold text-slate-900">
+                  Khi đăng ký tài khoản và sử dụng nền tảng đào tạo trực tuyến <strong>FAST E-Learning</strong> (thuộc Công ty TNHH Tư Vấn FAST), bạn đồng ý tuân thủ các quy định sau:
+                </p>
+                <div className="space-y-2.5 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                  <p>
+                    <strong>1. Tài khoản &amp; Bảo mật:</strong> Học viên chịu trách nhiệm bảo mật thông tin đăng nhập, mật khẩu cá nhân và sử dụng đúng thông tin xác thực qua Email/OTP. Không chia sẻ tài khoản cho bên thứ ba sử dụng trái phép.
+                  </p>
+                  <p>
+                    <strong>2. Quyền truy cập &amp; Sở hữu trí tuệ:</strong> Toàn bộ video bài giảng, giáo trình, biểu mẫu kiểm tra ISO/HACCP và tài liệu trên hệ thống thuộc bản quyền của Công ty TNHH Tư Vấn FAST. Nghiêm cấm sao chép, phát tán hoặc thương mại hóa khi chưa có văn bản chấp thuận.
+                  </p>
+                  <p>
+                    <strong>3. Thanh toán &amp; Kích hoạt khóa học:</strong> Giao dịch chuyển khoản qua mã VietQR được xác nhận tự động; tài khoản được kích hoạt quyền học ngay sau khi hệ thống đối soát thành công.
+                  </p>
+                  <p>
+                    <strong>4. Bảo vệ dữ liệu cá nhân:</strong> Thông tin họ tên, email và lịch sử học tập chỉ dùng cho mục đích cấp quyền học, thông báo lịch khai giảng và cấp chứng nhận hoàn thành khóa học.
+                  </p>
+                </div>
+                <div className="pt-1 flex items-center justify-between text-xs">
+                  <Link
+                    to="/dieu-khoan-su-dung"
+                    onClick={() => setIsTermsModalOpen(false)}
+                    className="text-[#007c76] font-bold hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Xem toàn bộ trang Điều khoản sử dụng</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAcceptedTerms(true);
+                    setTermsError('');
+                    setError(null);
+                    setIsTermsModalOpen(false);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-[#007c76] hover:bg-[#005c56] text-white text-xs font-black uppercase tracking-wider cursor-pointer"
+                >
+                  Tôi Đồng Ý &amp; Tiếp Tục
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

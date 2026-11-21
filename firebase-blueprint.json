@@ -127,10 +127,41 @@
     },
     "FastIso22kCrm": {
       "title": "FastIso22kCrm",
-      "description": "ISO 22000 checklist state and records",
+      "description": "ISO 22000:2018 checklist active session and CRM records",
       "type": "object",
       "properties": {
-        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+        "clientName": { "type": "string", "description": "Client company name" },
+        "contactName": { "type": "string", "description": "Client representative name" },
+        "contactPhone": { "type": "string", "description": "Client phone number" },
+        "leadAuditor": { "type": "string", "description": "Lead auditor name" },
+        "auditType": { "type": "string", "description": "ISO 22000 audit type" },
+        "auditAddress": { "type": "string", "description": "Facility address" },
+        "fsmsScope": { "type": "string", "description": "FSMS scope" },
+        "auditDate": { "type": "string", "description": "Audit date YYYY-MM-DD" },
+        "reportNo": { "type": "string", "description": "Report reference number" },
+        "records": { "type": "object", "description": "CRM records map indexed by recordId" },
+        "_lastUpdated": { "type": "integer", "description": "Millisecond timestamp for sync conflict resolution" },
+        "_writerId": { "type": "string", "description": "Tab writer identifier for anti-echo sync" }
+      }
+    },
+    "FastHaccpCrm": {
+      "title": "FastHaccpCrm",
+      "description": "HACCP Checklist & Verification active session and CRM records",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string", "description": "Client company or plant name" },
+        "contactName": { "type": "string", "description": "Facility representative name" },
+        "contactPhone": { "type": "string", "description": "Contact phone number" },
+        "leadAuditor": { "type": "string", "description": "Verification lead auditor name" },
+        "auditType": { "type": "string", "description": "HACCP verification audit type" },
+        "verificationMethod": { "type": "string", "description": "Primary verification methodology" },
+        "auditAddress": { "type": "string", "description": "Facility address" },
+        "fsmsScope": { "type": "string", "description": "HACCP scope and product lines" },
+        "auditDate": { "type": "string", "description": "Verification date YYYY-MM-DD" },
+        "reportNo": { "type": "string", "description": "Verification report number" },
+        "records": { "type": "object", "description": "CRM records map indexed by recordId" },
+        "_lastUpdated": { "type": "integer", "description": "Millisecond timestamp for sync conflict resolution" },
+        "_writerId": { "type": "string", "description": "Tab writer identifier for anti-echo sync" }
       }
     },
     "FastSupermarketHygieneCrm": {
@@ -241,6 +272,10 @@
     "global_sync/{docId}": {
       "schema": "GlobalSync",
       "description": "Real-time form reset synchronization across tabs"
+    },
+    "fast_haccp_crm/{recordId}": {
+      "schema": "FastHaccpCrm",
+      "description": "HACCP Checklist & Verification active session and CRM records"
     },
     "fast_iso22k_crm/{recordId}": {
       "schema": "FastIso22kCrm",

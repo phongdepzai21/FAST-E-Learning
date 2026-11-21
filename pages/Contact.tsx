@@ -212,17 +212,16 @@ const Contact: React.FC = () => {
                 <h3 className="text-xl font-black text-slate-900 mt-1 tracking-[0.02em] leading-[1.45]">CÔNG TY TNHH TƯ VẤN FAST</h3>
               </div>
 
-              {/* MST / ĐKKD */}
+              {/* MST */}
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200/60 flex items-center justify-center text-[#007c76] shrink-0">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Mã số thuế / Số ĐKKD</p>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Mã số thuế</p>
                   <p className="text-base sm:text-lg font-black text-slate-900 tabular-nums mt-0.5">
                     0314568146
                   </p>
-                  <span className="text-xs text-slate-500 font-medium block">Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh · Công bố theo Điều 28 NĐ 52/2013/NĐ-CP &amp; NĐ 85/2021/NĐ-CP</span>
                 </div>
               </div>
 
@@ -251,7 +250,7 @@ const Contact: React.FC = () => {
                     {officialEmail}
                   </a>
                   <a href={`mailto:${supportEmail}`} className="text-xs font-semibold text-slate-500 hover:text-[#007c76] transition-colors block mt-0.5">
-                    Học viên: {supportEmail}
+                    Email hỗ trợ: {supportEmail}
                   </a>
                 </div>
               </div>
@@ -267,35 +266,6 @@ const Contact: React.FC = () => {
                     {address}
                   </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Commitments Card */}
-            <div className="bg-gradient-to-br from-slate-900 to-[#004d49] text-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-4">
-              <div className="flex items-center gap-2.5 text-teal-300">
-                <ShieldCheck className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-widest">Cam Kết Dịch Vụ FAST</span>
-              </div>
-              <ul className="space-y-3 text-xs sm:text-sm text-slate-200 font-medium">
-                <li className="flex items-start gap-2.5">
-                  <span className="text-teal-400 font-black mt-0.5">✓</span>
-                  <span>Phản hồi thông tin tư vấn trong vòng 15 - 30 phút.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="text-teal-400 font-black mt-0.5">✓</span>
-                  <span>Chuyên gia QMS &amp; HACCP trực tiếp hỗ trợ giải quyết vấn đề.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="text-teal-400 font-black mt-0.5">✓</span>
-                  <span>Bảo mật tuyệt đối thông tin liên hệ và kế hoạch doanh nghiệp.</span>
-                </li>
-              </ul>
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-teal-200/80">
-                <span className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-teal-300" />
-                  <span>Xử lý yêu cầu liên tục 24/7</span>
-                </span>
-                <span className="font-bold">FAST E-Learning</span>
               </div>
             </div>
           </div>

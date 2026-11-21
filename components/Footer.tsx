@@ -27,7 +27,7 @@ const Footer: React.FC = () => {
             Food all standard & training
           </h4>
           <p className="text-sm md:text-base text-[#374151] leading-relaxed font-semibold max-w-3xl text-center md:text-left">
-            Nền tảng học trực tuyến hàng đầu về an toàn thực phẩm. Thành viên của hệ sinh thái học tập & tư vấn FAST Consulting.
+            Nền tảng học trực tuyến về an toàn thực phẩm. Thành viên của hệ sinh thái học tập & tư vấn FAST Consulting.
           </p>
         </div>
 
@@ -110,7 +110,6 @@ const Footer: React.FC = () => {
             <div className="space-y-3.5 text-left">
               <div className="space-y-1">
                 <p className="text-sm md:text-base font-black text-slate-900 tracking-[0.02em]">CÔNG TY TNHH TƯ VẤN FAST</p>
-                <p className="text-xs text-slate-500 font-medium">Website TMĐT bán hàng / Cung ứng dịch vụ đào tạo trực tuyến: fastelearning.com.vn</p>
               </div>
               <div className="flex items-start space-x-3">
                 <div className="w-5 h-5 text-[#007c76] shrink-0 mt-0.5">
@@ -119,8 +118,7 @@ const Footer: React.FC = () => {
                   </svg>
                 </div>
                 <div className="text-sm text-[#374151] font-normal space-y-0.5">
-                  <span className="block tabular-nums">MST / Số ĐKKD: 0314568146</span>
-                  <span className="block text-xs text-slate-500">Nơi cấp: Sở Kế hoạch và Đầu tư TP. Hồ Chí Minh</span>
+                  <span className="block tabular-nums">MST: 0314568146</span>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -148,10 +146,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-12 md:mt-16 pt-8 border-t border-gray-200 text-center space-y-2">
-            <p className="text-xs text-gray-500 font-semibold leading-relaxed">
-                Thông tin chủ sở hữu website và các nội dung giao dịch được công bố đầy đủ theo Điều 28 Nghị định 52/2013/NĐ-CP, được sửa đổi bởi Nghị định 85/2021/NĐ-CP.
-            </p>
+        <div className="mt-12 md:mt-16 pt-8 border-t border-gray-200 text-center">
             <p className="text-xs md:text-sm text-gray-400 font-medium">
                 © {new Date().getFullYear()} CÔNG TY TNHH TƯ VẤN FAST (FAST E-Learning). Nâng tầm chuẩn mực An toàn thực phẩm Việt Nam.
             </p>

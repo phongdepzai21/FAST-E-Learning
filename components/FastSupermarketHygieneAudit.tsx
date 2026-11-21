@@ -208,6 +208,29 @@ export const FastSupermarketHygieneAudit: React.FC = () => {
   crmRecordsRef.current = crmRecords;
   const activeCrmIdRef = useRef<string | null>(null);
   const latestPayloadRef = useRef<SupermarketAuditSession | null>(null);
+  const confirmModalRef = useRef<HTMLDivElement | null>(null);
+  const shouldScrollConfirmModalRef = useRef(false);
+
+  useEffect(() => {
+    if (!confirmDialog || !shouldScrollConfirmModalRef.current) return;
+    shouldScrollConfirmModalRef.current = false;
+
+    let rafId = 0;
+    let innerRafId = 0;
+    rafId = window.requestAnimationFrame(() => {
+      innerRafId = window.requestAnimationFrame(() => {
+        confirmModalRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      });
+    });
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      if (innerRafId) window.cancelAnimationFrame(innerRafId);
+    };
+  }, [confirmDialog]);
 
   const applySessionState = (data: Record<string, any>) => {
     if (!data || typeof data !== 'object') return;
@@ -627,6 +650,7 @@ export const FastSupermarketHygieneAudit: React.FC = () => {
 
   // CRM Actions
   const handleStartNewAudit = () => {
+    shouldScrollConfirmModalRef.current = true;
     setConfirmDialog({
       title: 'Tạo cuộc đánh giá mới',
       message:
@@ -1762,7 +1786,10 @@ export const FastSupermarketHygieneAudit: React.FC = () => {
       {/* In-Page Confirm Modal (no window.confirm) */}
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/65 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-xl space-y-4">
+          <div
+            ref={confirmModalRef}
+            className="bg-white rounded-2xl max-w-md w-full p-6 border border-slate-200 shadow-xl space-y-4"
+          >
             <h4 className="text-base font-black text-slate-900">{confirmDialog.title}</h4>
             <p className="text-xs text-slate-600 leading-relaxed">{confirmDialog.message}</p>
             <div className="flex justify-end gap-2 pt-2">

@@ -60,6 +60,7 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [customStartDate, setCustomStartDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdReg, setCreatedReg] = useState<DirectRegistration | null>(null);
@@ -86,6 +87,10 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
     }
     if (!email.trim()) {
       toast.error('Vui lòng nhập email nhận tài liệu và phòng Zoom!');
+      return;
+    }
+    if (!acceptedTerms) {
+      toast.error('Vui lòng đồng ý với Điều khoản sử dụng trước khi đăng ký!');
       return;
     }
 
@@ -656,6 +661,39 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
                 />
               </div>
 
+              {/* Terms of Service acceptance */}
+              <div className={`p-3 rounded-xl border transition-colors ${acceptedTerms ? 'bg-teal-50/50 border-teal-200' : 'bg-gray-50 border-gray-200'}`}>
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#007c76] focus:ring-[#007c76] shrink-0 cursor-pointer accent-[#007c76]"
+                  />
+                  <span className="text-xs font-semibold text-gray-700 leading-relaxed">
+                    Tôi đã đọc và đồng ý với{' '}
+                    <a
+                      href="/dieu-khoan-su-dung"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#007c76] font-extrabold underline hover:text-[#005f5b]"
+                    >
+                      Điều khoản sử dụng
+                    </a>{' '}
+                    &amp;{' '}
+                    <a
+                      href="/privacy-policy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#007c76] font-extrabold underline hover:text-[#005f5b]"
+                    >
+                      Chính sách bảo mật
+                    </a>{' '}
+                    của FAST E-Learning.
+                  </span>
+                </label>
+              </div>
+
               {/* Action Buttons */}
               <div className="pt-2 flex items-center justify-end gap-3 border-t border-gray-150">
                 <button
@@ -667,8 +705,8 @@ export const DirectRegistrationModal: React.FC<DirectRegistrationModalProps> = (
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2.5 rounded-xl bg-[#007c76] hover:bg-[#005f5b] text-white text-xs font-black uppercase tracking-wider shadow-md shadow-[#007c76]/20 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                  disabled={isSubmitting || !acceptedTerms}
+                  className="px-6 py-2.5 rounded-xl bg-[#007c76] hover:bg-[#005f5b] text-white text-xs font-black uppercase tracking-wider shadow-md shadow-[#007c76]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
                 >
                   {isSubmitting ? 'Đang gửi đăng ký...' : `Xác Nhận Đăng Ký (${price})`}
                 </button>

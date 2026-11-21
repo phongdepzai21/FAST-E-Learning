@@ -2701,6 +2701,219 @@ async function startServer() {
     }
   });
 
+  // --- FAST SERVICE HACCP CHECKLIST & VERIFICATION ENDPOINTS ---
+  const HACCP_SESSION_FILE = path.join(DATA_DIR, "fast_haccp_session.json");
+  const HACCP_CRM_FILE = path.join(DATA_DIR, "fast_haccp_crm.json");
+
+  function isMeaningfulHaccpSession(data: any): boolean {
+    if (!data || typeof data !== "object") return false;
+    if (data._isExplicitReset) return true;
+    const textKeys = [
+      "clientName",
+      "contactName",
+      "contactPhone",
+      "leadAuditor",
+      "auditType",
+      "verificationMethod",
+      "auditAddress",
+      "fsmsScope",
+      "auditDate",
+      "reportNo",
+    ];
+    if (textKeys.some((k) => typeof data[k] === "string" && data[k].trim() !== "")) {
+      return true;
+    }
+    return Object.keys(data).some(
+      (k) =>
+        (k.startsWith("comp_") ||
+          k.startsWith("sev_") ||
+          k.startsWith("cmt_") ||
+          k.startsWith("verif_") ||
+          k.startsWith("capa_")) &&
+        Boolean(data[k])
+    );
+  }
+
+  function loadHaccpSessionFromDisk(): any {
+    try {
+      if (fs.existsSync(HACCP_SESSION_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(HACCP_SESSION_FILE, "utf-8"));
+        return isMeaningfulHaccpSession(parsed) ? parsed : null;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function saveHaccpSessionToDisk(data: any) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(HACCP_SESSION_FILE, JSON.stringify(data, null, 2), "utf-8");
+    } catch (e) {}
+  }
+
+  function loadHaccpCrmFromDisk(): { records: Record<string, any>; _lastUpdated: number } {
+    try {
+      if (fs.existsSync(HACCP_CRM_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(HACCP_CRM_FILE, "utf-8"));
+        if (parsed && typeof parsed === "object") {
+          if (parsed.records && typeof parsed.records === "object") {
+            return {
+              records: parsed.records,
+              _lastUpdated: Number(parsed._lastUpdated || 0),
+            };
+          }
+          return {
+            records: parsed,
+            _lastUpdated: 0,
+          };
+        }
+      }
+    } catch (e) {}
+    return { records: {}, _lastUpdated: 0 };
+  }
+
+  function saveHaccpCrmToDisk(crmData: Record<string, any>, lastUpdated: number) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(
+        HACCP_CRM_FILE,
+        JSON.stringify({ records: crmData, _lastUpdated: lastUpdated }, null, 2),
+        "utf-8"
+      );
+    } catch (e) {}
+  }
+
+  let serverHaccpSession = loadHaccpSessionFromDisk();
+  const initialDiskHaccpCrm = loadHaccpCrmFromDisk();
+  let serverHaccpCrm: Record<string, any> = initialDiskHaccpCrm.records;
+  let serverHaccpCrmUpdatedAt: number = initialDiskHaccpCrm._lastUpdated;
+  let haccpBootstrapped = false;
+
+  async function ensureHaccpHydratedFromFirestore() {
+    if (haccpBootstrapped) return;
+    haccpBootstrapped = true;
+    try {
+      const db = getServerFirestore();
+      const [sessSnap, crmSnap] = await Promise.all([
+        db.collection("fast_haccp_crm").doc("current_session").get(),
+        db.collection("fast_haccp_crm").doc("database").get(),
+      ]);
+
+      if (sessSnap.exists) {
+        const remoteSess = sessSnap.data();
+        const remoteTs = Number(remoteSess?._lastUpdated || 0);
+        const localTs = Number(serverHaccpSession?._lastUpdated || 0);
+        if (
+          isMeaningfulHaccpSession(remoteSess) &&
+          (!serverHaccpSession || remoteTs >= localTs)
+        ) {
+          serverHaccpSession = remoteSess;
+          saveHaccpSessionToDisk(serverHaccpSession);
+        }
+      }
+
+      if (crmSnap.exists) {
+        const remoteCrm = crmSnap.data();
+        const remoteTs = Number(remoteCrm?._lastUpdated || 0);
+        if (
+          remoteCrm?.records &&
+          typeof remoteCrm.records === "object" &&
+          (Object.keys(serverHaccpCrm).length === 0 || remoteTs >= serverHaccpCrmUpdatedAt)
+        ) {
+          serverHaccpCrm = remoteCrm.records;
+          serverHaccpCrmUpdatedAt = remoteTs;
+          saveHaccpCrmToDisk(serverHaccpCrm, serverHaccpCrmUpdatedAt);
+        }
+      }
+    } catch (e) {
+      console.warn("[FastHaccp] Server hydration note:", e);
+    }
+  }
+
+  app.get("/api/fast-haccp/session", async (req, res) => {
+    await ensureHaccpHydratedFromFirestore();
+    res.json({ success: true, session: serverHaccpSession });
+  });
+
+  app.post("/api/fast-haccp/session", async (req, res) => {
+    try {
+      await ensureHaccpHydratedFromFirestore();
+      const sessionData = req.body;
+      if (sessionData && typeof sessionData === "object") {
+        const incomingTs = Number(sessionData._lastUpdated || Date.now());
+        const currentTs = Number(serverHaccpSession?._lastUpdated || 0);
+
+        if (
+          !isMeaningfulHaccpSession(sessionData) &&
+          isMeaningfulHaccpSession(serverHaccpSession)
+        ) {
+          return res.json({
+            success: true,
+            session: serverHaccpSession,
+            skippedEmptyOverwrite: true,
+          });
+        }
+
+        if (!serverHaccpSession || incomingTs >= currentTs) {
+          serverHaccpSession = { ...sessionData, _lastUpdated: incomingTs };
+          saveHaccpSessionToDisk(serverHaccpSession);
+          try {
+            const db = getServerFirestore();
+            await db.collection("fast_haccp_crm").doc("current_session").set(serverHaccpSession);
+          } catch (e) {}
+        }
+      }
+      res.json({ success: true, session: serverHaccpSession });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/fast-haccp/crm", async (req, res) => {
+    await ensureHaccpHydratedFromFirestore();
+    res.json({
+      success: true,
+      records: serverHaccpCrm,
+      _lastUpdated: serverHaccpCrmUpdatedAt,
+    });
+  });
+
+  app.post("/api/fast-haccp/crm", async (req, res) => {
+    try {
+      await ensureHaccpHydratedFromFirestore();
+      const { records, _lastUpdated, _writerId } = req.body || {};
+      if (records && typeof records === "object") {
+        const incomingTs = Number(_lastUpdated || Date.now());
+        if (
+          incomingTs >= serverHaccpCrmUpdatedAt ||
+          Object.keys(serverHaccpCrm).length === 0
+        ) {
+          serverHaccpCrm = records;
+          serverHaccpCrmUpdatedAt = incomingTs;
+          saveHaccpCrmToDisk(serverHaccpCrm, serverHaccpCrmUpdatedAt);
+          try {
+            const db = getServerFirestore();
+            await db
+              .collection("fast_haccp_crm")
+              .doc("database")
+              .set({
+                records: serverHaccpCrm,
+                _lastUpdated: serverHaccpCrmUpdatedAt,
+                ...(_writerId ? { _writerId } : {}),
+              });
+          } catch (e) {}
+        }
+      }
+      res.json({
+        success: true,
+        records: serverHaccpCrm,
+        _lastUpdated: serverHaccpCrmUpdatedAt,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   const OTP_FILE = path.join(DATA_DIR, "otp_cache.json");
   function loadOtpFromDisk(): Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }> {
     const map = new Map<string, { otp: string, expiresAt: number, attempts: number, flow?: string }>();

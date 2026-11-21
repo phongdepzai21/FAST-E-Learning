@@ -181,6 +181,42 @@ service cloud.firestore {
              (!('_isExplicitReset' in data) || data._isExplicitReset is bool);
     }
 
+    function isValidHaccpDoc(data) {
+      return (!('clientName' in data) || (data.clientName is string && data.clientName.size() <= 512)) &&
+             (!('contactName' in data) || (data.contactName is string && data.contactName.size() <= 256)) &&
+             (!('contactPhone' in data) || (data.contactPhone is string && data.contactPhone.size() <= 64)) &&
+             (!('leadAuditor' in data) || (data.leadAuditor is string && data.leadAuditor.size() <= 256)) &&
+             (!('auditType' in data) || (data.auditType is string && data.auditType.size() <= 256)) &&
+             (!('verificationMethod' in data) || (data.verificationMethod is string && data.verificationMethod.size() <= 256)) &&
+             (!('auditAddress' in data) || (data.auditAddress is string && data.auditAddress.size() <= 1024)) &&
+             (!('fsmsScope' in data) || (data.fsmsScope is string && data.fsmsScope.size() <= 1024)) &&
+             (!('auditDate' in data) || (data.auditDate is string && data.auditDate.size() <= 64)) &&
+             (!('reportNo' in data) || (data.reportNo is string && data.reportNo.size() <= 128)) &&
+             (!('records' in data) || data.records is map) &&
+             (!('customItems' in data) || data.customItems is list) &&
+             (!('_lastUpdated' in data) || data._lastUpdated is int) &&
+             (!('_writerId' in data) || (data._writerId is string && data._writerId.size() <= 128)) &&
+             (!('_loadedFromCrmId' in data) || data._loadedFromCrmId == null || (data._loadedFromCrmId is string && data._loadedFromCrmId.size() <= 256)) &&
+             (!('_isExplicitReset' in data) || data._isExplicitReset is bool);
+    }
+
+    function isValidIso22kDoc(data) {
+      return (!('clientName' in data) || (data.clientName is string && data.clientName.size() <= 512)) &&
+             (!('contactName' in data) || (data.contactName is string && data.contactName.size() <= 256)) &&
+             (!('contactPhone' in data) || (data.contactPhone is string && data.contactPhone.size() <= 64)) &&
+             (!('leadAuditor' in data) || (data.leadAuditor is string && data.leadAuditor.size() <= 256)) &&
+             (!('auditType' in data) || (data.auditType is string && data.auditType.size() <= 256)) &&
+             (!('auditAddress' in data) || (data.auditAddress is string && data.auditAddress.size() <= 1024)) &&
+             (!('fsmsScope' in data) || (data.fsmsScope is string && data.fsmsScope.size() <= 1024)) &&
+             (!('auditDate' in data) || (data.auditDate is string && data.auditDate.size() <= 64)) &&
+             (!('reportNo' in data) || (data.reportNo is string && data.reportNo.size() <= 128)) &&
+             (!('records' in data) || data.records is map) &&
+             (!('_lastUpdated' in data) || data._lastUpdated is int) &&
+             (!('_writerId' in data) || (data._writerId is string && data._writerId.size() <= 128)) &&
+             (!('_loadedFromCrmId' in data) || data._loadedFromCrmId == null || (data._loadedFromCrmId is string && data._loadedFromCrmId.size() <= 256)) &&
+             (!('_isExplicitReset' in data) || data._isExplicitReset is bool);
+    }
+
     // --- Collection Rules ---
 
     // 1. Users
@@ -270,14 +306,18 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // 7. Fast HACCP CRM Records (HACCP Checklist)
+    // 7. Fast HACCP CRM Records (HACCP Checklist & Verification)
     match /fast_haccp_crm/{recordId} {
-      allow read, write: if true;
+      allow read: if isValidId(recordId);
+      allow create, update: if isValidId(recordId) && isValidHaccpDoc(incoming());
+      allow delete: if isAdmin() || isSystemOwner();
     }
 
     // 8. Fast ISO 22000 CRM Records (ISO 22K Checklist)
     match /fast_iso22k_crm/{recordId} {
-      allow read, write: if true;
+      allow read: if isValidId(recordId);
+      allow create, update: if isValidId(recordId) && isValidIso22kDoc(incoming());
+      allow delete: if isAdmin() || isSystemOwner();
     }
 
     // 8.1 Fast Supermarket Hygiene Audit CRM Records

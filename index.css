@@ -117,7 +117,15 @@ h1, h2, h3, h4 {
   body.printing-fast-audit #root,
   body.printing-fast-audit #root > div,
   body.printing-fast-audit main,
-  body.printing-fast-audit main > div {
+  body.printing-fast-audit main > div,
+  body.printing-haccp-report #root,
+  body.printing-haccp-report #root > div,
+  body.printing-haccp-report main,
+  body.printing-haccp-report main > div,
+  body.printing-iso22k-report #root,
+  body.printing-iso22k-report #root > div,
+  body.printing-iso22k-report main,
+  body.printing-iso22k-report main > div {
     display: block !important;
     position: static !important;
     margin: 0 !important;
@@ -257,12 +265,14 @@ h1, h2, h3, h4 {
     page-break-inside: avoid !important;
   }
 
-  /* 4. IN CHECKLIST / BÁO CÁO ISO 22000 */
-  body.printing-iso22k-report .iso22k-main-checklist {
+  /* 4. IN CHECKLIST / BÁO CÁO ISO 22000 & HACCP */
+  body.printing-iso22k-report .iso22k-main-checklist,
+  body.printing-haccp-report .haccp-main-checklist {
     display: none !important;
   }
 
-  body.printing-iso22k-report #iso22k-report-panel {
+  body.printing-iso22k-report #iso22k-report-panel,
+  body.printing-haccp-report #haccp-report-panel {
     display: block !important;
     border: none !important;
     box-shadow: none !important;
@@ -276,8 +286,8 @@ h1, h2, h3, h4 {
     display: none !important;
   }
 
-  body:not(.printing-ad-checklist):not(.printing-fast-audit):not(.printing-iso22k-report):not(.printing-receipt) .fast-supermarket-audit-root input,
-  body:not(.printing-ad-checklist):not(.printing-fast-audit):not(.printing-iso22k-report):not(.printing-receipt) .fast-supermarket-audit-root select {
+  body:not(.printing-ad-checklist):not(.printing-fast-audit):not(.printing-iso22k-report):not(.printing-haccp-report):not(.printing-receipt) .fast-supermarket-audit-root input,
+  body:not(.printing-ad-checklist):not(.printing-fast-audit):not(.printing-iso22k-report):not(.printing-haccp-report):not(.printing-receipt) .fast-supermarket-audit-root select {
     display: block !important;
     border: 1px solid #cbd5e1 !important;
     background: #ffffff !important;
